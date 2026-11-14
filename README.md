@@ -80,7 +80,7 @@ Kimlik doğrulama ASP.NET Core Identity ve şifreli, `HttpOnly`, `Secure`, `Same
 | `GET /api/tenant/current` | Aktif tenant; yoksa 403. |
 | `POST /api/auth/logout` | Çıkış. |
 
-Aktif tenant her istekte veritabanından yeniden doğrulanır: üyelik devre dışı bırakılır veya tenant kapatılırsa erişim bir sonraki istekte kalkar. İstemcinin gönderdiği bir başlık veya parametre tenant belirlemez.
+Aktif tenant her istekte veritabanından yeniden doğrulanır: üyelik devre dışı bırakılır veya tenant kapatılırsa erişim bir sonraki istekte kalkar. İstemcinin gönderdiği bir başlık veya parametre tenant belirlemez. Üyelik, roller, açık modüller ve erişilebilir şirketler 30 saniye önbellekte tutulur (ADR-0048); bunları değiştiren her kayıt aynı sunucuda önbelleği hemen boşaltır, başka sunucu örneğinde ya da veritabanına doğrudan yazılan değişiklik en geç 30 saniyede geçerli olur. Oturum kapatma önbelleğe girmez, anında geçerlidir.
 
 ### İşletici şirketler ve aktif şirket (ADR-0008)
 
@@ -126,7 +126,7 @@ Her modül kendini tek bir `IModule` uygulamasıyla tanıtır (`Modulix.Core.Con
 | Rol | `core.Roles` | Tenant'a özel; ad ve izin listesi. Row-Level Security ile korunur. |
 | Rol ataması | `core.MembershipRoles` | Rol üyeliğe atanır; aynı kişinin her tenant'ta ayrı rolleri olur. Başka tenant'ın rolü veritabanı düzeyinde de atanamaz. |
 
-Geçerli izin = kullanıcının rollerindeki izinler ∩ tenant için açık modüller. Rol veya modül değişikliği bir sonraki istekte geçerli olur. Modül uç noktaları `.RequirePermission(CrmModule.Permissions.CompaniesRead)` veya `.RequireModule("crm")` ile korunur; izin yoksa 403 döner.
+Geçerli izin = kullanıcının rollerindeki izinler ∩ tenant için açık modüller. Rol veya modül değişikliği bir sonraki istekte geçerli olur (çok sunuculu kurulumda en geç 30 saniye, ADR-0048). Modül uç noktaları `.RequirePermission(CrmModule.Permissions.CompaniesRead)` veya `.RequireModule("crm")` ile korunur; izin yoksa 403 döner.
 
 | Uç nokta | Ne yapar | İzin |
 | --- | --- | --- |
