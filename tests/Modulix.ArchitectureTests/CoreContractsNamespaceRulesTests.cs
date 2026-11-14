@@ -26,6 +26,7 @@ public partial class CoreContractsNamespaceRulesTests
         "Modulix.Core.Contracts.Localization",
         "Modulix.Core.Contracts.Modules",
         "Modulix.Core.Contracts.Notifications",
+        "Modulix.Core.Contracts.Numbering", // ortak belge numaralama (ADR-0049)
         "Modulix.Core.Contracts.Persistence",
         "Modulix.Core.Contracts.Pricing", // ortak hesap çekirdeği: para, birim, indirim, teklif toplamı (ADR-0044 karar 2)
         "Modulix.Core.Contracts.Records",

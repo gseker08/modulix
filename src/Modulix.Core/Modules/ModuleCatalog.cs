@@ -27,6 +27,7 @@ public sealed partial class ModuleCatalog
     private readonly Dictionary<string, (string ModuleKey, LookupDefinition Lookup)> lookups = new(StringComparer.Ordinal);
     private readonly List<SharedRecordAccess> sharedAccess = [];
     private readonly Dictionary<string, (string ModuleKey, CredentialOwner Owner)> credentialOwners = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Modulix.Core.Contracts.Numbering.NumberSeriesDefinition> numberSeries = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, EventSubscription Subscription)> subscriptions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, BusinessEventDefinition Definition)> businessEvents = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> eventSchemaVersions = new(DomainEventTypes.SchemaVersions, StringComparer.Ordinal);
@@ -154,6 +155,17 @@ public sealed partial class ModuleCatalog
                 {
                     throw new InvalidOperationException(
                         $"Geçersiz süreli belge sahibi: '{owner.EntityKey}' ({module.Key}). Kayıt türü ve okuma izni modülün olmalı, kategori tanımlı olmalı, tür bir kez bildirilmeli.");
+                }
+            }
+
+            foreach (var series in module.NumberSeries)
+            {
+                if (!series.IsValid
+                    || !series.Key.StartsWith(module.Key + ".", StringComparison.Ordinal)
+                    || !numberSeries.TryAdd(series.Key, series))
+                {
+                    throw new InvalidOperationException(
+                        $"Geçersiz belge serisi: '{series.Key}' ({module.Key}). Anahtar modül anahtarıyla başlamalı ve bir kez bildirilmeli; önek büyük harf ve rakamdan oluşmalı, basamak sayısı {Modulix.Core.Contracts.Numbering.NumberSeriesDefinition.MinDigits}-{Modulix.Core.Contracts.Numbering.NumberSeriesDefinition.MaxDigits} olmalı.");
                 }
             }
 
@@ -331,6 +343,10 @@ public sealed partial class ModuleCatalog
     /// <summary>Süreli belge taşıyabilen kayıt türü ve modülü (ADR-0038 K3); bildirilmemişse null.</summary>
     public (string ModuleKey, CredentialOwner Owner)? FindCredentialOwner(string entityKey) =>
         credentialOwners.TryGetValue(entityKey, out var owner) ? owner : null;
+
+    /// <summary>Beyan edilmiş belge serisi (ADR-0049); bildirilmemişse null.</summary>
+    public Modulix.Core.Contracts.Numbering.NumberSeriesDefinition? FindNumberSeries(string seriesKey) =>
+        numberSeries.GetValueOrDefault(seriesKey);
 
     /// <summary>Süreli belge taşıyabilen kayıt türleri, modül ve tanım sırasıyla.</summary>
     public IEnumerable<(string ModuleKey, CredentialOwner Owner)> CredentialOwners =>

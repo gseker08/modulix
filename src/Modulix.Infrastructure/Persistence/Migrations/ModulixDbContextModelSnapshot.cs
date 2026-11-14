@@ -2450,6 +2450,36 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Notifications", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Numbering.NumberCounter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("LastValue")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Period")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SeriesKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "SeriesKey", "Period")
+                        .IsUnique();
+
+                    b.ToTable("NumberCounters", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Organization.Branch", b =>
                 {
                     b.Property<Guid>("Id")

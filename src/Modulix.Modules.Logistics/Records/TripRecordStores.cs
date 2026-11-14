@@ -143,7 +143,7 @@ internal sealed class TripRecordStore(LogisticsStoreContext context) : Logistics
 
         if (isNew)
         {
-            entity.Number = await NextNumberAsync(cancellationToken);
+            entity.Number = await Context.Numbers.NextAsync(LogisticsModule.TripNumberSeries, LastNumberAsync, cancellationToken);
         }
     }
 
@@ -171,16 +171,15 @@ internal sealed class TripRecordStore(LogisticsStoreContext context) : Logistics
     }
 
     /// <summary>
-    /// Sonraki numara: yılın en büyük sırası + 1 (SF-2026-00001). Aynı anda açılan iki sefer aynı numarayı alırsa benzersizlik dizini ikincisini
-    /// reddeder; belge serisi (Ç8.1) gelince numara oraya taşınır.
+    /// Yılın en büyük sefer sırası: ortak belge serisi (ADR-0049) bu yıl ilk kez kullanılırken sayacın başlangıcıdır; seri gelmeden önce açılmış
+    /// seferlerin numarası böylece yinelenmez. Sayaç açıldıktan sonra çağrılmaz.
     /// </summary>
-    private async Task<string> NextNumberAsync(CancellationToken cancellationToken)
+    private async Task<long> LastNumberAsync(int year, CancellationToken cancellationToken)
     {
-        var prefix = $"{NumberPrefix}-{DateTime.UtcNow.Year.ToString(CultureInfo.InvariantCulture)}-";
+        var prefix = $"{NumberPrefix}-{year.ToString("D4", CultureInfo.InvariantCulture)}-";
         var last = await Context.Data.Set<Trip>().AsNoTracking().Where(t => t.Number.StartsWith(prefix))
             .OrderByDescending(t => t.Number).Select(t => t.Number).FirstOrDefaultAsync(cancellationToken);
-        var next = last is not null && int.TryParse(last[prefix.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n + 1 : 1;
-        return prefix + next.ToString("D5", CultureInfo.InvariantCulture);
+        return last is not null && long.TryParse(last[prefix.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : 0;
     }
 }
 
