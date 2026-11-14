@@ -1,49 +1,46 @@
 @page "/platform/firma-sektorleri"
 @inject ApiClient Api
 
-<PageTitle>Firma sektörleri · Platform · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.platform.industries") · @Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
 @* Firma sektörü kataloğu (ADR-0043). Firma ve müşteri adayı formlarındaki "Sektör" alanı bu listeden seçilir; bütün modüller aynı listeyi kullanır.
    Faaliyet ağacından (Sektörler ve faaliyetler) ayrıdır: ağaç firmanın hangi işi yaptığını, bu liste firmanın hangi sektörde olduğunu söyler.
-   Sektör silinmez, pasife alınır; kayıtlardaki değer korunur. *@
+   Sektör silinmez, pasife alınır; kayıtlardaki değer korunur. Sektör adları sunucu verisidir, çevrilmez (ADR-0034 dilim 18). *@
 <PlatformGate>
-    <a class="back-link" href="platform">← Platform</a>
-    <h1>Firma sektörleri</h1>
-    <p class="text-muted">
-        Firma ve müşteri adayı formlarındaki "Sektör" alanı bu listeden seçilir. Sektör silinmez, pasife alınır: pasif sektör yeni kayıtlarda seçilemez,
-        mevcut kayıtlarda değeri korunur. Kod sonradan değişmez; adın değiştirilmesi desteklenmez (yanlış girişte pasife alıp yenisini ekleyin).
-    </p>
+    <a class="back-link" href="platform">← @Texts.Get("nav.app.platform")</a>
+    <h1>@Texts.Get("nav.app.platform.industries")</h1>
+    <p class="text-muted">@Texts.Get("platform.industries.intro")</p>
 
     <Notice Text="@notice" Failed="failed" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit:preventDefault>
-            <input id="industrySearch" class="form-control" type="search" maxlength="100" placeholder="Ad ya da kod ara" aria-label="Sektör ara" @bind="search" @bind:event="oninput" />
+            <input id="industrySearch" class="form-control" type="search" maxlength="100" placeholder="@Texts.Get("platform.industries.searchPlaceholder")" aria-label="@Texts.Get("platform.industries.search")" @bind="search" @bind:event="oninput" />
         </form>
         @if (!adding)
         {
-            <button type="button" class="btn btn-primary" @onclick="StartNew"><AppIcon Name="plus" Size="16" /> Yeni sektör</button>
+            <button type="button" class="btn btn-primary" @onclick="StartNew"><AppIcon Name="plus" Size="16" /> @Texts.Get("platform.industries.new")</button>
         }
     </div>
 
     @if (adding)
     {
         <form class="record-form settings-group" novalidate @onsubmit="AddAsync" @onsubmit:preventDefault>
-            <h2>Yeni sektör</h2>
+            <h2>@Texts.Get("platform.industries.new")</h2>
             <div class="form-grid">
                 <div>
-                    <label class="form-label" for="industryName">Ad *</label>
-                    <input id="industryName" class="form-control" maxlength="100" placeholder="ör. Gıda ve içecek" @bind="draftName" @bind:event="oninput" @onchange="SuggestCode" />
+                    <label class="form-label" for="industryName">@Texts.Get("common.field.nameRequired")</label>
+                    <input id="industryName" class="form-control" maxlength="100" placeholder="@Texts.Get("platform.industries.namePlaceholder")" @bind="draftName" @bind:event="oninput" @onchange="SuggestCode" />
                 </div>
                 <div>
-                    <label class="form-label" for="industryCode">Kod *</label>
-                    <input id="industryCode" class="form-control" maxlength="50" placeholder="ör. gida-icecek" @bind="draftCode" @bind:event="oninput" @onchange="() => codeEdited = true" />
-                    <div class="form-text">Küçük harf, rakam ve "-". Sonradan değişmez.</div>
+                    <label class="form-label" for="industryCode">@Texts.Get("platform.codeRequired")</label>
+                    <input id="industryCode" class="form-control" maxlength="50" placeholder="@Texts.Get("platform.industries.codePlaceholder")" @bind="draftCode" @bind:event="oninput" @onchange="() => codeEdited = true" />
+                    <div class="form-text">@Texts.Get("platform.codeHint")</div>
                 </div>
             </div>
             <div class="form-actions">
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">İptal</button>
-                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">Ekle</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">@Texts.Get("common.cancel")</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.add")</button>
             </div>
         </form>
     }
@@ -54,37 +51,39 @@
     }
     else if (industries.Count == 0)
     {
-        <EmptyState Compact="true" Title="Henüz sektör yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("platform.industries.empty")" />
     }
     else
     {
         var shown = Filtered;
-        <p class="text-muted" role="status">@industries.Count(i => i.IsActive) etkin, @industries.Count(i => !i.IsActive) pasif sektör@(search.Length > 0 ? $" · {shown.Count} sonuç" : "")</p>
+        <p class="text-muted" role="status">@(search.Length > 0
+            ? Texts.Get("platform.industries.countsFiltered", industries.Count(i => i.IsActive), industries.Count(i => !i.IsActive), shown.Count)
+            : Texts.Get("platform.industries.counts", industries.Count(i => i.IsActive), industries.Count(i => !i.IsActive)))</p>
         @if (shown.Count == 0)
         {
-            <EmptyState Icon="search" Title="Aramaya uyan sektör yok." />
+            <EmptyState Icon="search" Title="@Texts.Get("platform.industries.noMatch")" />
         }
         else
         {
             <table class="table record-table">
                 <thead>
                     <tr>
-                        <th scope="col"><SortHeader Label="Ad" ColumnIcon="type" Asc="name" Desc="-name" Value="@sort" Default="" ValueChanged="SortBy" /></th>
-                        <th scope="col"><SortHeader Label="Kod" ColumnIcon="hash" Asc="code" Desc="-code" Value="@sort" Default="" ValueChanged="SortBy" /></th>
-                        <th scope="col"><SortHeader Label="Durum" ColumnIcon="tag" Asc="active" Desc="-active" Value="@sort" Default="" ValueChanged="SortBy" /></th>
-                        <th scope="col"><span class="visually-hidden">Eylemler</span></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("common.field.name")" ColumnIcon="type" Asc="name" Desc="-name" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("warehouse.code")" ColumnIcon="hash" Asc="code" Desc="-code" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("common.field.status")" ColumnIcon="tag" Asc="active" Desc="-active" Value="@sort" Default="" ValueChanged="SortBy" /></th>
+                        <th scope="col"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var industry in ClientSort.Apply(shown, sort, SortColumns))
                     {
                         <tr>
-                            <td data-label="Ad" class="primary">@industry.Name</td>
-                            <td data-label="Kod"><code>@industry.Code</code></td>
-                            <td data-label="Durum"><span class="badge @(industry.IsActive ? "user-active" : "user-disabled")">@(industry.IsActive ? "Etkin" : "Pasif")</span></td>
+                            <td data-label="@Texts.Get("common.field.name")" class="primary">@industry.Name</td>
+                            <td data-label="@Texts.Get("warehouse.code")"><code>@industry.Code</code></td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge @(industry.IsActive ? "user-active" : "user-disabled")">@WarehouseLabels.ActiveText(industry.IsActive)</span></td>
                             <td class="actions">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="@(industry.IsActive ? $"{industry.Name} sektörünü pasife al" : $"{industry.Name} sektörünü etkinleştir")"
-                                        @onclick="() => SetActiveAsync(industry, !industry.IsActive)">@(industry.IsActive ? "Pasife al" : "Etkinleştir")</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" aria-label="@(industry.IsActive ? Texts.Get("platform.industries.deactivateOf", industry.Name) : Texts.Get("platform.industries.activateOf", industry.Name))"
+                                        @onclick="() => SetActiveAsync(industry, !industry.IsActive)">@(industry.IsActive ? Texts.Get("admin.subProfiles.deactivate") : Texts.Get("admin.subProfiles.activate"))</button>
                             </td>
                         </tr>
                     }
@@ -164,7 +163,7 @@
     {
         if (string.IsNullOrWhiteSpace(draftName) || string.IsNullOrWhiteSpace(draftCode))
         {
-            (notice, failed) = ("Ad ve kod zorunludur.", true);
+            (notice, failed) = (Texts.Get("platform.industries.required"), true);
             return;
         }
 
@@ -177,7 +176,7 @@
             return;
         }
 
-        (notice, failed, adding) = ($"\"{draftName.Trim()}\" sektörü eklendi.", false, false);
+        (notice, failed, adding) = (Texts.Get("platform.industries.added", draftName.Trim()), false, false);
         await LoadAsync();
     }
 
@@ -192,7 +191,7 @@
             return;
         }
 
-        (notice, failed) = (active ? $"\"{industry.Name}\" etkinleştirildi." : $"\"{industry.Name}\" pasife alındı; mevcut kayıtlardaki değer korunur.", false);
+        (notice, failed) = (active ? Texts.Get("platform.industries.activated", industry.Name) : Texts.Get("platform.industries.deactivated", industry.Name), false);
         await LoadAsync();
     }
 }

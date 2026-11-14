@@ -3,75 +3,73 @@
 @using Modulix.Shared.Sectors
 @inject ApiClient Api
 
-<PageTitle>Rejim profilleri · Platform · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.platform.regime-profiles") · @Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
 @* Rejim profili (ADR-0032 K16): ülke/rejim/antrepo tipine göre değişen kuralların sürümlü paketi. Bugün tescil numarası kuralını (K7) taşır: uzunluk, desen
    ve uygulama düzeyi. Akış: profil oluştur → taslak kaydet (doğrulanır, örnek numara kurala uymalı) → yayınla. Yayınlanan sürüm değişmez; yenisi yayınlanınca
-   öncekinin yerini alır. Mevzuat doğrulanmadığı için yayın "Doğrulanmadı" olarak işaretli kalabilir; başlangıçta kural uyarıdır, engel değildir. *@
+   öncekinin yerini alır. Mevzuat doğrulanmadığı için yayın "Doğrulanmadı" olarak işaretli kalabilir; başlangıçta kural uyarıdır, engel değildir.
+   Profil adları ve kodları, rejim kodu, desen ve doğrulama notu veridir, çevrilmez (ADR-0034 dilim 18). *@
 <PlatformGate>
-    <a class="back-link" href="platform">← Platform</a>
-    <h1>Rejim profilleri</h1>
-    <p class="text-muted">
-        Her profil sürümlü bir kural paketidir. Firmalar profili seçince tescil numarası bu kurala göre denetlenir. Kuralı uzman doğrulamadan
-        <strong>Engel</strong> yapmayın: başlangıçta ihlal yalnızca uyarıdır ve yayın "Doğrulanmadı" olarak işaretlenir.
-    </p>
+    <a class="back-link" href="platform">← @Texts.Get("nav.app.platform")</a>
+    <h1>@Texts.Get("nav.app.platform.regime-profiles")</h1>
+    <p class="text-muted">@Texts.Strong("platform.regimeProfiles.intro", Texts.Get("warehouse.regimeBindings.levelBlock"))</p>
 
     <Notice Text="@notice" Failed="@failed" />
 
     <form class="record-form settings-group" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
-        <h2>Yeni profil</h2>
+        <h2>@Texts.Get("platform.regimeProfiles.new")</h2>
         <div class="form-grid">
             <div>
-                <label class="form-label" for="profile-code">Kod *</label>
-                <input id="profile-code" class="form-control" maxlength="50" placeholder="ör. antrepo-7100" @bind="newCode" @bind:event="oninput" />
-                <div class="form-text">Küçük harf, rakam ve "-". Sonradan değişmez.</div>
+                <label class="form-label" for="profile-code">@Texts.Get("platform.codeRequired")</label>
+                <input id="profile-code" class="form-control" maxlength="50" placeholder="@Texts.Get("platform.regimeProfiles.codePlaceholder")" @bind="newCode" @bind:event="oninput" />
+                <div class="form-text">@Texts.Get("platform.codeHint")</div>
             </div>
             <div>
-                <label class="form-label" for="profile-name">Ad *</label>
-                <input id="profile-name" class="form-control" maxlength="100" placeholder="ör. Antrepo rejimi (7100)" @bind="newName" @bind:event="oninput" />
+                <label class="form-label" for="profile-name">@Texts.Get("common.field.nameRequired")</label>
+                <input id="profile-name" class="form-control" maxlength="100" placeholder="@Texts.Get("platform.regimeProfiles.namePlaceholder")" @bind="newName" @bind:event="oninput" />
             </div>
         </div>
         <div class="form-actions">
-            <button type="submit" class="btn btn-outline-secondary" disabled="@busy">Profil oluştur</button>
+            <button type="submit" class="btn btn-outline-secondary" disabled="@busy">@Texts.Get("platform.regimeProfiles.create")</button>
         </div>
     </form>
 
-    <h2 class="mt-4">Profiller</h2>
+    <h2 class="mt-4">@Texts.Get("platform.regimeProfiles.profiles")</h2>
     @if (profiles is null)
     {
         <LoadingState Kind="LoadingKind.Table" />
     }
     else if (profiles.Count == 0)
     {
-        <p class="text-muted" role="status">Henüz rejim profili yok; firmalar için tescil numarası kuralı uygulanmaz.</p>
+        <p class="text-muted" role="status">@Texts.Get("platform.regimeProfiles.empty")</p>
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">Rejim profilleri</caption>
+            <caption class="visually-hidden">@Texts.Get("nav.app.platform.regime-profiles")</caption>
             <thead>
-                <tr><th scope="col">Profil</th><th scope="col">Kod</th><th scope="col">Yayın</th><th scope="col">Taslak</th><th scope="col">Durum</th><th scope="col"></th></tr>
+                <tr><th scope="col">@Texts.Get("platform.tenantDetail.profileLabel")</th><th scope="col">@Texts.Get("warehouse.code")</th><th scope="col">@Texts.Get("platform.regimeProfiles.col.published")</th><th scope="col">@Texts.Get("platform.regimeProfiles.draft")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col"></th></tr>
             </thead>
             <tbody>
                 @foreach (var profile in profiles)
                 {
                     <tr>
-                        <td data-label="Profil" class="primary">@profile.Name</td>
-                        <td data-label="Kod">@profile.Code</td>
-                        <td data-label="Yayın">
+                        <td data-label="@Texts.Get("platform.tenantDetail.profileLabel")" class="primary">@profile.Name</td>
+                        <td data-label="@Texts.Get("warehouse.code")">@profile.Code</td>
+                        <td data-label="@Texts.Get("platform.regimeProfiles.col.published")">
                             @if (profile.PublishedNumber is { } number)
                             {
-                                <span>Sürüm @number</span>
-                                <span class="badge @(profile.PublishedVerified ? "status-customer" : "stage-qualified")">@(profile.PublishedVerified ? "Doğrulandı" : "Doğrulanmadı")</span>
+                                <span>@Texts.Get("platform.regimeProfiles.versionNumber", number)</span>
+                                <span class="badge @(profile.PublishedVerified ? "status-customer" : "stage-qualified")">@(profile.PublishedVerified ? Texts.Get("warehouse.verified") : Texts.Get("warehouse.unverified"))</span>
                             }
                             else
                             {
-                                <span class="text-muted">Yayında değil</span>
+                                <span class="text-muted">@Texts.Get("platform.regimeProfiles.notPublished")</span>
                             }
                         </td>
-                        <td data-label="Taslak">@(profile.HasDraft ? "Var" : "—")</td>
-                        <td data-label="Durum"><span class="badge @WarehouseLabels.ActiveBadge(profile.IsActive)">@(profile.IsActive ? "Etkin" : "Pasif")</span></td>
-                        <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => OpenAsync(profile.Id)">Aç</button></td>
+                        <td data-label="@Texts.Get("platform.regimeProfiles.draft")">@(profile.HasDraft ? Texts.Get("platform.regimeProfiles.hasDraft") : "—")</td>
+                        <td data-label="@Texts.Get("common.field.status")"><span class="badge @WarehouseLabels.ActiveBadge(profile.IsActive)">@WarehouseLabels.ActiveText(profile.IsActive)</span></td>
+                        <td class="actions"><button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => OpenAsync(profile.Id)">@Texts.Get("common.open")</button></td>
                     </tr>
                 }
             </tbody>
@@ -80,47 +78,49 @@
 
     @if (detail is not null)
     {
-        <section class="record-form settings-group" aria-label="Profil ayrıntısı">
+        <section class="record-form settings-group" aria-label="@Texts.Get("platform.regimeProfiles.detail")">
             <h2>@detail.Summary.Name <small class="text-muted">· @detail.Summary.Code</small></h2>
 
             <form novalidate @onsubmit="SaveDraftAsync" @onsubmit:preventDefault>
-                <h3>@(detail.Summary.HasDraft ? "Taslak" : "Yeni taslak")</h3>
+                <h3>@(detail.Summary.HasDraft ? Texts.Get("platform.regimeProfiles.draft") : Texts.Get("platform.regimeProfiles.newDraft"))</h3>
                 <div class="form-grid">
                     <div>
-                        <label class="form-label" for="rule-regime">Rejim kodu</label>
-                        <input id="rule-regime" class="form-control" maxlength="20" placeholder="ör. 7100" @bind="draft.RegimeCode" />
+                        <label class="form-label" for="rule-regime">@Texts.Get("platform.regimeProfiles.regimeCode")</label>
+                        <input id="rule-regime" class="form-control" maxlength="20" placeholder="@Texts.Get("platform.regimeProfiles.example", "7100")" @bind="draft.RegimeCode" />
                     </div>
                     <div>
-                        <label class="form-label" for="rule-min">Tescil no en az uzunluk</label>
+                        <label class="form-label" for="rule-min">@Texts.Get("platform.regimeProfiles.minLength")</label>
                         <input id="rule-min" class="form-control" type="number" min="1" max="30" @bind="draft.MinLength" />
                     </div>
                     <div>
-                        <label class="form-label" for="rule-max">Tescil no en çok uzunluk</label>
+                        <label class="form-label" for="rule-max">@Texts.Get("platform.regimeProfiles.maxLength")</label>
                         <input id="rule-max" class="form-control" type="number" min="1" max="30" @bind="draft.MaxLength" />
                     </div>
                     <div>
-                        <label class="form-label" for="rule-pattern">Tescil no deseni (düzenli ifade)</label>
-                        <input id="rule-pattern" class="form-control" maxlength="200" placeholder="ör. \d{8}[A-Z]{2}\d{8}" @bind="draft.Pattern" />
-                        <div class="form-text">Numaranın tamamıyla eşleşmelidir. Boş bırakılırsa yalnızca uzunluk denetlenir.</div>
+                        <label class="form-label" for="rule-pattern">@Texts.Get("platform.regimeProfiles.pattern")</label>
+                        <input id="rule-pattern" class="form-control" maxlength="200" placeholder="@Texts.Get("platform.regimeProfiles.example", PatternExample)" @bind="draft.Pattern" />
+                        <div class="form-text">@Texts.Get("platform.regimeProfiles.patternHint")</div>
                     </div>
                     <div>
-                        <label class="form-label" for="rule-example">Geçerli örnek numara</label>
+                        <label class="form-label" for="rule-example">@Texts.Get("platform.regimeProfiles.validExample")</label>
                         <input id="rule-example" class="form-control" maxlength="30" @bind="draft.Example" />
-                        <div class="form-text">Kuralın kendisine uymalıdır; yanlış desen yayına çıkmadan yakalanır.</div>
+                        <div class="form-text">@Texts.Get("platform.regimeProfiles.validExampleHint")</div>
                     </div>
                     <div>
-                        <label class="form-label" for="rule-level">İhlalde</label>
+                        <label class="form-label" for="rule-level">@Texts.Get("warehouse.regimeBindings.onViolation")</label>
                         <select id="rule-level" class="form-select" @bind="draft.Enforcement">
-                            <option value="Warn">Uyarı (kaydı engellemez)</option>
-                            <option value="Block">Engel (kaydı reddeder)</option>
+                            @foreach (var (key, label) in PlatformLabels.Enforcements)
+                            {
+                                <option value="@key">@label</option>
+                            }
                         </select>
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-outline-secondary" disabled="@busy">Taslağı kaydet</button>
+                    <button type="submit" class="btn btn-outline-secondary" disabled="@busy">@Texts.Get("admin.automationEditor.saveDraft")</button>
                     @if (detail.Summary.HasDraft)
                     {
-                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="DiscardDraftAsync">Taslağı sil</button>
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="DiscardDraftAsync">@Texts.Get("platform.regimeProfiles.discardDraft")</button>
                     }
                 </div>
             </form>
@@ -128,45 +128,45 @@
             @if (detail.Summary.HasDraft)
             {
                 <form class="mt-3" novalidate @onsubmit="PublishAsync" @onsubmit:preventDefault>
-                    <h3>Yayınla</h3>
+                    <h3>@Texts.Get("platform.regimeProfiles.publish")</h3>
                     <div class="form-grid">
                         <div>
-                            <label class="form-label" for="publish-verified">Doğrulama</label>
+                            <label class="form-label" for="publish-verified">@Texts.Get("platform.regimeProfiles.verification")</label>
                             <select id="publish-verified" class="form-select" @bind="verified">
-                                <option value="False">Doğrulanmadı (uzman teyidi bekliyor)</option>
-                                <option value="True">Doğrulandı</option>
+                                <option value="False">@Texts.Get("platform.regimeProfiles.unverifiedOption")</option>
+                                <option value="True">@Texts.Get("warehouse.verified")</option>
                             </select>
                         </div>
                         <div>
-                            <label class="form-label" for="publish-note">Doğrulama notu@(verified ? " *" : null)</label>
-                            <input id="publish-note" class="form-control" maxlength="500" placeholder="Kim, neye göre doğruladı?" @bind="note" />
+                            <label class="form-label" for="publish-note">@(verified ? Texts.Get("platform.regimeProfiles.noteRequired") : Texts.Get("platform.regimeProfiles.note"))</label>
+                            <input id="publish-note" class="form-control" maxlength="500" placeholder="@Texts.Get("platform.regimeProfiles.notePlaceholder")" @bind="note" />
                         </div>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@busy">Yayınla</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("platform.regimeProfiles.publish")</button>
                     </div>
                 </form>
             }
 
-            <h3 class="mt-3">Sürümler</h3>
+            <h3 class="mt-3">@Texts.Get("platform.versions")</h3>
             @if (detail.Versions.Count == 0)
             {
-                <EmptyState Title="Henüz sürüm yok." />
+                <EmptyState Title="@Texts.Get("platform.regimeProfiles.noVersions")" />
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Profil sürümleri</caption>
-                    <thead><tr><th scope="col">Sürüm</th><th scope="col">Durum</th><th scope="col">Doğrulama</th><th scope="col">Tescil no kuralı</th><th scope="col">Yayın</th></tr></thead>
+                    <caption class="visually-hidden">@Texts.Get("platform.regimeProfiles.versionsCaption")</caption>
+                    <thead><tr><th scope="col">@Texts.Get("platform.health.version")</th><th scope="col">@Texts.Get("common.field.status")</th><th scope="col">@Texts.Get("platform.regimeProfiles.verification")</th><th scope="col">@Texts.Get("warehouse.regimeBindings.rule")</th><th scope="col">@Texts.Get("platform.regimeProfiles.col.published")</th></tr></thead>
                     <tbody>
                         @foreach (var version in detail.Versions)
                         {
                             <tr>
-                                <td data-label="Sürüm" class="primary">@version.Number</td>
-                                <td data-label="Durum"><span class="badge @StateBadge(version.State)">@StateLabel(version.State)</span></td>
-                                <td data-label="Doğrulama">@(version.State == "Draft" ? "—" : version.IsVerified ? $"Doğrulandı · {version.VerificationNote}" : "Doğrulanmadı")</td>
-                                <td data-label="Tescil no kuralı">@RuleText(version.Content.RegistrationNo)</td>
-                                <td data-label="Yayın">@(version.PublishedAt is { } at ? CrmLabels.Time(at) : "—")</td>
+                                <td data-label="@Texts.Get("platform.health.version")" class="primary">@version.Number</td>
+                                <td data-label="@Texts.Get("common.field.status")"><span class="badge @StateBadge(version.State)">@PlatformLabels.RegimeStateOf(version.State)</span></td>
+                                <td data-label="@Texts.Get("platform.regimeProfiles.verification")">@(version.State == "Draft" ? "—" : version.IsVerified ? Texts.Get("platform.regimeProfiles.verifiedWithNote", version.VerificationNote) : Texts.Get("warehouse.unverified"))</td>
+                                <td data-label="@Texts.Get("warehouse.regimeBindings.rule")">@RuleText(version.Content.RegistrationNo)</td>
+                                <td data-label="@Texts.Get("platform.regimeProfiles.col.published")">@(version.PublishedAt is { } at ? CrmLabels.Time(at) : "—")</td>
                             </tr>
                         }
                     </tbody>
@@ -174,8 +174,8 @@
             }
 
             <div class="form-actions">
-                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ToggleActiveAsync">@(detail.Summary.IsActive ? "Pasife al" : "Etkinleştir")</button>
-                <button type="button" class="btn btn-ghost" @onclick="Close">Kapat</button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ToggleActiveAsync">@(detail.Summary.IsActive ? Texts.Get("admin.subProfiles.deactivate") : Texts.Get("admin.subProfiles.activate"))</button>
+                <button type="button" class="btn btn-ghost" @onclick="Close">@Texts.Get("common.close")</button>
             </div>
         </section>
     }
@@ -183,6 +183,9 @@
 
 @code {
     private const string Url = "/api/platform/regime-profiles";
+
+    // Desen örneği düzenli ifadedir, dile göre değişmez; yalnızca "ör." öneki sözlükten gelir.
+    private const string PatternExample = @"\d{8}[A-Z]{2}\d{8}";
 
     private List<RegimeProfileSummaryDto>? profiles;
     private RegimeProfileDetailDto? detail;
@@ -223,7 +226,7 @@
             return;
         }
 
-        Succeed($"“{result.Value!.Name}” profili oluşturuldu; kuralı taslak olarak kaydedin.");
+        Succeed(Texts.Get("platform.regimeProfiles.created", result.Value!.Name));
         newCode = newName = string.Empty;
         await LoadAsync();
         await OpenAsync(result.Value.Id);
@@ -265,7 +268,7 @@
             return;
         }
 
-        Succeed($"Taslak (sürüm {result.Value!.Number}) kaydedildi.");
+        Succeed(Texts.Get("platform.regimeProfiles.draftSaved", result.Value!.Number));
         await LoadAsync();
         await OpenAsync(detail.Summary.Id);
     }
@@ -286,7 +289,7 @@
             return;
         }
 
-        Succeed("Taslak silindi.");
+        Succeed(Texts.Get("platform.regimeProfiles.draftDiscarded"));
         await LoadAsync();
         await OpenAsync(detail.Summary.Id);
     }
@@ -307,7 +310,9 @@
             return;
         }
 
-        Succeed($"Sürüm {result.Value!.Number} yayınlandı ({(result.Value.IsVerified ? "doğrulandı" : "doğrulanmadı")}). Önceki yayın geçmişte kaldı.");
+        Succeed(result.Value!.IsVerified
+            ? Texts.Get("platform.regimeProfiles.publishedVerified", result.Value.Number)
+            : Texts.Get("platform.regimeProfiles.publishedUnverified", result.Value.Number));
         await LoadAsync();
         await OpenAsync(detail.Summary.Id);
     }
@@ -328,17 +333,10 @@
             return;
         }
 
-        Succeed(result.Value!.IsActive ? "Profil etkinleştirildi." : "Profil pasife alındı.");
+        Succeed(result.Value!.IsActive ? Texts.Get("platform.regimeProfiles.activated") : Texts.Get("platform.regimeProfiles.deactivated"));
         await LoadAsync();
         await OpenAsync(detail.Summary.Id);
     }
-
-    private static string StateLabel(string state) => state switch
-    {
-        "Draft" => "Taslak",
-        "Published" => "Yayında",
-        _ => "Yerini bıraktı",
-    };
 
     private static string StateBadge(string state) => state switch
     {
@@ -351,21 +349,21 @@
     {
         if (rule is null)
         {
-            return "Kural yok";
+            return Texts.Get("warehouse.regimeBindings.noRule");
         }
 
         var parts = new List<string>();
         if (rule.MinLength is not null || rule.MaxLength is not null)
         {
-            parts.Add($"{rule.MinLength?.ToString() ?? "—"}–{rule.MaxLength?.ToString() ?? "—"} karakter");
+            parts.Add(Texts.Get("warehouse.regimeBindings.length", rule.MinLength?.ToString() ?? "—", rule.MaxLength?.ToString() ?? "—"));
         }
 
         if (!string.IsNullOrEmpty(rule.Pattern))
         {
-            parts.Add($"desen {rule.Pattern}");
+            parts.Add(Texts.Get("warehouse.regimeBindings.pattern", rule.Pattern));
         }
 
-        parts.Add(rule.Enforcement == "Block" ? "engel" : "uyarı");
+        parts.Add(rule.Enforcement == "Block" ? Texts.Get("platform.regimeProfiles.ruleBlock") : Texts.Get("platform.regimeProfiles.ruleWarn"));
         return string.Join(" · ", parts);
     }
 
@@ -377,7 +375,7 @@
 
     private void Fail(string? message)
     {
-        notice = message ?? "İşlem tamamlanamadı.";
+        notice = message ?? Texts.Get("warehouse.regimeBindings.failed");
         failed = true;
     }
 

@@ -3,37 +3,35 @@
 @using Modulix.Shared.Customs
 @inject ApiClient Api
 
-<PageTitle>GTİP kataloğu · Platform · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.platform.gtip") · @Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
 @* Global GTİP kataloğu (ADR-0032 K9). Bakanlık tarife cetveli yürürlük tarihli sürümler olarak yüklenir; bir tarihte o günü geçmemiş en yeni
-   sürüm geçerlidir. Katalog yalnızca uyarı içindir: katalogda olmayan kod hiçbir kaydı engellemez. Hatalı dosya kısmen yüklenmez. *@
+   sürüm geçerlidir. Katalog yalnızca uyarı içindir: katalogda olmayan kod hiçbir kaydı engellemez. Hatalı dosya kısmen yüklenmez.
+   GTİP kodları ve tanımları, sürüm adları ve sunucunun satır hata iletileri veridir, çevrilmez (ADR-0034 dilim 18). *@
 <PlatformGate>
-    <a class="back-link" href="platform">← Platform</a>
-    <h1>GTİP kataloğu</h1>
-    <p class="text-muted">
-        Gümrük tarife cetvelini Excel (.xlsx) ya da CSV olarak yükleyin. Dosyada <strong>GTİP</strong> (ya da Kod) ve <strong>Tanım</strong> başlıklı
-        sütunlar gerekir; <strong>Birim</strong> isteğe bağlıdır. Fasıl ve pozisyon başlıkları (6 haneden kısa kodlar) atlanır. Firmalar stok kartında
-        yazdıkları kodu yürürlükteki sürümle karşılaştırır; bulunamayan kod uyarıdır, engel değildir.
-    </p>
+    <a class="back-link" href="platform">← @Texts.Get("nav.app.platform")</a>
+    <h1>@Texts.Get("nav.app.platform.gtip")</h1>
+    @* Kalın yazılan sütun başlıkları dosyada aranan adlardır (içe aktarıcı Türkçe başlık bekler); dile göre değişmez. *@
+    <p class="text-muted">@Texts.Strong("platform.gtip.intro", "GTİP", "Tanım", "Birim")</p>
 
     <Notice Text="@notice" Failed="@failed" />
 
     <form class="record-form settings-group" novalidate @onsubmit="ImportAsync" @onsubmit:preventDefault>
-        <h2>Yeni sürüm yükle</h2>
+        <h2>@Texts.Get("platform.gtip.upload")</h2>
         <div class="form-grid">
             <div>
-                <label class="form-label" for="gtip-name">Sürüm adı *</label>
-                <input id="gtip-name" class="form-control" maxlength="100" placeholder="ör. 2026 Gümrük Tarife Cetveli" @bind="name" @bind:event="oninput" />
+                <label class="form-label" for="gtip-name">@Texts.Get("platform.gtip.versionNameRequired")</label>
+                <input id="gtip-name" class="form-control" maxlength="100" placeholder="@Texts.Get("platform.gtip.namePlaceholder")" @bind="name" @bind:event="oninput" />
             </div>
             <div>
-                <label class="form-label" for="gtip-date">Yürürlük tarihi *</label>
+                <label class="form-label" for="gtip-date">@Texts.Get("platform.gtip.effectiveFromRequired")</label>
                 <input id="gtip-date" class="form-control" type="date" @bind="effectiveFrom" />
-                <div class="form-text">Bu tarihten itibaren geçerlidir. Aynı tarihli ikinci sürüm yüklenemez.</div>
+                <div class="form-text">@Texts.Get("platform.gtip.effectiveFromHint")</div>
             </div>
             <div>
-                <label class="form-label" for="gtip-file">Dosya *</label>
+                <label class="form-label" for="gtip-file">@Texts.Get("admin.importNew.file")</label>
                 <InputFile @key="inputKey" id="gtip-file" class="form-control" accept=".xlsx,.csv,.txt" OnChange="OnFileChosenAsync" disabled="@busy" />
-                <div class="form-text">En çok @(GtipImportLimits.MaxFileBytes / (1024 * 1024)) MB. Eski .xls biçimi desteklenmez.</div>
+                <div class="form-text">@Texts.Get("platform.gtip.fileHint", GtipImportLimits.MaxFileBytes / (1024 * 1024))</div>
             </div>
         </div>
 
@@ -47,134 +45,132 @@
                 else
                 {
                     <p>
-                        <strong>@preview.ValidCount</strong> geçerli satır
-                        @if (preview.HeadingRows > 0) { <text> · @preview.HeadingRows başlık satırı atlandı</text> }
-                        @if (preview.PaddedCodes > 0) { <text> · @preview.PaddedCodes kodun baştaki sıfırı tamamlandı (hücre sayı olarak kayıtlıydı)</text> }
-                        @if (preview.ErrorCount > 0) { <text> · <strong>@preview.ErrorCount hatalı satır</strong></text> }
+                        @Texts.Strong("platform.gtip.validRows", preview.ValidCount.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                        @if (preview.HeadingRows > 0) { <text> · @Texts.Get("platform.gtip.headingRows", preview.HeadingRows)</text> }
+                        @if (preview.PaddedCodes > 0) { <text> · @Texts.Get("platform.gtip.paddedCodes", preview.PaddedCodes)</text> }
+                        @if (preview.ErrorCount > 0) { <text> · <strong>@Texts.Get("platform.gtip.errorRows", preview.ErrorCount)</strong></text> }
                     </p>
                     @if (preview.ErrorCount > 0)
                     {
-                        <div class="alert alert-danger" role="alert">
-                            Dosya hatalı satırlar içeriyor; eksik katalog yüklenmesin diye hiçbir satır alınmaz. Dosyayı düzeltip yeniden seçin.
-                        </div>
+                        <div class="alert alert-danger" role="alert">@Texts.Get("platform.gtip.hasErrors")</div>
                         <table class="table record-table">
-                            <caption class="visually-hidden">Hatalı satırlar</caption>
-                            <thead><tr><th scope="col">Satır</th><th scope="col">Hata</th></tr></thead>
+                            <caption class="visually-hidden">@Texts.Get("platform.gtip.errorsCaption")</caption>
+                            <thead><tr><th scope="col">@Texts.Get("warehouse.line")</th><th scope="col">@Texts.Get("admin.importRun.error")</th></tr></thead>
                             <tbody>
                                 @foreach (var error in preview.Errors)
                                 {
-                                    <tr><td data-label="Satır" class="primary">@error.Row</td><td data-label="Hata">@error.Message</td></tr>
+                                    <tr><td data-label="@Texts.Get("warehouse.line")" class="primary">@error.Row</td><td data-label="@Texts.Get("admin.importRun.error")">@error.Message</td></tr>
                                 }
                             </tbody>
                         </table>
                         @if (preview.ErrorCount > preview.Errors.Count)
                         {
-                            <p class="text-muted">İlk @preview.Errors.Count hata gösteriliyor.</p>
+                            <p class="text-muted">@Texts.Get("platform.gtip.firstErrors", preview.Errors.Count)</p>
                         }
                     }
                     else if (preview.Sample.Count > 0)
                     {
                         <table class="table record-table">
-                            <caption class="visually-hidden">Dosyadaki ilk satırlar</caption>
-                            <thead><tr><th scope="col">GTİP</th><th scope="col">Tanım</th><th scope="col">Birim</th></tr></thead>
+                            <caption class="visually-hidden">@Texts.Get("platform.gtip.sampleCaption")</caption>
+                            <thead><tr><th scope="col">@Texts.Get("warehouse.gtip")</th><th scope="col">@Texts.Get("platform.gtip.description")</th><th scope="col">@Texts.Get("warehouse.unit")</th></tr></thead>
                             <tbody>
                                 @foreach (var entry in preview.Sample)
                                 {
                                     <tr>
-                                        <td data-label="GTİP" class="primary">@entry.Code</td>
-                                        <td data-label="Tanım">@entry.Description</td>
-                                        <td data-label="Birim">@(entry.Unit ?? "—")</td>
+                                        <td data-label="@Texts.Get("warehouse.gtip")" class="primary">@entry.Code</td>
+                                        <td data-label="@Texts.Get("platform.gtip.description")">@entry.Description</td>
+                                        <td data-label="@Texts.Get("warehouse.unit")">@(entry.Unit ?? "—")</td>
                                     </tr>
                                 }
                             </tbody>
                         </table>
-                        <p class="text-muted">İlk @preview.Sample.Count satır gösteriliyor.</p>
+                        <p class="text-muted">@Texts.Get("platform.gtip.firstRows", preview.Sample.Count)</p>
                     }
                 }
             </div>
         }
 
         <div class="form-actions">
-            <button type="button" class="btn btn-outline-secondary" disabled="@(busy || bytes is null)" @onclick="PreviewAsync">Önizle</button>
+            <button type="button" class="btn btn-outline-secondary" disabled="@(busy || bytes is null)" @onclick="PreviewAsync">@Texts.Get("platform.gtip.preview")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || preview is not { CanImport: true })">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                İçe aktar
+                @Texts.Get("platform.gtip.import")
             </button>
         </div>
     </form>
 
-    <h2 class="mt-4">Sürümler</h2>
+    <h2 class="mt-4">@Texts.Get("platform.versions")</h2>
     @if (versions is null)
     {
         <LoadingState Kind="LoadingKind.Table" />
     }
     else if (versions.Count == 0)
     {
-        <p class="text-muted" role="status">Henüz katalog sürümü yok; firmalar için GTİP uyarısı üretilmez.</p>
+        <p class="text-muted" role="status">@Texts.Get("platform.gtip.noVersions")</p>
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">GTİP katalog sürümleri</caption>
+            <caption class="visually-hidden">@Texts.Get("platform.gtip.versionsCaption")</caption>
             <thead>
                 <tr>
-                    <th scope="col"><SortHeader Label="Sürüm" ColumnIcon="type" Asc="name" Desc="-name" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
-                    <th scope="col"><SortHeader Label="Yürürlük" ColumnIcon="calendar" Asc="effectiveFrom" Desc="-effectiveFrom" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
-                    <th scope="col"><SortHeader Label="Satır" ColumnIcon="hash" Asc="entryCount" Desc="-entryCount" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
-                    <th scope="col"><SortHeader Label="Dosya" ColumnIcon="file-text" Asc="file" Desc="-file" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
-                    <th scope="col"><SortHeader Label="Yüklendi" ColumnIcon="clock" Asc="createdAt" Desc="-createdAt" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
-                    <th scope="col"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("platform.health.version")" ColumnIcon="type" Asc="name" Desc="-name" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("platform.gtip.col.effectiveFrom")" ColumnIcon="calendar" Asc="effectiveFrom" Desc="-effectiveFrom" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("warehouse.line")" ColumnIcon="hash" Asc="entryCount" Desc="-entryCount" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("admin.importRun.file")" ColumnIcon="file-text" Asc="file" Desc="-file" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("platform.gtip.col.uploaded")" ColumnIcon="clock" Asc="createdAt" Desc="-createdAt" Value="@versionSort" Default="" ValueChanged="SortVersions" /></th>
+                    <th scope="col"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var version in ClientSort.Apply(versions, versionSort, VersionColumns))
                 {
                     <tr>
-                        <td data-label="Sürüm" class="primary">
+                        <td data-label="@Texts.Get("platform.health.version")" class="primary">
                             @version.Name
                             @if (version.Id == InForceId)
                             {
-                                <span class="badge status-customer">Yürürlükte</span>
+                                <span class="badge status-customer">@Texts.Get("platform.gtip.inForce")</span>
                             }
                         </td>
-                        <td data-label="Yürürlük">@version.EffectiveFrom.ToString("dd.MM.yyyy")</td>
-                        <td data-label="Satır">@version.EntryCount</td>
-                        <td data-label="Dosya">@(version.SourceFileName ?? "—")</td>
-                        <td data-label="Yüklendi">@CrmLabels.Time(version.CreatedAt)</td>
+                        <td data-label="@Texts.Get("platform.gtip.col.effectiveFrom")">@version.EffectiveFrom.ToString("dd.MM.yyyy")</td>
+                        <td data-label="@Texts.Get("warehouse.line")">@version.EntryCount</td>
+                        <td data-label="@Texts.Get("admin.importRun.file")">@(version.SourceFileName ?? "—")</td>
+                        <td data-label="@Texts.Get("platform.gtip.col.uploaded")">@CrmLabels.Time(version.CreatedAt)</td>
                         <td class="actions">
                             @if (confirmDelete == version.Id)
                             {
-                                <span class="me-2">Silinsin mi?</span>
-                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(version)">Evet, sil</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => confirmDelete = null">Vazgeç</button>
+                                <span class="me-2">@Texts.Get("platform.gtip.confirmDelete")</span>
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => DeleteAsync(version)">@Texts.Get("common.view.deleteYes")</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => confirmDelete = null">@Texts.Get("common.dismiss")</button>
                             }
                             else
                             {
-                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => OpenEntriesAsync(version)">Satırlar</button>
-                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => confirmDelete = version.Id">Sil</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => OpenEntriesAsync(version)">@Texts.Get("warehouse.linesPanel.title")</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => confirmDelete = version.Id">@Texts.Get("common.delete")</button>
                             }
                         </td>
                     </tr>
                 }
             </tbody>
         </table>
-        <p class="text-muted">Sürüm silmek tenant verisini etkilemez (kayıtlar koda göre başvurur); yanlış yüklenen sürüm silinip yeniden yüklenir.</p>
+        <p class="text-muted">@Texts.Get("platform.gtip.deleteNote")</p>
     }
 
     @if (selected is not null)
     {
-        <section class="settings-group" aria-label="Sürüm satırları">
-            <h2>@selected.Name · satırlar</h2>
+        <section class="settings-group" aria-label="@Texts.Get("platform.gtip.entries")">
+            <h2>@Texts.Get("platform.gtip.entriesTitle", selected.Name)</h2>
             <div class="list-toolbar">
                 <form class="search" @onsubmit="() => LoadEntriesAsync(1)" @onsubmit:preventDefault>
-                    <label class="visually-hidden" for="gtip-search">Kod ya da tanım ara</label>
-                    <input id="gtip-search" class="form-control" type="search" placeholder="Kod ön eki ya da tanım ara" @bind="search" />
-                    <button type="submit" class="btn btn-outline-secondary">Ara</button>
+                    <label class="visually-hidden" for="gtip-search">@Texts.Get("platform.gtip.search")</label>
+                    <input id="gtip-search" class="form-control" type="search" placeholder="@Texts.Get("platform.gtip.searchPlaceholder")" @bind="search" />
+                    <button type="submit" class="btn btn-outline-secondary">@Texts.Get("common.search")</button>
                 </form>
-                <button type="button" class="btn btn-ghost" @onclick="CloseEntries">Kapat</button>
+                <button type="button" class="btn btn-ghost" @onclick="CloseEntries">@Texts.Get("common.close")</button>
             </div>
             @if (entries is null)
             {
@@ -182,26 +178,26 @@
             }
             else if (entries.Items.Count == 0)
             {
-                <EmptyState Compact="true" Title="Aramaya uyan satır yok." />
+                <EmptyState Compact="true" Title="@Texts.Get("platform.gtip.noMatch")" />
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Sürümdeki GTİP satırları</caption>
+                    <caption class="visually-hidden">@Texts.Get("platform.gtip.entriesCaption")</caption>
                     <thead>
                         <tr>
-                            <th scope="col"><SortHeader Label="GTİP" ColumnIcon="hash" Asc="code" Desc="-code" Value="@entrySort" Default="code" ValueChanged="SortEntriesAsync" /></th>
-                            <th scope="col"><SortHeader Label="Tanım" ColumnIcon="type" Asc="description" Desc="-description" Value="@entrySort" Default="code" ValueChanged="SortEntriesAsync" /></th>
-                            <th scope="col"><SortHeader Label="Birim" ColumnIcon="tag" Asc="unit" Desc="-unit" Value="@entrySort" Default="code" ValueChanged="SortEntriesAsync" /></th>
+                            <th scope="col"><SortHeader Label="@Texts.Get("warehouse.gtip")" ColumnIcon="hash" Asc="code" Desc="-code" Value="@entrySort" Default="code" ValueChanged="SortEntriesAsync" /></th>
+                            <th scope="col"><SortHeader Label="@Texts.Get("platform.gtip.description")" ColumnIcon="type" Asc="description" Desc="-description" Value="@entrySort" Default="code" ValueChanged="SortEntriesAsync" /></th>
+                            <th scope="col"><SortHeader Label="@Texts.Get("warehouse.unit")" ColumnIcon="tag" Asc="unit" Desc="-unit" Value="@entrySort" Default="code" ValueChanged="SortEntriesAsync" /></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var entry in entries.Items)
                         {
                             <tr>
-                                <td data-label="GTİP" class="primary">@entry.Code</td>
-                                <td data-label="Tanım">@entry.Description</td>
-                                <td data-label="Birim">@(entry.Unit ?? "—")</td>
+                                <td data-label="@Texts.Get("warehouse.gtip")" class="primary">@entry.Code</td>
+                                <td data-label="@Texts.Get("platform.gtip.description")">@entry.Description</td>
+                                <td data-label="@Texts.Get("warehouse.unit")">@(entry.Unit ?? "—")</td>
                             </tr>
                         }
                     </tbody>
@@ -280,7 +276,7 @@
         }
         catch (IOException)
         {
-            Fail($"Dosya en fazla {GtipImportLimits.MaxFileBytes / (1024 * 1024)} MB olabilir.");
+            Fail(Texts.Get("platform.gtip.fileTooLarge", GtipImportLimits.MaxFileBytes / (1024 * 1024)));
             return;
         }
 
@@ -315,7 +311,7 @@
 
         if (string.IsNullOrWhiteSpace(name) || effectiveFrom is null)
         {
-            Fail("Sürüm adı ve yürürlük tarihi gerekli.");
+            Fail(Texts.Get("platform.gtip.nameAndDateRequired"));
             return;
         }
 
@@ -331,7 +327,7 @@
             return;
         }
 
-        notice = $"“{result.Value!.Name}” yüklendi: {result.Value.EntryCount} satır, {result.Value.EffectiveFrom:dd.MM.yyyy} tarihinden itibaren yürürlükte.";
+        notice = Texts.Get("platform.gtip.imported", result.Value!.Name, result.Value.EntryCount, result.Value.EffectiveFrom.ToString("dd.MM.yyyy"));
         failed = false;
         name = string.Empty;
         effectiveFrom = null;
@@ -354,7 +350,7 @@
             return;
         }
 
-        notice = $"“{version.Name}” silindi.";
+        notice = Texts.Get("platform.gtip.deleted", version.Name);
         failed = false;
         if (selected?.Id == version.Id)
         {
@@ -396,7 +392,7 @@
 
     private void Fail(string? message)
     {
-        notice = message ?? "İşlem tamamlanamadı.";
+        notice = message ?? Texts.Get("warehouse.regimeBindings.failed");
         failed = true;
     }
 }
