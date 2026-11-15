@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -77,20 +78,20 @@ public sealed class RecordPipeline(
 
         if (normalized.Filters is { Count: > RecordQuery.MaxFilters })
         {
-            return Invalid<RecordPage>([new RecordFieldError("filters", $"En fazla {RecordQuery.MaxFilters} filtre verilebilir.")]);
+            return Invalid<RecordPage>([new RecordFieldError("filters", ServerMessages.Record.TooManyFilters(RecordQuery.MaxFilters))]);
         }
 
         // Hassas alana göre süzmek değerini sezdirir (ör. "tutar > 1 milyon"); göremeyen için bilinmeyen filtre gibidir.
         var hidden = await fieldAccess.GetHiddenFieldsAsync(tenant!, store.EntityKey, cancellationToken);
         if (normalized.Filters?.Keys.FirstOrDefault(hidden.Contains) is { } hiddenFilter)
         {
-            return Invalid<RecordPage>([new RecordFieldError(hiddenFilter, "Bu alana göre süzme yetkiniz yok.")]);
+            return Invalid<RecordPage>([new RecordFieldError(hiddenFilter, ServerMessages.Record.FilterDenied)]);
         }
 
         // Sıralama da değeri sezdirir (sıra, tutarı ele verir); sıralama anahtarı ("-alan" ya da "alan") gizli alansa reddedilir.
         if (normalized.Filters is not null && normalized.Filters.TryGetValue("sort", out var sortKey) && hidden.Contains(sortKey.TrimStart('-')))
         {
-            return Invalid<RecordPage>([new RecordFieldError("sort", "Bu alana göre sıralama yetkiniz yok.")]);
+            return Invalid<RecordPage>([new RecordFieldError("sort", ServerMessages.Record.SortDenied)]);
         }
 
         var custom = await CustomFieldsAsync(tenant!, store, cancellationToken);
@@ -162,6 +163,11 @@ public sealed class RecordPipeline(
             return Invalid<RecordData>(errors);
         }
 
+        if (command.Anonymous && !store.AllowsAnonymousWrites)
+        {
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, ServerMessages.Record.AnonymousNotAllowed);
+        }
+
         using var reason = commandContext?.Enter(command.Reason);
         try
         {
@@ -171,7 +177,19 @@ public sealed class RecordPipeline(
                 return OwnerOutOfScope<RecordData>(store);
             }
 
-            Record(tenant!, command.Source, created.EntityKey, created.Id, AuditAction.Created, DomainEventTypes.RecordCreated, before: null, after: created.Values, created.Version, command.Reason, CompanyIdOf(store, created.Values));
+            if (command.Anonymous)
+            {
+                // Anonim yazma (ADR-0042 bölüm 24): yazmanın olduğu denetlenir; kim, hangi kayıt ve ne yazıldığı hiçbir yere düşmez, olay yok.
+                audit.Add(new AuditEntry(tenant!.TenantId, Guid.Empty, created.EntityKey, Guid.Empty, AuditAction.Created, [], command.Source, CorrelationId: null)
+                {
+                    Anonymous = true,
+                });
+            }
+            else
+            {
+                Record(tenant!, command.Source, created.EntityKey, created.Id, AuditAction.Created, DomainEventTypes.RecordCreated, before: null, after: created.Values, created.Version, command.Reason, CompanyIdOf(store, created.Values));
+            }
+
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return RecordResult<RecordData>.Ok(Present(created, hidden, custom));
         }
@@ -181,12 +199,12 @@ public sealed class RecordPipeline(
         }
         catch (RecordAccessDeniedException denied)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, denied.Message);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, denied.ServerMessage);
         }
 
         catch (RecordConflictException conflict)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, conflict.Message);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, conflict.ServerMessage);
         }
     }
 
@@ -194,7 +212,7 @@ public sealed class RecordPipeline(
     {
         if (command.Id is not { } id)
         {
-            return Invalid<RecordData>([new RecordFieldError("id", "Güncellenecek kaydın kimliği zorunludur.")]);
+            return Invalid<RecordData>([new RecordFieldError("id", ServerMessages.Record.IdRequired)]);
         }
 
         var (gate, tenant, store) = await AuthorizeAsync<RecordData>(command.EntityKey, RecordOperation.Update, cancellationToken);
@@ -228,7 +246,7 @@ public sealed class RecordPipeline(
         // Şirket kapsamlı kaydın şirketi güncellemeyle değiştirilemez (ADR-0008): taşıma ayrı bir komuttur.
         if (store.CompanyField is { } companyField && ChangesCompany(before.Values, values, companyField))
         {
-            errors.Add(new RecordFieldError(companyField, "Kaydın şirketi değiştirilemez; taşıma ayrı bir işlemdir."));
+            errors.Add(new RecordFieldError(companyField, ServerMessages.Record.CompanyImmutable));
         }
 
         errors.AddRange(store.Validate(RecordOperation.Update, values));
@@ -274,12 +292,12 @@ public sealed class RecordPipeline(
         }
         catch (RecordAccessDeniedException denied)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, denied.Message);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, denied.ServerMessage);
         }
 
         catch (RecordConflictException conflict)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, conflict.Message);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, conflict.ServerMessage);
         }
     }
 
@@ -311,12 +329,12 @@ public sealed class RecordPipeline(
         }
         catch (RecordAccessDeniedException denied)
         {
-            return RecordResult<bool>.Fail(RecordErrorCode.PermissionDenied, denied.Message);
+            return RecordResult<bool>.Fail(RecordErrorCode.PermissionDenied, denied.ServerMessage);
         }
 
         catch (RecordConflictException conflict)
         {
-            return RecordResult<bool>.Fail(RecordErrorCode.Conflict, conflict.Message);
+            return RecordResult<bool>.Fail(RecordErrorCode.Conflict, conflict.ServerMessage);
         }
     }
 
@@ -346,7 +364,7 @@ public sealed class RecordPipeline(
         }
         catch (RecordConflictException conflict)
         {
-            return RecordResult<MergePreview>.Fail(RecordErrorCode.Conflict, conflict.Message);
+            return RecordResult<MergePreview>.Fail(RecordErrorCode.Conflict, conflict.ServerMessage);
         }
     }
 
@@ -400,7 +418,7 @@ public sealed class RecordPipeline(
         }
         catch (RecordConflictException conflict)
         {
-            return RecordResult<MergeResult>.Fail(RecordErrorCode.Conflict, conflict.Message);
+            return RecordResult<MergeResult>.Fail(RecordErrorCode.Conflict, conflict.ServerMessage);
         }
     }
 
@@ -453,12 +471,12 @@ public sealed class RecordPipeline(
 
         if (store is not IMergeableRecordStore mergeable)
         {
-            return new(Invalid<T>([new RecordFieldError("entityKey", "Bu kayıt türü birleştirilemez.")]), null, null, null);
+            return new(Invalid<T>([new RecordFieldError("entityKey", ServerMessages.Record.NotMergeable)]), null, null, null);
         }
 
         if (request.SourceId == request.TargetId || request.SourceId == Guid.Empty || request.TargetId == Guid.Empty)
         {
-            return new(Invalid<T>([new RecordFieldError("targetId", "Kayıt kendisiyle birleştirilemez.")]), null, null, null);
+            return new(Invalid<T>([new RecordFieldError("targetId", ServerMessages.Record.MergeSelf)]), null, null, null);
         }
 
         var target = await store.FindAsync(request.TargetId, cancellationToken);
@@ -479,7 +497,7 @@ public sealed class RecordPipeline(
         if ((await fieldAccess.GetHiddenFieldsAsync(tenant!, store.EntityKey, cancellationToken)).Count > 0)
         {
             return new(RecordResult<T>.Fail(RecordErrorCode.PermissionDenied,
-                "Görme yetkiniz olmayan alanları olan kayıtları birleştiremezsiniz."), null, null, null);
+                ServerMessages.Record.HiddenFieldMergeDenied), null, null, null);
         }
 
         return new(null, tenant, store, mergeable);
@@ -575,12 +593,12 @@ public sealed class RecordPipeline(
     }
 
     private static RecordResult<T> HiddenFieldDenied<T>() =>
-        RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, "Görme yetkiniz olmayan bir alanı değiştiremezsiniz.");
+        RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Record.HiddenFieldDenied);
 
     // Oluşturulan ya da güncellenen kaydın sorumlusu kapsam dışında: kayıt yazılmaz.
     // Kapsamı üst kayıttan türeyen alt kayıt türlerinde (sorumlu alanı yok) hata genel sorumlu alan adıyla verilir.
     private static RecordResult<T> OwnerOutOfScope<T>(IRecordStore store) =>
-        Invalid<T>([new RecordFieldError(store.OwnerField ?? OwnedRecordType.OwnerField, "Bu kişiyi sorumlu atayamazsınız: kayıt kapsamınızın dışında.")]);
+        Invalid<T>([new RecordFieldError(store.OwnerField ?? OwnedRecordType.OwnerField, ServerMessages.Record.OwnerOutOfScope)]);
 
     /// <summary>Adım 1-3: tenant, lisans, yetki. Geçemezse hazır hata sonucu döner.</summary>
     private async Task<(RecordResult<T>? Gate, TenantContext? Tenant, IRecordStore? Store)> AuthorizeAsync<T>(
@@ -588,22 +606,22 @@ public sealed class RecordPipeline(
     {
         if (tenantAccessor.Current is not { } tenant)
         {
-            return (RecordResult<T>.Fail(RecordErrorCode.NoActiveTenant, "Aktif tenant yok."), null, null);
+            return (RecordResult<T>.Fail(RecordErrorCode.NoActiveTenant, ServerMessages.Record.NoActiveTenant), null, null);
         }
 
         if (stores.Find(entityKey) is not { } store)
         {
-            return (RecordResult<T>.Fail(RecordErrorCode.UnknownEntity, $"Bilinmeyen kayıt türü: {entityKey}"), null, null);
+            return (RecordResult<T>.Fail(RecordErrorCode.UnknownEntity, ServerMessages.Record.UnknownEntity(entityKey)), null, null);
         }
 
         if (!await entitlements.CanUseAsync(tenant.TenantId, store.FeatureKey, cancellationToken))
         {
-            return (RecordResult<T>.Fail(RecordErrorCode.FeatureNotLicensed, "Bu özellik tenant'ın lisansında yok."), null, null);
+            return (RecordResult<T>.Fail(RecordErrorCode.FeatureNotLicensed, ServerMessages.Record.FeatureNotLicensed), null, null);
         }
 
         if (!await permissions.HasPermissionAsync(tenant, store.EntityKey, operation, cancellationToken))
         {
-            return (RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, "Bu işlem için yetkiniz yok."), null, null);
+            return (RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Record.PermissionDenied), null, null);
         }
 
         return (null, tenant, store);
@@ -688,14 +706,14 @@ public sealed class RecordPipeline(
         {
             if (company.ActiveCompanyId is not { } active)
             {
-                return new RecordFieldError(field, "Kayıt oluşturmak için erişebileceğiniz bir şirket seçili olmalı.");
+                return new RecordFieldError(field, ServerMessages.Record.CompanyRequired);
             }
 
             values[field] = active.ToString();
             return null;
         }
 
-        return company.CanAccess(requested) ? null : new RecordFieldError(field, "Bu şirkete erişiminiz yok.");
+        return company.CanAccess(requested) ? null : new RecordFieldError(field, ServerMessages.Record.CompanyDenied);
     }
 
     private static bool ChangesCompany(JsonObject before, JsonObject values, string field)
@@ -722,10 +740,10 @@ public sealed class RecordPipeline(
     private static Guid? CompanyIdOf(IRecordStore store, JsonObject values) =>
         store.CompanyField is { } field && TryCompanyId(values, field, out var id) ? id : null;
 
-    private static RecordResult<T> NotFound<T>() => RecordResult<T>.Fail(RecordErrorCode.NotFound, "Kayıt bulunamadı.");
+    private static RecordResult<T> NotFound<T>() => RecordResult<T>.Fail(RecordErrorCode.NotFound, ServerMessages.Record.NotFound);
 
     private static RecordResult<T> Invalid<T>(IReadOnlyList<RecordFieldError> errors) =>
-        RecordResult<T>.Fail(RecordErrorCode.ValidationFailed, "Doğrulama hatası.", errors);
+        RecordResult<T>.Fail(RecordErrorCode.ValidationFailed, ServerMessages.Record.ValidationFailed, errors);
 }
 
 /// <summary>İki kayıt hali arasındaki fark: { "alan": { "old": ..., "new": ... } }. Yalnızca değişen alanlar.</summary>

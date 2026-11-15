@@ -1,4 +1,6 @@
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Core.Contracts.Records;
 
@@ -41,6 +43,14 @@ public sealed record RecordCommand(
 {
     /// <summary>Değişikliğin nedeni; olaya yazılır (ör. <see cref="Events.EventReasons.Transfer"/>), abonelikler buna göre davranır.</summary>
     public string? Reason { get; init; }
+
+    /// <summary>
+    /// Anonim oluşturma (ADR-0042 bölüm 24: tam anonim anket cevabı). Yalnızca <see cref="IRecordStore.AllowsAnonymousWrites"/> diyen depoda
+    /// kabul edilir. Yetki ve doğrulama her zamanki gibi işler, ama yazan kişi hiçbir yere bağlanmaz: denetim satırı kullanıcısız, kayıt
+    /// kimliksiz, değersiz ve iz kimliksizdir, zamanı yalnızca gündür; olay yayımlanmaz. "Her önemli yazma denetim kaydına yazılır" kuralının
+    /// bilinçli istisnasıdır: yazmanın olduğu denetlenir, kimin ve neyin yazdığı denetlenmez.
+    /// </summary>
+    public bool Anonymous { get; init; }
 }
 
 /// <summary>
@@ -109,10 +119,30 @@ public static class RecordFields
 
 public sealed record RecordPage(IReadOnlyList<RecordData> Items, int Page, int PageSize, int TotalCount);
 
+/// <summary>
+/// Alan hatası. <see cref="Message"/> Türkçe kaynak metindir; <see cref="MessageKey"/> doluysa HTTP sınırında isteğin diline
+/// çevrilir (ADR-0034 §6). Anahtarsız hata olduğu gibi gösterilir.
+/// </summary>
 public sealed record RecordFieldError(string Field, string Message)
 {
+    /// <summary>Çevrilebilir iletiyle alan hatası (<see cref="ServerMessages"/>).</summary>
+    public RecordFieldError(string field, ServerMessage message)
+        : this(field, message.Text)
+    {
+        MessageKey = message.Key;
+        MessageArgs = message.Args;
+    }
+
     /// <summary>Hatanın makinece okunan türü; ileti değişse de içe aktarma gibi çağıranlar ayırt edebilsin diye. Çoğu hatada boştur.</summary>
     public string? Code { get; init; }
+
+    /// <summary>İletinin sözlük anahtarı (<c>server.*</c>); boşsa ileti çevrilmez.</summary>
+    [JsonIgnore]
+    public string? MessageKey { get; init; }
+
+    /// <summary>Anahtarın yer tutucu değerleri.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<object?>? MessageArgs { get; init; }
 }
 
 /// <summary><see cref="RecordFieldError.Code"/> değerleri.</summary>
@@ -133,7 +163,28 @@ public enum RecordErrorCode
     Conflict,
 }
 
-public sealed record RecordError(RecordErrorCode Code, string Message, IReadOnlyList<RecordFieldError>? FieldErrors = null);
+/// <summary>
+/// Kayıt işleminin hatası. <see cref="Code"/> makinece okunur ve dile göre değişmez; <see cref="Message"/> Türkçe kaynak metindir,
+/// <see cref="MessageKey"/> doluysa HTTP sınırında isteğin diline çevrilir (ADR-0034 §6).
+/// </summary>
+public sealed record RecordError(RecordErrorCode Code, string Message, IReadOnlyList<RecordFieldError>? FieldErrors = null)
+{
+    /// <summary>Çevrilebilir iletiyle hata (<see cref="ServerMessages"/>).</summary>
+    public RecordError(RecordErrorCode code, ServerMessage message, IReadOnlyList<RecordFieldError>? fieldErrors = null)
+        : this(code, message.Text, fieldErrors)
+    {
+        MessageKey = message.Key;
+        MessageArgs = message.Args;
+    }
+
+    /// <summary>İletinin sözlük anahtarı (<c>server.*</c>); boşsa ileti çevrilmez.</summary>
+    [JsonIgnore]
+    public string? MessageKey { get; init; }
+
+    /// <summary>Anahtarın yer tutucu değerleri.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<object?>? MessageArgs { get; init; }
+}
 
 public sealed class RecordResult<T>
 {
@@ -152,6 +203,10 @@ public sealed class RecordResult<T>
     public static RecordResult<T> Ok(T value) => new(value, null);
 
     public static RecordResult<T> Fail(RecordErrorCode code, string message, IReadOnlyList<RecordFieldError>? fieldErrors = null) =>
+        new(default, new RecordError(code, message, fieldErrors));
+
+    /// <summary>Çevrilebilir iletiyle hata (<see cref="ServerMessages"/>).</summary>
+    public static RecordResult<T> Fail(RecordErrorCode code, ServerMessage message, IReadOnlyList<RecordFieldError>? fieldErrors = null) =>
         new(default, new RecordError(code, message, fieldErrors));
 }
 
@@ -248,6 +303,12 @@ public interface IRecordStore
     bool UsesOwnerScope => OwnerField is not null;
 
     /// <summary>
+    /// Depo anonim oluşturmayı (<see cref="RecordCommand.Anonymous"/>) kabul eder mi? Varsayılan hayır: anonim yazma denetim kuralının istisnasıdır,
+    /// yalnızca kimliği hiçbir yerde saklanmaması gereken kayıt türü (tam anonim anket cevabı) açar.
+    /// </summary>
+    bool AllowsAnonymousWrites => false;
+
+    /// <summary>
     /// Veri kapsamının hangi kayıt türüne göre çözüleceği (ADR-0030): rolün kapsamı ve platform tavanı bu anahtarla aranır.
     /// Varsayılan kendi anahtarıdır. Görünürlüğü ana kaydına bağlı alt kayıt deposu (ör. fırsat iletişimcisi, aktivite notu)
     /// ana türünün anahtarını verir; böylece alt kayıt ana kaydın kapsamını izler.
@@ -290,13 +351,20 @@ public interface IRecordStore
 }
 
 /// <summary>Eşzamanlı değişiklik veya benzersizlik ihlali.</summary>
-public sealed class RecordConflictException(string message, Exception? innerException = null) : Exception(message, innerException);
+/// <remarks>İleti düz metin de olabilir (örtük dönüşüm); <see cref="ServerMessages"/> iletisi verilirse istemciye isteğin dilinde gider.</remarks>
+public sealed class RecordConflictException(ServerMessage message, Exception? innerException = null) : Exception(message.Text, innerException)
+{
+    public ServerMessage ServerMessage { get; } = message;
+}
 
 /// <summary>
 /// Kayıt türünde izin olduğu hâlde bu kayıt üzerinde işlem yetkisi yok (ör. süreli belgenin sahip kaydında güncelleme izni yok); boru hattı
 /// "yetkisiz" (403) döner. Kaydın varlığı zaten görünürken kullanılır; görünmeyen kayıt için depo "bulunamadı" döner.
 /// </summary>
-public sealed class RecordAccessDeniedException(string message) : Exception(message);
+public sealed class RecordAccessDeniedException(ServerMessage message) : Exception(message.Text)
+{
+    public ServerMessage ServerMessage { get; } = message;
+}
 
 /// <summary>
 /// Kayıtları başka bir listede tanıtmak için kısa ad (ör. araç → plaka, sürücü → kişinin adı). Süreli belge listesi sahip kaydı bununla gösterir
@@ -308,8 +376,9 @@ public interface IRecordLabelProvider
 }
 
 /// <summary>
-/// Kayıt türü iznine ek olarak kayıt düzeyinde yazma kuralı olan depolar (ör. süreli belge: sahip kaydın güncelleme izni ve modül lisansı) bunu uygular.
-/// Kayda bağlı yan yazmalar (dosya ekleme ve silme, ADR-0040) tür izninden sonra bunu da sorar; dönen ileti doluysa işlem yetkisizdir.
+/// Kayıt türü iznine ek olarak kayıt düzeyinde yazma kuralı olan depolar (ör. süreli belge: sahip kaydın güncelleme izni ve modül lisansı; İK masraf
+/// satırı: taslak beyan, sahibi ya da İK) bunu uygular. Kayda bağlı yan yazmalar (dosya ekleme ve silme, ADR-0040) tür izninden sonra bunu da sorar;
+/// dönen ileti doluysa işlem yetkisizdir. Kaydın güncellemesini durum ya da kişiyle sınırlayan depo bu kuralı vermezse dosya, kaydın kuralını atlatır.
 /// </summary>
 public interface IRecordWriteGuard
 {

@@ -23,12 +23,12 @@ public class HrImportTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
 {
     private const string Assets = "hr.asset";
     private const string Balances = "hr.leave-balance";
-    private const string Holidays = "hr.holiday";
+    private const string Holidays = "core.holiday"; // tatil listesi Core'dadır (ADR-0049 dilim 6a)
 
     private const string People = "core.person";
     private const string EmployeeCards = "hr.employee";
 
-    private static readonly string[] Importer = [RunImports, ImportPeople, EmployeesRead, EmployeesWrite, AssetsRead, AssetsManage, LeavesRead, LeavesManage];
+    private static readonly string[] Importer = [RunImports, ImportPeople, ManageHolidays, EmployeesRead, EmployeesWrite, AssetsRead, AssetsManage, LeavesRead, LeavesManage];
 
     [Fact]
     public async Task Assets_leave_balances_and_holidays_are_imported_and_balances_link_to_employees_by_number()

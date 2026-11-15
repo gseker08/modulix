@@ -1,12 +1,17 @@
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Modules;
+using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Persistence;
 
 namespace Modulix.Infrastructure.Modules;
 
-internal sealed class ModuleEntitlements(ModulixDbContext db, ModuleCatalog catalog) : IModuleEntitlements
+internal sealed class ModuleEntitlements(ModulixDbContext db, ModuleCatalog catalog, AccessCache cache) : IModuleEntitlements
 {
-    public async Task<IReadOnlySet<string>> GetEnabledAsync(Guid tenantId, CancellationToken cancellationToken)
+    /// <summary>Tenant'ın açık modülleri; her istekte sorulduğu için kısa süre önbellekte tutulur (ADR-0048).</summary>
+    public Task<IReadOnlySet<string>> GetEnabledAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        cache.GetOrLoadAsync("modules", tenantId, Guid.Empty, db, () => ReadEnabledAsync(tenantId, cancellationToken));
+
+    private async Task<IReadOnlySet<string>> ReadEnabledAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         var keys = await db.ModuleEntitlements.AsNoTracking()
             .Where(e => e.TenantId == tenantId && e.IsEnabled)

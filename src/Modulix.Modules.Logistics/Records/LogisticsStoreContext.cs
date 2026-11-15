@@ -9,8 +9,12 @@ namespace Modulix.Modules.Logistics.Records;
 /// modülündedir; lojistik araç tablosuna dokunmaz, <see cref="IVehicleDirectory"/> ile okur (ADR-0038 K1).
 /// </summary>
 internal sealed class LogisticsStoreContext(
-    IModuleData data, IChoiceLists choiceLists, IVehicleDirectory vehicles, LogisticsWorkflowGate gate, Lifecycle.ILogisticsPolicyProvider? policy = null)
+    IModuleData data, IChoiceLists choiceLists, IVehicleDirectory vehicles, LogisticsWorkflowGate gate,
+    Modulix.Core.Contracts.Numbering.IDocumentNumbers numbers, Lifecycle.ILogisticsPolicyProvider? policy = null)
 {
+    /// <summary>Ortak belge numaralama (ADR-0049).</summary>
+    public Modulix.Core.Contracts.Numbering.IDocumentNumbers Numbers => numbers;
+
     /// <summary>Ülke gönderilmediğinde kullanılan ülke: firma ayarı (<c>logistics.default-country</c>), yoksa ya da geçersizse <see cref="Domain.CargoEntity.DefaultCountry"/>.</summary>
     public async Task<string> DefaultCountryAsync(CancellationToken cancellationToken)
     {

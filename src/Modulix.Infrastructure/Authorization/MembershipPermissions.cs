@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Infrastructure.Persistence;
 
@@ -50,9 +51,29 @@ internal sealed record MembershipUnit(Guid Id, string Name, string Path);
 /// Üyeliğin rollerinden (doğrudan ve departmandan gelen) ve tenant'ın açık modüllerinden geçerli izinleri hesaplar. Oturumdaki
 /// kişinin erişimi (<see cref="CurrentAccess"/>), rol düzenlerken işlemi yapanın sınırı ve kullanıcı detayındaki "Erişim" görünümü
 /// aynı hesabı kullanır; ekranda görünen ile sunucunun uyguladığı ayrışmaz.
+/// Roller ve departman istek (scope) içinde üyelik başına bir kez okunur: izin, kayıt kapsamı ve kapsam dışı ortak kayıt kararları
+/// aynı istekte ayrı ayrı sorulur. Bu bağlamda bir kayıt yazılınca (<see cref="DbContext.SavedChanges"/>) bellek boşaltılır; rol ya da
+/// departman değiştiren işlemden sonraki okuma güncel veriyi görür. İstekler arasında roller, departman ve kapsam istisnaları aktif
+/// tenant'ın anahtarıyla kısa süre önbellekte tutulur (ADR-0048, <see cref="AccessCache"/>).
 /// </summary>
-internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog catalog)
+internal sealed class MembershipPermissions
 {
+    private readonly ModulixDbContext db;
+    private readonly ModuleCatalog catalog;
+    private readonly AccessCache cache;
+    private readonly ITenantContextAccessor tenantAccessor;
+    private readonly Dictionary<Guid, List<GrantingRole>> rolesByMembership = [];
+    private readonly Dictionary<Guid, MembershipUnit?> unitByMembership = [];
+
+    public MembershipPermissions(ModulixDbContext db, ModuleCatalog catalog, AccessCache cache, ITenantContextAccessor tenantAccessor)
+    {
+        this.db = db;
+        this.catalog = catalog;
+        this.cache = cache;
+        this.tenantAccessor = tenantAccessor;
+        db.SavedChanges += (_, _) => Forget();
+    }
+
     public async Task<MembershipAccess> GetAsync(Guid membershipId, IReadOnlySet<string> enabledModules, CancellationToken cancellationToken)
     {
         var roles = await LoadRolesAsync(membershipId, cancellationToken);
@@ -107,13 +128,12 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
             return (isAdministrator, byType);
         }
 
-        // İstisnalar yalnızca istenen türlerde ve etkin rollerde okunur; istisna yoksa ek sorgu yapılmaz.
-        var roleIds = effective.Select(r => r.Id).ToList();
-        var overrides = await db.RoleScopeOverrides.AsNoTracking()
-            .Where(o => entityKeys.Contains(o.EntityKey) && roleIds.Contains(o.RoleId))
-            .Select(o => new { o.RoleId, o.EntityKey, o.Scope })
-            .ToListAsync(cancellationToken);
-        var byRoleAndType = overrides.ToDictionary(o => (o.RoleId, o.EntityKey), o => o.Scope);
+        // İstisnalar tenant'ın bütün rollerinde birlikte okunur (küçük tablo) ve önbellekte tutulur; burada etkin rollere bakılır.
+        var byRoleAndType = await CachedAsync<IReadOnlyDictionary<(Guid RoleId, string EntityKey), RecordScope>>("scope-overrides", Guid.Empty, async () =>
+            (await db.RoleScopeOverrides.AsNoTracking()
+                .Select(o => new { o.RoleId, o.EntityKey, o.Scope })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(o => (o.RoleId, o.EntityKey), o => o.Scope));
         foreach (var key in entityKeys)
         {
             byType[key] = ScopesOf(false, effective.Select(r => byRoleAndType.TryGetValue((r.Id, key), out var scope) ? scope : r.Scope));
@@ -135,13 +155,22 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
         RecordScopeRules.Widest(await GetScopesAsync(membershipId, cancellationToken));
 
     /// <summary>Üyeliğin departmanı; departmansız üyelik (bozuk veri) için null.</summary>
-    public async Task<MembershipUnit?> GetUnitAsync(Guid membershipId, CancellationToken cancellationToken) =>
-        await (
+    public async Task<MembershipUnit?> GetUnitAsync(Guid membershipId, CancellationToken cancellationToken)
+    {
+        if (unitByMembership.TryGetValue(membershipId, out var known))
+        {
+            return known;
+        }
+
+        var found = await CachedAsync("unit", membershipId, () => (
             from member in db.BusinessUnitMembers.AsNoTracking()
             join unit in db.BusinessUnits.AsNoTracking() on member.BusinessUnitId equals unit.Id
             where member.MembershipId == membershipId
             select new MembershipUnit(unit.Id, unit.Name, unit.Path))
-            .SingleOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(cancellationToken));
+        unitByMembership[membershipId] = found;
+        return found;
+    }
 
     /// <summary>
     /// Kişinin görebildiği ve yönetebildiği departmanlar (ADR-0026): null tüm departmanlardır (tüm kayıtlar kapsamı). Aksi halde
@@ -213,8 +242,33 @@ internal sealed class MembershipPermissions(ModulixDbContext db, ModuleCatalog c
     internal static IReadOnlyList<RecordScope> ScopesOf(bool isAdministrator, IEnumerable<RecordScope> roleScopes) =>
         isAdministrator ? [RecordScope.All] : roleScopes.Distinct().DefaultIfEmpty(RecordScope.Own).ToList();
 
-    /// <summary>Doğrudan roller ve departmandan gelenler (yinelenen rol önce doğrudan olarak sayılır).</summary>
+    /// <summary>Bu istekte okunan roller ve departmanlar unutulur; sonraki soru veritabanına gider.</summary>
+    public void Forget()
+    {
+        rolesByMembership.Clear();
+        unitByMembership.Clear();
+    }
+
+    /// <summary>Doğrudan roller ve departmandan gelenler (yinelenen rol önce doğrudan olarak sayılır); istek içinde üyelik başına bir kez.</summary>
     private async Task<List<GrantingRole>> LoadRolesAsync(Guid membershipId, CancellationToken cancellationToken)
+    {
+        if (!rolesByMembership.TryGetValue(membershipId, out var roles))
+        {
+            roles = await CachedAsync("roles", membershipId, () => ReadRolesAsync(membershipId, cancellationToken));
+            rolesByMembership[membershipId] = roles;
+        }
+
+        return roles;
+    }
+
+    /// <summary>
+    /// Aktif tenant varken değer o tenant'ın anahtarıyla önbellekten gelir (sorgular RLS altında o tenant'ın verisini okur); tenant
+    /// bağlamı olmayan çağrı (platform işlemi) her zaman veritabanına gider.
+    /// </summary>
+    private Task<T> CachedAsync<T>(string kind, Guid id, Func<Task<T>> load) =>
+        tenantAccessor.Current is { } tenant ? cache.GetOrLoadAsync(kind, tenant.TenantId, id, db, load) : load();
+
+    private async Task<List<GrantingRole>> ReadRolesAsync(Guid membershipId, CancellationToken cancellationToken)
     {
         // Roller ve atamalar tenant verisidir: sorgu filtresi ve RLS yalnızca aktif tenant'ınkileri döndürür.
         var direct = await (

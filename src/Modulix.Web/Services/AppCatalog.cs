@@ -183,12 +183,12 @@ public static class AppCatalog
         new("crm.sales-forecasts", Crm, "Satış tahmini", "trending-up", "crm/satis-tahmini", 30, CrmAccess.ModuleKey, SalesAccess.ForecastsRead, Group: CrmReportsGroup),
         new("crm.sales-analysis", Crm, "Satış analizi", "percent", "crm/satis-analizi", 40, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmReportsGroup),
         new("crm.sales-team", Crm, "Ekip performansı", "users", "crm/ekip-performansi", 50, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Group: CrmReportsGroup),
+        new("crm.sales-data-quality", Crm, "Veri kalitesi", "shield", "crm/veri-kalitesi", 55, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmReportsGroup),
 
-        // CRM Ayarları: CRM'e özgü kurallar ve tanımlar, veri kalitesi.
+        // CRM Ayarları: CRM'e özgü kurallar ve tanımlar (yönetici işi; raporlar ve günlük kullanılan ekranlar burada değil).
         new("crm.settings", Crm, "Genel CRM ayarları", "wrench", ModuleSettingsRoute(CrmAccess.ModuleKey), 5, CrmAccess.ModuleKey, CoreAccess.ManageSettings, Group: CrmSettingsGroup),
         new("crm.quote-rules", Crm, "Teklif kuralları", "shield", "crm/teklif-kurallari", 10, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmSettingsGroup),
         new("crm.quote-delegations", Crm, "Onay vekâletleri", "users", "crm/onay-vekaletleri", 20, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmSettingsGroup),
-        new("crm.sales-data-quality", Crm, "Veri kalitesi", "shield", "crm/veri-kalitesi", 30, CrmAccess.ModuleKey, SalesAccess.ReportsRead, Tone: AppTone.Teal, Group: CrmSettingsGroup),
         new("crm.product-categories", Crm, "Ürün kategorileri", "layers", "crm/urun-kategorileri", 40, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmSettingsGroup),
         new("crm.units", Crm, "Ölçü birimleri", "sliders", "crm/birimler", 50, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmSettingsGroup),
         new("crm.tax-rates", Crm, "Vergi ve kur", "landmark", "crm/vergi-kur", 60, CrmAccess.ModuleKey, CrmAccess.PricesRead, Group: CrmSettingsGroup),
@@ -198,7 +198,7 @@ public static class AppCatalog
         new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal, Group: SalesGroup, HostId: Crm),
         new("contracts.dashboard", Contracts, "Pano", "dashboard", "sozlesmeler/ozet", 5, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, ExactMatch: true, Hosted: new(CrmReportsGroup, "Sözleşme panosu", 60)),
         new("contracts.list", Contracts, "Sözleşmeler", "file-text", "sozlesmeler", 10, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmSalesGroup, "Satış sözleşmeleri", 40, Route: "sozlesmeler?gorunum=sales")),
-        new("contracts.templates", Contracts, "Şablonlar", "layers", "sozlesmeler/sablonlar", 20, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmSettingsGroup, "Sözleşme şablonları", 70)),
+        new("contracts.templates", Contracts, "Şablonlar", "layers", "sozlesmeler/sablonlar", 20, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmSalesGroup, "Sözleşme şablonları", 45)),
         new("contracts.approvals", Contracts, "Onaylar", "check-circle", "sozlesmeler/onaylar", 30, ContractsAccess.ModuleKey, ContractsAccess.ContractsApprove, Tone: AppTone.Teal, Hosted: new(CrmWorkspaceGroup, "Sözleşme onayları", 30, ParentEntryId: "crm.approvals")),
         new("contracts.signatures", Contracts, "İmzalar", "check-circle", "sozlesmeler/imzalar", 35, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmAfterSalesGroup, "Sözleşme imzaları", 30)),
         new("contracts.commitments", Contracts, "Taahhütler", "clipboard-list", "sozlesmeler/taahhutler", 36, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Tone: AppTone.Teal, Hosted: new(CrmAfterSalesGroup, null, 20)),
@@ -259,7 +259,7 @@ public static class AppCatalog
         new("hr.my-leaves", Hr, "İzinlerim", "calendar", "ik/izinlerim", 40, HrAccess.ModuleKey, HrAccess.LeavesRequest, Tone: AppTone.Teal),
         new("hr.leave-requests", Hr, "İzin talepleri", "check-circle", "ik/izin-talepleri", 50, HrAccess.ModuleKey, AnyPermission: [HrAccess.LeavesApprove, HrAccess.LeavesManage]),
         new("hr.leave-balances", Hr, "İzin hakları", "star", "ik/izin-haklari", 60, HrAccess.ModuleKey, HrAccess.LeavesManage, Tone: AppTone.Teal),
-        new("hr.holidays", Hr, "Resmî tatiller", "sun", "ik/resmi-tatiller", 70, HrAccess.ModuleKey, HrAccess.LeavesManage),
+        new("hr.holidays", Hr, "Resmî tatiller", "sun", "ik/resmi-tatiller", 70, HrAccess.ModuleKey, CoreAccess.ManageHolidays), // liste Core'dadır (ADR-0049 dilim 6a)
         new("hr.my-expenses", Hr, "Masraflarım", "wallet", "ik/masraflarim", 80, HrAccess.ModuleKey, HrAccess.ExpensesRequest, Tone: AppTone.Teal),
         new("hr.my-assets", Hr, "Zimmetlerim", "package", "ik/zimmetlerim", 100, HrAccess.ModuleKey, HrAccess.AssetsRead, Tone: AppTone.Teal),
         new("hr.assets", Hr, "Demirbaşlar", "clipboard-list", "ik/demirbaslar", 110, HrAccess.ModuleKey, HrAccess.AssetsManage),
@@ -296,6 +296,7 @@ public static class AppCatalog
         new("admin.roles", Admin, "Roller", "key", "yonetim/roller", 40, Permission: CoreAccess.ManageRoles, Tone: AppTone.Teal),
         new("admin.companies", Admin, "Şirketler", "landmark", "yonetim/sirketler", 50, Permission: CoreAccess.ManageCompanies),
         new("admin.settings", Admin, "Kuruluş ayarları", "wrench", "yonetim/ayarlar", 60, Permission: CoreAccess.ManageSettings, Tone: AppTone.Teal),
+        new("admin.holidays", Admin, "Resmî tatiller", "sun", "yonetim/resmi-tatiller", 62, Permission: CoreAccess.ManageHolidays),
         new("admin.ai-access", Admin, "Yapay zekâ erişimi", "zap", "yonetim/yapay-zeka", 65, Permission: CoreAccess.ManageSettings),
         new("admin.audit", Admin, "Denetim kaydı", "history", "yonetim/denetim", 70, Permission: CoreAccess.ReadAudit),
         new("admin.import-log", Admin, "İşlem günlüğü", "history", "yonetim/gunluk", 72, AnyPermission: [CoreAccess.ReadImports, CoreAccess.RunImports]),

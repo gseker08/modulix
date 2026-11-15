@@ -8,8 +8,11 @@ namespace Modulix.Modules.Hr.Records;
 /// <summary>Kayıt depolarının ihtiyaç duyduğu servisler. Tenant filtresi ve RLS <see cref="IModuleData"/> üzerinden uygulanır.</summary>
 internal sealed class HrStoreContext(
     IModuleData data, IChoiceLists choiceLists, ITenantMembers members, ITenantContextAccessor tenant, ICurrentAccess access, HrWorkflowGate gate,
-    IBusinessUnitDirectory businessUnits)
+    IBusinessUnitDirectory businessUnits, Modulix.Core.Contracts.Calendar.IHolidayCalendar holidays)
 {
+    /// <summary>Firmanın resmî tatil listesi (Core, ADR-0049 dilim 6a); izin gün sayısından düşülür.</summary>
+    public Modulix.Core.Contracts.Calendar.IHolidayCalendar Holidays => holidays;
+
     public HrWorkflowGate Gate => gate;
 
     /// <summary>İsteği yapan kullanıcı (aktif tenant yoksa null).</summary>

@@ -1,8 +1,11 @@
 using System.Text.Json.Nodes;
 using Modulix.Api.Audit;
+using Modulix.Api.Localization;
 using Modulix.Api.Tenancy;
 using Modulix.Core.Audit;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Localization;
 using Modulix.Shared.Records;
 
 namespace Modulix.Api.Records;
@@ -103,15 +106,32 @@ public static class RecordEndpoints
 
     /// <summary>Güncelleme ve silme kaydın okunan sürümünü ister; sürümsüz istek son yazanın ezmesine yol açacağı için 428 alır.</summary>
     internal static IResult VersionRequired() =>
-        Results.Problem(
-            statusCode: StatusCodes.Status428PreconditionRequired,
-            title: "Kaydın sürümü gerekli.",
-            detail: "Güncelleme ve silme isteğinde okuduğunuz kaydın version değeri gönderilmelidir.",
-            extensions: new Dictionary<string, object?> { ["code"] = "VersionRequired" });
+        LocalizedProblems.Problem(
+            StatusCodes.Status428PreconditionRequired,
+            ServerMessages.Record.VersionRequiredTitle,
+            ServerMessages.Record.VersionRequiredDetail,
+            new Dictionary<string, object?> { ["code"] = "VersionRequired" });
 
     private static RecordResponse ToResponse(RecordData data) => new(data.EntityKey, data.Id, data.Version, data.Values);
 
-    internal static IResult ToProblem(RecordError error)
+    /// <summary>
+    /// Kayıt hatasının HTTP karşılığı. Anahtarlı iletiler (ADR-0034 §6) yanıt yazılırken isteğin diline çevrilir; <c>code</c>, alan
+    /// adları ve yanıtın biçimi dile göre değişmez. Anahtarsız hata dil çözülmeden olduğu gibi döner.
+    /// </summary>
+    internal static IResult ToProblem(RecordError error) =>
+        ServerMessageTranslation.IsTranslatable(error) ? new TranslatedRecordProblem(error) : ToHttp(error);
+
+    private sealed class TranslatedRecordProblem(RecordError error) : IResult
+    {
+        public async Task ExecuteAsync(HttpContext httpContext)
+        {
+            var services = httpContext.RequestServices;
+            var language = await services.GetRequiredService<IRequestLanguage>().GetAsync(httpContext.RequestAborted);
+            await ToHttp(services.GetRequiredService<ITextCatalog>().Translate(language, error)).ExecuteAsync(httpContext);
+        }
+    }
+
+    private static IResult ToHttp(RecordError error)
     {
         var extensions = new Dictionary<string, object?> { ["code"] = error.Code.ToString() };
 

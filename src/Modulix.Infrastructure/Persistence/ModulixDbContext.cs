@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -46,7 +47,7 @@ public class ModulixDbContext(
     DbContextOptions<ModulixDbContext> options,
     ITenantContextAccessor? tenantAccessor = null,
     ModuleCatalog? modules = null)
-    : IdentityUserContext<ModulixUser, Guid>(options)
+    : IdentityUserContext<ModulixUser, Guid>(options), IDataProtectionKeyContext
 {
     private static readonly MethodInfo ApplyTenantFilterMethod =
         typeof(ModulixDbContext).GetMethod(nameof(ApplyTenantFilter), BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -74,6 +75,9 @@ public class ModulixDbContext(
     public DbSet<BillingRecord> BillingRecords => Set<BillingRecord>();
 
     public DbSet<UserSession> UserSessions => Set<UserSession>();
+
+    /// <summary>Data Protection anahtarları (platform geneli); uygulama örnekleri aynı anahtar halkasını kullanır.</summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     public DbSet<QueuedEmail> EmailMessages => Set<QueuedEmail>();
 
@@ -185,6 +189,12 @@ public class ModulixDbContext(
     /// <summary>Kullanıcının kişisel liste görünümleri (ADR-0034).</summary>
     public DbSet<Modulix.Core.Views.GridView> GridViews => Set<Modulix.Core.Views.GridView>();
 
+    /// <summary>Firmanın resmî tatil listesi (ADR-0049 dilim 6a).</summary>
+    public DbSet<Modulix.Core.Calendar.Holiday> Holidays => Set<Modulix.Core.Calendar.Holiday>();
+
+    /// <summary>Belge serisi sayaçları (ADR-0049).</summary>
+    public DbSet<Modulix.Core.Numbering.NumberCounter> NumberCounters => Set<Modulix.Core.Numbering.NumberCounter>();
+
     /// <summary>Kayıtlara bağlı dosyaların üst verisi (ADR-0040); içerik depolama adaptöründedir.</summary>
     public DbSet<Modulix.Core.Files.StoredFile> StoredFiles => Set<Modulix.Core.Files.StoredFile>();
 
@@ -239,6 +249,9 @@ public class ModulixDbContext(
         modelBuilder.Entity<IdentityUserClaim<Guid>>().ToTable("UserClaims", DatabaseSchemas.Platform);
         modelBuilder.Entity<IdentityUserLogin<Guid>>().ToTable("UserLogins", DatabaseSchemas.Platform);
         modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("UserTokens", DatabaseSchemas.Platform);
+
+        // Data Protection anahtar halkası (oturum çerezi, davet ve sıfırlama belirteçleri): bütün örnekler paylaşır.
+        modelBuilder.Entity<DataProtectionKey>().ToTable("DataProtectionKeys", DatabaseSchemas.Platform);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ModulixDbContext).Assembly);
 
