@@ -173,11 +173,13 @@ public static class ApprovalEndpoints
         Results.ValidationProblem(new Dictionary<string, string[]> { [key] = [message] }, statusCode: StatusCodes.Status400BadRequest);
 
     private static ApprovalDefinitionInput ToInput(SaveApprovalDefinitionRequest request) => new(
-        request.Name, request.Description, request.Currency, TargetEntityKey: request.TargetEntityKey, GatedCommands: request.GatedCommands, Steps:
+        request.Name, request.Description, request.Currency, TargetEntityKey: request.TargetEntityKey, GatedCommands: request.GatedCommands,
+        DueInWorkingHours: request.DueInWorkingHours, Steps:
         [.. (request.Steps ?? []).Select(s => new ApprovalStepDefinition(s.Name, s.Order, s.ApproverUserId, s.ApproverRoleId, s.MinAmount, s.DueHours, s.EscalateToUserId, s.EscalateToRoleId))]);
 
     private static ApprovalDefinitionDto ToDto(ApprovalDefinition definition) => new(
-        definition.Id, definition.Name, definition.Description, definition.Currency, definition.IsActive, definition.Revision, definition.Version, TargetEntityKey: definition.TargetEntityKey, GatedCommands: definition.Commands, Steps:
+        definition.Id, definition.Name, definition.Description, definition.Currency, definition.IsActive, definition.Revision, definition.Version, TargetEntityKey: definition.TargetEntityKey, GatedCommands: definition.Commands,
+        DueInWorkingHours: definition.DueInWorkingHours, Steps:
         [.. definition.Steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.ApproverUserId, s.ApproverRoleId, s.MinAmount, s.DueHours, s.EscalateToUserId, s.EscalateToRoleId))]);
 
     private static ApprovalRequestDto ToDto(ApprovalRequestDetail detail) => new(

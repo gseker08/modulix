@@ -32,6 +32,9 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
     public const int StepNameMaxLength = 100;
     public const int MaxSteps = 10;
     public const int MaxDueHours = 8760;
+
+    /// <summary>Süre iş saatiyle sayılırken adım süresinin üst sınırı (yaklaşık bir yıllık mesai; ADR-0049 dilim 6d).</summary>
+    public const int MaxWorkingDueHours = 2000;
     public const int GatedCommandsMaxLength = 500;
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -63,6 +66,12 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
     /// </summary>
     public string? GatedCommands { get; private set; }
 
+    /// <summary>
+    /// Adım süreleri firmanın iş takvimine göre mi sayılır (ADR-0049 dilim 6d): mesai saatleri, çalışma günleri ve resmî tatil listesi. Kapalıysa
+    /// (varsayılan) süre adımın açıldığı andan itibaren takvim saatidir. Talep açılırken kopyalanır.
+    /// </summary>
+    public bool DueInWorkingHours { get; private set; }
+
     public IReadOnlyList<string> Commands =>
         GatedCommands is null ? [] : GatedCommands.Split(',', StringSplitOptions.RemoveEmptyEntries);
 
@@ -87,7 +96,7 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
 
     public static ApprovalDefinition Create(
         string name, string? description, string? currency, IReadOnlyList<ApprovalStepDefinition> steps, Guid userId, DateTimeOffset now,
-        string? targetEntityKey = null, IReadOnlyList<string>? gatedCommands = null)
+        string? targetEntityKey = null, IReadOnlyList<string>? gatedCommands = null, bool dueInWorkingHours = false)
     {
         ApprovalDefinition definition = new()
         {
@@ -98,17 +107,17 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
             CreatedBy = userId,
             Version = 1,
         };
-        definition.Assign(name, description, currency, steps, userId, now, targetEntityKey, gatedCommands);
+        definition.Assign(name, description, currency, steps, userId, now, targetEntityKey, gatedCommands, dueInWorkingHours);
         return definition;
     }
 
     public void Update(
         string name, string? description, string? currency, IReadOnlyList<ApprovalStepDefinition> steps, Guid userId, DateTimeOffset now,
-        string? targetEntityKey = null, IReadOnlyList<string>? gatedCommands = null)
+        string? targetEntityKey = null, IReadOnlyList<string>? gatedCommands = null, bool dueInWorkingHours = false)
     {
-        (string StepsJson, string? Currency, string? Target) before = (StepsJson, Currency, TargetEntityKey);
-        Assign(name, description, currency, steps, userId, now, targetEntityKey, gatedCommands);
-        if (before != (StepsJson, Currency, TargetEntityKey))
+        (string StepsJson, string? Currency, string? Target, bool DueInWorkingHours) before = (StepsJson, Currency, TargetEntityKey, DueInWorkingHours);
+        Assign(name, description, currency, steps, userId, now, targetEntityKey, gatedCommands, dueInWorkingHours);
+        if (before != (StepsJson, Currency, TargetEntityKey, DueInWorkingHours))
         {
             Revision++;
         }
@@ -126,7 +135,7 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
 
     private void Assign(
         string name, string? description, string? currency, IReadOnlyList<ApprovalStepDefinition> steps, Guid userId, DateTimeOffset now,
-        string? targetEntityKey, IReadOnlyList<string>? gatedCommands)
+        string? targetEntityKey, IReadOnlyList<string>? gatedCommands, bool dueInWorkingHours)
     {
         TargetEntityKey = string.IsNullOrWhiteSpace(targetEntityKey) ? null : targetEntityKey.Trim();
         List<string> commands = [.. (gatedCommands ?? [])
@@ -163,12 +172,13 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
         Name = trimmedName;
         Description = trimmedDescription;
         Currency = code;
-        StepsJson = JsonSerializer.Serialize(Normalize(steps, code), Json);
+        StepsJson = JsonSerializer.Serialize(Normalize(steps, code, dueInWorkingHours), Json);
+        DueInWorkingHours = dueInWorkingHours;
         UpdatedAt = now;
         UpdatedBy = userId;
     }
 
-    private static List<ApprovalStepDefinition> Normalize(IReadOnlyList<ApprovalStepDefinition> steps, string? currency)
+    private static List<ApprovalStepDefinition> Normalize(IReadOnlyList<ApprovalStepDefinition> steps, string? currency, bool dueInWorkingHours)
     {
         if (steps is null || steps.Count is 0 or > MaxSteps)
         {
@@ -201,9 +211,12 @@ public sealed class ApprovalDefinition : ITenantEntity, ICompanyShared
                     : $"\"{stepName}\" adımının tutar eşiği negatif olamaz.");
             }
 
-            if (step.DueHours is { } hours && hours is < 1 or > MaxDueHours)
+            int maxHours = dueInWorkingHours ? MaxWorkingDueHours : MaxDueHours;
+            if (step.DueHours is { } hours && (hours < 1 || hours > maxHours))
             {
-                throw new ArgumentException($"\"{stepName}\" adımının süresi 1-{MaxDueHours} saat olmalı.");
+                throw new ArgumentException(dueInWorkingHours
+                    ? $"\"{stepName}\" adımının süresi iş saatiyle 1-{MaxWorkingDueHours} saat olmalı."
+                    : $"\"{stepName}\" adımının süresi 1-{MaxDueHours} saat olmalı.");
             }
 
             if (step.EscalateToUserId is not null && step.EscalateToRoleId is not null)

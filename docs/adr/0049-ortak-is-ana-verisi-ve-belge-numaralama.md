@@ -67,7 +67,13 @@ Tek Core takvimi (mesai saatleri + tatil günleri, tenant başına; ileride şir
 - **Ayarlar (Core, "Çalışma takvimi" grubu):** `core.calendar.work-days` (Pazartesi–Cuma varsayılan; Pazartesi–Cuma + Cumartesi yarım gün; Pazartesi–Cumartesi; Pazar–Perşembe) ve `core.calendar.work-hours` (hazır aralıklar, varsayılan 09:00–18:00). Seçenekli ayar oldukları için mevcut ayar ekranında görünür; serbest saat girişi yoktur (çapraz doğrulama gerektirir, ihtiyaç doğarsa ayrı dilim). Seçenekler ve çözümleme `WorkWeek` (`Core.Contracts.Calendar`); bozuk değer varsayılana düşer.
 - **Sözleşme:** `ITenantWorkCalendar`: `GetWeekAsync` (saat dilimi + haftalık mesai) ve `GetAsync(from, to)` (tatil listesi uygulanmış). Uygulama ayar okuyucusunu çağrı anında çözer (kayıt depolarına verildiği için kurucuda alınırsa servis döngüsü oluşur).
 - **İK:** izin gün sayısı firmanın çalışma günlerine göre (`WorkWeek.DayWorth`: penceresi olmayan gün 0, haftanın en uzun gününün %60'ından kısa gün yarım, diğerleri 1). Varsayılan ayarla sonuç önceki sabit cumartesi–pazar kuralıyla aynıdır; açılmış taleplerin gün sayısı değişmez.
-- **Kalan:** onay eskalasyonunun iş saatine geçmesi (süreç başına seçenek; bugün adım açılışından itibaren duvar saati), lojistik teslim süresi, platformun hazır tatil kataloğu (açık karar 3), şube başına takvim, `hr.Holidays` tablosunun kaldırılması.
+
+#### Dilim 6d: onay adımı süresi iş saatiyle (teslim edildi)
+
+- **Seçenek süreç başınadır:** `ApprovalDefinition.DueInWorkingHours` (varsayılan kapalı; mevcut süreçler takvim saatiyle sürer). Açıkken adımın süresi `ITenantWorkCalendar`'ın takviminde (mesai, çalışma günleri, tatil listesi) `WorkCalendar.AddWorkingTime` ile sayılır; bitiş anı (`DueAt`) adım açılırken bir kez hesaplanır, eskalasyon işi değişmeden bu anı kullanır.
+- **Anlık görüntü:** seçenek talep açılırken `ApprovalRequest.DueInWorkingHours`'a kopyalanır; süreç sonradan değişse de açık talep kendi ayarıyla sürer. Seçeneği değiştirmek süreç sürümünü (`Revision`) artırır. Tatil listesi adım açılırken bugünden 400 gün ileriye kadar okunur; bu yüzden iş saatiyle adım süresi en çok 2000 saattir (yaklaşık bir yıllık mesai). Sonradan eklenen tatil açılmış adımın bitişini değiştirmez.
+- **Kapsam dışı:** sözleşme onayı (`contracts`) kendi süresini kullanır; adım başına ayrı seçenek yoktur.
+- **Kalan:** lojistik teslim süresi, platformun hazır tatil kataloğu (açık karar 3), şube başına takvim, `hr.Holidays` tablosunun kaldırılması.
 
 ## Açık kararlar
 

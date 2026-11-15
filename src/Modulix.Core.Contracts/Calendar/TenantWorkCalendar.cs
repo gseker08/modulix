@@ -2,7 +2,7 @@ namespace Modulix.Core.Contracts.Calendar;
 
 /// <summary>
 /// Firmanın iş takvimi (ADR-0049 dilim 6c): saat dilimi (bölgesel ayar), haftalık mesai (çalışma takvimi ayarları) ve resmî tatil listesi tek takvimde.
-/// İzin gün sayısı, ileride onay eskalasyonu ve teslim süresi bu takvimi kullanır; kendi takvimi olan özellik (ör. destek SLA takvimi) onu kullanmaya devam eder.
+/// İzin gün sayısı ve iş saatiyle sayılan onay adımı süresi (dilim 6d) bu takvimi kullanır, ileride teslim süresi de; kendi takvimi olan özellik (ör. destek SLA takvimi) onu kullanmaya devam eder.
 /// </summary>
 public interface ITenantWorkCalendar
 {

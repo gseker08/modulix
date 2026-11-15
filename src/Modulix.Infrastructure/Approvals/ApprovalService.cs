@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Approvals;
 using Modulix.Core.Contracts.Approvals;
+using Modulix.Core.Contracts.Calendar;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -27,6 +28,7 @@ internal sealed class ApprovalService(
     INotificationRecipients recipients,
     IRecordPipeline pipeline,
     ModuleCatalog modules,
+    ITenantWorkCalendar workCalendar,
     TimeProvider time) : IApprovalService, IApprovalStatusReader, IApprovalGate
 {
     private const int TrendDays = 14;
@@ -34,6 +36,9 @@ internal sealed class ApprovalService(
     private const int EscalationBatch = 200;
     private const string EscalationSource = "core.approval-escalation";
     private const string InvalidationSource = "core.approvals";
+
+    // İş saatiyle sayılan süre için yüklenen tatil aralığı (gün): en uzun adım süresi (MaxWorkingDueHours) bir yıllık mesaiyi aşmaz.
+    private const int WorkCalendarDays = 400;
 
     // Kişinin karar verebildiği kimlikler; Users kendisi ve o an vekili olduğu kişilerdir.
     private sealed record Me(List<Guid> Users, List<Guid> Roles);
@@ -56,7 +61,8 @@ internal sealed class ApprovalService(
         RequireTarget(input.TargetEntityKey, input.GatedCommands);
         ApprovalDefinition definition = Guarded(() =>
             ApprovalDefinition.Create(
-                input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey, input.GatedCommands));
+                input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey, input.GatedCommands,
+                input.DueInWorkingHours));
         db.ApprovalDefinitions.Add(definition);
         Audit(tenant, CoreModule.AuditedEntityKeys.ApprovalDefinition, definition.Id, AuditAction.Created, null, Snapshot(definition));
         await SaveAsync(cancellationToken);
@@ -82,7 +88,9 @@ internal sealed class ApprovalService(
         JsonObject before = Snapshot(definition);
         Guarded(() =>
         {
-            definition.Update(input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey, input.GatedCommands);
+            definition.Update(
+                input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey, input.GatedCommands,
+                input.DueInWorkingHours);
             return definition;
         });
         Audit(tenant, CoreModule.AuditedEntityKeys.ApprovalDefinition, id, AuditAction.Updated, before, Snapshot(definition));
@@ -295,8 +303,9 @@ internal sealed class ApprovalService(
             throw new ApprovalException("Bu süreç bir kayda bağlanmaz.");
         }
 
+        WorkCalendar? calendar = await DueCalendarAsync(definition.DueInWorkingHours, cancellationToken);
         (ApprovalRequest request, List<ApprovalRequestStep> steps) = Guarded(() =>
-            ApprovalRequest.Open(definition, title, input.Description, amount, currency, requesterId, now, target, sourceKey));
+            ApprovalRequest.Open(definition, title, input.Description, amount, currency, requesterId, now, target, sourceKey, calendar));
 
         // Süreç açılışta sahipsiz kalmasın: her adımda talep sahibinden başka etkin bir onaycı olmalı (dört göz).
         foreach (ApprovalRequestStep step in steps)
@@ -356,11 +365,12 @@ internal sealed class ApprovalService(
 
         JsonObject before = Snapshot(request);
         DateTimeOffset now = time.GetUtcNow();
+        WorkCalendar? calendar = approve ? await DueCalendarAsync(request.DueInWorkingHours, cancellationToken) : null;
         Guarded(() =>
         {
             if (approve)
             {
-                request.Approve(step, steps, tenant.UserId, comment, now, onBehalfOf);
+                request.Approve(step, steps, tenant.UserId, comment, now, onBehalfOf, calendar);
             }
             else
             {
@@ -794,7 +804,20 @@ internal sealed class ApprovalService(
         ["revision"] = definition.Revision,
         ["steps"] = string.Join(" → ", definition.Steps.Select(s => s.Name)),
         ["gatedCommands"] = definition.Commands.Count == 0 ? null : string.Join(", ", definition.Commands.Select(c => CommandName(definition.TargetEntityKey, c))),
+        ["dueInWorkingHours"] = definition.DueInWorkingHours,
     };
+
+    // Süre iş saatiyle sayılıyorsa firmanın iş takvimi (mesai + tatil; ADR-0049 dilim 6d); değilse null (takvim saati).
+    private async Task<WorkCalendar?> DueCalendarAsync(bool dueInWorkingHours, CancellationToken cancellationToken)
+    {
+        if (!dueInWorkingHours)
+        {
+            return null;
+        }
+
+        DateOnly today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        return new WorkCalendar(await workCalendar.GetAsync(today.AddDays(-1), today.AddDays(WorkCalendarDays), cancellationToken));
+    }
 
     private static JsonObject Snapshot(ApprovalRequest request) => new()
     {

@@ -5959,6 +5959,8 @@
   "admin.approvalProcesses.gated": "Cannot be done without approval",
   "admin.approvalProcesses.gatedHelp": "A ticked action cannot be done until the record is approved in this process.",
   "admin.approvalProcesses.currencyHelp": "If filled in, an amount is required on the request and step thresholds are in this currency.",
+  "admin.approvalProcesses.dueInWorkingHours": "Count step time limits in working hours",
+  "admin.approvalProcesses.dueInWorkingHoursHelp": "Time runs only during the company's working hours; weekends, off-hours and public holidays are not counted (Organization settings > Work calendar). Open requests keep the setting they were opened with.",
   "admin.approvalProcesses.stepName": "Step name",
   "admin.approvalProcesses.approver": "Approver",
   "admin.approvalProcesses.people": "People",

@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Calendar;
 using Modulix.Core.Contracts.Tenancy;
 
 namespace Modulix.Core.Approvals;
@@ -82,6 +83,9 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
 
     public ApprovalRequestStatus Status { get; private set; }
 
+    /// <summary>Adım süreleri firmanın iş takvimiyle mi sayılır; açılış anında süreçten kopyalanır (ADR-0049 dilim 6d).</summary>
+    public bool DueInWorkingHours { get; private set; }
+
     public DateTimeOffset SubmittedAt { get; private set; }
 
     public DateTimeOffset? CompletedAt { get; private set; }
@@ -91,11 +95,11 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
 
     /// <summary>
     /// Talebi ve adım kopyalarını üretir. Tutar eşiğine takılmayan adım eklenmez; uygulanacak adım kalmazsa talep kendiliğinden onaylanır
-    /// (süreç sahibi eşik altını onaysız bırakmıştır).
+    /// (süreç sahibi eşik altını onaysız bırakmıştır). Süreç süreyi iş saatiyle sayıyorsa <paramref name="workCalendar"/> (firmanın iş takvimi) verilmelidir.
     /// </summary>
     public static (ApprovalRequest Request, List<ApprovalRequestStep> Steps) Open(
         ApprovalDefinition definition, string title, string? description, decimal? amount, string? currency, Guid requesterId, DateTimeOffset now,
-        ApprovalRecordTarget? target = null, string? sourceKey = null)
+        ApprovalRecordTarget? target = null, string? sourceKey = null, WorkCalendar? workCalendar = null)
     {
         if (sourceKey is not null && (sourceKey.Length is 0 || sourceKey.Length > SourceKeyMaxLength))
         {
@@ -151,6 +155,7 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
             TargetLabel = target is null ? null : target.Label.Length > TitleMaxLength ? target.Label[..TitleMaxLength] : target.Label,
             SourceKey = sourceKey,
             Status = ApprovalRequestStatus.Pending,
+            DueInWorkingHours = definition.DueInWorkingHours,
             SubmittedAt = now,
             Version = 1,
         };
@@ -159,17 +164,22 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
             .Where(s => s.MinAmount is null || amount >= s.MinAmount)
             .Select(s => ApprovalRequestStep.Create(request.Id, s))
             .ToList();
-        request.ActivateNext(steps, now);
+        request.ActivateNext(steps, now, workCalendar);
         return (request, steps);
     }
 
-    /// <summary>Etkin adımı onaylar: aynı sıradaki etkin adımlar bitince sonraki sıra açılır, adım kalmadıysa talep onaylanır.</summary>
-    public void Approve(ApprovalRequestStep step, IReadOnlyList<ApprovalRequestStep> steps, Guid actorId, string? comment, DateTimeOffset now, Guid? onBehalfOf = null)
+    /// <summary>
+    /// Etkin adımı onaylar: aynı sıradaki etkin adımlar bitince sonraki sıra açılır, adım kalmadıysa talep onaylanır. Talep süreyi iş saatiyle
+    /// sayıyorsa <paramref name="workCalendar"/> verilmelidir.
+    /// </summary>
+    public void Approve(
+        ApprovalRequestStep step, IReadOnlyList<ApprovalRequestStep> steps, Guid actorId, string? comment, DateTimeOffset now, Guid? onBehalfOf = null,
+        WorkCalendar? workCalendar = null)
     {
         step.Decide(ApprovalStepStatus.Approved, actorId, comment, now, onBehalfOf);
         if (!steps.Any(s => s.Status == ApprovalStepStatus.Active))
         {
-            ActivateNext(steps, now);
+            ActivateNext(steps, now, workCalendar);
         }
 
         Version++;
@@ -191,7 +201,7 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
     /// <summary>Atama değişikliği talebin sürümünü artırır: aynı anda verilen karar çakışma alır.</summary>
     public void Touch() => Version++;
 
-    private void ActivateNext(IReadOnlyList<ApprovalRequestStep> steps, DateTimeOffset now)
+    private void ActivateNext(IReadOnlyList<ApprovalRequestStep> steps, DateTimeOffset now, WorkCalendar? workCalendar)
     {
         List<ApprovalRequestStep> waiting = steps.Where(s => s.Status == ApprovalStepStatus.Waiting).ToList();
         if (waiting.Count == 0)
@@ -202,9 +212,15 @@ public sealed class ApprovalRequest : ITenantEntity, ICompanyShared
         }
 
         int next = waiting.Min(s => s.StepOrder);
-        foreach (ApprovalRequestStep step in waiting.Where(s => s.StepOrder == next))
+        List<ApprovalRequestStep> opening = [.. waiting.Where(s => s.StepOrder == next)];
+        if (DueInWorkingHours && workCalendar is null && opening.Any(s => s.DueHours is not null))
         {
-            step.Activate(now);
+            throw new InvalidOperationException("Süre iş saatiyle sayılan talepte firmanın iş takvimi verilmeli.");
+        }
+
+        foreach (ApprovalRequestStep step in opening)
+        {
+            step.Activate(now, DueInWorkingHours ? workCalendar : null);
         }
     }
 
@@ -291,11 +307,14 @@ public sealed class ApprovalRequestStep : ITenantEntity, ICompanyShared
 
     public void Escalate(DateTimeOffset now) => EscalatedAt ??= now;
 
-    internal void Activate(DateTimeOffset now)
+    // Takvim verilirse süre yalnızca mesai pencerelerinde işler (ADR-0049 dilim 6d); verilmezse takvim saatidir.
+    internal void Activate(DateTimeOffset now, WorkCalendar? workCalendar = null)
     {
         Status = ApprovalStepStatus.Active;
         ActivatedAt = now;
-        DueAt = DueHours is { } hours ? now.AddHours(hours) : null;
+        DueAt = DueHours is not { } hours ? null
+            : workCalendar is null ? now.AddHours(hours)
+            : workCalendar.AddWorkingTime(now, TimeSpan.FromHours(hours));
     }
 
     internal void Decide(ApprovalStepStatus status, Guid actorId, string? comment, DateTimeOffset now, Guid? onBehalfOf)
