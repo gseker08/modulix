@@ -94,7 +94,13 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
     public async Task<RecordData?> FindAsync(Guid id, CancellationToken cancellationToken)
     {
         var entity = await Data.Set<TEntity>().AsNoTracking().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
-        return entity is null ? null : ToData(entity);
+        if (entity is null)
+        {
+            return null;
+        }
+
+        await PrepareAsync([entity], cancellationToken);
+        return ToData(entity);
     }
 
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
@@ -114,6 +120,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
 
         var total = await source.CountAsync(cancellationToken);
         var items = await Order(source, sort).ThenBy(e => e.Id).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToListAsync(cancellationToken);
+        await PrepareAsync(items, cancellationToken);
         return new RecordPage([.. items.Select(ToData)], query.Page, query.PageSize, total);
     }
 
@@ -135,6 +142,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
 
         await ApplyAsync(entity, values, isNew: true, cancellationToken);
         Data.Set<TEntity>().Add(entity);
+        await PrepareAsync([entity], cancellationToken);
         return ToData(entity);
     }
 
@@ -152,6 +160,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
         }
 
         EnsureVersion(entity, expectedVersion);
+        await PrepareAsync([entity], cancellationToken);
         var before = ToData(entity).Values;
         await ApplyAsync(entity, values, isNew: false, cancellationToken);
         if (!JsonNode.DeepEquals(before, ToData(entity).Values))
@@ -186,6 +195,12 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
     /// değiştirilebilen ya da değişmeyen depolar (ör. onaylanmış masraf, teslim kanıtı) aynı kuralı burada da verir; yoksa dosya kaydın kuralını atlatır.
     /// </summary>
     protected virtual Task<string?> FileWriteDeniedAsync(TEntity entity, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
+
+    /// <summary>
+    /// Kayıtlar dışarı verilmeden önce, hesaplanan alanların ihtiyaç duyduğu bağlı veriyi toplu yükler (ör. masrafın seferi iptal edildi mi). Liste
+    /// sayfası için tek sorgu atılır; varsayılan bir şey yapmaz.
+    /// </summary>
+    protected virtual Task PrepareAsync(IReadOnlyCollection<TEntity> entities, CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>Kayıt silinmeden önce (bağlı kayıtları denetlemek ya da kaldırmak için).</summary>
     protected virtual Task BeforeDeleteAsync(TEntity entity, CancellationToken cancellationToken) => Task.CompletedTask;

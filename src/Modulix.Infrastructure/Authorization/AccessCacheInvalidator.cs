@@ -15,7 +15,7 @@ namespace Modulix.Infrastructure.Authorization;
 /// etkileyen bir tür varsa o tenant'ın girdileri boşaltılır. Uç noktaları tek tek bilmez; yeni bir yazma ucu kendiliğinden kapsanır.
 /// Açık işlem içindeki kayıt, işlem sonlanınca bir kez daha geçersiz kılar (işlem sürerken başka istek eski değeri okuyup saklamış
 /// olabilir). Bu tablolara <c>ExecuteUpdate</c>/<c>ExecuteDelete</c> ya da ham SQL ile yazan kod bu yolu atlar; değişiklik en geç
-/// <see cref="AccessCache.Ttl"/> içinde görünür. Bağlam başına bir örnektir (bekleyen tenant'ları tutar).
+/// <see cref="AccessCache.Ttl"/> içinde görünür (mimari test: <c>AccessCacheBulkWriteRulesTests</c>). Bağlam başına bir örnektir (bekleyen tenant'ları tutar).
 /// </summary>
 internal sealed class AccessCacheInvalidator(AccessCache cache) : ISaveChangesInterceptor, IDbTransactionInterceptor
 {

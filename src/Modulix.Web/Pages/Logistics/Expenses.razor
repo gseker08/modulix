@@ -23,6 +23,10 @@
             <h2>
                 @WarehouseLabels.Text(selected, "description")
                 <span class="badge @StatusBadge(WarehouseLabels.Text(selected, "status"))">@StatusLabel(WarehouseLabels.Text(selected, "status"))</span>
+                @if (WarehouseLabels.Flag(selected, "tripCancelled"))
+                {
+                    <span class="badge @LogisticsLabels.TripStatusBadge("cancelled")">Sefer iptal edildi</span>
+                }
             </h2>
             <dl class="summary-facts">
                 <div><dt>Sefer</dt><dd>@WarehouseLabels.NameOf(trips, WarehouseLabels.Id(selected, "tripId"))</dd></div>
@@ -55,11 +59,11 @@
                 }
                 @if (WarehouseLabels.Text(selected, "statusReason") is { Length: > 0 } reason)
                 {
-                    <div><dt>Ret gerekçesi</dt><dd>@reason</dd></div>
+                    <div><dt>@(WarehouseLabels.Text(selected, "status") == "approved" ? "Onay gerekçesi" : "Ret gerekçesi")</dt><dd>@reason</dd></div>
                 }
             </dl>
             <LogisticsActionsBar Kind="expenses" Record="selected" Changed="DecidedAsync" />
-            <AttachmentPanel EntityKey="@LogisticsAccess.TripExpenseEntityKey" RecordId="selected.Id" CanWrite="@(Session.Can(LogisticsAccess.ExpensesWrite) && LogisticsAccess.ExpenseFilesWritable(WarehouseLabels.Text(selected, "status"), selectedTripStatus))" Title="Makbuz ve fiş" EmptyText="Makbuz ya da fiş eklenmedi." />
+            <AttachmentPanel EntityKey="@LogisticsAccess.TripExpenseEntityKey" RecordId="selected.Id" CanWrite="@(Session.Can(LogisticsAccess.ExpensesWrite) && LogisticsAccess.ExpenseFilesWritable(WarehouseLabels.Text(selected, "status"), WarehouseLabels.Flag(selected, "tripCancelled")))" Title="Makbuz ve fiş" EmptyText="Makbuz ya da fiş eklenmedi." />
             <div class="list-toolbar">
                 <button type="button" class="btn btn-outline-secondary" @onclick="Close">Kapat</button>
             </div>
@@ -139,7 +143,6 @@
     private PersonalGridViews views = default!;
     private RecordPageResponse? page;
     private RecordResponse? selected;
-    private string? selectedTripStatus; // açık masrafın seferinin durumu; sefer okuma izni yoksa boş (karar sunucuda)
     private string? message;
     private string? search;
     private string view = Views[0].Key;
@@ -250,18 +253,11 @@
         }
     }
 
-    /// <summary>Satırı açar; tedarikçi adı ve (sefer okuma izni varsa) seferin durumu çözülür: iptal edilmiş seferin masrafına belge eklenmez.</summary>
+    /// <summary>Satırı açar; tedarikçi adı çözülür. Seferin iptal edildiği masraf kaydında gelir (<c>tripCancelled</c>).</summary>
     private async Task OpenAsync(RecordResponse record)
     {
         selected = record;
-        selectedTripStatus = null;
         message = null;
-        if (Session.Can(LogisticsAccess.TripsRead) && WarehouseLabels.Id(record, "tripId") is { } tripId
-            && (await Api.GetAsync<RecordResponse>($"/api/records/{LogisticsAccess.TripEntityKey}/{tripId}")).Value is { } trip)
-        {
-            selectedTripStatus = WarehouseLabels.Text(trip, "status");
-        }
-
         if (WarehouseLabels.Id(record, "supplierPartyId") is { } supplier)
         {
             await WarehouseLabels.ResolveNamesAsync(Api, LogisticsAccess.ExpenseSupplierLookup, [supplier], suppliers);
@@ -303,7 +299,10 @@
         "kind" => @<text>@Lookups.Label(LogisticsAccess.ExpenseKindList, WarehouseLabels.Text(record, "kindKey"))</text>,
         "description" => @<text>@WarehouseLabels.Text(record, "description")</text>,
         "amount" => @<text>@FleetLabels.Money(Amount(record), WarehouseLabels.Text(record, "currency"))</text>,
-        "status" => @<span class="badge @StatusBadge(WarehouseLabels.Text(record, "status"))">@StatusLabel(WarehouseLabels.Text(record, "status"))</span>,
+        "status" => @<text><span class="badge @StatusBadge(WarehouseLabels.Text(record, "status"))">@StatusLabel(WarehouseLabels.Text(record, "status"))</span>@if (WarehouseLabels.Flag(record, "tripCancelled"))
+            {
+                <text> </text><span class="badge @LogisticsLabels.TripStatusBadge("cancelled")">Sefer iptal edildi</span>
+            }</text>,
         _ => @<text></text>,
     };
 

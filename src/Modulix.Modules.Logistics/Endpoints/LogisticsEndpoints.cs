@@ -48,7 +48,7 @@ internal static class LogisticsEndpoints
 
             var result = await workflow.ActionsAsync(entityKey, id, ct);
             return result.IsSuccess
-                ? Results.Ok(result.Value!.Select(a => new LogisticsActionDto(a.Action, a.Label, a.Allowed, a.Message, a.RequiresReason, a.Destructive)).ToList())
+                ? Results.Ok(result.Value!.Select(a => new LogisticsActionDto(a.Action, a.Label, a.Allowed, a.Message, a.RequiresReason, a.Destructive, a.Warning)).ToList())
                 : RecordProblems.ToProblem(result.Error!);
         });
 
