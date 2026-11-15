@@ -5959,6 +5959,8 @@
   "admin.approvalProcesses.gated": "Təsdiqsiz edilə bilməz",
   "admin.approvalProcesses.gatedHelp": "İşarələnmiş əməliyyat qeyd bu prosesdə təsdiqlənmədən edilə bilməz.",
   "admin.approvalProcesses.currencyHelp": "Doludursa sorğuda məbləğ məcburidir və addım hədləri bu valyutadadır.",
+  "admin.approvalProcesses.dueInWorkingHours": "Addım müddətlərini iş saatı ilə say",
+  "admin.approvalProcesses.dueInWorkingHoursHelp": "Müddət yalnız şirkətin iş saatlarında işləyir; həftəsonu, iş saatından kənar vaxt və rəsmi bayramlar sayılmır (Təşkilat ayarları > İş təqvimi). Açıq sorğular açıldıqları ayarla davam edir.",
   "admin.approvalProcesses.stepName": "Addım adı",
   "admin.approvalProcesses.approver": "Təsdiqləyici",
   "admin.approvalProcesses.people": "Şəxslər",

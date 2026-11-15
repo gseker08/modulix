@@ -124,6 +124,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("DueInWorkingHours")
+                        .HasColumnType("bit");
+
                     b.Property<string>("GatedCommands")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -240,6 +243,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("DueInWorkingHours")
+                        .HasColumnType("bit");
 
                     b.Property<Guid>("RequesterId")
                         .HasColumnType("uniqueidentifier");

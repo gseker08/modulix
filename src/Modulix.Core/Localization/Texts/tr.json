@@ -5959,6 +5959,8 @@
   "admin.approvalProcesses.gated": "Onaysız yapılamaz",
   "admin.approvalProcesses.gatedHelp": "İşaretlenen işlem, kayıt bu süreçte onaylanmadan yapılamaz.",
   "admin.approvalProcesses.currencyHelp": "Doluysa talepte tutar zorunludur ve adım eşikleri bu para birimindedir.",
+  "admin.approvalProcesses.dueInWorkingHours": "Adım sürelerini iş saatiyle say",
+  "admin.approvalProcesses.dueInWorkingHoursHelp": "Süre yalnızca firmanın mesai saatlerinde işler; hafta sonu, mesai dışı ve resmî tatiller sayılmaz (Kuruluş ayarları > Çalışma takvimi). Açık talepler açıldıkları ayarla sürer.",
   "admin.approvalProcesses.stepName": "Adım adı",
   "admin.approvalProcesses.approver": "Onaycı",
   "admin.approvalProcesses.people": "Kişiler",

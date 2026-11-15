@@ -649,7 +649,7 @@ public sealed class CoreModule : IModule
         new(AuditedEntityKeys.ApprovalDefinition, "Onay süreci", null, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["description"] = "Açıklama", ["currency"] = "Para birimi", ["isActive"] = "Açık", ["revision"] = "Sürüm", ["steps"] = "Adımlar",
-            ["target"] = "Kayıt türü", ["gatedCommands"] = "Onaysız yapılamaz",
+            ["target"] = "Kayıt türü", ["gatedCommands"] = "Onaysız yapılamaz", ["dueInWorkingHours"] = "Süre iş saatiyle",
         }, "name"),
         new(AuditedEntityKeys.ApprovalRequest, "Onay talebi", null, new Dictionary<string, string>
         {

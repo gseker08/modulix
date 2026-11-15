@@ -5,11 +5,12 @@ public sealed record ApprovalStepDefinitionDto(
 
 public sealed record ApprovalDefinitionDto(
     Guid Id, string Name, string? Description, string? Currency, bool IsActive, int Revision, long Version, IReadOnlyList<ApprovalStepDefinitionDto> Steps,
-    string? TargetEntityKey = null, IReadOnlyList<string>? GatedCommands = null);
+    string? TargetEntityKey = null, IReadOnlyList<string>? GatedCommands = null, bool DueInWorkingHours = false);
 
+/// <summary><see cref="DueInWorkingHours"/>: adım süreleri firmanın iş takvimiyle (mesai, çalışma günleri, resmî tatil) sayılır (ADR-0049 dilim 6d).</summary>
 public sealed record SaveApprovalDefinitionRequest(
     string Name, string? Description, string? Currency, IReadOnlyList<ApprovalStepDefinitionDto> Steps, long? ExpectedVersion = null,
-    string? TargetEntityKey = null, IReadOnlyList<string>? GatedCommands = null);
+    string? TargetEntityKey = null, IReadOnlyList<string>? GatedCommands = null, bool DueInWorkingHours = false);
 
 /// <summary>Onaya açık kayıt türü ve onaya bağlanabilen işlemleri (Ç6a.3).</summary>
 public sealed record ApprovalTargetDto(string EntityKey, string DisplayName, IReadOnlyList<ApprovalCommandDto>? Commands = null);
