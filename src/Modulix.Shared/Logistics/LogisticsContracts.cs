@@ -101,11 +101,14 @@ public static class LogisticsAccess
     ];
 
     /// <summary>
-    /// Masrafın makbuzu ve fişi eklenip silinebilir mi (ADR-0038 bölüm 24): kaydın güncelleme kuralıyla aynı, beklemede ya da reddedilmiş masraf ve
-    /// iptal edilmemiş sefer. Arayüz yalnızca düğmeleri gizler; kararı sunucu verir. Sefer durumu bilinmiyorsa (boş) yalnızca masrafın durumuna bakılır.
+    /// Masraf düzenlenebilir mi (ADR-0038 bölüm 25): beklemede ya da reddedilmiş masraf ve iptal edilmemiş sefer. Arayüz yalnızca düğmeyi gizler;
+    /// kararı sunucu verir. Sefer durumu bilinmiyorsa (boş) yalnızca masrafın durumuna bakılır.
     /// </summary>
-    public static bool ExpenseFilesWritable(string? expenseStatus, string? tripStatus) =>
+    public static bool ExpenseEditable(string? expenseStatus, string? tripStatus) =>
         expenseStatus is "pending" or "rejected" && tripStatus != "cancelled";
+
+    /// <summary>Masrafın makbuzu ve fişi eklenip silinebilir mi (ADR-0038 bölüm 24): kaydın düzenleme kuralıyla aynı (<see cref="ExpenseEditable"/>).</summary>
+    public static bool ExpenseFilesWritable(string? expenseStatus, string? tripStatus) => ExpenseEditable(expenseStatus, tripStatus);
 
     /// <summary>
     /// Teslim kanıtının fotoğrafı ve imzası eklenip silinebilir mi (ADR-0038 bölüm 24): sevkiyatın seferi açıkken; sefer tamamlanınca ya da iptal
