@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -35,6 +36,7 @@ internal sealed class UserAdministration(
     IRoleService roles,
     AdministratorGuard administrators,
     IEmailQueue emails,
+    IRecipientLanguage languages,
     IAuditWriter audit,
     RecordHandover handover,
     MembershipPermissions membershipPermissions,
@@ -256,6 +258,7 @@ internal sealed class UserAdministration(
         if (existingAccount)
         {
             emails.Enqueue(UserEmails.AddedToTenant(
+                await languages.ForUserAsync(user.Id, cancellationToken),
                 email, user.DisplayName, context.TenantName, context.ActorName, AccountTokens.SignInLink(invitation.PublicUrl)));
         }
         else
@@ -263,6 +266,7 @@ internal sealed class UserAdministration(
             var token = await users.GenerateUserTokenAsync(
                 user, AccountTokens.InvitationProvider, AccountTokens.InvitationPurpose(membership.Id));
             emails.Enqueue(UserEmails.Invitation(
+                await languages.ForUserAsync(user.Id, cancellationToken),
                 email,
                 displayName,
                 context.TenantName,
@@ -301,6 +305,7 @@ internal sealed class UserAdministration(
         membership.MarkInvitationSent(now);
         var context = await LoadEmailContextAsync(tenant, cancellationToken);
         emails.Enqueue(UserEmails.Invitation(
+            await languages.ForUserAsync(user.Id, cancellationToken),
             user.Email!,
             user.DisplayName,
             context.TenantName,
@@ -685,6 +690,7 @@ internal sealed class UserAdministration(
         var token = await users.GeneratePasswordResetTokenAsync(user);
         var context = await LoadEmailContextAsync(tenant, cancellationToken);
         emails.Enqueue(UserEmails.PasswordReset(
+            await languages.ForUserAsync(user.Id, cancellationToken),
             user.Email!,
             user.DisplayName,
             context.TenantName,

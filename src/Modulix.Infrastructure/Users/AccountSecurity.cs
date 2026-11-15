@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Records;
 using Modulix.Core.Settings;
@@ -50,6 +51,7 @@ public sealed class AccountSecurity(
     UserSessions sessions,
     AccountAudit audit,
     IEmailQueue emails,
+    IRecipientLanguage languages,
     IMemoryCache cache,
     IOptions<AccountOptions> options)
 {
@@ -124,7 +126,7 @@ public sealed class AccountSecurity(
 
         // Adres başka hesapta kullanılsa da bağlantı gider; böylece adreslerin kayıtlı olup olmadığı buradan yoklanamaz.
         var token = await users.GenerateChangeEmailTokenAsync(user, email);
-        emails.Enqueue(UserEmails.ConfirmEmailChange(email, user.DisplayName, AccountTokens.EmailChangeLink(publicUrl, user.Id, email, token)));
+        emails.Enqueue(UserEmails.ConfirmEmailChange(await languages.ForUserAsync(user.Id, cancellationToken), email, user.DisplayName, AccountTokens.EmailChangeLink(publicUrl, user.Id, email, token)));
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -167,7 +169,7 @@ public sealed class AccountSecurity(
             await transaction.CommitAsync(cancellationToken);
         }
 
-        emails.Enqueue(UserEmails.EmailChanged(before, user.DisplayName, email, AccountTokens.SignInLink(publicUrl)));
+        emails.Enqueue(UserEmails.EmailChanged(await languages.ForUserAsync(user.Id, cancellationToken), before, user.DisplayName, email, AccountTokens.SignInLink(publicUrl)));
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(user, AuditAction.Updated, null, client, cancellationToken, before: new JsonObject { ["email"] = before });
         return EmailChangeResult.Changed;
@@ -207,7 +209,7 @@ public sealed class AccountSecurity(
 
         cache.Set(userKey, true, settings.ForgotPasswordInterval);
         var token = await users.GeneratePasswordResetTokenAsync(user);
-        emails.Enqueue(UserEmails.ForgotPassword(user.Email!, user.DisplayName, AccountTokens.PasswordResetLink(publicUrl, user.Id, token)));
+        emails.Enqueue(UserEmails.ForgotPassword(await languages.ForUserAsync(user.Id, cancellationToken), user.Email!, user.DisplayName, AccountTokens.PasswordResetLink(publicUrl, user.Id, token)));
         await db.SaveChangesAsync(cancellationToken);
         await audit.RecordAsync(user, AuditAction.PasswordResetRequested, null, client, cancellationToken);
         return ForgotPasswordResult.Accepted;
