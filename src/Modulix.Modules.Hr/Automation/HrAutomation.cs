@@ -174,17 +174,24 @@ public static class HrAutomation
             {
                 Options = [new(Survey.Statuses.Draft, "Taslak"), new(Survey.Statuses.Open, "Yanıta açık"), new(Survey.Statuses.Closed, "Kapalı")],
             },
-            new(HrModule.Entities.BlogPost, "title", "Başlık", AutomationFieldType.Text),
-            new(HrModule.Entities.BlogPost, "isPublished", "Yayında", AutomationFieldType.Boolean),
+            // Blog alanları okuma iznini taşır (bölüm 28): kayıt deposu okumada "blog okuma" ister, taslağı görmek için "blog yönetimi" (kayıt türünün
+            // izni) gerekir. Alan kullanan kuralın kimliği ikisine de sahip olur; yoksa kural kaydı okuyamaz.
+            new(HrModule.Entities.BlogPost, "title", "Başlık", AutomationFieldType.Text) { ReadPermission = HrModule.Permissions.BlogRead },
+            new(HrModule.Entities.BlogPost, "isPublished", "Yayında", AutomationFieldType.Boolean) { ReadPermission = HrModule.Permissions.BlogRead },
             new(HrModule.Entities.BlogPost, "status", "Durum", AutomationFieldType.Choice)
             {
+                ReadPermission = HrModule.Permissions.BlogRead,
                 Options =
                 [
                     new(BlogPost.Statuses.Draft, "Taslak"), new(BlogPost.Statuses.Submitted, "Onay bekliyor"),
                     new(BlogPost.Statuses.Returned, "Geri çevrildi"), new(BlogPost.Statuses.Published, "Yayında"),
                 ],
             },
-            new(HrModule.Entities.BlogPost, "authorUserId", "Yazan", AutomationFieldType.Lookup) { LookupKey = NotifyRecipientLookup },
+            new(HrModule.Entities.BlogPost, "authorUserId", "Yazan", AutomationFieldType.Lookup)
+            {
+                ReadPermission = HrModule.Permissions.BlogRead,
+                LookupKey = NotifyRecipientLookup,
+            },
             new(HrModule.Entities.PhotoAlbum, "title", "Başlık", AutomationFieldType.Text),
             new(HrModule.Entities.PhotoAlbum, "isPublished", "Yayında", AutomationFieldType.Boolean),
         ],

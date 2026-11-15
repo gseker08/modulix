@@ -32,6 +32,18 @@ public partial class HrAutomationTests
     }
 
     [Fact]
+    public void Blog_rules_run_with_both_the_read_and_the_manage_permission_so_they_can_read_drafts()
+    {
+        // Blog deposu okumada "blog okuma", taslak için "blog yönetimi" ister; kuralın kimliği ikisini de taşımalı (bölüm 28).
+        foreach (var template in HrAutomationTemplates.All.Where(t => t.EntityKey == HrModule.Entities.BlogPost))
+        {
+            var identity = AutomationRuleIdentity.Permissions(template.EntityKey, template.Definition, Catalog);
+            Assert.Contains(HrModule.Permissions.BlogRead, identity);
+            Assert.Contains(HrModule.Permissions.BlogManage, identity);
+        }
+    }
+
+    [Fact]
     public void Core_keys_written_in_the_module_match_core()
     {
         Assert.Equal(NotifyAutomation.RecipientLookup, HrAutomation.NotifyRecipientLookup);
