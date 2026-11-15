@@ -94,6 +94,10 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
                 entity.Status = status;
                 entity.StatusReason = Context.Gate.Reason;
             }
+            else if (!isNew && Context.Gate.LinkedId is { } targetTrip)
+            {
+                await TransferAsync(entity, targetTrip, cancellationToken);
+            }
         }
         else if (!isNew && entity.Status is not (TripExpense.Statuses.Pending or TripExpense.Statuses.Rejected))
         {
@@ -177,6 +181,37 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
         {
             throw new RecordValidationException(errors);
         }
+    }
+
+    /// <summary>
+    /// Başka sefere aktarma (ADR-0038 bölüm 28; komut <see cref="Lifecycle.ILogisticsWorkflow.TransferExpenseAsync"/> kapıyı hedef seferle açar):
+    /// yalnızca iptal edilen seferin beklemedeki masrafı, iptal edilmemiş başka bir sefere taşınır. Durum değişmez (onaylayan yeni seferde karar
+    /// verir); gerekçe durum gerekçesine yazılır, eski ve yeni sefer denetim kaydında görünür. Belgeler masrafa bağlıdır, onunla gider.
+    /// </summary>
+    private async Task TransferAsync(TripExpense entity, Guid targetTrip, CancellationToken cancellationToken)
+    {
+        if (entity.Status != TripExpense.Statuses.Pending)
+        {
+            throw new RecordConflictException("Yalnızca beklemedeki masraf aktarılır; reddedilen masrafı önce yeniden onaya gönderin.");
+        }
+
+        var trips = Context.Data.Set<Trip>().AsNoTracking();
+        if (await trips.Where(t => t.Id == entity.TripId).Select(t => t.Status).SingleAsync(cancellationToken) != Trip.Statuses.Cancelled)
+        {
+            throw new RecordConflictException("Yalnızca iptal edilen seferin masrafı başka sefere aktarılır.");
+        }
+
+        var targetStatus = await trips.Where(t => t.Id == targetTrip).Select(t => t.Status).SingleOrDefaultAsync(cancellationToken);
+        var error = targetStatus is null ? "Sefer bulunamadı."
+            : targetStatus == Trip.Statuses.Cancelled ? "İptal edilen sefere masraf aktarılmaz."
+            : null;
+        if (error is not null)
+        {
+            throw new RecordValidationException([new RecordFieldError("tripId", error)]);
+        }
+
+        entity.TripId = targetTrip;
+        entity.StatusReason = Context.Gate.Reason;
     }
 
     protected override async Task PrepareAsync(IReadOnlyCollection<TripExpense> entities, CancellationToken cancellationToken)

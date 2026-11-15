@@ -59,10 +59,11 @@
                 }
                 @if (WarehouseLabels.Text(selected, "statusReason") is { Length: > 0 } reason)
                 {
-                    <div><dt>@(WarehouseLabels.Text(selected, "status") == "approved" ? "Onay gerekçesi" : "Ret gerekçesi")</dt><dd>@reason</dd></div>
+                    <div><dt>@ReasonLabel(WarehouseLabels.Text(selected, "status"))</dt><dd>@reason</dd></div>
                 }
             </dl>
             <LogisticsActionsBar Kind="expenses" Record="selected" Changed="DecidedAsync" />
+            <ExpenseTransferPanel Expense="selected" Changed="DecidedAsync" />
             <AttachmentPanel EntityKey="@LogisticsAccess.TripExpenseEntityKey" RecordId="selected.Id" CanWrite="@(Session.Can(LogisticsAccess.ExpensesWrite) && LogisticsAccess.ExpenseFilesWritable(WarehouseLabels.Text(selected, "status"), WarehouseLabels.Flag(selected, "tripCancelled")))" Title="Makbuz ve fiş" EmptyText="Makbuz ya da fiş eklenmedi." />
             <div class="list-toolbar">
                 <button type="button" class="btn btn-outline-secondary" @onclick="Close">Kapat</button>
@@ -265,6 +266,14 @@
     }
 
     private void Close() => selected = null;
+
+    /// <summary>Durum gerekçesinin adı: son iş akışı adımının gerekçesidir (onay, ret; beklemede ise başka sefere aktarma, ADR-0038 bölüm 28).</summary>
+    private static string ReasonLabel(string? status) => status switch
+    {
+        "approved" => "Onay gerekçesi",
+        "rejected" => "Ret gerekçesi",
+        _ => "Aktarma gerekçesi",
+    };
 
     /// <summary>Karar verildi: liste yenilenir, karar verilmiş masraf (güncel haliyle) açık kalır.</summary>
     private async Task DecidedAsync(RecordResponse decided)

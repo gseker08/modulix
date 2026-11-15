@@ -687,3 +687,29 @@ Kod: `CargoRecordStore.IsClosed` (talep ve sevkiyat), `TripFiles.Denied` (sefer 
 | --- | --- |
 | `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` | 111/111 / 36/36 |
 | `LogisticsRecordFileTests` (3 yeni entegrasyon testi) | **Mutlu yol ve kural:** yeni talebe belge eklenir ve silinir, onaydan sonra 403; planlanan ve yoldaki sevkiyata eklenir, teslimden sonra 403; sevkiyat teslim edilmişken açık sefere ve durağa eklenir, sefer iptal edilince ikisi de 403; donan belgeler listelenir ve indirilir. **Tenant izolasyonu:** başka tenant ekleyemez, listeleyemez, indiremez, silemez (404). **Yetki:** yalnızca okuyan açık kayda ekleyemez ve silemez (403), indirir. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |
+
+## 28. Masrafı başka sefere aktarma (15 Kasım 2026)
+
+Karar (kullanıcı, 15 Kasım 2026: "İkisi de"; önce aktarma, sonra bildirim şablonu, ayrı PR'lar). Bölüm 26'daki senaryo (3): sefer iptal edilince sevkiyatlar "Planlama bekliyor"a döner ve başka sefere atanabilir; depoda alınan yakıt gibi harcama o yeni seferde kullanılır. Masrafın seferi yalnızca oluştururken seçildiği için bugüne kadar tek yol masrafı reddedip yeni seferde yeniden girmekti (belge yeniden yüklenir, denetim izi kopar).
+
+**Çözüm:**
+- **Komut:** `POST /api/logistics/expenses/{id}/transfer` (`TransferExpenseRequest { tripId, version, reason }`; `ILogisticsWorkflow.TransferExpenseAsync`). Sefer alanı genel uçtan değişmemeye devam eder; komut iş akışı kapısını hedef seferle açar (`LinkedId`), boru hattından değer göndermeden günceller (izin, kapsam, sürüm, denetim, olay).
+- **Kurallar (depoda, `TripExpenseRecordStore.TransferAsync`):**
+  - Yalnızca **beklemedeki** masraf aktarılır (409). Reddedilen önce yeniden onaya gönderilir (iptal edilen seferde bu açık kalır, bölüm 25); onaylanmış masraf değişmez.
+  - Kaynak sefer **iptal edilmiş** olmalıdır (409). Genel "yanlış sefer düzeltmesi" değildir; açık seferde yanlış sefere girilen masraf reddedilip doğru sefere girilir.
+  - Hedef sefer bu tenant'ta olmalı ve iptal edilmemiş olmalıdır; aynı sefer olamaz (422, alan `tripId`). Başka tenant'ın seferi "bulunamadı".
+- **Gerekçe:** zorunlu (422), en çok 500 karakter. `statusReason`'a yazılır (son iş akışı adımının gerekçesi); ayrıntıda "Aktarma gerekçesi" olarak görünür. Eski ve yeni sefer denetim kaydında `tripId` değişimi olarak durur. Boru hattının olay nedeni (`RecordCommand.Reason`) kodlu nedenler içindir (ör. `transfer`, `import`), serbest metin yazılmaz.
+- **İzin:** masraf yazma izni (`logistics.expenses.write`); masrafı göremeyen 403/404 (boru hattının okuma kuralı). Hedef seferin seçicisi sefer okuma izni ister; arayüz düğmeyi iki izinle gösterir.
+- **Durum değişmez:** masraf beklemede kalır; açık seferde onay gerekçe istemez, düzenleme ve belge yeniden açılır (`tripCancelled` false). Belgeler masrafa bağlıdır, onunla gider.
+- **Arayüz:** Masraflar ekranında, seferi iptal edilmiş beklemedeki masrafın ayrıntısında "Başka sefere aktar" (`ExpenseTransferPanel`): hedef sefer (`LookupPicker`, `logistics.trip-expense.trip`; sefer numarasıyla arama), gerekçe, "Aktar"; başarıda toast. Sayfa içi küçük eylem formu, sekmesiz; yeni CSS sınıfı ya da token yok. Tarayıcıda açık ve koyu temada denetlendi (form, aktarma sonrası "Aktarma gerekçesi" ve kalkan "Sefer iptal edildi" rozeti).
+
+**Kapsam dışı (bilerek):** sefer kartındaki masraf panelinden aktarma (onay kuyruğu Masraflar ekranıdır); hedef seçicide iptal edilmiş seferleri gizlemek (sunucu reddeder; arama tanımı süzgeç desteklemiyor); toplu aktarma.
+
+### Test sonuçları (bölüm 28)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet build` | Hatasız (SDK 10.0.404) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Web.Tests` | 111/111 / 36/36 / 282/282 |
+| `... --filter "Logistics\|File"` (yerel SQL Server) | 109 geçti, 2 atlandı (önceden atlanan), 1 kırık: `S3BlobStorageTests` yerelde S3 servisi gerektiriyor (CI kurar; bu değişiklikle ilgisiz). 4 yeni test. **Mutlu yol:** iptal edilen seferin bekleyen yakıt masrafı makbuzuyla açık sefere geçer; durum beklemede, gerekçe masrafta, sefer süzgeçleri yeni seferi gösterir, masraf yeniden düzenlenir ve gerekçesiz onaylanır, denetim kaydında `tripId` değişimi. **Kural:** gerekçesiz, iptal edilmiş/bilinmeyen/aynı hedef 422; açık seferdeki, reddedilmiş, onaylanmış masraf ve eski sürüm 409; masraf değişmez. **Tenant izolasyonu:** başka tenant 404; başka tenant'ın seferine aktarma 422. **Yetki:** yalnızca okuyan 403, masraf okuma izni olmayan 403. Durum ve kaynak kuralı geri alınınca kural testi kırılıyor |
+

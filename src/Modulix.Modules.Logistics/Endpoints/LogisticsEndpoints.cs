@@ -65,6 +65,10 @@ internal static class LogisticsEndpoints
                 : RecordProblems.ToProblem(result.Error!);
         });
 
+        // Masrafı başka sefere aktarma (ADR-0038 bölüm 28): yalnızca iptal edilen seferin beklemedeki masrafı; izin, gerekçe ve kurallar serviste ve depoda.
+        group.MapPost("/expenses/{id:guid}/transfer", async (Guid id, TransferExpenseRequest request, ILogisticsWorkflow workflow, CancellationToken ct) =>
+            ToResponse(await workflow.TransferExpenseAsync(id, request.TripId, request.Version, request.Reason, ct)));
+
         // Teslim (dilim 6): yoldaki sevkiyat teslim edilir, kısmen teslim edilir ya da teslim edilemez. Değişmez teslim kanıtı, durum ve iş olayı tek işlemde
         // yazılır. Yazan POST salt okunur lisans evresinde 403'tür; sunucu zamanı verir, istemci zamanı yok sayılır.
         group.MapPost("/shipments/{id:guid}/delivery", async (Guid id, RecordDeliveryRequest request, IShipmentDelivery delivery, CancellationToken ct) =>

@@ -179,6 +179,9 @@ public sealed record LogisticsActionDto(string Action, string Label, bool Allowe
 /// <summary>İş akışı eylemi isteği; sürüm eşzamanlı değişikliği yakalar (409).</summary>
 public sealed record RunLogisticsActionRequest(string Action, long Version, string? Reason);
 
+/// <summary>İptal edilen seferin beklemedeki masrafını başka sefere aktarma isteği (ADR-0038 bölüm 28); gerekçe zorunludur.</summary>
+public sealed record TransferExpenseRequest(Guid TripId, long Version, string? Reason);
+
 /// <summary>Seferin uygunluk denetimi (ADR-0038 dilim 5): engel varsa plan onaylanmaz; uyarılar onayla birlikte seferde saklanır.</summary>
 public sealed record TripCheckDto(bool CanConfirm, IReadOnlyList<TripCheckIssueDto> Issues, TripLoadDto Load);
 
