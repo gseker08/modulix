@@ -114,41 +114,6 @@ public static class RecordEndpoints
 
     private static RecordResponse ToResponse(RecordData data) => new(data.EntityKey, data.Id, data.Version, data.Values);
 
-    /// <summary>
-    /// Kayıt hatasının HTTP karşılığı. Anahtarlı iletiler (ADR-0034 §6) yanıt yazılırken isteğin diline çevrilir; <c>code</c>, alan
-    /// adları ve yanıtın biçimi dile göre değişmez. Anahtarsız hata dil çözülmeden olduğu gibi döner.
-    /// </summary>
-    internal static IResult ToProblem(RecordError error) =>
-        ServerMessageTranslation.IsTranslatable(error) ? new TranslatedRecordProblem(error) : ToHttp(error);
-
-    private sealed class TranslatedRecordProblem(RecordError error) : IResult
-    {
-        public async Task ExecuteAsync(HttpContext httpContext)
-        {
-            var services = httpContext.RequestServices;
-            var language = await services.GetRequiredService<IRequestLanguage>().GetAsync(httpContext.RequestAborted);
-            await ToHttp(services.GetRequiredService<ITextCatalog>().Translate(language, error)).ExecuteAsync(httpContext);
-        }
-    }
-
-    private static IResult ToHttp(RecordError error)
-    {
-        var extensions = new Dictionary<string, object?> { ["code"] = error.Code.ToString() };
-
-        return error.Code switch
-        {
-            RecordErrorCode.ValidationFailed => Results.ValidationProblem(
-                (error.FieldErrors ?? Array.Empty<RecordFieldError>())
-                    .GroupBy(e => e.Field)
-                    .ToDictionary(g => g.Key, g => g.Select(e => e.Message).ToArray()),
-                title: error.Message,
-                statusCode: StatusCodes.Status422UnprocessableEntity,
-                extensions: extensions),
-            RecordErrorCode.NotFound or RecordErrorCode.UnknownEntity =>
-                Results.Problem(statusCode: StatusCodes.Status404NotFound, title: error.Message, extensions: extensions),
-            RecordErrorCode.Conflict =>
-                Results.Problem(statusCode: StatusCodes.Status409Conflict, title: error.Message, extensions: extensions),
-            _ => Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: error.Message, extensions: extensions),
-        };
-    }
+    /// <summary>Uygulama <see cref="RecordProblems"/>'tedir (modül uç noktalarıyla ortak, ADR-0046); host içi çağrılar için bırakıldı.</summary>
+    internal static IResult ToProblem(RecordError error) => RecordProblems.ToProblem(error);
 }

@@ -1,33 +1,36 @@
-using Modulix.Api.Access;
-using Modulix.Api.Records;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Modulix.Core.Hosting;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr;
 using Modulix.Modules.Hr.Records;
 using Modulix.Shared.Hr;
 using Modulix.Shared.Records;
 
-namespace Modulix.Api.Hr;
+namespace Modulix.Modules.Hr.Endpoints;
 
 /// <summary>
 /// İK iş akışı uçları (ADR-0042): izin talebi (dilim 2), masraf beyanı (dilim 3) ve zimmet (dilim 4, tutanak PDF'i dahil) işe giriş/çıkış (dilim 5), duyuru okundu işareti (dilim 6) ve anketler (dilim 7: durum, yanıt, sonuç; bölüm 23b: sonucun CSV dışa aktarımı) ve Core departmanları (bölüm 22: seçici, eski değerlerin eşlenmesi). Talepler, haklar ve tatiller genel kayıt uçlarındadır (<c>/api/records/hr.leave-request</c>,
 /// <c>hr.leave-balance</c>, <c>hr.holiday</c>); talebin durumu yalnızca buradaki komutlarla değişir. Yetki ve onaylayan kuralı serviste denetlenir;
 /// tenant oturumdan gelir. Önizleme yazmaz (yolu <c>/preview</c> ile biter); salt okunur lisans evresinde eylem POST'u 403'tür.
 /// </summary>
-public static class HrEndpoints
+internal static class HrEndpoints
 {
-    public static IEndpointRouteBuilder MapHrEndpoints(this IEndpointRouteBuilder app)
+    /// <summary><paramref name="routes"/> host tarafından <c>/api/hr</c> grubu olarak, oturum ve modül kontrolüyle sarılmış gelir (ADR-0046).</summary>
+    public static void MapEndpoints(IEndpointRouteBuilder routes)
     {
-        var group = app.MapGroup("/api/hr")
-            .RequireAuthorization()
-            .RequireModule(HrModule.ModuleKey)
-            .WithTags("İnsan Kaynakları");
+        // İzin uç noktada değil serviste denetlenir: eylemin izni kayda ve duruma göre iş akışında belirlenir.
+        var group = routes.MapGroup(string.Empty)
+            .WithTags("İnsan Kaynakları")
+            .PermissionCheckedInService();
 
         group.MapGet("/leave-requests/{id:guid}/actions", async (Guid id, ILeaveWorkflow workflow, CancellationToken ct) =>
         {
             var result = await workflow.ActionsAsync(id, ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value!.Select(a => new HrActionDto(a.Action, a.Label, a.Allowed, a.Message, a.RequiresReason, a.Destructive)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         group.MapPost("/leave-requests/{id:guid}/actions", async (Guid id, RunHrActionRequest request, ILeaveWorkflow workflow, CancellationToken ct) =>
@@ -35,7 +38,7 @@ public static class HrEndpoints
             var result = await workflow.RunAsync(id, request.Action ?? string.Empty, request.Version, request.Reason, ct);
             return result.IsSuccess
                 ? Results.Ok(new RecordResponse(result.Value!.EntityKey, result.Value.Id, result.Value.Version, result.Value.Values))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         group.MapPost("/leave-requests/preview", async (LeavePreviewRequest request, ILeaveWorkflow workflow, CancellationToken ct) =>
@@ -43,7 +46,7 @@ public static class HrEndpoints
             var result = await workflow.PreviewAsync(request.EmployeeId, request.LeaveTypeKey, request.StartDate, request.EndDate, request.HalfDay, ct);
             return result.IsSuccess
                 ? Results.Ok(new LeavePreviewDto(result.Value!.Days, result.Value.RemainingDays, result.Value.PendingDays))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         // Masraf beyanı iş akışı (dilim 3): gönder, onayla, iade et, reddet, ödendi, iptal. Satırlar ve beyan alanları genel kayıt uçlarındadır.
@@ -52,7 +55,7 @@ public static class HrEndpoints
             var result = await workflow.ActionsAsync(id, ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value!.Select(a => new HrActionDto(a.Action, a.Label, a.Allowed, a.Message, a.RequiresReason, a.Destructive)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         group.MapPost("/expense-claims/{id:guid}/actions", async (Guid id, RunHrActionRequest request, IExpenseWorkflow workflow, CancellationToken ct) =>
@@ -60,7 +63,7 @@ public static class HrEndpoints
             var result = await workflow.RunAsync(id, request.Action ?? string.Empty, request.Version, request.Reason, ct);
             return result.IsSuccess
                 ? Results.Ok(new RecordResponse(result.Value!.EntityKey, result.Value.Id, result.Value.Version, result.Value.Values))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         // Zimmet iş akışı (dilim 4): teslim aldım, iade al, kayıp. Demirbaş ve zimmet kayıtları genel kayıt uçlarındadır.
@@ -69,7 +72,7 @@ public static class HrEndpoints
             var result = await workflow.ActionsAsync(id, ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value!.Select(a => new HrActionDto(a.Action, a.Label, a.Allowed, a.Message, a.RequiresReason, a.Destructive)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         group.MapPost("/asset-assignments/{id:guid}/actions", async (Guid id, RunHrActionRequest request, IAssetWorkflow workflow, CancellationToken ct) =>
@@ -77,7 +80,7 @@ public static class HrEndpoints
             var result = await workflow.RunAsync(id, request.Action ?? string.Empty, request.Version, request.Reason, ct);
             return result.IsSuccess
                 ? Results.Ok(new RecordResponse(result.Value!.EntityKey, result.Value.Id, result.Value.Version, result.Value.Values))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         // Zimmet tutanağı (PDF): zimmet, demirbaş ve çalışan kayıt boru hattından okunur; zimmeti göremeyen için 404.
@@ -86,7 +89,7 @@ public static class HrEndpoints
             var assignment = await pipeline.GetAsync(new RecordRef(HrModule.Entities.AssetAssignment, id), ct);
             if (!assignment.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(assignment.Error!);
+                return RecordProblems.ToProblem(assignment.Error!);
             }
 
             var values = assignment.Value!.Values;
@@ -115,7 +118,7 @@ public static class HrEndpoints
             var result = await workflow.StartAsync(request.EmployeeId, request.TemplateId, request.StartDate, ct);
             return result.IsSuccess
                 ? Results.Ok(new RecordResponse(result.Value!.EntityKey, result.Value.Id, result.Value.Version, result.Value.Values))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         group.MapGet("/employee-checklists/{id:guid}/actions", async (Guid id, IChecklistWorkflow workflow, CancellationToken ct) =>
@@ -151,7 +154,7 @@ public static class HrEndpoints
                 ? Results.Ok(new SurveyResultsDto(result.Value!.SurveyId, result.Value.ResponseCount, result.Value.HiddenReason,
                     [.. result.Value.Questions.Select(q => new SurveyQuestionResultDto(q.QuestionId, q.Text, q.QuestionType, q.AnswerCount, q.Average,
                         [.. q.Counts.Select(c => new SurveyOptionCountDto(c.Option, c.Count))], q.Texts))]))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         // Yorum ve beğeni (bölüm 23d): içeriği görebilen yazar ve beğenir; yorumu yazarı siler, içeriği yöneten gizler/gösterir/siler.
@@ -166,7 +169,7 @@ public static class HrEndpoints
                 var result = await interactions.CommentAsync(contentEntity, id, request.Body, ct);
                 return result.IsSuccess
                     ? Results.Ok(new RecordResponse(result.Value!.EntityKey, result.Value.Id, result.Value.Version, result.Value.Values))
-                    : RecordEndpoints.ToProblem(result.Error!);
+                    : RecordProblems.ToProblem(result.Error!);
             });
 
             group.MapPost($"/{route}/{{id:guid}}/like", async (Guid id, IContentInteractions interactions, CancellationToken ct) =>
@@ -175,7 +178,7 @@ public static class HrEndpoints
             group.MapPost($"/{commentEntity["hr.".Length..]}s/{{id:guid}}/actions", async (Guid id, RunHrActionRequest request, IContentInteractions interactions, CancellationToken ct) =>
             {
                 var result = await interactions.ModerateAsync(commentEntity, id, request.Action ?? string.Empty, request.Version, ct);
-                return !result.IsSuccess ? RecordEndpoints.ToProblem(result.Error!)
+                return !result.IsSuccess ? RecordProblems.ToProblem(result.Error!)
                     : result.Value is { } comment ? Results.Ok(new RecordResponse(comment.EntityKey, comment.Id, comment.Version, comment.Values))
                     : Results.NoContent();
             });
@@ -187,7 +190,7 @@ public static class HrEndpoints
             var result = await surveys.ResultsAsync(id, ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             return result.Value!.HiddenReason is { } hidden
@@ -202,7 +205,7 @@ public static class HrEndpoints
             var result = await mapping.UnitsAsync(ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value!.Select(u => new HrBusinessUnitDto(u.Id, u.ParentId, u.Name, u.PathNames, u.Depth, u.IsActive)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         group.MapGet("/department-mapping", async (IDepartmentMapping mapping, CancellationToken ct) =>
@@ -211,25 +214,23 @@ public static class HrEndpoints
             return result.IsSuccess
                 ? Results.Ok(result.Value!.Select(r => new DepartmentMappingRowDto(
                     r.DepartmentKey, r.Label, r.BusinessUnitId, r.BusinessUnitName, r.EmployeeCount, r.AnnouncementCount, r.SurveyCount)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         group.MapPost("/department-mapping", async (IDepartmentMapping mapping, CancellationToken ct) =>
         {
             var result = await mapping.ApplyAsync(ct);
-            return result.IsSuccess ? Results.Ok(new DepartmentMappingResultDto(result.Value)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(new DepartmentMappingResultDto(result.Value)) : RecordProblems.ToProblem(result.Error!);
         });
-
-        return app;
     }
 
     private static IResult Actions(RecordResult<IReadOnlyList<LeaveActionState>> result) =>
         result.IsSuccess
             ? Results.Ok(result.Value!.Select(a => new HrActionDto(a.Action, a.Label, a.Allowed, a.Message, a.RequiresReason, a.Destructive)).ToList())
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
 
     private static IResult Record(RecordResult<RecordData> result) =>
         result.IsSuccess
             ? Results.Ok(new RecordResponse(result.Value!.EntityKey, result.Value.Id, result.Value.Version, result.Value.Values))
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
 }

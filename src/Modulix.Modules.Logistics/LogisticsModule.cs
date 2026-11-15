@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Credentials;
@@ -5,6 +6,9 @@ using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Hosting;
+using Modulix.Modules.Logistics.Endpoints;
+using Modulix.Modules.Logistics.Lifecycle;
 using Modulix.Modules.Logistics.Records;
 
 namespace Modulix.Modules.Logistics;
@@ -13,7 +17,7 @@ namespace Modulix.Modules.Logistics;
 /// Lojistik (ADR-0038): sürücü kartı (dilim 3), sonra taşıma talebi, sevkiyat, sefer, teslim ve masraf. Araç kimliği Filo modülündedir
 /// (<c>IVehicleDirectory</c>); sürücü <c>core.Person</c> kaydının uzantısıdır.
 /// </summary>
-public sealed class LogisticsModule : IModule
+public sealed class LogisticsModule : IModule, IModuleEndpoints
 {
     public const string ModuleKey = "logistics";
 
@@ -73,6 +77,9 @@ public sealed class LogisticsModule : IModule
     }
 
     public string Key => ModuleKey;
+
+    /// <summary>Modüle özel uç noktalar (ADR-0046); genel kayıt uçları host'ta <c>OwnedRecords</c>'tan üretilir.</summary>
+    public void MapEndpoints(IEndpointRouteBuilder routes) => LogisticsEndpoints.MapEndpoints(routes);
 
     public string DisplayName => "Lojistik";
 
@@ -582,6 +589,7 @@ public sealed class LogisticsModule : IModule
 
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<ILogisticsPolicyProvider, LogisticsPolicyProvider>();
         services.AddScoped<LogisticsWorkflowGate>();
         services.AddScoped<LogisticsStoreContext>();
         services.AddScoped<IRecordStore, DriverRecordStore>();

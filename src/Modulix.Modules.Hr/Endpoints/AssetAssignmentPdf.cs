@@ -2,7 +2,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
-namespace Modulix.Api.Hr;
+namespace Modulix.Modules.Hr.Endpoints;
 
 /// <summary>Zimmet tutanağının girdisi: yalnızca kayıt boru hattından okunmuş (çağıranın görebildiği) değerler.</summary>
 public sealed record AssetAssignmentPdfModel(

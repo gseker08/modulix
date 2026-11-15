@@ -29,14 +29,14 @@ public class ProjectReferenceRulesTests
         ["Modulix.Core"] = [CoreContracts],
         ["Modulix.Infrastructure"] = ["Modulix.Core", CoreContracts],
         ["Modulix.Modules.Crm"] = [CoreContracts, CrmContracts, MarketingContracts],
-        ["Modulix.Modules.Logistics"] = [CoreContracts, FleetContracts],
+        ["Modulix.Modules.Logistics"] = [CoreContracts, CoreHosting, Shared, FleetContracts],
         ["Modulix.Modules.Contracts"] = [CoreContracts, CrmContracts],
         ["Modulix.Modules.Orders"] = [CoreContracts, CrmContracts],
         ["Modulix.Modules.Support"] = [CoreContracts],
         ["Modulix.Modules.Marketing"] = [CoreContracts, CrmContracts, MarketingContracts],
         ["Modulix.Modules.Warehouse"] = [CoreContracts, CoreHosting, Shared],
         ["Modulix.Modules.Fleet"] = [CoreContracts, FleetContracts],
-        ["Modulix.Modules.Hr"] = [CoreContracts],
+        ["Modulix.Modules.Hr"] = [CoreContracts, CoreHosting, Shared],
 
         // Modül sözleşme projeleri (ADR-0044): yalnızca arayüz ve veri tipleri; başka modüle ya da sözleşmeye bağlanmaz.
         [CrmContracts] = [CoreContracts],
