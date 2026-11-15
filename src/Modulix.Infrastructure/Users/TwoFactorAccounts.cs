@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
@@ -38,6 +39,7 @@ public sealed class TwoFactorAccounts(
     UserSessions sessions,
     AccountAudit audit,
     IEmailQueue emails,
+    IRecipientLanguage languages,
     ITenantScopeFactory tenantScopes)
 {
     public const int RecoveryCodeCount = 10;
@@ -138,7 +140,7 @@ public sealed class TwoFactorAccounts(
         if (result == TwoFactorCodeResult.RecoveryCode)
         {
             var left = await users.CountRecoveryCodesAsync(user);
-            emails.Enqueue(UserEmails.RecoveryCodeUsed(user.Email!, user.DisplayName, left, AccountTokens.AccountLink(publicUrl)));
+            emails.Enqueue(UserEmails.RecoveryCodeUsed(await languages.ForUserAsync(user.Id, cancellationToken), user.Email!, user.DisplayName, left, AccountTokens.AccountLink(publicUrl)));
             await db.SaveChangesAsync(cancellationToken);
             await audit.RecordAsync(user, AuditAction.SignedInWithRecoveryCode, null, client, cancellationToken,
                 details: new JsonObject { ["recoveryCodesLeft"] = left });

@@ -21,6 +21,7 @@ public static class ServerLocalizationSetup
         services.AddScoped<ILanguagePreferences, SessionLanguagePreferences>();
         services.AddScoped<IRequestLanguage, RequestLanguage>();
         services.AddScoped<ILocalizer, Localizer>();
+        services.AddScoped<IRecipientLanguage, RecipientLanguage>();
         return services;
     }
 }
@@ -52,3 +53,46 @@ public sealed class SessionLanguagePreferences(
             : await services.GetRequiredService<ITenantSettings>().GetValueAsync(CoreModule.SettingKeys.Language, cancellationToken);
 }
 
+
+/// <summary>
+/// <see cref="IRecipientLanguage"/> (dilim 18b): alıcının tercihi <c>platform</c> kullanıcı tablosundan, tenant varsayılanı aktif tenant'ın
+/// firma ayarından okunur; geçersiz değer atlanır. Sonuçlar kapsam boyunca tenant başına saklanır (aynı işte çok alıcıya gönderimde tekrar sorgu yok; tenant değişince yeniden okunur).
+/// </summary>
+public sealed class RecipientLanguage(ITenantContextAccessor tenant, ModulixDbContext db, IServiceProvider services, ITextCatalog catalog)
+    : IRecipientLanguage
+{
+    private readonly Dictionary<(Guid? Tenant, Guid User), LocalizedTexts> users = [];
+    private readonly Dictionary<Guid, LocalizedTexts> externals = [];
+
+    public async ValueTask<LocalizedTexts> ForUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var key = (tenant.Current?.TenantId, userId);
+        if (users.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var preference = await db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => u.PreferredLanguage).FirstOrDefaultAsync(cancellationToken);
+        var texts = LanguageOptions.Normalize(preference) is { } language
+            ? new LocalizedTexts(language, catalog)
+            : await ForExternalAsync(cancellationToken);
+        users[key] = texts;
+        return texts;
+    }
+
+    public async ValueTask<LocalizedTexts> ForExternalAsync(CancellationToken cancellationToken)
+    {
+        var tenantId = tenant.Current?.TenantId ?? Guid.Empty;
+        if (externals.TryGetValue(tenantId, out var cached))
+        {
+            return cached;
+        }
+
+        var tenantDefault = tenant.Current is null
+            ? null
+            : await services.GetRequiredService<ITenantSettings>().GetValueAsync(CoreModule.SettingKeys.Language, cancellationToken);
+        var texts = new LocalizedTexts(LanguageOptions.Normalize(tenantDefault) ?? LanguageOptions.Default, catalog);
+        externals[tenantId] = texts;
+        return texts;
+    }
+}
