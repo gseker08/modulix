@@ -79,7 +79,7 @@
 </AuthGate>
 
 @code {
-    private static readonly string Url = "/api/records/" + CoreAccess.HolidayEntityKey;
+    private static readonly string Url = "/api/records/" + HolidayAccess.EntityKey;
     private static readonly int ThisYear = DateTime.Today.Year;
 
     private static IReadOnlyList<ViewOption> YearOptions { get; } =

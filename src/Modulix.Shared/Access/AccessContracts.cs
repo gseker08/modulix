@@ -189,6 +189,13 @@ public sealed record SaveRoleRequest(
 
 public sealed record SetMembershipRolesRequest(IReadOnlyList<Guid> RoleIds);
 
+/// <summary>Firmanın resmî tatil listesi (ADR-0049 dilim 6a). Yazma izni <see cref="CoreAccess.ManageHolidays"/>'tir.</summary>
+public static class HolidayAccess
+{
+    /// <summary>Tatil listesinin kayıt türü: <c>/api/records/core.holiday</c>.</summary>
+    public const string EntityKey = "core.holiday";
+}
+
 /// <summary>Çekirdek (yönetim) izinleri; arayüz menüsü bunlara bakar. <c>CoreModule.Permissions</c> ile aynıdır (test denetler).</summary>
 public static class CoreAccess
 {
@@ -200,9 +207,6 @@ public static class CoreAccess
 
     /// <summary>Firmanın resmî tatil listesi (ADR-0049 dilim 6a): okuma her üyeye açık, yazma bu izinle.</summary>
     public const string ManageHolidays = "core.holidays.manage";
-
-    /// <summary>Tatil listesinin kayıt türü: <c>/api/records/core.holiday</c>.</summary>
-    public const string HolidayEntityKey = "core.holiday";
 
     public const string ReadAudit = "core.audit.read";
 
