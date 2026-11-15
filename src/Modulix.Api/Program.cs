@@ -97,6 +97,9 @@ builder.Services.AddScoped<Modulix.Modules.Support.Lifecycle.ISupportPolicyProvi
 builder.Services.AddScoped<Modulix.Modules.Marketing.Runs.IMarketingPolicyProvider, Modulix.Api.Marketing.MarketingPolicyProvider>();
 builder.Services.Configure<Modulix.Api.Communication.CommunicationCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Communication.CommunicationCleanupOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Imports.ImportErrorReports>();
+builder.Services.Configure<Modulix.Api.Imports.ImportReportCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Imports.ImportReportCleanupOptions.SectionName));
+builder.Services.AddSingleton<Modulix.Api.Imports.ImportReportCleanup>();
+builder.Services.AddHostedService<Modulix.Api.Imports.ImportReportCleanupWorker>();
 builder.Services.AddSingleton<Modulix.Api.Imports.ImportRunner>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Modulix.Api.Imports.ImportRunner>());
 builder.Services.AddScoped<Modulix.Api.Imports.ImportContext>();

@@ -152,7 +152,7 @@ public static class ImportEndpoints
             return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "İçe aktarma bulunamadı.");
         }
 
-        return context.Reports.Find(tenant.TenantId, runId) is { } report
+        return await context.Reports.FindAsync(tenant.TenantId, runId, ct) is { } report
             ? Results.File(report.Content, "text/csv", report.FileName)
             : Results.Problem(statusCode: StatusCodes.Status410Gone, title: "Hata raporunun süresi doldu; dosyayı yeniden yükleyerek yeni rapor alın.");
     }

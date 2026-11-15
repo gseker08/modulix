@@ -63,6 +63,7 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
             .UseSetting("ReportJobs:WorkerEnabled", "false")
             .UseSetting("CommunicationCleanup:WorkerEnabled", "false")
             .UseSetting("FileCleanup:WorkerEnabled", "false")
+            .UseSetting("ImportReportCleanup:WorkerEnabled", "false")
 
             // Dosya içerikleri testlerde bu fabrikaya özel geçici dizine yazılır (ADR-0040); testler dizini doğrudan inceleyebilir.
             .UseSetting("Storage:LocalRoot", BlobRoot)
