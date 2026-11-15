@@ -43,7 +43,7 @@ Sürüm geçmişi (aynı dosyanın yeni sürümü), saklama süresi ve legal hol
 - **Yükle ve sil:** kayıt okunabilir **ve** kayıt türünde `Update` izni var **ve** modül yazılabilir (lisans salt okunur evresinde değil, ADR-0028). Kayıt okunabilir ama yazma izni yoksa 403.
 - **Kayıt düzeyinde kural:** kaydı yalnızca belirli durumda ya da belirli kişi değiştirebiliyorsa (ör. masraf satırı: taslak beyan, sahibi ya da İK) ya da hiç değişmiyorsa depo aynı kuralı `IRecordWriteGuard` ile verir; yükleme ve silme tür izninden sonra buna da sorulur, kural tutmazsa 403. Kuralı vermeyen tür izinle sınırlı kalır; bu yüzden kaydın güncellemesini durum ya da kişiyle sınırlayan her deponun dosya kuralını da vermesi gerekir. Lojistik: onaylanmış masraf ve iptal edilmiş seferdeki masraf, kapanmış seferdeki teslim kanıtı (ADR-0038 bölüm 24); İK: ADR-0042 bölüm 25.
 - Dosya kimliğinden gidilirken önce metadata okunur, sonra bağlı kaydın erişimi her istekte yeniden sorulur. Dosya kimliğini bilmek yetki vermez. Tenant yalnızca oturumdan gelir; başka tenant'ın dosyası RLS ve sorgu süzgeciyle bulunamaz.
-- Bağlı kayıt silinmiş ya da erişilemezse dosya da erişilemez (404). Silinen kaydın eklerinin temizliği dilim 3'tür; tenant silme ise hepsini kapsar (K6).
+- Bağlı kayıt silinmiş ya da erişilemezse dosya da erişilemez (404). Silinen kaydın ekleri K8 ile temizlenir; tenant silme ise hepsini kapsar (K6).
 
 ### K3 — Yükleme doğrulaması
 
@@ -61,11 +61,12 @@ IBlobStorage
   DeleteAsync(tenantId, key)
   ExportTenantAsync(tenantId, dizin)   // tenant dışa aktarma için
   DeleteTenantAsync(tenantId)          // tenant silme için
+  ListAsync(tenantId)                  // yetim temizliği için: anahtar + son değişiklik zamanı (K8)
 ```
 
 - Dilim 1 uygulaması `LocalBlobStorage`: kök dizin `Storage:LocalRoot` (varsayılan veri dizini altında `blobs`; web köküne ve statik dosya sunumuna **dışında**). Yol `{kök}/{tenantId:N}/{anahtar[0..2]}/{anahtar}`; anahtar rastgele olduğundan yoldan dosya adı ya da kayıt çıkarılamaz, tahminle erişilemez. Yazma geçici dosyaya yapılıp taşınır (yarım dosya görünmez).
 - Nesne depolama (S3 uyumlu) adaptörü aynı arayüzle sonra eklenir; yapılandırma anahtarı adaptörü seçer. On-prem'de yerel disk, tek imaj ilkesi korunur (müşteriye özel kod yok).
-- Blob dosyaya, metadata veritabanına yazılır; ikisi tek işlemde olamaz. Sıra: blob yazılır → metadata kaydedilir; kayıt başarısızsa blob silinir. Blobsuz metadata oluşamaz; metadatasız (yetim) blob olabilir ve temizliği dilim 3'tür.
+- Blob dosyaya, metadata veritabanına yazılır; ikisi tek işlemde olamaz. Sıra: blob yazılır → metadata kaydedilir; kayıt başarısızsa blob silinir. Blobsuz metadata oluşamaz; metadatasız (yetim) blob olabilir ve K8'deki tarama ile temizlenir.
 
 ### K5 — Uç noktalar ve indirme
 
@@ -94,10 +95,21 @@ IBlobStorage
 | --- | --- |
 | 1b | `AttachmentPanel` Blazor bileşeni; ilk ekran (Firma ayrıntısı), sonra fırsat, aktivite |
 | 2 | Karantina ve zararlı içerik taraması (`Pending` → `Clean`/`Infected`), sıkıştırılmış dosya limitleri, `Classification` ile yeni sınıflar |
-| 3 | Yaşam döngüsü: sürüm, saklama, legal hold, silinen kaydın ekleri, yetim blob temizliği, kota rezervasyonu (Ç12) |
+| 3 | Yaşam döngüsü: sürüm, saklama, legal hold, kota rezervasyonu (Ç12). Silinen kaydın ekleri ve yetim blob temizliği yapıldı (K8) |
 | 4 | İmzalı kısa ömürlü bağlantı; portal erişimi |
 | 5 | Mobil: kamera yüklemesi, yeniden deneme, devam ettirilebilir yükleme |
 | Taşıma | Destek ekleri, teklif PDF'i, sözleşme belgeleri, sipariş teslim kanıtı bu depoya taşınır (her biri kendi ADR dilimidir) |
+
+### K8 — Silinen kaydın ekleri ve yetim içerik (dilim 3, 15 Kasım 2026)
+
+İki adımdır; ikisi de geri alınamaz silmedir, bu yüzden ayrılmıştır:
+
+1. **Metadata (olayla, işlem içinde):** Core `core.file-cleanup` aboneliği (ADR-0007) her `record.deleted` olayını dinler (bütün kayıt türleri). `IRecordFileCleanup.RemoveForRecordAsync` silinen kayda bağlı `StoredFiles` satırlarını siler ve her biri için `core.file` denetim satırı yazar (eylem Silindi, kaynak arka plan işi). Abone olay dağıtıcısının işlemi içinde çalışır; en az bir kez teslim edilir, ikinci çalıştırma bir şey bulmaz (idempotent). İçerik burada silinmez: veritabanı işlemi geri alınırsa silinmiş içerik geri gelmez.
+2. **İçerik (tarama ile):** `files.cleanup` arka plan işi (`FileCleanup:IntervalMinutes`, varsayılan 360) her etkin tenant için depodaki anahtarları listeler (`IBlobStorage.ListAsync`) ve hiçbir `StoredFiles` satırının göstermediği, `FileCleanup:OrphanGraceHours` (varsayılan 24, en az 1) saatten eski içeriği siler. Bekleme süresi yükleme sırasını korur: içerik metadata'dan önce yazıldığı için yeni yüklenen dosyanın içeriği kısa bir süre metadatasızdır. Önce eski anahtarlar, sonra bilinen anahtarlar okunur; böylece arada kaydedilen dosya silinmez. Tenant başına `sp_getapplock` ile tek düğüm çalışır; silinemeyen içerik günlüğe yazılır ve bir sonraki çalıştırmada yeniden denenir. `FileCleanup:WorkerEnabled=false` işi kapatır.
+
+Aynı anda kayıt silme ve dosya yükleme yarışında yüklenen dosyanın metadata'sı kalabilir; bağlı kaydı olmadığı için erişilemez (K2) ve tenant silmede temizlenir.
+
+**Kapsam dışı:** olay yayınlamadan silinen alt satırlar (bir modülün ana kaydıyla birlikte toplu sildiği satırlar) ve birleştirilen kayıtların ekleri (birleştirmede ekler hedef kayda taşınmaz). Bu satırların ekleri bağlı kayıt bulunamadığı için erişilemez kalır; taşıma ya da temizlik ilgili modülün dilimidir.
 
 ## Sonuçlar
 
@@ -109,3 +121,7 @@ IBlobStorage
 ## Testler (dilim 1)
 
 Mutlu yol (yükle, listele, indir, sil; denetim kaydı), doğrulama (boyut, uzantı, imza, çift uzantı, boş dosya, yinelenen içerik, kayıt başına sınır, geçersiz kayıt türü), tenant izolasyonu (B tenant'ı A'nın dosyasını listeleyemez/indiremez/silemez; dışa aktarma ve silme blobları kapsar), yetki (kaydı göremeyen 404, yazma izni olmayan 403, oturumsuz 401), nesne anahtarının rastgeleliği ve yol çıkışı (yol geçişi yok), indirme başlıkları.
+
+## Testler (dilim 3, K8)
+
+`FileCleanupTests` (entegrasyon): kayıt silinince yalnızca onun dosyalarının metadata'sı silinir ve denetime yazılır, ikinci çalıştırma 0 döner, tarama bekleme süresi içindeki içeriği korur, süresi geçen yetim içeriği siler, kalan dosya indirilebilir ve B tenant'ının içeriği dokunulmadan kalır; yetkisiz kullanıcı (403) ve başka tenant (404) kaydı silemez, dosya ve içerik kalır. `ModuleCatalogTests`: `record.deleted` olayının tek abonesi `core.file-cleanup`.

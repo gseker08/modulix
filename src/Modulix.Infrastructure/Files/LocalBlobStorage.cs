@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Options;
 using Modulix.Core.Files;
 
@@ -76,6 +77,29 @@ internal sealed class LocalBlobStorage(IOptions<FileStorageOptions> options) : I
         }
 
         return Task.FromResult(count);
+    }
+
+    public async IAsyncEnumerable<StoredBlob> ListAsync(Guid tenantId, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var source = TenantDirectory(tenantId);
+        if (!Directory.Exists(source))
+        {
+            yield break;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var name = Path.GetFileName(file);
+            if (name.Contains(TempMarker, StringComparison.Ordinal) || !BlobKeys.IsValid(name))
+            {
+                continue;
+            }
+
+            yield return new StoredBlob(name, new DateTimeOffset(File.GetLastWriteTimeUtc(file), TimeSpan.Zero));
+        }
+
+        await Task.CompletedTask;
     }
 
     public Task<int> DeleteTenantAsync(Guid tenantId, CancellationToken cancellationToken)
