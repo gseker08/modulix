@@ -24,7 +24,8 @@ namespace Modulix.IntegrationTests;
 /// masrafı görünmez, onaylanamaz, başka tenant'ın seferine masraf açılamaz) ve yetki (yazma izni olmayan giremez, onay izni olmayan onaylayamaz ve
 /// eylem listesinde görmez, okuma izni olmayan göremez). Makbuz ve fiş (bölüm 24): beklemede ve reddedilmişte eklenir ve silinir, onaylanmışta ve
 /// iptal edilmiş seferde 403; başka tenant 404; yalnızca okuyan 403. İptal edilmiş seferin masrafı (bölüm 25): düzenleme 409, karar komutları açık;
-/// başka tenant 404, okuyan 403.
+/// başka tenant 404, okuyan 403. Gerekçeli onay ve iptal uyarısı (bölüm 26): iptal edilen seferin masrafını onaylamak gerekçe ister, iptal adımı bekleyen
+/// masraf sayısını masraf okuyana söyler; başka tenant 404, onay izni olmayan 403.
 /// </summary>
 public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
@@ -332,6 +333,92 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
         Assert.Equal(1200m, (await GetAsync(opsA, $"{Expenses}/{expense.Id}")).Values["amount"]!.GetValue<decimal>());
     }
 
+    // --- iptal edilen seferin masrafı: gerekçeli onay ve uyarı (ADR-0038 bölüm 26) ---
+
+    /// <summary>
+    /// Mutlu yol ve kural: açık seferde onay gerekçe istemez; sefer iptal edilirken bekleyen masraf sayısı uyarı olarak gelir. İptalden sonra masraf
+    /// kaydı "seferi iptal edildi" der, onay gerekçe ister (gerekçesiz 422, masraf beklemede kalır); gerekçeyle onaylanır ve gerekçe masrafta kalır.
+    /// Ret değişmez.
+    /// </summary>
+    [Fact]
+    public async Task Approving_an_expense_of_a_cancelled_trip_needs_a_reason_and_the_expense_says_its_trip_was_cancelled()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var manager = await LoginAsync(s.Manager);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var fuel = await PostAsync(operations, Expenses, Fuel(trip.Id));
+        var toll = await PostAsync(operations, Expenses, Toll(trip.Id));
+
+        Assert.False(fuel.Values["tripCancelled"]!.GetValue<bool>());
+        var before = await ActionAsync(manager, "expenses", fuel.Id, "approve");
+        Assert.False(before.RequiresReason);
+        Assert.Null(before.Warning);
+
+        // İptal adımı bekleyen masrafları söyler; iptal engellenmez.
+        var cancel = await ActionAsync(operations, "trips", trip.Id, "cancel");
+        Assert.True(cancel.Allowed);
+        Assert.Contains("2 bekleyen masrafı", cancel.Warning);
+        await ActAsync(operations, trip, "cancel", "Müşteri vazgeçti", kind: "trips");
+
+        // Masraf kaydı ve liste seferin iptal edildiğini söyler (kuyruktaki rozet buradan).
+        Assert.True((await GetAsync(manager, $"{Expenses}/{fuel.Id}")).Values["tripCancelled"]!.GetValue<bool>());
+        Assert.All((await manager.GetFromJsonAsync<RecordPageResponse>($"{Expenses}?status=pending"))!.Items,
+            e => Assert.True(e.Values["tripCancelled"]!.GetValue<bool>()));
+
+        var approve = await ActionAsync(manager, "expenses", fuel.Id, "approve");
+        Assert.True(approve.Allowed);
+        Assert.True(approve.RequiresReason);
+        Assert.Contains("gerekçe", approve.Warning);
+
+        var withoutReason = await manager.PostAsJsonAsync($"/api/logistics/expenses/{fuel.Id}/actions", new RunLogisticsActionRequest("approve", fuel.Version, "  "));
+        Assert.Contains("reason", (await ValidationProblemAsync(withoutReason)).Errors.Keys);
+        Assert.Equal("pending", (await GetAsync(manager, $"{Expenses}/{fuel.Id}")).Values["status"]!.GetValue<string>());
+
+        var approved = await ActAsync(manager, fuel, "approve", "Yakıt iptalden önce depoda alındı");
+        Assert.Equal("approved", approved.Values["status"]!.GetValue<string>());
+        Assert.Equal("Yakıt iptalden önce depoda alındı", approved.Values["statusReason"]!.GetValue<string>());
+        Assert.Equal("rejected", (await ActAsync(manager, toll, "reject", "Geçiş yapılmadı")).Values["status"]!.GetValue<string>());
+
+        var history = (await manager.GetFromJsonAsync<AuditPageResponse>($"{Expenses}/{fuel.Id}/history"))!;
+        Assert.Contains(history.Items, h => h.Changes.Any(c => c.Field == "status"));
+    }
+
+    /// <summary>
+    /// Tenant izolasyonu ve yetki: başka tenant iptal edilen seferin masrafını göremez, eylemlerini alamaz, gerekçeyle bile onaylayamaz (404); onay
+    /// izni olmayan gerekçeyle de onaylayamaz (403) ve onay eylemini görmez; seferi yöneten ama masrafları göremeyen kişiye iptal uyarısı masraf sayısını
+    /// söylemez.
+    /// </summary>
+    [Fact]
+    public async Task Cancelled_trip_expense_approval_is_hidden_from_other_tenants_and_from_users_without_the_permission()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var opsA = await LoginAsync(a.Operations);
+        using var dispatcherA = await LoginAsync(a.Dispatcher);
+        using var managerB = await LoginAsync(b.Manager);
+        var trip = await PostAsync(opsA, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(opsA, Expenses, Toll(trip.Id));
+
+        var dispatcherCancel = await ActionAsync(dispatcherA, "trips", trip.Id, "cancel");
+        Assert.True(dispatcherCancel.Allowed);
+        Assert.Null(dispatcherCancel.Warning);
+        await ActAsync(dispatcherA, trip, "cancel", "Araç arızalandı", kind: "trips");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await managerB.GetAsync($"/api/logistics/expenses/{expense.Id}/actions")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await managerB.PostAsJsonAsync($"/api/logistics/expenses/{expense.Id}/actions",
+            new RunLogisticsActionRequest("approve", expense.Version, "Yabancı"))).StatusCode);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await opsA.PostAsJsonAsync($"/api/logistics/expenses/{expense.Id}/actions",
+            new RunLogisticsActionRequest("approve", expense.Version, "Kendi masrafım"))).StatusCode);
+        Assert.DoesNotContain((await opsA.GetFromJsonAsync<List<LogisticsActionDto>>($"/api/logistics/expenses/{expense.Id}/actions"))!, x => x.Action == "approve");
+
+        Assert.Equal("pending", (await GetAsync(opsA, $"{Expenses}/{expense.Id}")).Values["status"]!.GetValue<string>());
+    }
+
+    private static async Task<LogisticsActionDto> ActionAsync(HttpClient client, string kind, Guid id, string action) =>
+        Assert.Single((await client.GetFromJsonAsync<List<LogisticsActionDto>>($"/api/logistics/{kind}/{id}/actions"))!, x => x.Action == action);
+
     // --- makbuz ve fiş: kaydın kuralı (ADR-0038 bölüm 24, ADR-0040 K2) ---
 
     /// <summary>Mutlu yol: beklemedeki masrafa makbuz eklenir ve silinir; reddedilen masrafın belgesi düzeltilir (yeni fiş eklenir, eskisi silinir).</summary>
@@ -479,7 +566,7 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
         ["amount"] = 1200, ["currency"] = "TRY",
     };
 
-    private sealed record Setup(Guid TenantId, ModulixUser Operations, ModulixUser Manager, ModulixUser Reader, ModulixUser Outsider);
+    private sealed record Setup(Guid TenantId, ModulixUser Operations, ModulixUser Manager, ModulixUser Reader, ModulixUser Outsider, ModulixUser Dispatcher);
 
     private async Task<Setup> SetUpAsync()
     {
@@ -489,11 +576,13 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
         var manager = await factory.CreateUserAsync(tenant);
         var reader = await factory.CreateUserAsync(tenant);
         var outsider = await factory.CreateUserAsync(tenant);
+        var dispatcher = await factory.CreateUserAsync(tenant);
         await factory.CreateRoleAsync(tenant.Id, [TripsRead, TripsWrite, ExpensesRead, ExpensesWrite], Scope.All, operations);
         await factory.CreateRoleAsync(tenant.Id, [TripsRead, TripsWrite, ExpensesRead, ExpensesWrite, ExpensesApprove], Scope.All, manager);
         await factory.CreateRoleAsync(tenant.Id, [ExpensesRead], Scope.All, reader);
         await factory.CreateRoleAsync(tenant.Id, [TripsRead], Scope.All, outsider);
-        return new Setup(tenant.Id, operations, manager, reader, outsider);
+        await factory.CreateRoleAsync(tenant.Id, [TripsRead, TripsWrite], Scope.All, dispatcher); // seferi yönetir, masrafları göremez
+        return new Setup(tenant.Id, operations, manager, reader, outsider, dispatcher);
     }
 
     private static async Task<RecordResponse> ActAsync(HttpClient client, RecordResponse record, string action, string? reason = null, string kind = "expenses")

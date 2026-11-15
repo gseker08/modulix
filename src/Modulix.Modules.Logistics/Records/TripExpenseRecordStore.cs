@@ -18,13 +18,18 @@ namespace Modulix.Modules.Logistics.Records;
 /// </summary>
 internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : LogisticsRecordStore<TripExpense>(context)
 {
+    /// <summary>Seferi iptal edilmiş masrafların seferleri (<see cref="PrepareAsync"/> doldurur; <c>tripCancelled</c> alanı okur).</summary>
+    private readonly HashSet<Guid> cancelledTrips = [];
+
+    private IReadOnlyList<RecordField<TripExpense>>? fields;
+
     public override string EntityKey => LogisticsModule.Entities.TripExpense;
 
     protected override string ReadPermission => LogisticsModule.Permissions.ExpensesRead;
 
     protected override string WritePermission => LogisticsModule.Permissions.ExpensesWrite;
 
-    protected override IReadOnlyList<RecordField<TripExpense>> Fields { get; } =
+    protected override IReadOnlyList<RecordField<TripExpense>> Fields => fields ??=
     [
         Field.Reference<TripExpense, Trip>("tripId", "Sefer bulunamadı.", e => e.TripId, (e, v) => e.TripId = v!.Value, required: true, createOnly: true),
         Field.ListChoice<TripExpense>("kindKey", LogisticsModule.Lists.ExpenseKind, e => e.KindKey, (e, v) => e.KindKey = v ?? string.Empty),
@@ -42,6 +47,8 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
         Field.Computed<TripExpense>("unitPrice", e => e.Liters is > 0 ? JsonValue.Create(decimal.Round(e.Amount / e.Liters.Value, 4)) : null),
         Field.Computed<TripExpense>("status", e => e.Status),
         Field.Computed<TripExpense>("statusReason", e => e.StatusReason),
+        // Masrafın kendi kuralını belirler (düzenleme, belge, gerekçeli onay; ADR-0038 bölüm 25-26); seferin başka bilgisi açılmaz.
+        Field.Computed<TripExpense>("tripCancelled", e => cancelledTrips.Contains(e.TripId)),
     ];
 
     protected override IReadOnlyDictionary<string, RecordFilter<TripExpense>> Filters { get; } = new Dictionary<string, RecordFilter<TripExpense>>
@@ -169,6 +176,17 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
         if (errors.Count > 0)
         {
             throw new RecordValidationException(errors);
+        }
+    }
+
+    protected override async Task PrepareAsync(IReadOnlyCollection<TripExpense> entities, CancellationToken cancellationToken)
+    {
+        cancelledTrips.Clear();
+        var tripIds = entities.Select(e => e.TripId).Distinct().ToList();
+        if (tripIds.Count > 0)
+        {
+            cancelledTrips.UnionWith(await Context.Data.Set<Trip>().AsNoTracking()
+                .Where(t => tripIds.Contains(t.Id) && t.Status == Trip.Statuses.Cancelled).Select(t => t.Id).ToListAsync(cancellationToken));
         }
     }
 
