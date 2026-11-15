@@ -86,6 +86,12 @@ public interface IModule
     IReadOnlyList<Credentials.CredentialOwner> CredentialOwners => [];
 
     /// <summary>
+    /// Modülün belge serileri (ADR-0049): sunucuda numara verilen kayıt türleri (ör. sefer → "SF-2026-00001"). Modül numarayı kendisi üretmez,
+    /// <see cref="Numbering.IDocumentNumbers"/> ile bu serilerden ister; beyan edilmemiş seriden numara alınamaz. Anahtar modül anahtarıyla başlar.
+    /// </summary>
+    IReadOnlyList<Numbering.NumberSeriesDefinition> NumberSeries => [];
+
+    /// <summary>
     /// Olay abonelikleri (ADR-0007): modül başka modüllerin değişikliğine bunlarla tepki verir. Anahtar modül anahtarıyla
     /// başlar; izinler modülün kendi izinleridir; abone sınıfı <see cref="ConfigureServices"/>'te scoped kaydedilir.
     /// </summary>
