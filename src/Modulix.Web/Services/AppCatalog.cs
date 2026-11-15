@@ -189,6 +189,7 @@ public static class AppCatalog
         new("crm.settings", Crm, "Genel CRM ayarları", "wrench", ModuleSettingsRoute(CrmAccess.ModuleKey), 5, CrmAccess.ModuleKey, CoreAccess.ManageSettings, Group: CrmSettingsGroup),
         new("crm.quote-rules", Crm, "Teklif kuralları", "shield", "crm/teklif-kurallari", 10, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmSettingsGroup),
         new("crm.quote-delegations", Crm, "Onay vekâletleri", "users", "crm/onay-vekaletleri", 20, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmSettingsGroup),
+        new("crm.lead-scoring", Crm, "Müşteri adayı puanı", "trending-up", "crm/aday-puani", 30, CrmAccess.ModuleKey, CrmAccess.LeadScoringManage, Group: CrmSettingsGroup),
         new("crm.product-categories", Crm, "Ürün kategorileri", "layers", "crm/urun-kategorileri", 40, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmSettingsGroup),
         new("crm.units", Crm, "Ölçü birimleri", "sliders", "crm/birimler", 50, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmSettingsGroup),
         new("crm.tax-rates", Crm, "Vergi ve kur", "landmark", "crm/vergi-kur", 60, CrmAccess.ModuleKey, CrmAccess.PricesRead, Group: CrmSettingsGroup),

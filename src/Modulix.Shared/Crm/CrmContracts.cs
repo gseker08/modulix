@@ -45,6 +45,7 @@ public static class CrmAccess
     public const string LeadsConvert = "crm.leads.convert";
     public const string LeadsExport = "crm.leads.export";
     public const string LeadFormsManage = "crm.lead-forms.manage";
+    public const string LeadScoringManage = "crm.lead-scoring.manage";
     public const string ProductsRead = "crm.products.read";
     public const string ProductsWrite = "crm.products.write";
     public const string ProductCostsRead = "crm.product-costs.read";
