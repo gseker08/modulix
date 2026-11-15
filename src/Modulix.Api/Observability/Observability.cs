@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Claims;
 using Modulix.Api.Tenancy;
 using Modulix.Infrastructure.Events;
+using Modulix.Infrastructure.Persistence;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -41,11 +42,12 @@ public static class Observability
             .ConfigureResource(resource => resource.AddService(ServiceName, serviceVersion: version))
             .WithTracing(tracing => tracing
                 .AddAspNetCoreInstrumentation(options => options.Filter = context => !context.Request.Path.StartsWithSegments("/health"))
-                .AddHttpClientInstrumentation())
+                .AddHttpClientInstrumentation()
+                .AddSource(DatabaseCommandDiagnostics.ActivitySourceName))
             .WithMetrics(metrics => metrics
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
-                .AddMeter(EventMetrics.MeterName, JobMetrics.MeterName))
+                .AddMeter(EventMetrics.MeterName, JobMetrics.MeterName, DatabaseCommandDiagnostics.MeterName))
             .UseOtlpExporter(OtlpProtocol(builder.Configuration), endpoint);
 
         return builder;

@@ -2,7 +2,7 @@
 
 Bütün projenin salt okunur incelemesi: modül sınırları, veri ve tenant izolasyonu, güvenlik ve API, istemci, test, CI ve işletim. Kod değiştirilmedi, derleme ve test çalıştırılmadı. Bulgular dosya ve satır kanıtına dayanır; kanıtı olmayanlar "doğrulanmadı" diye işaretlidir. Satır numaraları `main` @ `cfc11f7b` içindir.
 
-> **Durum (15 Kasım 2026):** Dalga 1 main'de (PR #377: A1, A3, A7, A10, C1, D3; C2 yalnızca Report-Only). Dalga 2'nin ilk kalemi A2 (JSON log, log kapsamı, OpenTelemetry) main'de (PR #383, #398); A4 dosya içeriği için S3 uyumlu nesne deposu adaptörü main'de (PR #402; içe aktarma hata raporu ve hız sınırları hâlâ düğüm belleğinde). A6 migration uyumluluk job'u (`migration-compat.yml`) PR'da. Yapay zekâ kuralları [ADR-0047](adr/0047-yapay-zeka-ajan-kurallari.md) main'de.
+> **Durum (15 Kasım 2026):** Dalga 1 main'de (PR #377: A1, A3, A7, A10, C1, D3; C2 yalnızca Report-Only). Dalga 2'nin ilk kalemi A2 (JSON log, log kapsamı, OpenTelemetry) main'de (PR #383, #398); A4 dosya içeriği için S3 uyumlu nesne deposu adaptörü main'de (PR #402; içe aktarma hata raporu ve hız sınırları hâlâ düğüm belleğinde). A4 içe aktarma hata raporu (PR #412) ve A6 migration uyumluluk job'u (PR #407) main'de; A2 veritabanı izleri PR'da. Yapay zekâ kuralları [ADR-0047](adr/0047-yapay-zeka-ajan-kurallari.md) main'de.
 
 ## Özet hüküm
 

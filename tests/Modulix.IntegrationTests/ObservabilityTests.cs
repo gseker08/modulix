@@ -1,15 +1,19 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Modulix.Api.Observability;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Infrastructure.Email;
+using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
 using Modulix.Shared.Auth;
 using OpenTelemetry.Trace;
@@ -133,6 +137,75 @@ public class ObservabilityTests(ModulixApiFactory factory) : IClassFixture<Modul
         Assert.Contains(turns, t => t.Outcome == "failed");
         Assert.All(turns, t => Assert.Equal(new[] { "job", "outcome" }, t.Tags.Keys.Order(StringComparer.Ordinal)));
     }
+
+    /// <summary>
+    /// EF komutu çağıranın izine bağlı bir span ve süre ölçümü üretir. Sorgu metni ve parametre değeri yazılmaz; başarısız komutta hata türü
+    /// ve SQL Server hata numarası yazılır, ileti yazılmaz (kişisel veri taşıyabilir).
+    /// </summary>
+    [Fact]
+    public async Task Database_commands_are_traced_and_measured_without_query_text()
+    {
+        using var parentSource = new ActivitySource($"Modulix.Tests.{Guid.NewGuid():N}");
+        var stopped = new ConcurrentBag<Activity>();
+        using var activities = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == DatabaseCommandDiagnostics.ActivitySourceName || source.Name == parentSource.Name,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = stopped.Add,
+        };
+        ActivitySource.AddActivityListener(activities);
+        var measurements = new ConcurrentBag<IReadOnlyDictionary<string, object?>>();
+        using var meters = new MeterListener();
+        meters.InstrumentPublished = (instrument, l) =>
+        {
+            if (instrument.Meter.Name == DatabaseCommandDiagnostics.MeterName)
+            {
+                l.EnableMeasurementEvents(instrument);
+            }
+        };
+        meters.SetMeasurementEventCallback<double>((_, _, tags, _) => measurements.Add(ToDictionary(tags)));
+        meters.Start();
+
+        var tenant = await factory.CreateTenantAsync();
+        var marker = $"gizli-{Guid.NewGuid():N}";
+        ActivityTraceId traceId;
+        ActivitySpanId parentSpanId;
+        using (var parent = parentSource.StartActivity("test")!)
+        {
+            (traceId, parentSpanId) = (parent.TraceId, parent.SpanId);
+            using var scope = factory.OpenScope(tenant.Id);
+            var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+            await db.TenantSettings.CountAsync(s => s.Key == marker);
+            await Assert.ThrowsAsync<SqlException>(() => db.Database.ExecuteSqlRawAsync("SELECT 1 / 0"));
+        }
+
+        var spans = stopped.Where(a => a.Source.Name == DatabaseCommandDiagnostics.ActivitySourceName && a.TraceId == traceId).ToList();
+        Assert.Contains(spans, a => a.ParentSpanId == parentSpanId && Equals(a.GetTagItem("db.operation.name"), "SELECT") && a.Status == ActivityStatusCode.Unset);
+        var failed = Assert.Single(spans, a => a.Status == ActivityStatusCode.Error);
+        Assert.Equal(("8134", typeof(SqlException).FullName), (failed.GetTagItem("db.response.status_code"), failed.GetTagItem("error.type")));
+        Assert.Null(failed.StatusDescription);
+        Assert.All(spans, a =>
+        {
+            Assert.Equal("microsoft.sql_server", a.GetTagItem("db.system.name"));
+            Assert.Null(a.GetTagItem("db.query.text"));
+            Assert.DoesNotContain(a.TagObjects, t => t.Value is string text && (text.Contains(marker, StringComparison.Ordinal) || text.Contains(" FROM ", StringComparison.OrdinalIgnoreCase)));
+        });
+
+        Assert.NotEmpty(measurements);
+        Assert.All(measurements, tags => Assert.Empty(tags.Keys.Except(["db.system.name", "db.operation.name", "error.type"])));
+        Assert.Contains(measurements, tags => Equals(tags.GetValueOrDefault("error.type"), typeof(SqlException).FullName));
+    }
+
+    [Theory]
+    [InlineData("SELECT [t].[Id] FROM [core].[TenantSettings] AS [t]", "SELECT")]
+    [InlineData("SET IMPLICIT_TRANSACTIONS OFF;\nSET NOCOUNT ON;\nINSERT INTO [core].[AuditLog] ([Id]) OUTPUT INSERTED.[Id] VALUES (@p0);", "INSERT")]
+    [InlineData("SET NOCOUNT ON;\nUPDATE [crm].[Leads] SET [Subject] = @p0 OUTPUT DELETED.[Id] WHERE [Id] = @p1;", "UPDATE")]
+    [InlineData("MERGE [crm].[Leads] USING (VALUES (@p0)) AS i ([Id]) ON 1=0 WHEN NOT MATCHED THEN INSERT ([Id]) VALUES (i.[Id]);", "MERGE")]
+    [InlineData("execute sys.sp_getapplock @Resource = @name", "EXEC")]
+    [InlineData("DECLARE @x int = 1;", "OTHER")]
+    [InlineData("", "OTHER")]
+    public void Operation_name_is_the_first_statement_keyword(string commandText, string expected) =>
+        Assert.Equal(expected, DatabaseCommandDiagnostics.OperationName(commandText));
 
     [Fact]
     public async Task Email_queue_is_measured_even_without_email_settings()
