@@ -323,6 +323,12 @@ internal sealed class EfEmailQueue(
     }
 }
 
+/// <summary>E-posta kuyruğunun bir ölçümü; <see cref="OldestPending"/> boşsa bekleyen yoktur.</summary>
+public sealed record EmailQueueSnapshot(int Pending, DateTimeOffset? OldestPending, DateTimeOffset MeasuredAt)
+{
+    public TimeSpan OldestPendingAge => OldestPending is { } at ? MeasuredAt - at : TimeSpan.Zero;
+}
+
 /// <summary>
 /// Bekleyen e-postaları gönderir. Birden fazla uygulama örneği aynı anda çalışabilir: her e-posta koşullu bir
 /// UPDATE ile tek bir işleyiciye alınır, böylece iki kez gönderilmez.
@@ -336,6 +342,19 @@ public sealed class EmailDispatcher(
 {
     /// <summary>Alınan e-postanın başka işleyiciye geçmeden önce gönderilmesi gereken süre; SMTP zaman aşımından uzun olmalı.</summary>
     public static readonly TimeSpan Lease = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Kuyruğun durumu (gözlemleme, A2): bekleyen e-posta sayısı ve en eski bekleyenin oluşturulma zamanı. Ayarlar eksik
+    /// olsa da ölçülür; e-posta tam da o durumda birikir. (Status, NextAttemptAt) indeksini kullanır.
+    /// </summary>
+    public async Task<EmailQueueSnapshot> MeasureAsync(CancellationToken cancellationToken)
+    {
+        var pending = db.EmailMessages.AsNoTracking().Where(e => e.Status == EmailStatus.Pending);
+        return new EmailQueueSnapshot(
+            await pending.CountAsync(cancellationToken),
+            await pending.MinAsync(e => (DateTimeOffset?)e.CreatedAt, cancellationToken),
+            time.GetUtcNow());
+    }
 
     /// <summary>Zamanı gelmiş en fazla <see cref="EmailOptions.BatchSize"/> e-postayı dener; denenen sayıyı döner.</summary>
     public async Task<int> DispatchPendingAsync(CancellationToken cancellationToken)

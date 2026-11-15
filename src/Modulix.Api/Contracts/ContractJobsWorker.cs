@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -102,8 +103,10 @@ public sealed class ContractJobsRunner(IServiceScopeFactory scopes, TimeProvider
 /// Sözleşme zamanlanmış işlerini düzenli aralıklarla çalıştırır (<c>ContractJobs:WorkerEnabled</c> ile kapatılır). Sözleşme modülü açık her tenant ayrı çalışır; biri başarısız
 /// olursa diğerleri etkilenmez ve bir sonraki turda (kaçırılanlar dahil) yeniden denenir.
 /// </summary>
-public sealed class ContractJobsWorker(IServiceScopeFactory scopes, ContractJobsRunner runner, IOptions<ContractJobsOptions> options, ILogger<ContractJobsWorker> logger) : BackgroundService
+public sealed class ContractJobsWorker(IServiceScopeFactory scopes, ContractJobsRunner runner, IOptions<ContractJobsOptions> options, IJobMetrics metrics, ILogger<ContractJobsWorker> logger) : BackgroundService
 {
+    public const string JobName = "contracts.jobs";
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
@@ -138,9 +141,12 @@ public sealed class ContractJobsWorker(IServiceScopeFactory scopes, ContractJobs
                     }
                     catch (Exception exception)
                     {
+                        metrics.TenantFailed(JobName);
                         logger.LogWarning(exception, "Tenant {TenantId} sözleşme işleri bu turda çalıştırılamadı.", tenantId);
                     }
                 }
+
+                metrics.TurnCompleted(JobName);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -148,6 +154,7 @@ public sealed class ContractJobsWorker(IServiceScopeFactory scopes, ContractJobs
             }
             catch (Exception exception)
             {
+                metrics.TurnFailed(JobName);
                 logger.LogError(exception, "Sözleşme işleri çalıştırılamadı.");
             }
 

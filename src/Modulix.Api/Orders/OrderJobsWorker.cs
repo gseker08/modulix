@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -101,8 +102,10 @@ public sealed class OrderJobsRunner(IServiceScopeFactory scopes, TimeProvider ti
 /// Sipariş zamanlanmış işlerini düzenli aralıklarla çalıştırır (<c>OrderJobs:WorkerEnabled</c> ile kapatılır). Sipariş modülü açık her tenant ayrı çalışır; biri başarısız
 /// olursa diğerleri etkilenmez ve bir sonraki turda (kaçırılanlar dahil) yeniden denenir.
 /// </summary>
-public sealed class OrderJobsWorker(IServiceScopeFactory scopes, OrderJobsRunner runner, IOptions<OrderJobsOptions> options, ILogger<OrderJobsWorker> logger) : BackgroundService
+public sealed class OrderJobsWorker(IServiceScopeFactory scopes, OrderJobsRunner runner, IOptions<OrderJobsOptions> options, IJobMetrics metrics, ILogger<OrderJobsWorker> logger) : BackgroundService
 {
+    public const string JobName = "orders.jobs";
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
@@ -133,9 +136,12 @@ public sealed class OrderJobsWorker(IServiceScopeFactory scopes, OrderJobsRunner
                     }
                     catch (Exception exception)
                     {
+                        metrics.TenantFailed(JobName);
                         logger.LogWarning(exception, "Tenant {TenantId} sipariş işleri bu turda çalıştırılamadı.", tenantId);
                     }
                 }
+
+                metrics.TurnCompleted(JobName);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -143,6 +149,7 @@ public sealed class OrderJobsWorker(IServiceScopeFactory scopes, OrderJobsRunner
             }
             catch (Exception exception)
             {
+                metrics.TurnFailed(JobName);
                 logger.LogError(exception, "Sipariş işleri çalıştırılamadı.");
             }
 

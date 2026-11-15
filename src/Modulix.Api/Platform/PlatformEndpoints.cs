@@ -338,13 +338,17 @@ public static class PlatformEndpoints
         Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? throw new InvalidOperationException("Oturumda kullanıcı yok."));
 }
 
-/// <summary>Yeni kapsamda tenant bağlamını kurar (<see cref="HttpTenantContextAccessor"/>).</summary>
+/// <summary>
+/// Yeni kapsamda tenant bağlamını kurar (<see cref="HttpTenantContextAccessor"/>). Kapsam açıkken yazılan loglar tenant
+/// kimliğini taşır (<see cref="Observability.TenantLogScope"/>; arka plan işçileri ve oturumsuz uçlar).
+/// </summary>
 public sealed class TenantScopeFactory(IServiceScopeFactory scopes) : ITenantScopeFactory
 {
     public AsyncServiceScope Create(TenantContext tenant)
     {
         var scope = scopes.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current = tenant;
+        scope.ServiceProvider.GetRequiredService<Observability.TenantLogScope>().Begin(tenant);
         return scope;
     }
 }

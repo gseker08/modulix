@@ -21,6 +21,7 @@ public partial class CoreContractsNamespaceRulesTests
         "Modulix.Core.Contracts.Communication",
         "Modulix.Core.Contracts.Credentials",
         "Modulix.Core.Contracts.Customization",
+        "Modulix.Core.Contracts.Diagnostics", // ortak gözlemleme: arka plan işçisi tur ölçümü (IJobMetrics, A2)
         "Modulix.Core.Contracts.Events",
         "Modulix.Core.Contracts.Files",
         "Modulix.Core.Contracts.Localization",

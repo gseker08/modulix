@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
@@ -6,6 +7,10 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Modulix.Api.Observability;
+using Modulix.Core.Contracts.Notifications;
+using Modulix.Core.Contracts.Tenancy;
+using Modulix.Infrastructure.Email;
+using Modulix.Infrastructure.Platform;
 using Modulix.Shared.Auth;
 using OpenTelemetry.Trace;
 
@@ -61,6 +66,99 @@ public class ObservabilityTests(ModulixApiFactory factory) : IClassFixture<Modul
         using var host = factory.WithWebHostBuilder(builder => builder.UseSetting("OpenTelemetry:OtlpEndpoint", "http://localhost:4317"));
 
         Assert.NotNull(host.Services.GetService<TracerProvider>());
+    }
+
+    [Fact]
+    public async Task Logs_inside_a_tenant_scope_carry_the_tenant_until_the_scope_ends()
+    {
+        var logs = new CapturingLoggerProvider();
+        using var host = WithLogs(logs);
+        var tenantId = Guid.NewGuid();
+        var factoryOfScopes = host.Services.GetRequiredService<ITenantScopeFactory>();
+        var logger = host.Services.GetRequiredService<ILogger<ObservabilityTests>>();
+
+        await using (factoryOfScopes.Create(new TenantContext(tenantId, Guid.Empty, Guid.Empty)))
+        {
+            logger.LogInformation("kapsam-ici");
+        }
+
+        logger.LogInformation("kapsam-disi");
+
+        var inside = Assert.Single(logs.Entries, e => e.Message == "kapsam-ici");
+        Assert.Equal(tenantId, inside.Scope[RequestLogScopeMiddleware.TenantIdKey]);
+        Assert.False(inside.Scope.ContainsKey(RequestLogScopeMiddleware.UserIdKey)); // sistem işi: kullanıcı yok
+        var outside = Assert.Single(logs.Entries, e => e.Message == "kapsam-disi");
+        Assert.False(outside.Scope.ContainsKey(RequestLogScopeMiddleware.TenantIdKey));
+    }
+
+    [Fact]
+    public void Job_turns_are_measured_per_job_without_tenant_tags()
+    {
+        var metrics = factory.Services.GetRequiredService<JobMetrics>();
+        var job = $"test.{Guid.NewGuid():N}";
+        var ages = new ConcurrentDictionary<string, double>();
+        var turns = new ConcurrentBag<(string Outcome, IReadOnlyDictionary<string, object?> Tags)>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, l) =>
+        {
+            if (instrument.Meter.Name == JobMetrics.MeterName)
+            {
+                l.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) =>
+        {
+            var values = ToDictionary(tags);
+            if (instrument.Name == "modulix.jobs.last_completed_turn.age" && values["job"] is string name)
+            {
+                ages[name] = value;
+            }
+        });
+        listener.SetMeasurementEventCallback<long>((instrument, _, tags, _) =>
+        {
+            var values = ToDictionary(tags);
+            if (instrument.Name == "modulix.jobs.turns" && Equals(values["job"], job))
+            {
+                turns.Add(((string)values["outcome"]!, values));
+            }
+        });
+        listener.Start();
+
+        metrics.TurnCompleted(job);
+        metrics.TurnFailed(job);
+        listener.RecordObservableInstruments();
+
+        Assert.True(ages.TryGetValue(job, out var age) && age >= 0);
+        Assert.Contains(turns, t => t.Outcome == "completed");
+        Assert.Contains(turns, t => t.Outcome == "failed");
+        Assert.All(turns, t => Assert.Equal(new[] { "job", "outcome" }, t.Tags.Keys.Order(StringComparer.Ordinal)));
+    }
+
+    [Fact]
+    public async Task Email_queue_is_measured_even_without_email_settings()
+    {
+        using (var scope = factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<IEmailQueue>().Enqueue(new EmailMessage($"o-{Guid.NewGuid():N}@test.modulix", "Ölçüm", "<p>Ölçüm</p>"));
+        }
+
+        using var measure = factory.Services.CreateScope();
+        var snapshot = await measure.ServiceProvider.GetRequiredService<EmailDispatcher>().MeasureAsync(CancellationToken.None);
+
+        Assert.True(snapshot.Pending >= 1);
+        Assert.NotNull(snapshot.OldestPending);
+        Assert.True(snapshot.OldestPendingAge >= TimeSpan.Zero);
+    }
+
+    private static Dictionary<string, object?> ToDictionary(ReadOnlySpan<KeyValuePair<string, object?>> tags)
+    {
+        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var tag in tags)
+        {
+            values[tag.Key] = tag.Value;
+        }
+
+        return values;
     }
 
     // Uç nokta yürütme logları (Microsoft.AspNetCore.Routing, Information) kapsamın içinde yazılır; varsayılanda Warning'dir.
