@@ -194,7 +194,14 @@ public static class PersistenceSetup
         services.AddScoped<FormLayoutService>();
         services.AddScoped<IFormLayoutService>(sp => sp.GetRequiredService<FormLayoutService>());
         services.AddScoped<Modulix.Core.Views.IGridViewService, Modulix.Infrastructure.Views.GridViewService>();
-        services.AddSingleton<Modulix.Core.Files.IBlobStorage, Modulix.Infrastructure.Files.LocalBlobStorage>();
+        // Depo türü Storage:Provider ile seçilir: yerel disk ya da S3 uyumlu nesne deposu (mimari değerlendirme A4).
+        services.AddSingleton<Modulix.Core.Files.IBlobStorage>(sp =>
+        {
+            Microsoft.Extensions.Options.IOptions<Modulix.Core.Files.FileStorageOptions> storage = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Modulix.Core.Files.FileStorageOptions>>();
+            return storage.Value.Provider == Modulix.Core.Files.BlobStorageProvider.S3
+                ? new Modulix.Infrastructure.Files.S3BlobStorage(storage)
+                : new Modulix.Infrastructure.Files.LocalBlobStorage(storage);
+        });
         services.AddScoped<Modulix.Infrastructure.Files.FileStore>();
         services.AddScoped<Modulix.Core.Contracts.Files.IFileStore>(sp => sp.GetRequiredService<Modulix.Infrastructure.Files.FileStore>());
         services.AddScoped<Modulix.Core.Contracts.Files.IFileLimits>(sp => sp.GetRequiredService<Modulix.Infrastructure.Files.FileStore>());

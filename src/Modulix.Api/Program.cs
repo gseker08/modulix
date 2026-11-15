@@ -157,9 +157,10 @@ builder.Services.Configure<PublicLinkOptions>(builder.Configuration.GetSection(P
 // Hesap güvenliği (Y7a): "Şifremi unuttum" sınırları "Account" bölümünde.
 builder.Services.Configure<AccountOptions>(builder.Configuration.GetSection(AccountOptions.SectionName));
 // Sağlık uçları: /health/live yalnızca sürecin ayakta olduğunu söyler (yeniden başlatma kararı, bağımlılık denetlenmez);
-// /health/ready trafik alabilir mi sorusudur (veritabanı); /health bütün denetimleri (olay birikimi dahil) gösterir.
+// /health/ready trafik alabilir mi sorusudur (veritabanı, dosya deposu); /health bütün denetimleri (olay birikimi dahil) gösterir.
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ModulixDbContext>("database", tags: [ReadyTag])
+    .AddCheck<Modulix.Api.Files.BlobStorageHealthCheck>("storage", tags: [ReadyTag])
     .AddCheck<EventHealthCheck>("events");
 
 var app = builder.Build();

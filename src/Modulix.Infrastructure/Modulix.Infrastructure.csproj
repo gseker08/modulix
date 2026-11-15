@@ -30,6 +30,10 @@
     <PackageReference Include="MailKit" Version="4.18.*" />
   </ItemGroup>
   <ItemGroup>
+    <!-- S3 uyumlu nesne deposu adaptörü (Files/S3BlobStorage, mimari değerlendirme A4). -->
+    <PackageReference Include="AWSSDK.S3" Version="4.0.*" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- Sektör kataloğu başlangıç paketleri (ADR-0029 Dilim D): veri olarak gömülür. -->
     <EmbeddedResource Include="Sectors/StarterPackages/*.json" LogicalName="Modulix.StarterPackages.%(Filename)%(Extension)" />
   </ItemGroup>

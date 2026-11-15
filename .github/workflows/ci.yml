@@ -147,17 +147,22 @@ jobs:
           sa="Mx!$(openssl rand -hex 12)"
           app="Mx!$(openssl rand -hex 12)"
           migrator="Mx!$(openssl rand -hex 12)"
-          for secret in "$sa" "$app" "$migrator"; do echo "::add-mask::$secret"; done
-          printf 'MSSQL_PORT=14333\nMSSQL_SA_PASSWORD=%s\nMODULIX_APP_PASSWORD=%s\nMODULIX_MIGRATOR_PASSWORD=%s\n' \
-            "$sa" "$app" "$migrator" > .env
+          s3="$(openssl rand -hex 16)"
+          for secret in "$sa" "$app" "$migrator" "$s3"; do echo "::add-mask::$secret"; done
+          printf 'MSSQL_PORT=14333\nMSSQL_SA_PASSWORD=%s\nMODULIX_APP_PASSWORD=%s\nMODULIX_MIGRATOR_PASSWORD=%s\nS3_SECRET_KEY=%s\n' \
+            "$sa" "$app" "$migrator" "$s3" > .env
           {
             echo "ConnectionStrings__Modulix=Server=localhost,14333;Database=Modulix;User Id=modulix_app;Password=$app;TrustServerCertificate=True"
             echo "ConnectionStrings__ModulixMigrations=Server=localhost,14333;Database=Modulix;User Id=modulix_migrator;Password=$migrator;TrustServerCertificate=True"
+            echo "TestStorage__S3__ServiceUrl=http://127.0.0.1:9000"
+            echo "TestStorage__S3__AccessKey=modulix"
+            echo "TestStorage__S3__SecretKey=$s3"
           } >> "$GITHUB_ENV"
 
       # Mailpit: yerel test posta kutusu; e-posta entegrasyon testi gercek SMTP gonderimini burada dogrular.
-      - name: SQL Server'i ve Mailpit'i baslat
-        run: docker compose up -d --wait sqlserver mailpit
+      # s3: S3 uyumlu yerel nesne deposu; S3 dosya adaptorunun testleri (S3BlobStorageTests) burada calisir.
+      - name: SQL Server'i, Mailpit'i ve S3 deposunu baslat
+        run: docker compose up -d --wait sqlserver mailpit s3
 
       - name: Veritabani, semalar ve kullanicilar
         run: docker compose run --rm db-init
