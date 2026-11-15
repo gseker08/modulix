@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Orders;
 using Modulix.Core.Authorization;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
@@ -234,7 +233,7 @@ public class OrderHandoverTests(ModulixApiFactory factory) : IClassFixture<Modul
         var order = await ApprovedOrderAsync(s, sales);
         var ready = await ReadyHandoverAsync(s, sales, order.Id);
         var sent = await ActAsync(sales, ready.Handover.Id, "send", ready.Handover.Version);
-        var runner = factory.Services.GetRequiredService<OrderJobsRunner>();
+        var runner = new OrderJobsRunner(factory.Services);
 
         // Bekleme süresi dolmadan tur hiçbir şey üretmez.
         Assert.Equal(0, (await runner.RunTenantAsync(s.Tenant.Id, CancellationToken.None)).Run!.HandoverEscalations);

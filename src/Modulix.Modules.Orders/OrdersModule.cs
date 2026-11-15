@@ -332,14 +332,24 @@ public sealed class OrdersModule : IModule
     IReadOnlyList<EventSubscription> IModule.EventSubscriptions { get; } =
     [
         EventSubscription.For<OrdersSchedulerAnchor>(
-            "orders.scheduler",
+            OrderJobs.Identity,
             [DomainEventTypes.RecordDeleted],
             [Entities.Order],
             [Permissions.OrdersRead, Permissions.HandoversWrite, Permissions.JobsManage]),
     ];
 
+    /// <summary>
+    /// Zamanlanmış iş (ADR-0046): host'taki tek zamanlayıcı 15 dakikada bir, sipariş modülü yazılabilir olan her tenant için çalıştırır.
+    /// Yapılandırma <c>Jobs:orders.jobs</c>; eski <c>OrderJobs</c> bölümü okunmaya devam eder.
+    /// </summary>
+    IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
+    [
+        ModuleJobDefinition.For<OrderJobs>(OrderJobs.JobKey, TimeSpan.FromSeconds(900), OrderJobs.Identity) with { LegacySection = "OrderJobs" },
+    ];
+
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<OrderJobs>();
         services.AddScoped<OrdersStoreContext>();
         services.AddScoped<OrderWorkflowGate>();
         services.AddScoped<OrderReader>();
