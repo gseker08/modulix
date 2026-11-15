@@ -75,6 +75,7 @@ public static class PersistenceSetup
         ArgumentException.ThrowIfNullOrWhiteSpace(migrationsConnectionString);
 
         services.AddMemoryCache();
+        services.AddSingleton<AccessCache>();
         services.AddSingleton(new ModulixDatabaseOptions(appConnectionString, migrationsConnectionString));
 
         // Tek bağlam (ADR-0020): platform tabloları ve bütün tenant'ların iş verisi aynı veritabanında. Interceptor isteğin aktif
@@ -84,7 +85,9 @@ public static class PersistenceSetup
         {
             var tenantAccessor = serviceProvider.GetService<ITenantContextAccessor>();
             options.UseModulixSqlServer(appConnectionString)
-                .AddInterceptors(new TenantSessionContextInterceptor(tenantAccessor));
+                .AddInterceptors(
+                    new TenantSessionContextInterceptor(tenantAccessor),
+                    new AccessCacheInvalidator(serviceProvider.GetRequiredService<AccessCache>()));
         });
 
         services.AddScoped<IMembershipDirectory, MembershipDirectory>();

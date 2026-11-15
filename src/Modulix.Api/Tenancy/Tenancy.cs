@@ -7,6 +7,7 @@ using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
 using Modulix.Core.Settings;
+using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
 using Modulix.Shared.Auth;
@@ -54,7 +55,7 @@ public static class TenantProblems
 public sealed class TenantContextMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(
-        HttpContext context, HttpTenantContextAccessor accessor, IMembershipDirectory directory, ModulixDbContext db)
+        HttpContext context, HttpTenantContextAccessor accessor, IMembershipDirectory directory, ModulixDbContext db, AccessCache cache)
     {
         var principal = context.User;
         if (principal.Identity?.IsAuthenticated == true
@@ -66,6 +67,11 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             {
                 accessor.Current = new TenantContext(membership.TenantId, userId, membership.MembershipId);
 
+                // Tenant artık bu istek boyunca değişmez: bağlantı bir kez açılır ve istek sonuna kadar açık kalır. Açılışta interceptor
+                // tenant'ı oturuma salt okunur yazar; sonraki sorgular aynı bağlantıyı kullanır, her sorguda ayrı bir
+                // sp_set_session_context turu olmaz. Bağlam scope sonunda kapanır; havuz oturum değerini temizler.
+                await db.Database.OpenConnectionAsync(context.RequestAborted);
+
                 // Destek oturumunda her API isteği, işlenmeden önce okuma günlüğüne yazılır (ADR-0028, Y1.3); yazılamazsa istek durur.
                 if (membership.IsSupport && context.Request.Path.StartsWithSegments("/api"))
                 {
@@ -76,12 +82,18 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
                 // ITenantSettings tenant DbContext'ine bağlıdır (ADR-0020); yalnızca aktif tenant kurulduktan SONRA çözülür.
                 var settings = context.RequestServices.GetRequiredService<ITenantSettings>();
 
-                // Firma iki adımlı doğrulamayı zorunlu kılıyorsa kapalı olan kişi önce kurulumu yapar (Y7b).
-                if (await settings.GetValueAsync(CoreModule.SettingKeys.RequireTwoFactor, context.RequestAborted) == CoreModule.SettingValues.Yes
+                // Firma iki adımlı doğrulamayı zorunlu kılıyorsa kapalı olan kişi önce kurulumu yapar (Y7b). Firma ayarı kısa süre
+                // önbellekte tutulur (ADR-0048); kişinin kendi durumu yalnızca ayar açıkken ve her istekte sorulur.
+                var requireTwoFactor = await cache.GetOrLoadAsync("require-two-factor", membership.TenantId, Guid.Empty, db,
+                    () => settings.GetValueAsync(CoreModule.SettingKeys.RequireTwoFactor, context.RequestAborted));
+                if (requireTwoFactor == CoreModule.SettingValues.Yes
                     && !await db.Users.AnyAsync(u => u.Id == userId && u.TwoFactorEnabled, context.RequestAborted))
                 {
                     accessor.Current = null;
                     accessor.TwoFactorRequiredTenantId = membership.TenantId;
+
+                    // Bağlam yok: tenant'ı oturuma yazılmış bağlantı bırakılır; sonraki sorgular tenant'sız yeni bağlantı açar.
+                    await db.Database.CloseConnectionAsync();
                 }
             }
         }
