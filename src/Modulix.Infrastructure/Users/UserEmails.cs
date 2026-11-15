@@ -1,128 +1,116 @@
 using System.Net;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 
 namespace Modulix.Infrastructure.Users;
 
-/// <summary>Kullanıcı yönetimi e-postaları. Kullanıcı girdisi (ad, tenant adı) HTML'e kodlanarak eklenir.</summary>
+/// <summary>
+/// Kullanıcı yönetimi e-postaları. Metinler alıcının dilinde sözlükten gelir (<c>email.user.*</c>, ADR-0034 §6, dilim 18b); dil
+/// e-postayla birlikte kuyruğa yazılır. Kullanıcı girdisi (ad, tenant adı) HTML'e kodlanarak eklenir.
+/// </summary>
 internal static class UserEmails
 {
-    public static EmailMessage Invitation(string to, string displayName, string tenantName, string invitedBy, string link) =>
+    public static EmailMessage Invitation(LocalizedTexts t, string to, string displayName, string tenantName, string invitedBy, string link) =>
         Build(
+            t,
             to,
             displayName,
-            $"{tenantName} sizi Modülix'e davet etti",
-            [
-                $"{invitedBy}, sizi Modülix'te {tenantName} kuruluşuna davet etti.",
-                "Daveti kabul etmek için şifrenizi belirleyin. Bağlantı 7 gün geçerlidir ve bir kez kullanılabilir.",
-            ],
-            ("Şifremi belirle", link),
-            "Bu daveti beklemiyorsanız e-postayı yok sayabilirsiniz.");
+            t.Get("email.user.invitation.subject", tenantName),
+            [t.Get("email.user.invitation.p1", invitedBy, tenantName), t.Get("email.user.invitation.p2")],
+            (t.Get("email.user.invitation.action"), link),
+            t.Get("email.user.invitation.footer"));
 
-    public static EmailMessage AddedToTenant(string to, string displayName, string tenantName, string invitedBy, string link) =>
+    public static EmailMessage AddedToTenant(LocalizedTexts t, string to, string displayName, string tenantName, string invitedBy, string link) =>
         Build(
+            t,
             to,
             displayName,
-            $"{tenantName} kuruluşuna eklendiniz",
-            [
-                $"{invitedBy}, sizi Modülix'te {tenantName} kuruluşuna ekledi.",
-                "Mevcut e-posta adresiniz ve şifrenizle giriş yapıp kuruluşu seçebilirsiniz. Şifreniz değişmedi.",
-            ],
-            ("Giriş yap", link),
-            "Bu kuruluşu tanımıyorsanız kuruluşun yöneticisine bildirin.");
+            t.Get("email.user.added.subject", tenantName),
+            [t.Get("email.user.added.p1", invitedBy, tenantName), t.Get("email.user.added.p2")],
+            (t.Get("email.user.added.action"), link),
+            t.Get("email.user.added.footer"));
 
-    public static EmailMessage PasswordReset(string to, string displayName, string tenantName, string requestedBy, string link) =>
+    public static EmailMessage PasswordReset(LocalizedTexts t, string to, string displayName, string tenantName, string requestedBy, string link) =>
         Build(
+            t,
             to,
             displayName,
-            "Modülix şifre sıfırlama bağlantınız",
-            [
-                $"{tenantName} kuruluşunun yöneticisi {requestedBy}, Modülix hesabınız için şifre sıfırlama bağlantısı gönderdi.",
-                "Yeni şifrenizi belirlemek için bağlantıyı açın. Bağlantı 24 saat geçerlidir ve bir kez kullanılabilir. "
-                + "Hesabınızı birden fazla kuruluşta kullanıyorsanız yeni şifre hepsinde geçerli olur.",
-            ],
-            ("Yeni şifre belirle", link),
-            "Bu isteği beklemiyorsanız şifreniz değişmez; e-postayı yok sayabilirsiniz.");
+            t.Get("email.user.password-reset.subject"),
+            [t.Get("email.user.password-reset.p1", tenantName, requestedBy), t.Get("email.user.password-reset.p2")],
+            (t.Get("email.user.password-reset.action"), link),
+            t.Get("email.user.password-reset.footer"));
 
     /// <summary>Kişinin kendi istediği şifre sıfırlama bağlantısı (Y7a, "Şifremi unuttum").</summary>
-    public static EmailMessage ForgotPassword(string to, string displayName, string link) =>
+    public static EmailMessage ForgotPassword(LocalizedTexts t, string to, string displayName, string link) =>
         Build(
+            t,
             to,
             displayName,
-            "Modülix şifre sıfırlama bağlantınız",
-            [
-                "Modülix hesabınız için şifre sıfırlama bağlantısı istendi.",
-                "Yeni şifrenizi belirlemek için bağlantıyı açın. Bağlantı 24 saat geçerlidir ve bir kez kullanılabilir. "
-                + "Hesabınızı birden fazla kuruluşta kullanıyorsanız yeni şifre hepsinde geçerli olur.",
-            ],
-            ("Yeni şifre belirle", link),
-            "Bu isteği siz yapmadıysanız şifreniz değişmez; e-postayı yok sayabilirsiniz.");
+            t.Get("email.user.password-reset.subject"),
+            [t.Get("email.user.forgot-password.p1"), t.Get("email.user.password-reset.p2")],
+            (t.Get("email.user.password-reset.action"), link),
+            t.Get("email.user.forgot-password.footer"));
 
-    public static EmailMessage ConfirmEmailChange(string to, string displayName, string link) =>
+    public static EmailMessage ConfirmEmailChange(LocalizedTexts t, string to, string displayName, string link) =>
         Build(
+            t,
             to,
             displayName,
-            "Yeni e-posta adresinizi onaylayın",
-            [
-                "Modülix hesabınızın e-posta adresini bu adresle değiştirmek istediniz.",
-                "Onaylamak için bağlantıyı açın. Bağlantı 24 saat geçerlidir. Onayladıktan sonra bu adresle giriş yaparsınız.",
-            ],
-            ("E-postamı onayla", link),
-            "Bu isteği siz yapmadıysanız e-postayı yok sayabilirsiniz; hesabınız değişmez.");
+            t.Get("email.user.confirm-email.subject"),
+            [t.Get("email.user.confirm-email.p1"), t.Get("email.user.confirm-email.p2")],
+            (t.Get("email.user.confirm-email.action"), link),
+            t.Get("email.user.confirm-email.footer"));
 
-    public static EmailMessage EmailChanged(string to, string displayName, string newEmail, string link) =>
+    public static EmailMessage EmailChanged(LocalizedTexts t, string to, string displayName, string newEmail, string link) =>
         Build(
+            t,
             to,
             displayName,
-            "Modülix e-posta adresiniz değişti",
-            [
-                $"Modülix hesabınızın e-posta adresi {newEmail} olarak değiştirildi. Artık bu adrese e-posta gelmeyecek.",
-                "Bu değişikliği siz yapmadıysanız hemen kuruluşunuzun yöneticisine bildirin.",
-            ],
-            ("Giriş sayfası", link),
-            "Bu e-posta bilgi amaçlıdır.");
+            t.Get("email.user.email-changed.subject"),
+            [t.Get("email.user.email-changed.p1", newEmail), t.Get("email.user.email-changed.p2")],
+            (t.Get("email.user.email-changed.action"), link),
+            t.Get("email.common.informational"));
 
-    public static EmailMessage RecoveryCodeUsed(string to, string displayName, int left, string link) =>
+    public static EmailMessage RecoveryCodeUsed(LocalizedTexts t, string to, string displayName, int left, string link) =>
         Build(
+            t,
             to,
             displayName,
-            "Modülix hesabınıza kurtarma koduyla girildi",
-            [
-                $"Modülix hesabınıza bir kurtarma koduyla giriş yapıldı. {left} kurtarma kodunuz kaldı.",
-                "Doğrulama uygulamanıza erişemiyorsanız Hesabım sayfasından uygulamayı yeniden kurun ve kodlarınızı yenileyin.",
-            ],
-            ("Hesabıma git", link),
-            "Bu girişi siz yapmadıysanız hemen şifrenizi değiştirin ve kuruluşunuzun yöneticisine bildirin.");
+            t.Get("email.user.recovery-code.subject"),
+            [t.Get("email.user.recovery-code.p1", left), t.Get("email.user.recovery-code.p2")],
+            (t.Get("email.user.recovery-code.action"), link),
+            t.Get("email.user.recovery-code.footer"));
 
     /// <summary>
     /// Kayıt devri (ADR-0004, ADR-0007): devirde kayıt başına atama e-postası gitmez; yeni sorumluya tek özet gider.
     /// <paramref name="link"/> yoksa (App:PublicUrl ayarlı değil) bağlantı konmaz.
     /// </summary>
-    public static EmailMessage RecordsTransferred(string to, string displayName, string transferredBy, string previousOwner, string summary, string? link) =>
+    public static EmailMessage RecordsTransferred(
+        LocalizedTexts t, string to, string displayName, string transferredBy, string previousOwner, string summary, string? link) =>
         Build(
+            t,
             to,
             displayName,
-            "Kayıtlar size devredildi",
-            [
-                $"{transferredBy}, {previousOwner} kişisinin kayıtlarını size devretti: {summary}.",
-                "Bu kayıtların sorumlusu artık sizsiniz.",
-            ],
-            link is null ? null : ("Modülix'i aç", link),
-            "Bu e-posta bilgi amaçlıdır.");
+            t.Get("email.user.records-transferred.subject"),
+            [t.Get("email.user.records-transferred.p1", transferredBy, previousOwner, summary), t.Get("email.user.records-transferred.p2")],
+            link is null ? null : (t.Get("email.common.open-app"), link),
+            t.Get("email.common.informational"));
 
     private static EmailMessage Build(
-        string to, string displayName, string subject, string[] paragraphs, (string Text, string Url)? action, string footer)
+        LocalizedTexts t, string to, string displayName, string subject, string[] paragraphs, (string Text, string Url)? action, string footer)
     {
+        var greeting = t.Get("email.common.greeting", displayName);
         var html = string.Concat(
-            $"<p>Merhaba {Encode(displayName)},</p>",
+            $"<p>{Encode(greeting)}</p>",
             string.Concat(paragraphs.Select(p => $"<p>{Encode(p)}</p>")),
             action is { } a ? $"<p><a href=\"{Encode(a.Url)}\">{Encode(a.Text)}</a></p>" : string.Empty,
             $"<p style=\"color:#666\">{Encode(footer)}</p>");
 
         var text = string.Join(
             "\n\n",
-            [$"Merhaba {displayName},", .. paragraphs, .. action is { } b ? [$"{b.Text}: {b.Url}"] : Array.Empty<string>(), footer]);
+            [greeting, .. paragraphs, .. action is { } b ? [$"{b.Text}: {b.Url}"] : Array.Empty<string>(), footer]);
 
-        return new EmailMessage(to, subject, html) { ToName = displayName, TextBody = text };
+        return new EmailMessage(to, subject, html) { ToName = displayName, TextBody = text, Language = t.Language };
     }
 
     private static string Encode(string value) => WebUtility.HtmlEncode(value);

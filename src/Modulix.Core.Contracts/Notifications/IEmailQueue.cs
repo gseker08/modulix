@@ -16,6 +16,12 @@ public sealed record EmailMessage(string To, string Subject, string HtmlBody)
     /// gönderim durumunu sorgular. Alıcıya görünmez, içerik değildir.
     /// </summary>
     public string? Reference { get; init; }
+
+    /// <summary>
+    /// İçeriğin yazıldığı dil (ADR-0034 §6; ör. "en"). Kuyruk satırında saklanır; gönderim anında içerik yeniden çevrilmez.
+    /// Boşsa dil bilinmiyor demektir (eski ya da dile bağlı olmayan e-posta).
+    /// </summary>
+    public string? Language { get; init; }
 }
 
 /// <summary>
