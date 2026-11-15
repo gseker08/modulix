@@ -149,13 +149,16 @@ public static class SupportAccess
 
 // ---- Dilim 2: SLA, iş takvimi ve eskalasyon (ADR-0024). Hesap backend'dedir; arayüz sayacı yalnızca gösterimdir.
 
+/// <param name="UseTenantHolidays">Firmanın resmî tatil listesi (Core) de uygulanır mı (ADR-0049 dilim 6b); takvimin kendi tatili aynı günde önceliklidir.</param>
 public sealed record SlaCalendarDto(
-    Guid Id, long Version, string Name, string TimeZoneId, bool IsAlwaysOpen, string? WeeklyHours, string? Holidays, bool IsActive, Guid? CreatedBy, Guid? UpdatedBy);
+    Guid Id, long Version, string Name, string TimeZoneId, bool IsAlwaysOpen, string? WeeklyHours, string? Holidays, bool IsActive, Guid? CreatedBy, Guid? UpdatedBy,
+    bool UseTenantHolidays = false);
 
 /// <param name="WeeklyHours">JSON: <c>[{"day":1,"start":"09:00","end":"18:00"}]</c> (0=Pazar … 6=Cumartesi).</param>
 /// <param name="Holidays">JSON: <c>[{"date":"2026-10-29","name":"…","start":null,"end":null}]</c>; start/end verilirse yarım gün.</param>
 public sealed record SaveSlaCalendarRequest(
-    long Version = 0, string? Name = null, string? TimeZoneId = "Europe/Istanbul", bool IsAlwaysOpen = false, string? WeeklyHours = null, string? Holidays = null, bool IsActive = true);
+    long Version = 0, string? Name = null, string? TimeZoneId = "Europe/Istanbul", bool IsAlwaysOpen = false, string? WeeklyHours = null, string? Holidays = null, bool IsActive = true,
+    bool UseTenantHolidays = true);
 
 public sealed record SlaPolicyDto(
     Guid Id, long Version, string Name, string? Description, bool IsActive, bool IsDefault, int Precedence, string? TypeKey, Guid? CategoryId, string? Priority, Guid? PartyId,

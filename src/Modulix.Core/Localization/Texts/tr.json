@@ -4203,6 +4203,7 @@
   "support.sla.dayStart": "{0} başlangıç",
   "support.sla.dayEnd": "{0} bitiş",
   "support.sla.holidays": "Tatiller (satır başına bir tane)",
+  "support.sla.useTenantHolidays": "Firmanın resmî tatil listesini de uygula (Yönetim > Resmî tatiller; buradaki tatiller aynı günde önceliklidir)",
   "support.sla.holidayFormat": "Biçim: {0} (tam gün kapalı) ya da {1} (yalnızca o pencere açık, yarım gün).",
   "support.sla.holidayFormatDay": "yyyy-MM-dd; ad",
   "support.sla.holidayFormatWindow": "yyyy-MM-dd; ad; SS:dd-SS:dd",

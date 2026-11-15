@@ -4203,6 +4203,7 @@
   "support.sla.dayStart": "{0} start",
   "support.sla.dayEnd": "{0} end",
   "support.sla.holidays": "Holidays (one per line)",
+  "support.sla.useTenantHolidays": "Also apply the company public holiday list (Administration > Public holidays; holidays entered here take precedence on the same day)",
   "support.sla.holidayFormat": "Format: {0} (closed all day) or {1} (open only in that window, half day).",
   "support.sla.holidayFormatDay": "yyyy-MM-dd; name",
   "support.sla.holidayFormatWindow": "yyyy-MM-dd; name; HH:mm-HH:mm",
