@@ -179,6 +179,7 @@ public class HrModuleTests
         {
             var permissions = Module.RoleTemplates.Single(t => t.Key == template).Permissions;
             Assert.Contains(HrModule.Permissions.BlogRead, permissions);
+            Assert.Contains(HrModule.Permissions.BlogWrite, permissions); // kendi yazısını yazar ve onaya gönderir (bölüm 27)
             Assert.Contains(HrModule.Permissions.GalleryRead, permissions);
             Assert.DoesNotContain(HrModule.Permissions.BlogManage, permissions);
             Assert.DoesNotContain(HrModule.Permissions.GalleryManage, permissions);
@@ -186,6 +187,7 @@ public class HrModuleTests
 
         var specialist = Module.RoleTemplates.Single(t => t.Key == "hr.specialist").Permissions;
         Assert.Contains(HrModule.Permissions.BlogManage, specialist);
+        Assert.Contains(HrModule.Permissions.BlogWrite, specialist); // yöneten yazmak için yazma iznini de taşır
         Assert.Contains(HrModule.Permissions.GalleryManage, specialist);
         Assert.Equal(HrModule.Permissions.GalleryRead, Assert.Single(Module.AuditedEntities, a => a.EntityKey == HrModule.Entities.PhotoAlbum).ReadPermission);
     }
@@ -372,6 +374,9 @@ public class HrModuleTests
         Assert.Equal([.. SurveyQuestion.Types.All], HrAccess.QuestionTypes.Select(s => s.Key));
         Assert.Equal(HrModule.Permissions.BlogRead, HrAccess.BlogRead);
         Assert.Equal(HrModule.Permissions.BlogManage, HrAccess.BlogManage);
+        Assert.Equal(HrModule.Permissions.BlogWrite, HrAccess.BlogWrite);
+        Assert.Equal(BlogPost.Statuses.All.Count, BlogPost.Statuses.All.Select(status => HrAccess.BlogStatus(status).Label).Distinct().Count());
+        Assert.Equal([BlogPost.Statuses.Draft, BlogPost.Statuses.Returned], BlogPost.Statuses.All.Where(HrAccess.BlogEditableByAuthor));
         Assert.Equal(HrModule.Permissions.GalleryRead, HrAccess.GalleryRead);
         Assert.Equal(HrModule.Permissions.GalleryManage, HrAccess.GalleryManage);
         Assert.Equal(HrModule.Entities.BlogPost, HrAccess.BlogPostEntityKey);

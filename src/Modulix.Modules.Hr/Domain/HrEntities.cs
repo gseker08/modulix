@@ -884,13 +884,36 @@ public sealed class SurveyAnswer : HrEntity
 
 /// <summary>
 /// Kurum içi blog yazısı (ADR-0042 dilim 8). İletişim/İK ekibi yazar ve yayınlar; okurlar yalnızca yayındaki yazıları görür. Metin düz metindir
-/// (HTML yorumlanmaz); ekler ADR-0040 dosya deposundadır (kayda bağlı).
+/// (HTML yorumlanmaz); ekler ADR-0040 dosya deposundadır (kayda bağlı). Çalışan da kendi yazısını yazıp onaya gönderebilir (bölüm 27): taslak →
+/// onay bekliyor → yayında ya da geri çevrildi (düzeltilip yeniden gönderilir).
 /// </summary>
 public sealed class BlogPost : HrEntity
 {
     public const int TitleMaxLength = 200;
     public const int SummaryMaxLength = 500;
     public const int BodyMaxLength = 20_000;
+    public const int ReviewNoteMaxLength = 1000;
+
+    /// <summary>Yazının görünen durumu (türetilir: yayın bayrağı ve onay durumu).</summary>
+    public static class Statuses
+    {
+        public const string Draft = "draft";
+        public const string Submitted = "submitted";
+        public const string Returned = "returned";
+        public const string Published = "published";
+
+        public static IReadOnlyList<string> All { get; } = [Draft, Submitted, Returned, Published];
+    }
+
+    /// <summary>Onay durumu: boş (taslak ya da doğrudan yazılan), <see cref="Statuses.Submitted"/> ya da <see cref="Statuses.Returned"/>.</summary>
+    public string? ReviewStatus { get; internal set; }
+
+    /// <summary>Geri çevirme gerekçesi; yeniden gönderilince ya da yayınlanınca silinir.</summary>
+    public string? ReviewNote { get; internal set; }
+
+    public DateTimeOffset? SubmittedAt { get; internal set; }
+
+    public string Status => IsPublished ? Statuses.Published : ReviewStatus ?? Statuses.Draft;
 
     public string Title { get; internal set; } = string.Empty;
 

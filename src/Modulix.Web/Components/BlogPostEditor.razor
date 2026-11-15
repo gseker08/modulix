@@ -1,5 +1,6 @@
 @* Blog yazısı formu (ADR-0042 dilim 8). Düzen firmanın form düzenine (ADR-0021) göre çizilir. Metin düz metindir (satır sonları korunur, HTML
-   yorumlanmaz); "Yayında" işaretlenmeden okurlar görmez. Ekler kayıt kaydedildikten sonra dosya panelinden eklenir. *@
+   yorumlanmaz); "Yayında" işaretlenmeden okurlar görmez. Ekler kayıt kaydedildikten sonra dosya panelinden eklenir. Yayınlama yetkisi olmayan yazar
+   (bölüm 27) "Yayında" kutusunu görmez; yazısını onaya gönderir. *@
 @using System.Text.Json.Nodes
 @inject ApiClient Api
 @inject FormLayouts Layouts
@@ -50,7 +51,7 @@
                     <textarea id="post-body" class="form-control" rows="14" maxlength="20000" required aria-required="true" @bind="form.Body"></textarea>
                     <FieldError Field="body" Errors="errors" />
                     break;
-                case "isPublished":
+                case "isPublished" when CanPublish:
                     <div class="form-check mt-4">
                         <input id="post-published" class="form-check-input" type="checkbox" @bind="form.IsPublished" />
                         <label class="form-check-label" for="post-published">@f.Label</label>
@@ -80,6 +81,9 @@
 
     [Parameter] public EventCallback Cancelled { get; set; }
 
+    /// <summary>"Yayında" kutusu yalnızca blog yöneten için; yazar yazısını onaya gönderir (bölüm 27).</summary>
+    [Parameter] public bool CanPublish { get; set; } = true;
+
     private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(EntityKey)];
 
     protected override async Task OnInitializedAsync()
@@ -106,7 +110,7 @@
             ["title"] = string.IsNullOrWhiteSpace(form.Title) ? null : form.Title.Trim(),
             ["summary"] = string.IsNullOrWhiteSpace(form.Summary) ? null : form.Summary.Trim(),
             ["body"] = string.IsNullOrWhiteSpace(form.Body) ? null : form.Body.Trim(),
-            ["isPublished"] = form.IsPublished,
+            ["isPublished"] = CanPublish && form.IsPublished,
             ["custom"] = CustomFieldText.ForSave(CustomFields, form.Custom),
         }, form.Version);
         var url = "/api/records/" + EntityKey;

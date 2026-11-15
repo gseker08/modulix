@@ -3,11 +3,13 @@
 @inject ApiClient Api
 @inject SessionState Session
 @inject CrmLookups Lookups
+@inject ToastService Toasts
 
 <PageTitle>Blog yönetimi · Modulix</PageTitle>
 
 @* Blog yönetimi (ADR-0042 dilim 8): taslak ve yayındaki bütün yazılar; yazma, yayınlama, ek ekleme ve silme. Okurlar yazıları "Blog" ekranında
-   görür. *@
+   görür. Çalışanların onaya gönderdiği yazılar "Onay bekleyen" görünümündedir; açılan yazıda onaylanıp yayınlanır ya da gerekçeyle geri çevrilir
+   (bölüm 27). *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.BlogManage">
     <PageHeader Title="Blog yönetimi" Icon="file-text" Subtitle="@(page is null ? "Kurum içi yazıları hazırlayın ve yayınlayın." : $"{page.TotalCount} yazı")" />
 
@@ -18,6 +20,10 @@
 
     @if (editing)
     {
+        @if (selected is not null)
+        {
+            <LeaveActionsBar Record="selected" BaseUrl="/api/hr/blog-posts" Changed="ReviewedAsync" />
+        }
         <BlogPostEditor @key="selected?.Id" Post="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
         @if (selected is not null)
         {
@@ -115,8 +121,9 @@
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
         new("all", "Tüm yazılar", Icon: "list"),
+        new("status=submitted", "Onay bekleyen", Icon: "clock"),
         new("isPublished=true", "Yayında", Icon: "file-text"),
-        new("isPublished=false", "Taslak", Icon: "pencil"),
+        new("isPublished=false", "Yayında olmayan", Icon: "pencil"),
         .. views.Options,
     ];
 
@@ -216,7 +223,7 @@
         "title" => @<text>@WarehouseLabels.Text(record, "title")</text>,
         "author" => @<text>@(WarehouseLabels.Id(record, "authorUserId") is { } author ? Lookups.MemberName(author) : "—")</text>,
         "publishedAt" => @<text>@(DateTimeOffset.TryParse(WarehouseLabels.Text(record, "publishedAt"), out var at) ? at.LocalDateTime.ToString("dd.MM.yyyy") : "—")</text>,
-        "status" => @<span class="badge @(WarehouseLabels.Flag(record, "isPublished") ? "status-customer" : "status-inactive")">@(WarehouseLabels.Flag(record, "isPublished") ? "Yayında" : "Taslak")</span>,
+        "status" => @<span class="badge @HrAccess.BlogStatus(WarehouseLabels.Text(record, "status")).Badge">@HrAccess.BlogStatus(WarehouseLabels.Text(record, "status")).Label</span>,
         _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.BlogPostEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
             @<text>@CustomFieldText.Format(field, record.Values["custom"] as JsonObject)</text>,
         _ => @<text></text>,
@@ -246,6 +253,14 @@
             Close();
         }
 
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private async Task ReviewedAsync(RecordResponse post)
+    {
+        // Karar verilen yazı kapanır: onay kuyruğundan çıkar.
+        Close();
+        Toasts.Success(WarehouseLabels.Text(post, "status") == "published" ? "Yazı yayınlandı." : "Yazı yazarına geri çevrildi.");
         await LoadAsync(page?.Page ?? 1);
     }
 

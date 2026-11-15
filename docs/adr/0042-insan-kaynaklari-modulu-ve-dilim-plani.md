@@ -535,3 +535,44 @@ Karar (kullanıcı, 14 Kasım 2026: "Core + masraf düzeltmesi"; blog yazar mode
 | `dotnet test tests/Modulix.ArchitectureTests` | 111/111 geçti |
 | `dotnet test tests/Modulix.Core.Tests` | 1053/1053 geçti |
 | `FileCleanupTests` (2 entegrasyon testi, İK duyurusu üzerinden) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |
+
+## 27. Çalışanın blog yazısı ve onay akışı (15 Kasım 2026)
+
+Karar (kullanıcı, 15 Kasım 2026: "Yaz, onaya gönder"). Bölüm 25'te bilerek sonraya bırakılan blog yazar modeli.
+
+**Akış:** taslak → onay bekliyor → yayında; yöneten geri çevirirse "geri çevrildi" (gerekçeli), yazar düzeltip yeniden gönderir.
+
+- **İzin:** yeni `hr.blog.write` ("Kendi blog yazısını yazar, ek ekler ve onaya gönderir; yayınlayamaz"). Kayıt türünün yazma izni artık budur. `hr.blog.manage` başkasının yazısını yönetmeyi ve yayını verir; yöneten rol iki izni birlikte taşır.
+  - Rol şablonları: "Çalışan (rehber)" ve "Yönetici (izin onayı)" yazma iznini alır; "İK uzmanı" ikisini de taşır.
+  - Geriye uyum: migration `HrBlogAuthorReview`, `hr.blog.manage` veren her role `hr.blog.write`'ı da ekler (`PermissionGrantSql`); bugünkü yöneticiler yazmaya devam eder.
+- **Veri:** `hr.BlogPosts`'a `ReviewStatus` (boş, `submitted`, `returned`), `ReviewNote` (en çok 1000 karakter) ve `SubmittedAt` eklendi (boş sütunlar, geriye uyumlu). Görünen durum `status` türetilir: `draft`, `submitted`, `returned`, `published`.
+- **Kurallar (sunucuda):**
+  - Yazar (yönetim izni yok) yazıyı yayınlayamaz (`isPublished` 422).
+  - Yazar yalnızca kendi yazısını, taslakken ya da geri çevrilmişken değiştirir ve siler. Onay bekleyen ve yayındaki yazı kilitlidir (409).
+  - Başkasının yazısı yazara görünmez (404).
+  - Ekler aynı kurala uyar (`IRecordWriteGuard`, ADR-0040 K2): kilitli yazının eki eklenmez ve silinmez (403).
+  - Yöneten her yazıyı değiştirir. Doğrudan "Yayında" işaretlemesi onay yerine geçer.
+- **Görünürlük:** yöneten hepsini görür; diğerleri yayındakileri ve kendi yazılarını. Okur akışı (`/ik/blog`) yine yalnızca yayındakileri listeler.
+- **Komutlar:** `GET/POST /api/hr/blog-posts/{id}/actions`.
+  - `submit`: yazar; taslak ya da geri çevrilen yazıda; gerekçeyi siler.
+  - `publish`: yöneten; onay bekleyen yazıda.
+  - `return`: yöneten; onay bekleyen yazıda; gerekçe zorunlu.
+  - Komutlar kayıt boru hattından geçer (denetim, olay).
+- **Süzgeçler:** `status`, `authorUserId`. **Sıralama:** `submittedAt` eklendi.
+- **Arayüz:**
+  - Yeni "Yazılarım" ekranı (`/ik/yazilarim`, `hr.blog.write`): kendi yazıları, durum sekmeleri, düzenleme, ekler, "Onaya gönder" ve geri çevirme gerekçesi.
+  - "Blog yönetimi"nde "Onay bekleyen" görünümü, durum rozeti ve açılan yazıda "Onayla ve yayınla" / "Geri çevir".
+  - Yazarın formunda "Yayında" kutusu yoktur.
+  - Yeni CSS sınıfı ya da token yok.
+
+**Kapsam dışı (bilerek):** onaya gönderme ve karar için bildirim (otomasyon kuralıyla ileride eklenebilir); yayındaki yazının düzeltme talebi (yöneten yayından alıp düzenleyebilir).
+
+### Test sonuçları (bölüm 27)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.ArchitectureTests` | 111/111 geçti |
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 64/64 geçti (rol şablonları ve paylaşılan sabitler genişletildi) |
+| `dotnet test tests/Modulix.Core.Tests` | 1053/1053 geçti |
+| `HrBlogAuthorTests` (4 yeni entegrasyon testi) | Mutlu yol (yaz, ek, gönder, geri çevir, düzelt, yeniden gönder, yayınla; okur görür), doğrulama ve kural (yazar yayınlayamaz, kilitli yazı ve ekleri, gerekçesiz geri çevirme, durum dışı ve bilinmeyen eylem, eski sürüm), tenant izolasyonu (404), yetki (okur yazamaz, yazar başkasının taslağını göremez ve değiştiremez, yazar karar veremez). Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |
+| `Modulix.Web` derlemesi | Yerel SDK 10.0.115'teki bilinen Razor hataları dışında yeni hata yok (önce/sonra aynı 204 satır); Razor sayfaları CI'daki SDK ile derlenir |

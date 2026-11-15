@@ -1,0 +1,237 @@
+@page "/ik/yazilarim"
+@inject ApiClient Api
+@inject SessionState Session
+@inject CrmLookups Lookups
+@inject ToastService Toasts
+
+<PageTitle>Yazılarım · Modulix</PageTitle>
+
+@* Yazılarım (ADR-0042 bölüm 27): çalışan kendi blog yazısını yazar, ek ekler ve onaya gönderir; blog yöneten yayınlar ya da gerekçeyle geri
+   çevirir. Yazı yalnızca taslakken ve geri çevrilmişken değiştirilir ve silinir; onay bekleyen ve yayındaki yazı kilitlidir. Kararı sunucu verir. *@
+<AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.BlogWrite">
+    <PageHeader Title="Yazılarım" Icon="pencil" Subtitle="@(page is null ? "Blog yazılarınızı hazırlayın ve onaya gönderin." : $"{page.TotalCount} yazı")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editing)
+    {
+        @if (selected is not null)
+        {
+            @if (WarehouseLabels.Text(selected, "status") == "returned" && WarehouseLabels.Text(selected, "reviewNote") is { Length: > 0 } note)
+            {
+                <div class="alert alert-warning" role="status">Geri çevirme gerekçesi: @note</div>
+            }
+            <LeaveActionsBar Record="selected" BaseUrl="/api/hr/blog-posts" Changed="SubmittedAsync" />
+        }
+        @if (Editable(selected))
+        {
+            <BlogPostEditor @key="selected?.Id" Post="selected" Lookups="Lookups" CanPublish="false" Saved="SavedAsync" Cancelled="Close" />
+        }
+        else if (selected is not null)
+        {
+            <section class="summary-card mb-3" aria-label="Yazı">
+                <h2 class="h6 mb-1">@WarehouseLabels.Text(selected, "title")</h2>
+                <p class="text-muted mb-2">@HrAccess.BlogStatus(WarehouseLabels.Text(selected, "status")).Label · yazı değiştirilemez.</p>
+                <p class="preline mb-2">@WarehouseLabels.Text(selected, "body")</p>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Close">Kapat</button>
+            </section>
+        }
+        @if (selected is not null)
+        {
+            <AttachmentPanel EntityKey="@HrAccess.BlogPostEntityKey" RecordId="selected.Id" CanWrite="@Editable(selected)" Title="Ekler" EmptyText="Bu yazının eki yok." />
+        }
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Yazı görünümleri" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Yazılarımda ara" placeholder="Başlık ya da metinde ara" @bind="search" />
+        </form>
+        <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (!editing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni yazı</button>
+        }
+    </div>
+
+    @if (page is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (page.Items.Count == 0)
+    {
+        <EmptyState Compact="true" Title="Bu görünümde yazınız yok." />
+    }
+    else
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) yazı listelendi.</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">Yazılarım</caption>
+            <thead>
+                <tr>
+                    @foreach (var column in grid.VisibleColumns)
+                    {
+                        <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
+                    }
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var post in page.Items)
+                {
+                    <tr>
+                        @foreach (var column in grid.VisibleColumns)
+                        {
+                            <td data-label="@column.Label" class="@(column.Key == "title" ? "primary" : null)">@CellContent(column.Key, post)</td>
+                        }
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(post, "title")} eylemleri")">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(post)">
+                                    <AppIcon Name="@(Editable(post) ? "pencil" : "eye")" Size="16" /> <span>@(Editable(post) ? "Düzenle" : "Aç")</span>
+                                </button>
+                                @if (Editable(post))
+                                {
+                                    <RowMenuDelete OnConfirm="() => DeleteAsync(post)" />
+                                }
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + HrAccess.BlogPostEntityKey;
+
+    private const string AllViews = "all";
+
+    // Sıralama anahtarları kayıt deposunun beyanıdır (BlogPostRecordStore.SortKeys).
+    private static readonly GridColumnDef[] Columns =
+    [
+        new("title", "Başlık", "file-text", "title", "-title", Locked: true),
+        new("status", "Durum", "tag"),
+        new("submittedAt", "Gönderim", "calendar", "submittedAt", "-submittedAt"),
+        new("publishedAt", "Yayın", "calendar", "publishedAt", "-publishedAt"),
+    ];
+
+    private static readonly IReadOnlyList<ViewOption> ViewOptions =
+    [
+        new(AllViews, "Tüm yazılarım", Icon: "list"),
+        new("draft", "Taslak", Icon: "pencil"),
+        new("submitted", "Onay bekleyen", Icon: "clock"),
+        new("returned", "Geri çevrilen", Icon: "alert-circle"),
+        new("published", "Yayında", Icon: "file-text"),
+    ];
+
+    private readonly GridViewState grid = new("hr.my-posts", "-createdAt");
+    private string view = AllViews;
+
+    private RecordPageResponse? page;
+    private RecordResponse? selected;
+    private bool editing;
+    private string? message;
+    private string? search;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(HrAccess.BlogWrite))
+        {
+            await Lookups.LoadAsync();
+            grid.Define(Columns);
+            await LoadAsync(1);
+        }
+    }
+
+    private static bool Editable(RecordResponse? post) => post is null || HrAccess.BlogEditableByAuthor(WarehouseLabels.Text(post, "status"));
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string key)
+    {
+        grid.Sort = key;
+        await LoadAsync(1);
+    }
+
+    private Task ColumnsChanged() => Task.CompletedTask;
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        // Yöneten de bu ekranda yalnızca kendi yazılarını görür.
+        var url = $"{Url}?authorUserId={Session.User?.UserId}&page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (grid.Sort != grid.DefaultSort)
+        {
+            url += $"&sort={Uri.EscapeDataString(grid.Sort)}";
+        }
+
+        if (view != AllViews)
+        {
+            url += $"&status={view}";
+        }
+
+        var result = await Api.GetAsync<RecordPageResponse>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private RenderFragment CellContent(string key, RecordResponse record) => key switch
+    {
+        "title" => @<text>@WarehouseLabels.Text(record, "title")</text>,
+        "status" => @<span class="badge @HrAccess.BlogStatus(WarehouseLabels.Text(record, "status")).Badge">@HrAccess.BlogStatus(WarehouseLabels.Text(record, "status")).Label</span>,
+        "submittedAt" => @<text>@Day(record, "submittedAt")</text>,
+        "publishedAt" => @<text>@Day(record, "publishedAt")</text>,
+        _ => @<text></text>,
+    };
+
+    private static string Day(RecordResponse record, string field) =>
+        DateTimeOffset.TryParse(WarehouseLabels.Text(record, field), out var at) ? at.LocalDateTime.ToString("dd.MM.yyyy") : "—";
+
+    private void Open(RecordResponse? post)
+    {
+        selected = post;
+        editing = true;
+    }
+
+    private void Close()
+    {
+        editing = false;
+        selected = null;
+    }
+
+    private async Task SavedAsync(RecordResponse saved)
+    {
+        // Kaydedilen yazı açık kalır: ek eklenebilsin ve onaya gönderilebilsin.
+        selected = saved;
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private async Task SubmittedAsync(RecordResponse post)
+    {
+        selected = post;
+        Toasts.Success("Yazınız onaya gönderildi.");
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private async Task DeleteAsync(RecordResponse post)
+    {
+        var result = await Api.DeleteAsync($"{Url}/{post.Id}?version={post.Version}");
+        message = result.IsSuccess ? null : result.Error;
+        if (result.IsSuccess && selected?.Id == post.Id)
+        {
+            Close();
+        }
+
+        await LoadAsync(page?.Page ?? 1);
+    }
+}

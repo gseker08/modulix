@@ -270,6 +270,7 @@ public static class AppCatalog
         new("hr.surveys", Hr, "Anketler", "clipboard-list", "ik/anketler", 6, HrAccess.ModuleKey, HrAccess.SurveysRespond, Tone: AppTone.Teal),
         new("hr.blog", Hr, "Blog", "file-text", "ik/blog", 7, HrAccess.ModuleKey, HrAccess.BlogRead, Tone: AppTone.Teal),
         new("hr.gallery", Hr, "Galeri", "image", "ik/galeri", 8, HrAccess.ModuleKey, HrAccess.GalleryRead, Tone: AppTone.Teal),
+        new("hr.my-posts", Hr, "Yazılarım", "pencil", "ik/yazilarim", 9, HrAccess.ModuleKey, HrAccess.BlogWrite, Tone: AppTone.Teal),
         new("hr.blog-admin", Hr, "Blog yönetimi", "file-text", "ik/blog-yonetimi", 170, HrAccess.ModuleKey, HrAccess.BlogManage),
         new("hr.gallery-admin", Hr, "Galeri yönetimi", "image", "ik/galeri-yonetimi", 180, HrAccess.ModuleKey, HrAccess.GalleryManage),
         new("hr.survey-admin", Hr, "Anket yönetimi", "clipboard-list", "ik/anket-yonetimi", 160, HrAccess.ModuleKey, HrAccess.SurveysManage),
