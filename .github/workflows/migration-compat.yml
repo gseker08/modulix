@@ -1,0 +1,160 @@
+# Migration geriye uyumlulugu (mimari degerlendirme A6, docs/mimari-degerlendirme-2026-11.md).
+#
+# Tek veritabaninda (ADR-0020) yeni surumun migration'i, eski surum hala calisirken uygulanir (kesintisiz dagitim). Uyumsuz bir
+# migration (kolon silme/yeniden adlandirma, varsayilansiz NOT NULL kolon, eski kodun yazdigi tabloyu degistirme) butun tenant'lari
+# birden durdurur. Bu job bunu dagitimdan once yakalar:
+#   1. Yeni surumun (PR) migration'lari bos veritabanina uygulanir.
+#   2. Bir onceki surumun (PR tabani, main) entegrasyon testleri DERLENIR ve bu yeni semaya karsi kosar.
+# Eski kod yeni semada calisamiyorsa testleri kirilir. Cozum migration'i iki adima bolmektir (genislet / daralt): once eklenen
+# yapi ve onu kullanan kod, eski yapiyi kaldiran migration ise bir sonraki surumde.
+#
+# Yalnizca migration'lara (ya da veritabani kurulumuna) dokunan PR'larda kosar. Zorunlu kontrol degildir; kasitli kirici bir
+# degisiklikte kirmizi sonuc PR'da gerekcesiyle aciklanir.
+
+name: Migration uyumlulugu
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/Modulix.Infrastructure/Persistence/Migrations/**'
+      - 'docker/sqlserver/**'
+      - '.github/workflows/migration-compat.yml'
+  workflow_dispatch:
+    inputs:
+      previous:
+        description: "Onceki surum (dal, etiket ya da commit); testleri bu surumden kosar"
+        required: true
+        default: main
+        type: string
+
+concurrency:
+  group: migration-compat-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  PREVIOUS_DIR: previous
+
+jobs:
+  # Parcalama ci.yml ile aynidir (scripts/ci-test-shard.sh); her parca kendi SQL Server'inda kosar.
+  previous-tests:
+    name: previous-tests (${{ matrix.shard }}/${{ strategy.job-total }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      INTEGRATION_SHARDS: ${{ strategy.job-total }}
+
+    steps:
+      - name: Yeni surumu al
+        uses: actions/checkout@v5
+
+      - name: Onceki surumu al
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.base.sha || inputs.previous }}
+          path: ${{ env.PREVIOUS_DIR }}
+
+      - name: Surumleri goster
+        run: |
+          echo "yeni:   $(git rev-parse HEAD)"
+          echo "onceki: $(git -C "$PREVIOUS_DIR" rev-parse HEAD)"
+
+      - name: .NET SDK kurulumu
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.100'
+
+      # ci.yml ile ayni: her calismaya ozel sifreler, kayitlarda gizlenir.
+      - name: Gecici veritabani sifreleri
+        run: |
+          sa="Mx!$(openssl rand -hex 12)"
+          app="Mx!$(openssl rand -hex 12)"
+          migrator="Mx!$(openssl rand -hex 12)"
+          s3="$(openssl rand -hex 16)"
+          for secret in "$sa" "$app" "$migrator" "$s3"; do echo "::add-mask::$secret"; done
+          printf 'MSSQL_PORT=14333\nMSSQL_SA_PASSWORD=%s\nMODULIX_APP_PASSWORD=%s\nMODULIX_MIGRATOR_PASSWORD=%s\nS3_SECRET_KEY=%s\n' \
+            "$sa" "$app" "$migrator" "$s3" > .env
+          {
+            echo "ConnectionStrings__Modulix=Server=localhost,14333;Database=Modulix;User Id=modulix_app;Password=$app;TrustServerCertificate=True"
+            echo "ConnectionStrings__ModulixMigrations=Server=localhost,14333;Database=Modulix;User Id=modulix_migrator;Password=$migrator;TrustServerCertificate=True"
+            echo "TestStorage__S3__ServiceUrl=http://127.0.0.1:9000"
+            echo "TestStorage__S3__AccessKey=modulix"
+            echo "TestStorage__S3__SecretKey=$s3"
+          } >> "$GITHUB_ENV"
+
+      # Veritabani kurulumu (sema, kullanicilar) yeni surumden: yeni migration'lar onun semalarina ihtiyac duyabilir.
+      - name: SQL Server'i, Mailpit'i ve S3 deposunu baslat
+        run: docker compose up -d --wait sqlserver mailpit s3
+
+      - name: Veritabani, semalar ve kullanicilar
+        run: docker compose run --rm db-init
+
+      - name: Yeni surumun migration'larini uygula
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet run --project src/Modulix.Api --configuration Release -- migrate 2>&1 | tee "$RUNNER_TEMP/steplogs/migrate.log"
+
+      - name: Onceki surumun entegrasyon testlerini derle
+        run: set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"; dotnet build "$PREVIOUS_DIR/tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj" --configuration Release 2>&1 | tee "$RUNNER_TEMP/steplogs/build.log"
+
+      # Parca filtresi onceki surumun test listesinden ve betiginden hesaplanir. Tablo envanteri (TableInventoryTests) disarida
+      # kalir: veritabanindaki tablolari o surumun listesiyle karsilastirir, yeni tablo eklenince uyumluluktan bagimsiz kirilir.
+      - name: Parca filtresini hesapla
+        run: |
+          set -o pipefail
+          dotnet test "$PREVIOUS_DIR/tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj" --configuration Release --no-build --list-tests > "$RUNNER_TEMP/integration-list.txt"
+          shard=$(bash "$PREVIOUS_DIR/scripts/ci-test-shard.sh" "${{ matrix.shard }}" "$INTEGRATION_SHARDS" < "$RUNNER_TEMP/integration-list.txt")
+          filter="($shard)&FullyQualifiedName!~Modulix.IntegrationTests.TableInventoryTests."
+          echo "INTEGRATION_FILTER=$filter" >> "$GITHUB_ENV"
+          echo "Parca ${{ matrix.shard }}/$INTEGRATION_SHARDS filtresi:"
+          echo "$filter" | tr '|' '\n'
+
+      - name: Onceki surumun entegrasyon testleri (yeni semaya karsi)
+        run: |
+          set -o pipefail; mkdir -p "$RUNNER_TEMP/steplogs"
+          dotnet test "$PREVIOUS_DIR/tests/Modulix.IntegrationTests/Modulix.IntegrationTests.csproj" --configuration Release --no-build \
+            --filter "$INTEGRATION_FILTER" \
+            2>&1 | tee "$RUNNER_TEMP/steplogs/previous-tests.log"
+
+      - name: Test ozeti
+        if: always()
+        run: |
+          f="$RUNNER_TEMP/steplogs/previous-tests.log"
+          [ -f "$f" ] || exit 0
+          line=$(grep -E "(Passed|Failed)!|total:|toplam:" "$f" | tail -n 1)
+          echo "::notice title=previous-tests-${{ matrix.shard }}::${line:-ozet bulunamadi}"
+
+      - name: Hata ozeti
+        if: failure()
+        run: |
+          {
+            echo "### Migration uyumlulugu: parca ${{ matrix.shard }} kirmizi"
+            echo "Onceki surumun testleri yeni semada calismadi. Migration'i genislet/daralt adimlarina bolun (README > CI)."
+          } >> "$GITHUB_STEP_SUMMARY"
+          for f in "$RUNNER_TEMP"/steplogs/*.log; do
+            [ -f "$f" ] || continue
+            body=$( { grep -E "error|Error|ERROR|fail|Fail|Exception|Assert" "$f" | tail -n 40; echo '--- son satirlar ---'; tail -n 40 "$f"; } )
+            body="${body//'%'/'%25'}"; body="${body//$'\r'/'%0D'}"; body="${body//$'\n'/'%0A'}"
+            echo "::error title=$(basename "$f")::${body:0:60000}"
+          done
+
+  # Tek sonuc: parcalar tek tek adlandirildigi icin dal kuralinda istenirse bu ad kullanilir.
+  migration-compat:
+    needs: [previous-tests]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Sonucu denetle
+        env:
+          RESULT: ${{ needs.previous-tests.result }}
+        run: |
+          echo "previous-tests: $RESULT"
+          [ "$RESULT" = "success" ]

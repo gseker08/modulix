@@ -150,6 +150,13 @@ internal sealed class TripRecordStore(LogisticsStoreContext context) : Logistics
     protected override Task BeforeDeleteAsync(Trip entity, CancellationToken cancellationToken) =>
         throw new RecordConflictException("Sefer silinmez; gerekirse iptal edin.");
 
+    /// <summary>
+    /// Seferin belgeleri (CMR, irsaliye, yol belgeleri) sefer kapanana kadar eklenir ve silinir; kayıt yalnızca planlanırken düzenlense de belge yolda da
+    /// eklenir. Sefer tamamlanınca ya da iptal edilince dosyalar donar (ADR-0038 bölüm 27).
+    /// </summary>
+    protected override Task<string?> FileWriteDeniedAsync(Trip entity, CancellationToken cancellationToken) =>
+        Task.FromResult(TripFiles.Denied(entity.Status));
+
     private async Task CheckVehicleAsync(string field, Guid vehicleId, bool towed, List<RecordFieldError> errors, CancellationToken cancellationToken)
     {
         if (!await Context.Vehicles.IsAvailableAsync(cancellationToken))
@@ -302,6 +309,21 @@ internal sealed class TripStopRecordStore(LogisticsStoreContext context) : Logis
             throw new RecordConflictException("Sevkiyat durağı elle kaldırılmaz; sevkiyatı seferden çıkarın.");
         }
     }
+
+    /// <summary>Durağın belgeleri seferin kuralına uyar: sefer kapanınca donar (ADR-0038 bölüm 27).</summary>
+    protected override async Task<string?> FileWriteDeniedAsync(TripStop entity, CancellationToken cancellationToken)
+    {
+        var status = await Context.Data.Set<Trip>().AsNoTracking().Where(t => t.Id == entity.TripId).Select(t => t.Status).SingleOrDefaultAsync(cancellationToken);
+        return TripFiles.Denied(status);
+    }
+}
+
+/// <summary>Sefer ve durak dosyalarının ortak kuralı (ADR-0038 bölüm 27).</summary>
+internal static class TripFiles
+{
+    public static string? Denied(string? tripStatus) => tripStatus is null or Trip.Statuses.Completed or Trip.Statuses.Cancelled
+        ? "Sefer kapandığı için belgeleri donmuştur; dosya eklenemez ya da silinemez."
+        : null;
 }
 
 /// <summary>Firmanın "Taşıyıcı" ilişki rolünde olup olmadığı (taşeron sürücü ve taşeron sefer).</summary>
