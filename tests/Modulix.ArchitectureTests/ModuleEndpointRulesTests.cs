@@ -4,8 +4,8 @@ namespace Modulix.ArchitectureTests;
 
 /// <summary>
 /// ADR-0046: modül projesindeki her uç nokta izin kontrolüyle biter. Oturum ve modül lisans kontrolünü host uygular
-/// (<c>MapModuleEndpoints</c>); izin (<c>RequirePermission</c> / <c>RequireAnyPermission</c>) uç nokta başına modüldedir ve
-/// unutulursa bu test kırılır. Yetkilendirme yalnızca arayüzde gizlemek değildir; sunucuda uygulanır.
+/// (<c>MapModuleEndpoints</c>); izin (<c>RequirePermission</c> / <c>RequireAnyPermission</c>) modüldedir: uç noktada ya da uç noktanın grubunda. İzin serviste
+/// denetleniyorsa bu <c>PermissionCheckedInService()</c> ile açıkça yazılır. Hiçbiri yoksa bu test kırılır. Yetkilendirme yalnızca arayüzde gizlemek değildir; sunucuda uygulanır.
 /// </summary>
 /// <remarks>
 /// Denetim kaynak metni üzerindedir: <c>.MapGet(...)</c> gibi bir çağrıdan o ifadenin sonundaki <c>;</c> işaretine kadar olan
@@ -57,6 +57,9 @@ public partial class ModuleEndpointRulesTests
     [InlineData("group.MapGet(\"/a\", () => 1).RequirePermission(\"x\");", true)]
     [InlineData("group.MapPost(\"/a\", async (int id) => { await Task.Yield(); return id; })\n    .RequireAnyPermission(\"x\", \"y\");", true)]
     [InlineData("group.MapGet(\"/a\", () => 1);", false)]
+    [InlineData("var group = routes.MapGroup(\"\").PermissionCheckedInService();\ngroup.MapGet(\"/a\", () => 1);", true)]
+    [InlineData("var group = routes.MapGroup(\"\");\ngroup.MapGet(\"/a\", () => 1).PermissionCheckedInService();", true)]
+    [InlineData("var other = routes.MapGroup(\"\").RequirePermission(\"x\");\ngroup.MapGet(\"/a\", () => 1);", false)]
     [InlineData("group.MapGet(\"/a\", () => 1).WithName(\"a\"); other.RequirePermission(\"x\");", false)]
     [InlineData("group.MapDelete(\"/a;b\", () => \";\").RequirePermission(\"x\");", true)]
     [InlineData("group.MapGet(\"/a\", () =>\n{\n    // host'ta; kalır\n    return 1;\n});\nother.RequirePermission(\"x\");", false)]
@@ -91,10 +94,21 @@ public partial class ModuleEndpointRulesTests
         foreach (Match match in MapCall().Matches(source))
         {
             string statement = StatementFrom(source, match.Index);
-            result.Add(($"{file}: {match.Groups["route"].Value}", PermissionCall().IsMatch(statement)));
+            bool onEndpoint = PermissionCall().IsMatch(statement);
+            result.Add(($"{file}: {match.Groups["route"].Value}", onEndpoint || GroupHasPermission(source, match.Groups["group"].Value)));
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// İzin grup düzeyinde verilmiş mi: uç noktanın eşlendiği değişken (<c>group.MapGet</c> → <c>group</c>) aynı dosyada
+    /// <c>var group = ...;</c> ile tanımlanmış ve o ifade izin çağrısı içeriyorsa gruptaki bütün uç noktalar onu taşır.
+    /// </summary>
+    private static bool GroupHasPermission(string source, string group)
+    {
+        var declaration = Regex.Match(source, $@"\bvar\s+{Regex.Escape(group)}\s*=");
+        return declaration.Success && PermissionCall().IsMatch(StatementFrom(source, declaration.Index));
     }
 
     /// <summary>
@@ -160,9 +174,9 @@ public partial class ModuleEndpointRulesTests
     private static bool IsBuildOutput(FileInfo file) =>
         file.FullName.Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj");
 
-    [GeneratedRegex(@"\.Map(Get|Post|Put|Delete|Patch)\s*\(\s*""(?<route>[^""]*)""")]
+    [GeneratedRegex(@"(?<group>[A-Za-z_]\w*)\s*\.Map(Get|Post|Put|Delete|Patch)\s*\(\s*""(?<route>[^""]*)""")]
     private static partial Regex MapCall();
 
-    [GeneratedRegex(@"\.Require(Any)?Permission\s*\(")]
+    [GeneratedRegex(@"\.(Require(Any)?Permission|PermissionCheckedInService)\s*\(")]
     private static partial Regex PermissionCall();
 }

@@ -1,6 +1,6 @@
 # ADR-0046: Modül dikey dilimleri (uç noktalar ve arka plan işleri modüle taşınır)
 
-- **Durum:** Kabul edildi, 14 Kasım 2026 (açık sorular aynı gün karara bağlandı; aşağıda "Açık soruların kararı"). Dilim 0 (envanter ve mimari kural) ve Dilim 1 (`Core.Hosting`, `IModuleEndpoints`, Antrepo pilotu) yapıldı; sırada Dilim 2.
+- **Durum:** Kabul edildi, 14 Kasım 2026 (açık sorular aynı gün karara bağlandı; aşağıda "Açık soruların kararı"). Dilim 0 (envanter ve mimari kural) ve Dilim 1 (`Core.Hosting`, `IModuleEndpoints`, Antrepo pilotu) ve Dilim 2 (İK, Lojistik) yapıldı; sırada Dilim 3 (iş zamanlayıcısı).
 - **Karar:** Bir modülün HTTP uç noktaları ve arka plan işleri `Modulix.Api` yerine modülün kendi projesinde durur. Host (`Modulix.Api`) modülleri tanımaz; uç noktaları ve işleri modül kaydından (`IModule` ve yanındaki arayüzler) keşfeder. Arka plan işleri modül başına ayrı `BackgroundService` yerine tek bir zamanlayıcıdan çalışır. DTO'lar ve Blazor ekranları bu ADR'de yerinde kalır; onlar için yalnızca yön belirlenir.
 
 > Numara notu: 14 Kasım 2026'da `main`'de en yüksek numara 0045'ti ve 0046 adını taşıyan açık PR yoktu. Birleştirmeden önce numara yeniden kontrol edilmeli (0043 iki ADR'de kullanılmış durumda).
@@ -124,9 +124,9 @@ Api'deki modül klasörlerinin kendi modülü, `Core.Contracts`, `Shared`, modü
 
 | Klasör | Dosya | Host içi başvuru | Başvuran dosya |
 |---|---|---|---|
-| `Hr` | 3 | yok | hazır |
+| `Hr` | 0 | — | modüle taşındı (Dilim 2) |
 | `Warehouse` | 0 | — | modüle taşındı (Dilim 1) |
-| `Logistics` | 1 | yok | hazır (ayar okuma `ITenantSettingReader`'a alındı) |
+| `Logistics` | 0 | — | modüle taşındı (Dilim 2) |
 | `Orders` | 2 | `Core.Events`, `Core.Modules`, `Core.Platform`, `Infrastructure` | 1 (iş) |
 | `Marketing` | 7 | `Core.Events`, `Core.Modules`, `Core.Platform`, `Infrastructure` | 1 (iş) |
 | `Support` | 3 | `Api.Crm`, `Core.Events`, `Core.Modules`, `Core.Platform`, `Core.Records`, `Infrastructure` | 2 (biri iş) |
@@ -152,7 +152,7 @@ Her dilim ayrı PR'dır; taşıma dilimleri davranış ve URL değiştirmez.
 
 0. **Envanter ve kural (yapıldı).** Api'deki her modül klasörü için başvuru envanteri (yukarıda). `ApiModuleFolderRulesTests`: modül klasörü başka modülün ana projesine başvuramaz (istisnasız); host içi başvurular `PendingCleanup` listesiyle sabit ve yalnızca küçülür. Kod taşınmadı.
 1. **`Core.Hosting` + `IModuleEndpoints` + pilot (yapıldı).** `Modulix.Core.Hosting` projesi: `RequirePermission`, `RequireAnyPermission`, `RequireModule` (`Api/Access`'ten taşındı) ve `IModuleEndpoints`. Host `MapModuleEndpoints` ile modülleri gezer. Pilot Antrepo: pano uç noktası `Modulix.Modules.Warehouse/Endpoints`'te, `Api/Warehouse` klasörü kalktı. Taslaktan sapmalar: (a) süzgeçlerin iki host bağımlılığı sözleşmeye çevrildi: yazılabilirlik sorusu `IModuleWriteAccess` (`Core.Contracts.Modules`; `IModuleLicense` ondan türer), aktif tenant kontrolü `IActiveTenantGuard` (`Core.Hosting`; host uygular); (b) `Api/Records` yardımcıları taşınmadı, pilot onlara ihtiyaç duymuyor; ilk kullanan modülle (Dilim 2: İK, Lojistik) taşınır; (c) host'taki dosyalar süzgeçleri `global using Modulix.Core.Hosting` ile görür, tek tek değiştirilmedi. Yeni mimari test `ModuleEndpointRulesTests`: modül projesindeki her `Map*` çağrısı izin kontrolüyle biter (gerekçeli istisna listesi, bugün boş).
-2. **Küçük modüller.** Lojistik, İK. (Filo'nun modüle özel uç noktası yok; taşınacak bir şey çıkmaz.)
+2. **Küçük modüller (yapıldı).** Lojistik ve İK uç noktaları modüllerine taşındı; `Api/Hr` ve `Api/Logistics` klasörleri kalktı. (Filo'nun modüle özel uç noktası yok; taşınacak bir şey çıkmaz.) Bu dilimde ortaya çıkanlar: (a) İki modülün 32 uç noktasının hiçbirinde `RequirePermission` yoktu; izin iş akışı servisinde denetleniyor (eylemin izni kayda ve duruma göre belirlenir). Davranışı değiştirmemek için `Core.Hosting`'e `PermissionCheckedInService()` işareti eklendi: süzgeç eklemez, kararı açıkça yazar. `ModuleEndpointRulesTests` uç noktada ya da grubunda izin çağrısı ya da bu işareti arar. (b) Kayıt hatasını HTTP yanıtına çeviren yardımcı `RecordProblems.ToProblem` olarak `Core.Hosting`'e alındı; host'taki `RecordEndpoints.ToProblem` ona yönlenir. `MapRecordEndpoints` kararda yazdığı gibi host'ta kaldı. (c) Zimmet tutanağı PDF'i uç noktasıyla taşındığı için İK modülü QuestPDF paketine başvuruyor (sürüm Api ile aynı). (d) `LogisticsPolicyProvider` (ayarlardan politika okuyan host köprüsü) modüle taşındı ve modülün kendi `ConfigureServices`'inde kaydoluyor; `ITenantSettingReader` sayesinde köprüye gerek kalmadı.
 3. **İş zamanlayıcısı + pilot.** `ModuleJobDefinition`, `IModuleJob`, `ModuleJobsWorker`; pilot `OrderJobs`. Eski yapılandırma adları okunmaya devam eder.
 4. **Kalan modül işleri.** `QuoteExpiry`, `ContractJobs`, `SupportJobs`, `MarketingSend`.
 5. **Orta modüller.** Sipariş, Destek, Marketing: önce bölüm 4'teki temizlik, sonra taşıma (modül başına bir PR).

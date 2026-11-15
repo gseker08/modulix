@@ -1,11 +1,14 @@
-using Modulix.Api.Access;
-using Modulix.Api.Records;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Logistics;
 using Modulix.Modules.Logistics.Lifecycle;
 using Modulix.Shared.Logistics;
 using Modulix.Shared.Records;
 
-namespace Modulix.Api.Logistics;
+namespace Modulix.Modules.Logistics.Endpoints;
 
 /// <summary>
 /// Lojistik iş akışı uçları (ADR-0038 K7, dilim 4–5): taşıma talebi, sevkiyat ve seferin durum eylemleri; seferin uygunluk denetimi ve
@@ -13,12 +16,12 @@ namespace Modulix.Api.Logistics;
 /// (<c>/api/records/logistics.transport-request</c>, <c>/api/records/logistics.shipment</c>); durum yalnızca buradaki komutlarla değişir.
 /// Eylemin izni serviste denetlenir (talep onayı ayrı izindir); tenant oturumdan gelir. Salt okunur lisans evresinde POST 403'tür.
 /// </summary>
-public static class LogisticsEndpoints
+internal static class LogisticsEndpoints
 {
     private static IResult ToResponse(Modulix.Core.Contracts.Records.RecordResult<Modulix.Core.Contracts.Records.RecordData> result) =>
         result.IsSuccess
             ? Results.Ok(new RecordResponse(result.Value!.EntityKey, result.Value.Id, result.Value.Version, result.Value.Values))
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
 
     private static readonly Dictionary<string, string> EntityOf = new(StringComparer.Ordinal)
     {
@@ -28,12 +31,13 @@ public static class LogisticsEndpoints
         ["expenses"] = LogisticsModule.Entities.TripExpense,
     };
 
-    public static IEndpointRouteBuilder MapLogisticsEndpoints(this IEndpointRouteBuilder app)
+    /// <summary><paramref name="routes"/> host tarafından <c>/api/logistics</c> grubu olarak, oturum ve modül kontrolüyle sarılmış gelir (ADR-0046).</summary>
+    public static void MapEndpoints(IEndpointRouteBuilder routes)
     {
-        var group = app.MapGroup("/api/logistics")
-            .RequireAuthorization()
-            .RequireModule(LogisticsModule.ModuleKey)
-            .WithTags("Lojistik");
+        // İzin uç noktada değil serviste denetlenir (talep onayı ayrı izindir): eylemin izni iş akışında belirlenir.
+        var group = routes.MapGroup(string.Empty)
+            .WithTags("Lojistik")
+            .PermissionCheckedInService();
 
         group.MapGet("/{kind}/{id:guid}/actions", async (string kind, Guid id, ILogisticsWorkflow workflow, CancellationToken ct) =>
         {
@@ -45,7 +49,7 @@ public static class LogisticsEndpoints
             var result = await workflow.ActionsAsync(entityKey, id, ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value!.Select(a => new LogisticsActionDto(a.Action, a.Label, a.Allowed, a.Message, a.RequiresReason, a.Destructive)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         group.MapPost("/{kind}/{id:guid}/actions", async (string kind, Guid id, RunLogisticsActionRequest request, ILogisticsWorkflow workflow, CancellationToken ct) =>
@@ -58,7 +62,7 @@ public static class LogisticsEndpoints
             var result = await workflow.RunAsync(entityKey, id, request.Action ?? string.Empty, request.Version, request.Reason, ct);
             return result.IsSuccess
                 ? Results.Ok(new RecordResponse(result.Value!.EntityKey, result.Value.Id, result.Value.Version, result.Value.Values))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         });
 
         // Teslim (dilim 6): yoldaki sevkiyat teslim edilir, kısmen teslim edilir ya da teslim edilemez. Değişmez teslim kanıtı, durum ve iş olayı tek işlemde
@@ -69,7 +73,7 @@ public static class LogisticsEndpoints
                 id, request.Version, new DeliveryCommand(request.Outcome ?? string.Empty, request.ReceivedBy, request.Damaged, request.Shortage, request.FailureReason, request.Notes), ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             var (shipment, proof) = (result.Value!.Shipment, result.Value.Proof);
@@ -93,7 +97,7 @@ public static class LogisticsEndpoints
             var result = await planner.CheckAsync(id, ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             var (issues, load) = (result.Value!.Issues, result.Value.Load);
@@ -109,12 +113,10 @@ public static class LogisticsEndpoints
 
         group.MapDelete("/trips/{id:guid}/shipments/{shipmentId:guid}", async (Guid id, Guid shipmentId, ITripPlanner planner, CancellationToken ct) =>
             ToResponse(await planner.UnassignAsync(id, shipmentId, ct)));
-
-        return app;
     }
 }
 
-/// <summary>Lojistik politikası: tenant ayarlarından okunur (modül Core'un ayar servisini görmez; host bu köprüyü sağlar).</summary>
+/// <summary>Lojistik politikası: tenant ayarlarından okunur (ayar okuma sözleşmesiyle, ADR-0046).</summary>
 internal sealed class LogisticsPolicyProvider(IServiceProvider services) : ILogisticsPolicyProvider
 {
     public async Task<string> CredentialCheckAsync(CancellationToken cancellationToken)

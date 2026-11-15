@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Credentials;
@@ -5,7 +6,9 @@ using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Hr.Domain;
+using Modulix.Modules.Hr.Endpoints;
 using Modulix.Modules.Hr.Records;
 
 namespace Modulix.Modules.Hr;
@@ -15,7 +18,7 @@ namespace Modulix.Modules.Hr;
 /// Dilim 1: çalışan kartı, rehber, organizasyon şeması. İzin, masraf, zimmet, işe giriş/çıkış ve kurum içi iletişim (duyuru, anket, blog,
 /// galeri) sonraki dilimlerdedir (ADR-0042 bölüm 5).
 /// </summary>
-public sealed class HrModule : IModule
+public sealed class HrModule : IModule, IModuleEndpoints
 {
     public const string ModuleKey = "hr";
 
@@ -122,6 +125,9 @@ public sealed class HrModule : IModule
         ["nationalId", "birthDate", "homeAddress", "emergencyContactName", "emergencyContactPhone", "iban"];
 
     public string Key => ModuleKey;
+
+    /// <summary>Modüle özel uç noktalar (ADR-0046); genel kayıt uçları host'ta <c>OwnedRecords</c>'tan üretilir.</summary>
+    public void MapEndpoints(IEndpointRouteBuilder routes) => HrEndpoints.MapEndpoints(routes);
 
     public string DisplayName => "İnsan Kaynakları";
 

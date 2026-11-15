@@ -3,7 +3,7 @@ using System.Text;
 using Modulix.Modules.Hr.Records;
 using Modulix.Shared.Hr;
 
-namespace Modulix.Api.Hr;
+namespace Modulix.Modules.Hr.Endpoints;
 
 /// <summary>
 /// Anket sonucunun CSV dışa aktarımı (ADR-0042 bölüm 23b). İçerik sonuç ekranıyla aynı özettir: soru başına cevaplayan sayısı, puan ortalaması,

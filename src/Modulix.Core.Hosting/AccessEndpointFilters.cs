@@ -80,10 +80,33 @@ public static class AccessEndpointFilters
         return builder;
     }
 
+    /// <summary>
+    /// İznin uç noktada değil, çağrılan serviste denetlendiğini bildirir (ör. iş akışı eylemleri: hangi eylemin hangi izni
+    /// istediği kayda ve duruma göre serviste belirlenir). Süzgeç eklemez; yalnızca işarettir. Modül uç noktası ya
+    /// <see cref="RequirePermission{TBuilder}"/> / <see cref="RequireAnyPermission{TBuilder}"/> ile ya da bununla biter
+    /// (mimari test, ADR-0046); böylece izinsiz uç nokta unutkanlıkla değil, açık bir kararla olur.
+    /// </summary>
+    public static TBuilder PermissionCheckedInService<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        builder.WithMetadata(PermissionCheckedInServiceMetadata.Instance);
+        return builder;
+    }
+
     private static bool IsReadOnlySafe(HttpRequest request) =>
         HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method) || HttpMethods.IsOptions(request.Method)
         || request.Path.Value?.TrimEnd('/').EndsWith("/preview", StringComparison.OrdinalIgnoreCase) == true;
 
     private static IResult Forbidden(string detail) =>
         Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Yetkiniz yok.", detail: detail);
+}
+
+/// <summary><see cref="AccessEndpointFilters.PermissionCheckedInService{TBuilder}"/> işaretinin uç nokta metadata'sı.</summary>
+public sealed class PermissionCheckedInServiceMetadata
+{
+    public static readonly PermissionCheckedInServiceMetadata Instance = new();
+
+    private PermissionCheckedInServiceMetadata()
+    {
+    }
 }
