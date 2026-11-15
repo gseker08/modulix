@@ -370,6 +370,9 @@ internal sealed class BlogPostConfiguration : IEntityTypeConfiguration<BlogPost>
         builder.Property(p => p.Summary).HasMaxLength(BlogPost.SummaryMaxLength);
         builder.Property(p => p.Body).HasMaxLength(BlogPost.BodyMaxLength).IsRequired();
         builder.HasIndex(p => new { p.TenantId, p.IsPublished, p.PublishedAt }).HasDatabaseName("IX_BlogPosts_Published");
+        builder.Property(p => p.ReviewStatus).HasMaxLength(20);
+        builder.Property(p => p.ReviewNote).HasMaxLength(BlogPost.ReviewNoteMaxLength);
+        builder.Ignore(p => p.Status);
     }
 }
 

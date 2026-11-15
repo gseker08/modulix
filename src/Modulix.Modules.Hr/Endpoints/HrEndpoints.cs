@@ -157,6 +157,13 @@ internal static class HrEndpoints
                 : RecordProblems.ToProblem(result.Error!);
         });
 
+        // Blog onay akışı (bölüm 27): yazar onaya gönderir, yöneten yayınlar ya da gerekçeyle geri çevirir.
+        group.MapGet("/blog-posts/{id:guid}/actions", async (Guid id, IBlogReview review, CancellationToken ct) =>
+            Actions(await review.ActionsAsync(id, ct)));
+
+        group.MapPost("/blog-posts/{id:guid}/actions", async (Guid id, RunHrActionRequest request, IBlogReview review, CancellationToken ct) =>
+            Record(await review.RunAsync(id, request.Action ?? string.Empty, request.Version, request.Reason, ct)));
+
         // Yorum ve beğeni (bölüm 23d): içeriği görebilen yazar ve beğenir; yorumu yazarı siler, içeriği yöneten gizler/gösterir/siler.
         foreach (var (route, contentEntity, commentEntity) in new[]
         {
