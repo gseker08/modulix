@@ -100,7 +100,8 @@ public static class LogisticsLookupDefinitions
         },
         // Masraf tedarikçisi (yakıt istasyonu, otoyol işletmesi...): rol süzgeci yok; her firma tedarikçi olabilir.
         Party(ExpenseSupplier, LogisticsModule.Entities.TripExpense, "supplierPartyId", "Tedarikçi"),
-        // Masraf listesinde seferin numarasını göstermek için (çözümleme); seçici olarak kullanılmaz, okuma sefer okuma iznine bağlıdır.
+        // Masraf listesinde seferin numarasını göstermek (çözümleme) ve masrafı başka sefere aktarırken hedef seferi seçmek için (ADR-0038 bölüm 27);
+        // okuma sefer okuma iznine bağlıdır.
         new(ExpenseTrip, LogisticsModule.Entities.TripExpense, "tripId", "Sefer", LookupTargetKind.Record, LogisticsModule.Entities.Trip)
         {
             LabelFields = ["number"],

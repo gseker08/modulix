@@ -28,6 +28,12 @@ public interface ILogisticsWorkflow
 
     /// <summary>Eylemi uygular. Bilinmeyen eylem 422; izin yoksa 403; ön koşul geçmezse 409; gerekçe isteyen eylemde gerekçe zorunlu (422).</summary>
     Task<RecordResult<RecordData>> RunAsync(string entityKey, Guid id, string action, long version, string? reason, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// İptal edilen seferin beklemedeki masrafını başka sefere aktarır (ADR-0038 bölüm 27). Masraf görünmüyorsa 404; masraf yazma izni yoksa 403;
+    /// gerekçe zorunlu (422); masraf beklemede değilse ya da seferi iptal edilmemişse 409; hedef sefer yoksa ya da iptal edilmişse 422.
+    /// </summary>
+    Task<RecordResult<RecordData>> TransferExpenseAsync(Guid id, Guid tripId, long version, string? reason, CancellationToken cancellationToken);
 }
 
 /// <summary>Eylem anahtarları (API ve arayüz bunları kullanır).</summary>
@@ -174,6 +180,33 @@ internal sealed class LogisticsWorkflow(
         return transition.Action == LogisticsActions.Approve && entityKey == LogisticsModule.Entities.TransportRequest
             ? await pipeline.RunAtomicAsync(ct => ApproveAsync(record.Value!, transition, version, ct), cancellationToken)
             : await TransitionAsync(entityKey, id, transition, version, trimmed, linkedId: null, cancellationToken);
+    }
+
+    public async Task<RecordResult<RecordData>> TransferExpenseAsync(Guid id, Guid tripId, long version, string? reason, CancellationToken cancellationToken)
+    {
+        var record = await pipeline.GetAsync(new RecordRef(LogisticsModule.Entities.TripExpense, id), cancellationToken);
+        if (!record.IsSuccess)
+        {
+            return record;
+        }
+
+        if (!await access.HasPermissionAsync(LogisticsModule.Permissions.ExpensesWrite, cancellationToken))
+        {
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, "Bu eylem için yetkiniz yok.");
+        }
+
+        var trimmed = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        if (trimmed is null || trimmed.Length > CargoEntity.ReasonMaxLength)
+        {
+            var message = trimmed is null ? "Gerekçe zorunludur." : $"En fazla {CargoEntity.ReasonMaxLength} karakter olabilir.";
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError("reason", message)]);
+        }
+
+        // Kapı hedef seferle açılır; kuralları depo uygular (durum, iptal edilen kaynak, hedef sefer). Değer gönderilmez: sefer alanı genel uçtan değişmez.
+        using (gate.Open(LogisticsModule.Permissions.ExpensesWrite, status: null, trimmed, tripId))
+        {
+            return await pipeline.UpdateAsync(new RecordCommand(LogisticsModule.Entities.TripExpense, id, new JsonObject(), version), cancellationToken);
+        }
     }
 
     /// <summary>Talep onayı: sevkiyat açılır (talebin yük ve güzergâhıyla), talep "Onaylandı" olur ve sevkiyata bağlanır; ikisi tek işlemde.</summary>
