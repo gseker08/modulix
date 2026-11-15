@@ -83,6 +83,9 @@ public sealed class CrmModule : IModule
         /// <summary>Lead toplama formlarını/entegrasyonlarını yönetir (sır yenileme dahil). Hiçbir hazır role verilmez.</summary>
         public const string LeadFormsManage = "crm.lead-forms.manage";
 
+        /// <summary>Müşteri adayı puan kurallarını tanımlar (ADR-0050). Hiçbir hazır role verilmez.</summary>
+        public const string LeadScoringManage = "crm.lead-scoring.manage";
+
         // Ürün/hizmet kataloğu (ADR-0018). Maliyeti görme ayrı izindir; hiçbir hazır role verilmez.
         public const string ProductsRead = "crm.products.read";
         public const string ProductsWrite = "crm.products.write";
@@ -144,6 +147,7 @@ public sealed class CrmModule : IModule
         public const string ActivityParticipant = "crm.activity-participant";
         public const string Lead = "crm.lead";
         public const string LeadForm = "crm.lead-form";
+        public const string LeadScoreRule = "crm.lead-score-rule";
         public const string ProductCategory = "crm.product-category";
         public const string MeasureUnit = "crm.measure-unit";
         public const string Product = "crm.product";
@@ -273,6 +277,7 @@ public sealed class CrmModule : IModule
         new(Permissions.LeadsConvert, "Nitelikli müşteri adayını fırsata dönüştürür", "Müşteri adayları"),
         new(Permissions.LeadsExport, "Müşteri adayı listesini dışa aktarır", "Müşteri adayları"),
         new(Permissions.LeadFormsManage, "Müşteri adayı toplama formlarını ve entegrasyon sırlarını yönetir", "Müşteri adayı formları"),
+        new(Permissions.LeadScoringManage, "Müşteri adayı puan kurallarını tanımlar ve değiştirir", "Müşteri adayı puanı"),
         new(Permissions.ProductsRead, "Ürün, hizmet, kategori ve birimleri görüntüler", "Ürün kataloğu"),
         new(Permissions.ProductsWrite, "Ürün, hizmet, kategori ve birim ekler, düzenler", "Ürün kataloğu"),
         new(Permissions.ProductCostsRead, "Ürün maliyetini görür ve düzenler", "Ürün maliyeti"),
@@ -981,6 +986,11 @@ public sealed class CrmModule : IModule
         {
             UserFields = ["defaultOwnerId"],
         },
+        new(Entities.LeadScoreRule, "Müşteri adayı puan kuralı (CRM)", Permissions.LeadScoringManage, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["description"] = "Açıklama", ["isActive"] = "Etkin", ["field"] = "Alan", ["operator"] = "Karşılaştırma",
+            ["value"] = "Değer", ["points"] = "Puan",
+        }, "name"),
         new(Entities.Lead, "Müşteri adayı (CRM)", Permissions.LeadsRead, new Dictionary<string, string>
         {
             ["leadNumber"] = "Müşteri adayı no", ["subject"] = "Konu", ["description"] = "Açıklama", ["status"] = "Durum", ["statusReason"] = "Durum gerekçesi",
@@ -994,7 +1004,7 @@ public sealed class CrmModule : IModule
             ["ownerId"] = "Sorumlu", ["assignedAt"] = "Atanma", ["firstContactAt"] = "İlk temas", ["followUpAt"] = "Takip tarihi",
             ["qualifiedAt"] = "Nitelendirilme", ["disqualifiedAt"] = "Elenme", ["disqualificationReason"] = "Eleme nedeni",
             ["convertedAt"] = "Dönüşüm", ["convertedBy"] = "Dönüştüren", ["convertedCompanyId"] = "Dönüşüm firması",
-            ["convertedContactId"] = "Dönüşüm kişisi", ["convertedOpportunityId"] = "Dönüşüm fırsatı",
+            ["convertedContactId"] = "Dönüşüm kişisi", ["convertedOpportunityId"] = "Dönüşüm fırsatı", ["score"] = "Puan",
         }, "subject")
         {
             UserFields = ["ownerId", "convertedBy"],
@@ -1183,6 +1193,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<IActivityWorkflow, ActivityWorkflow>();
         services.AddScoped<IRecordStore, LeadRecordStore>();
         services.AddScoped<IRecordStore, LeadFormRecordStore>();
+        services.AddScoped<IRecordStore, LeadScoreRuleRecordStore>();
         services.AddScoped<ILeadIntake, LeadIntake>();
         services.AddScoped<ILeadFormAdmin, LeadFormAdmin>();
         services.AddScoped<LeadIntakeAnchor>();

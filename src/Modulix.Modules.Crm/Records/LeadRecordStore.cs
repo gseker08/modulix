@@ -1,9 +1,11 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
+using Modulix.Modules.Crm.Leads;
 
 namespace Modulix.Modules.Crm.Records;
 
@@ -92,6 +94,8 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         Field.Id<Lead>("convertedCompanyId", l => l.ConvertedCompanyId, (l, v) => l.ConvertedCompanyId = v).AsSystem(),
         Field.Id<Lead>("convertedContactId", l => l.ConvertedContactId, (l, v) => l.ConvertedContactId = v).AsSystem(),
         Field.Id<Lead>("convertedOpportunityId", l => l.ConvertedOpportunityId, (l, v) => l.ConvertedOpportunityId = v).AsSystem(),
+        // Otomatik puan (ADR-0050): firmanın puan kurallarından kayıtta hesaplanır; istemciden gelen değer yok sayılır.
+        Field.Count<Lead>("score", l => l.Score, (l, v) => l.Score = v).AsSystem(),
     ];
 
     protected override IReadOnlyDictionary<string, RecordFilter<Lead>> Filters { get; } = new Dictionary<string, RecordFilter<Lead>>
@@ -120,6 +124,8 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
             ? flag ? q.Where(l => l.OwnerId == null && LeadStatus.Open.Contains(l.Status)) : q.Where(l => l.OwnerId != null)
             : null,
         ["qualifiedNotConverted"] = (q, v, _) => FilterValue.Bool(v) is true ? q.Where(l => l.Status == LeadStatus.Qualified) : null,
+        // En az bu puan (ADR-0050): "sıcak" adaylar görünümü.
+        ["minScore"] = (q, v, _) => int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out var min) ? q.Where(l => l.Score >= min) : null,
         ["receivedFrom"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(l => l.FirstReceivedAt >= time) : null,
         ["receivedBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(l => l.FirstReceivedAt < time) : null,
         ["convertedFrom"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(l => l.ConvertedAt >= time) : null,
@@ -151,7 +157,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
     [
         "number", "-number", "subject", "-subject", "requester", "-requester", "status", "-status", "priority", "-priority", "source", "-source",
         "received", "-received", "firstContact", "-firstContact", "company", "-company", "email", "-email", "phone", "-phone", "city", "-city",
-        "industry", "-industry", "productInterest", "-productInterest",
+        "industry", "-industry", "productInterest", "-productInterest", "score", "-score",
     ];
 
     protected override IOrderedQueryable<Lead> Order(IQueryable<Lead> source, string? sort) => sort switch
@@ -183,6 +189,8 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         "-industry" => source.OrderBy(l => (l.IndustryEntry!.Name ?? l.Industry) == null).ThenByDescending(l => l.IndustryEntry!.Name ?? l.Industry).ThenByDescending(l => l.FirstReceivedAt),
         "productInterest" => source.OrderBy(l => l.ProductInterest == null).ThenBy(l => l.ProductInterest).ThenByDescending(l => l.FirstReceivedAt),
         "-productInterest" => source.OrderBy(l => l.ProductInterest == null).ThenByDescending(l => l.ProductInterest).ThenByDescending(l => l.FirstReceivedAt),
+        "score" => source.OrderBy(l => l.Score).ThenByDescending(l => l.FirstReceivedAt),
+        "-score" => source.OrderByDescending(l => l.Score).ThenByDescending(l => l.FirstReceivedAt),
         _ => Order(source),
     };
 
@@ -261,6 +269,17 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
 
         await ResolveIndustryAsync(entity, values, cancellationToken);
         await EnsureReferencesVisibleAsync(entity, values, cancellationToken);
+        await ScoreAsync(entity, cancellationToken);
+    }
+
+    /// <summary>
+    /// Puan (ADR-0050) her kayıtta etkin kurallardan yeniden hesaplanır; değişiklik denetim kaydına ve olaya kayıtla aynı işlemde girer.
+    /// Kurallar iç okuyucuyla okunur: puan kuralı sunucu kararıdır, kural okuma izni gerekmez.
+    /// </summary>
+    private async Task ScoreAsync(Lead entity, CancellationToken cancellationToken)
+    {
+        var rules = await Context.Data.Set<LeadScoreRule>().AsNoTracking().Where(r => r.IsActive).ToListAsync(cancellationToken);
+        entity.Score = LeadScoring.Calculate(entity, rules);
     }
 
     /// <summary>Sektör alanı kataloğa göre çözülür (<see cref="IndustryResolution"/>); sektör seçilince katalog öncesi serbest metin temizlenir.</summary>

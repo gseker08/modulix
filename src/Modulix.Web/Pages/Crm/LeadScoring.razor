@@ -1,0 +1,314 @@
+@page "/crm/aday-puani"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject ToastService Toasts
+
+<PageTitle>Müşteri adayı puanı · Modulix</PageTitle>
+
+@* Müşteri adayı puan kuralları (ADR-0050, dilim 1). Ayar ekranı; sekmeli form kuralının dışındadır, düzenleme formu FormTabs ile çizilir.
+   Kurallar genel kayıt uçlarındadır (/api/records/crm.lead-score-rule); okumak ve yazmak crm.lead-scoring.manage ister. Puan, aday
+   kaydedilirken sunucuda hesaplanır; bu ekran yalnızca kuralları yönetir. *@
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.LeadScoringManage">
+    <PageHeader Title="Müşteri adayı puanı" Icon="trending-up"
+                Subtitle="Koşulu sağlayan her etkin kuralın puanı toplanır; toplam 0 ile 100 arasında tutulur. Puan, müşteri adayı kaydedildiğinde hesaplanır." />
+
+    <p class="text-muted">
+        Kural değişikliği mevcut müşteri adaylarına, aday bir sonraki kaydedilişinde yansır. Tahmini bütçe gizli alan olduğu için puanlanamaz.
+    </p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(form.Id is null ? "Yeni puan kuralı" : "Puan kuralını düzenle")</h2>
+            <FormTabs Title="Kural" Label="Puan kuralı bölümleri">
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="s-name">Ad *</label>
+                        <input id="s-name" class="form-control" maxlength="150" required aria-required="true" @bind="form.Name" />
+                        <FieldError Field="name" Errors="errors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="s-field">Alan *</label>
+                        <select id="s-field" class="form-select" @bind="form.Field" @bind:after="FieldChanged">
+                            <option value="">Seçin</option>
+                            @foreach (var field in LeadScoreCatalog.Fields)
+                            {
+                                <option value="@field.Key">@field.Label</option>
+                            }
+                        </select>
+                        <FieldError Field="field" Errors="errors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="s-operator">Karşılaştırma *</label>
+                        <select id="s-operator" class="form-select" @bind="form.Operator" disabled="@(SelectedField is null)">
+                            @foreach (var op in SelectedField?.Operators ?? [])
+                            {
+                                <option value="@op">@LeadScoreCatalog.OperatorLabel(op)</option>
+                            }
+                        </select>
+                        <FieldError Field="operator" Errors="errors" />
+                    </div>
+                    @if (LeadScoreCatalog.NeedsValue(form.Operator))
+                    {
+                        <div>
+                            <label class="form-label" for="s-value">Değer *</label>
+                            <input id="s-value" class="form-control" maxlength="200" @bind="form.Value" />
+                            <FieldError Field="value" Errors="errors" />
+                            <div class="form-text">Kaynak, sektör, ülke ve öncelikte kayıttaki kodu yazın (ör. ülke için TR). Karşılaştırma büyük/küçük harfe duyarlı değildir.</div>
+                        </div>
+                    }
+                    <div>
+                        <label class="form-label" for="s-points">Puan *</label>
+                        <input id="s-points" class="form-control" type="number" min="-100" max="100" step="1" @bind="form.Points" />
+                        <FieldError Field="points" Errors="errors" />
+                        <div class="form-text">-100 ile 100 arası; eksi puan uygun olmayan adayı geriye iter.</div>
+                    </div>
+                    <div class="form-check">
+                        <input id="s-active" class="form-check-input" type="checkbox" @bind="form.IsActive" />
+                        <label class="form-check-label" for="s-active">Etkin</label>
+                    </div>
+                    <div class="wide">
+                        <label class="form-label" for="s-description">Açıklama</label>
+                        <textarea id="s-description" class="form-control" rows="2" maxlength="500" @bind="form.Description"></textarea>
+                    </div>
+                </div>
+            </FormTabs>
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+            </div>
+        </form>
+    }
+
+    <div class="list-toolbar">
+        <span class="ms-auto"></span>
+        @if (form is null)
+        {
+            <button type="button" class="btn btn-primary" @onclick="NewRule"><AppIcon Name="plus" Size="16" /> Yeni puan kuralı</button>
+        }
+    </div>
+
+    @if (page is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (page.Items.Count == 0)
+    {
+        <EmptyState Icon="trending-up" Title="Henüz puan kuralı yok." Text="Kural eklenene kadar bütün müşteri adaylarının puanı 0'dır." />
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Müşteri adayı puan kuralları</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><SortHeader Label="Kural" ColumnIcon="tag" Asc="name" Desc="-name" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><AppIcon Name="filter" Size="14" /> Koşul</th>
+                    <th scope="col"><SortHeader Label="Puan" ColumnIcon="trending-up" Asc="points" Desc="-points" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><AppIcon Name="check-circle" Size="14" /> Durum</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var rule in page.Items)
+                {
+                    <tr>
+                        <td data-label="Kural" class="primary">
+                            <button type="button" class="btn btn-link p-0" @onclick="() => Edit(rule)">@WarehouseLabels.Text(rule, "name")</button>
+                            @if (WarehouseLabels.Text(rule, "description") is { Length: > 0 } description)
+                            {
+                                <div class="small text-muted">@description</div>
+                            }
+                        </td>
+                        <td data-label="Koşul">@Condition(rule)</td>
+                        <td data-label="Puan">@PointsText(WarehouseLabels.Number(rule, "points"))</td>
+                        <td data-label="Durum">
+                            @if (WarehouseLabels.Flag(rule, "isActive"))
+                            {
+                                <span class="badge stage-won">Etkin</span>
+                            }
+                            else
+                            {
+                                <span class="badge stage-cancelled">Pasif</span>
+                            }
+                        </td>
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@($"{WarehouseLabels.Text(rule, "name")} eylemleri")">
+                                <button type="button" class="dropdown-item" role="menuitem" @onclick="() => Edit(rule)">Düzenle</button>
+                                <RowMenuDelete Question="Puan kuralı silinsin mi? Mevcut adayların puanı, aday bir sonraki kaydedilişinde güncellenir." OnConfirm="() => DeleteAsync(rule)" />
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + LeadScoreCatalog.EntityKey;
+
+    private RecordPageResponse? page;
+    private RuleForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    // Sıralama sunucudadır (kayıt deposunun sort anahtarları); boş değer deponun varsayılan sırasıdır (alan, ad).
+    private string sort = "";
+
+    private LeadScoreCatalog.ScoreFieldOption? SelectedField => LeadScoreCatalog.Find(form?.Field);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.LeadScoringManage))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task SortAsync(string value)
+    {
+        sort = value;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var query = sort.Length == 0 ? "" : "&sort=" + Uri.EscapeDataString(sort);
+        var result = await Api.GetAsync<RecordPageResponse>($"{Url}?pageSize=100{query}");
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private static string Condition(RecordResponse rule)
+    {
+        var field = WarehouseLabels.Text(rule, "field");
+        var op = WarehouseLabels.Text(rule, "operator");
+        var label = LeadScoreCatalog.Find(field)?.Label ?? field;
+        return LeadScoreCatalog.NeedsValue(op)
+            ? $"{label} {LeadScoreCatalog.OperatorLabel(op)} \"{WarehouseLabels.Text(rule, "value")}\""
+            : $"{label} {LeadScoreCatalog.OperatorLabel(op)}";
+    }
+
+    private static string PointsText(int points) => points > 0 ? "+" + points : points.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private void NewRule()
+    {
+        form = new RuleForm();
+        errors = null;
+        message = null;
+    }
+
+    private void Edit(RecordResponse rule)
+    {
+        form = new RuleForm
+        {
+            Id = rule.Id,
+            Version = rule.Version,
+            Name = WarehouseLabels.Text(rule, "name"),
+            Description = WarehouseLabels.Text(rule, "description"),
+            Field = WarehouseLabels.Text(rule, "field"),
+            Operator = WarehouseLabels.Text(rule, "operator"),
+            Value = WarehouseLabels.Text(rule, "value"),
+            Points = WarehouseLabels.Number(rule, "points"),
+            IsActive = WarehouseLabels.Flag(rule, "isActive"),
+        };
+        errors = null;
+        message = null;
+    }
+
+    // Alan değişince karşılaştırma, alanın desteklediği ilk işlece döner.
+    private void FieldChanged()
+    {
+        if (form is not null && SelectedField is { } field && !field.Operators.Contains(form.Operator))
+        {
+            form.Operator = field.Operators[0];
+        }
+    }
+
+    private void Cancel()
+    {
+        form = null;
+        errors = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy || form is null)
+        {
+            return;
+        }
+
+        busy = true;
+        message = null;
+        var f = form;
+        var values = new JsonObject
+        {
+            ["name"] = Blank(f.Name),
+            ["description"] = Blank(f.Description),
+            ["field"] = Blank(f.Field),
+            ["operator"] = Blank(f.Operator),
+            ["value"] = LeadScoreCatalog.NeedsValue(f.Operator) ? Blank(f.Value) : null,
+            ["points"] = f.Points,
+            ["isActive"] = f.IsActive,
+        };
+        var result = f.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", new RecordWriteRequest(values, f.Version))
+            : await Api.PostAsync<RecordResponse>(Url, new RecordWriteRequest(values));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            message = result.FieldErrors is { Count: > 0 } ? null : result.Error;
+            return;
+        }
+
+        form = null;
+        errors = null;
+        Toasts.Success("Puan kuralı kaydedildi.");
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(RecordResponse rule)
+    {
+        var result = await Api.DeleteAsync($"{Url}/{rule.Id}?version={rule.Version}");
+        if (result.IsSuccess)
+        {
+            Toasts.Success("Puan kuralı silindi.");
+        }
+
+        message = result.IsSuccess ? null : result.Error;
+        await LoadAsync();
+    }
+
+    private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+    private sealed class RuleForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public string Field { get; set; } = string.Empty;
+
+        public string Operator { get; set; } = LeadScoreCatalog.EqualsTo;
+
+        public string? Value { get; set; }
+
+        public int Points { get; set; } = 10;
+
+        public bool IsActive { get; set; } = true;
+    }
+}

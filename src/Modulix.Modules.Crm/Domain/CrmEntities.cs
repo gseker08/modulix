@@ -847,6 +847,11 @@ public sealed class Lead : CrmEntity, IOwnedEntity
     public Guid? ConvertedContactId { get; internal set; }
 
     public Guid? ConvertedOpportunityId { get; internal set; }
+
+    /// <summary>
+    /// Otomatik puan (ADR-0050): firmanın puan kurallarından kayıtta hesaplanır, 0..100. Sistem alanıdır; istemci yazamaz.
+    /// </summary>
+    public int Score { get; internal set; }
 }
 
 /// <summary>

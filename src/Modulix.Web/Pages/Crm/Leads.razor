@@ -171,6 +171,8 @@
         new("requester", Texts.Get("crm.leads.col.requester"), "user", "requester", "-requester"),
         new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
         new("priority", Texts.Get("crm.leads.col.priority"), "alert-circle", "priority", "-priority"),
+        // Otomatik puan (ADR-0050): firmanın puan kurallarından kayıtta hesaplanır.
+        new("score", "Puan", "trending-up", "score", "-score"),
         new("source", Texts.Get("crm.company.source"), "globe", "source", "-source"),
         new("owner", Texts.Get("common.field.owner"), "user"),
         new("received", Texts.Get("crm.leads.col.received"), "calendar", "received", "-received"),
@@ -394,6 +396,7 @@
         "requester" => @<text>@Requester(lead)</text>,
         "status" => @<span class="badge stage-@lead.Status.ToLowerInvariant()">@CrmText.LeadStatusName(lead.Status)</span>,
         "priority" => @<text>@CrmText.LeadPriorityName(lead.Priority)</text>,
+        "score" => @<text>@lead.Score</text>,
         "source" => @<text>@Lookups.Label(CrmLeadLists.Source, lead.Source)</text>,
         "owner" => OwnerPart(lead),
         "received" => @<text>@CrmLabels.Time(lead.FirstReceivedAt)</text>,

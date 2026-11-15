@@ -519,6 +519,11 @@ internal sealed class LeadConfiguration : IEntityTypeConfiguration<Lead>
         builder.Property(l => l.UtmCampaign).HasMaxLength(Lead.UtmMaxLength);
         builder.Property(l => l.DisqualificationReason).HasMaxLength(ChoiceValueKeys.MaxLength);
 
+        // Otomatik puan (ADR-0050): mevcut adaylar 0 ile başlar; "puana göre" sıralama ve "en az puan" süzgeci dizini kullanır.
+        builder.Property(l => l.Score).HasDefaultValue(0);
+        builder.HasIndex(l => new { l.TenantId, l.Score });
+        builder.ToTable(t => t.HasCheckConstraint("CK_Leads_Score", "[Score] BETWEEN 0 AND 100"));
+
         builder.HasIndex(l => new { l.TenantId, l.LeadNumber }).IsUnique();
         builder.HasIndex(l => new { l.TenantId, l.Status, l.OwnerId });
         // Liste ve rapor okumaları "en yeni önce" sıralıdır (ORDER BY FirstReceivedAt DESC, Id): sıralamanın indeksle verilmesi için Id açıkça ve aynı
