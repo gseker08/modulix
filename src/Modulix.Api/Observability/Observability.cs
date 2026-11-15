@@ -27,6 +27,9 @@ public static class Observability
         // TraceId ve SpanId her log satırının kapsamına girer; denetim kaydındaki CorrelationId ile aynı değerdir.
         builder.Logging.Configure(options =>
             options.ActivityTrackingOptions = ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId | ActivityTrackingOptions.ParentId);
+        builder.Services.AddSingleton<JobMetrics>();
+        builder.Services.AddSingleton<Modulix.Core.Contracts.Diagnostics.IJobMetrics>(sp => sp.GetRequiredService<JobMetrics>());
+        builder.Services.AddScoped<TenantLogScope>();
 
         if (OtlpEndpoint(builder.Configuration) is not { } endpoint)
         {
@@ -42,7 +45,7 @@ public static class Observability
             .WithMetrics(metrics => metrics
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
-                .AddMeter(EventMetrics.MeterName))
+                .AddMeter(EventMetrics.MeterName, JobMetrics.MeterName))
             .UseOtlpExporter(OtlpProtocol(builder.Configuration), endpoint);
 
         return builder;
@@ -68,6 +71,33 @@ public static class Observability
         string.Equals(configuration[$"{SectionName}:OtlpProtocol"], "http/protobuf", StringComparison.OrdinalIgnoreCase)
             ? OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf
             : OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+}
+
+/// <summary>
+/// Tenant kapsamında (arka plan işçisi, oturumsuz uç) yazılan log satırlarına <c>TenantId</c> ekler. <see cref="Platform.TenantScopeFactory"/>
+/// kapsamı açarken başlatır; servis kapsamı kapanınca log kapsamı da kapanır. Kullanıcı kimliği boşsa (sistem işi) eklenmez.
+/// </summary>
+public sealed class TenantLogScope(ILogger<TenantLogScope> logger) : IDisposable
+{
+    private IDisposable? scope;
+
+    public void Begin(Modulix.Core.Contracts.Tenancy.TenantContext tenant)
+    {
+        scope?.Dispose();
+        var values = new Dictionary<string, object>(2) { [RequestLogScopeMiddleware.TenantIdKey] = tenant.TenantId };
+        if (tenant.UserId != Guid.Empty)
+        {
+            values[RequestLogScopeMiddleware.UserIdKey] = tenant.UserId;
+        }
+
+        scope = logger.BeginScope(values);
+    }
+
+    public void Dispose()
+    {
+        scope?.Dispose();
+        scope = null;
+    }
 }
 
 /// <summary>
