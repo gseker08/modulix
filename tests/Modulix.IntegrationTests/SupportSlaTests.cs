@@ -131,7 +131,7 @@ public class SupportSlaTests(ModulixApiFactory factory) : IClassFixture<ModulixA
 
     private async Task<SlaSchedulerRun> RunSchedulerAsync(Guid tenantId)
     {
-        var (run, skipped) = await factory.Services.GetRequiredService<SupportJobsRunner>().RunTenantAsync(tenantId, CancellationToken.None);
+        var (run, skipped) = await new SupportJobsRunner(factory.Services).RunTenantAsync(tenantId, CancellationToken.None);
         Assert.False(skipped);
         return run!;
     }
@@ -498,7 +498,7 @@ public class SupportSlaTests(ModulixApiFactory factory) : IClassFixture<ModulixA
 
         // Tekrar ve paralel çalıştırma: hiçbir eylem ya da kayıt çoğalmaz.
         Assert.Equal(new SlaSchedulerRun(0, 0), await RunSchedulerAsync(s.Tenant.Id));
-        var parallel = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => factory.Services.GetRequiredService<SupportJobsRunner>().RunTenantAsync(s.Tenant.Id, CancellationToken.None)));
+        var parallel = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => new SupportJobsRunner(factory.Services).RunTenantAsync(s.Tenant.Id, CancellationToken.None)));
         Assert.All(parallel, r => Assert.Equal(0, (r.Run?.Breaches ?? 0) + (r.Run?.Escalations ?? 0)));
         Assert.Equal(3, (await SlaAsync(lead, ticket.Id)).Single().Escalations.Count);
         Assert.Equal(2, await emails());
