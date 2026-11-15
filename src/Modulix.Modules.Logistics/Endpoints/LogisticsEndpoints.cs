@@ -65,7 +65,7 @@ internal static class LogisticsEndpoints
                 : RecordProblems.ToProblem(result.Error!);
         });
 
-        // Masrafı başka sefere aktarma (ADR-0038 bölüm 27): yalnızca iptal edilen seferin beklemedeki masrafı; izin, gerekçe ve kurallar serviste ve depoda.
+        // Masrafı başka sefere aktarma (ADR-0038 bölüm 28): yalnızca iptal edilen seferin beklemedeki masrafı; izin, gerekçe ve kurallar serviste ve depoda.
         group.MapPost("/expenses/{id:guid}/transfer", async (Guid id, TransferExpenseRequest request, ILogisticsWorkflow workflow, CancellationToken ct) =>
             ToResponse(await workflow.TransferExpenseAsync(id, request.TripId, request.Version, request.Reason, ct)));
 

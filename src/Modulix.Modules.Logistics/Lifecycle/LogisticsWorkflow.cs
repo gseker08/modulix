@@ -30,7 +30,7 @@ public interface ILogisticsWorkflow
     Task<RecordResult<RecordData>> RunAsync(string entityKey, Guid id, string action, long version, string? reason, CancellationToken cancellationToken);
 
     /// <summary>
-    /// İptal edilen seferin beklemedeki masrafını başka sefere aktarır (ADR-0038 bölüm 27). Masraf görünmüyorsa 404; masraf yazma izni yoksa 403;
+    /// İptal edilen seferin beklemedeki masrafını başka sefere aktarır (ADR-0038 bölüm 28). Masraf görünmüyorsa 404; masraf yazma izni yoksa 403;
     /// gerekçe zorunlu (422); masraf beklemede değilse ya da seferi iptal edilmemişse 409; hedef sefer yoksa ya da iptal edilmişse 422.
     /// </summary>
     Task<RecordResult<RecordData>> TransferExpenseAsync(Guid id, Guid tripId, long version, string? reason, CancellationToken cancellationToken);

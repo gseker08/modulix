@@ -662,7 +662,33 @@ Karar (kullanıcı, 15 Kasım 2026: "B + 3"). Bölüm 25'ten sonra iki soru aç�
 | `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Web.Tests` | 94/94 / 36/36 / 282/282 |
 | `... --filter "Logistics\|File"` (yerel SQL Server) | 103 geçti, 2 atlandı (önceden atlanan), 0 kırık; 2 yeni test. **Mutlu yol ve kural:** açık seferde onay gerekçesiz; iptal adımı "2 bekleyen masrafı" uyarısını verir ve engellenmez; iptalden sonra masraf ve liste `tripCancelled`; onay gerekçe ister (eylem listesi ve 422, masraf beklemede kalır), gerekçeyle onaylanır ve gerekçe masrafta kalır, ret değişmez, denetim kaydı. **Tenant izolasyonu ve yetki:** başka tenant eylemleri alamaz ve gerekçeyle de onaylayamaz (404); onay izni olmayan 403 alır ve onay eylemini görmez; seferi yönetip masrafları göremeyen kişiye iptal uyarısı sayı söylemez. Gerekçe kuralı geri alınınca kural testi kırılıyor |
 
-## 27. Masrafı başka sefere aktarma (15 Kasım 2026)
+## 27. Talep, sevkiyat, sefer ve durak belgeleri süreç kapanınca donar (15 Kasım 2026)
+
+Karar (kullanıcı, 15 Kasım 2026: "Kapanınca donsun").
+
+**Bulunan açık:** bölüm 24 masraf ve teslim kanıtını kapattı; ADR-0040 K2'ye göre güncellemesi durumla sınırlı her deponun dosya kuralı da olmalı. Taşıma talebi (yalnızca "Yeni"), sevkiyat (yük bilgisi yüklemeye kadar), sefer ve durak (yalnızca planlanırken) bu kuralı vermiyordu: tamamlanmış ya da iptal edilmiş sefere, teslim edilmiş sevkiyata ve karara bağlanmış talebe API'den her zaman belge eklenip silinebiliyordu. Arayüzde bu kayıtlar için ek paneli henüz yok.
+
+**Çözüm:** belge kaydın düzenleme kuralından **geniştir**; süreç kapanana kadar açık kalır, çünkü CMR, irsaliye ve yol belgeleri kayıt kilitlendikten sonra (yolda) gelir. Kapanınca ekleme ve silme 403 döner; okuma ve indirme sürer.
+
+| Kayıt | Belge açık | Donar |
+| --- | --- | --- |
+| Taşıma talebi | Yeni | Onaylandı, reddedildi, iptal (belge sevkiyata eklenir) |
+| Sevkiyat | Planlama bekliyor, planlandı, yükleniyor, yolda | Teslim edildi, kısmi, başarısız, iptal (teslim belgesi teslim kanıtına eklenir) |
+| Sefer | Planlanıyor, hazır, yolda | Tamamlandı, iptal |
+| Durak | Seferi açıkken | Seferi tamamlanınca ya da iptal edilince |
+
+Kod: `CargoRecordStore.IsClosed` (talep ve sevkiyat), `TripFiles.Denied` (sefer ve durak), hepsi `LogisticsRecordStore.FileWriteDeniedAsync` üzerinden (bölüm 24'teki kanca). Core'da ve arayüzde değişiklik yok; ek paneli eklendiğinde `CanWrite` aynı koşulla verilmeli.
+
+**Kapsam dışı:** sürücü kartı ve taşıyıcı anlaşmasında kayıt düzeyinde kısıt yok (tür izni yeter); değişiklik gerekmedi.
+
+### Test sonuçları (bölüm 27)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` | 111/111 / 36/36 |
+| `LogisticsRecordFileTests` (3 yeni entegrasyon testi) | **Mutlu yol ve kural:** yeni talebe belge eklenir ve silinir, onaydan sonra 403; planlanan ve yoldaki sevkiyata eklenir, teslimden sonra 403; sevkiyat teslim edilmişken açık sefere ve durağa eklenir, sefer iptal edilince ikisi de 403; donan belgeler listelenir ve indirilir. **Tenant izolasyonu:** başka tenant ekleyemez, listeleyemez, indiremez, silemez (404). **Yetki:** yalnızca okuyan açık kayda ekleyemez ve silemez (403), indirir. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |
+
+## 28. Masrafı başka sefere aktarma (15 Kasım 2026)
 
 Karar (kullanıcı, 15 Kasım 2026: "İkisi de"; önce aktarma, sonra bildirim şablonu, ayrı PR'lar). Bölüm 26'daki senaryo (3): sefer iptal edilince sevkiyatlar "Planlama bekliyor"a döner ve başka sefere atanabilir; depoda alınan yakıt gibi harcama o yeni seferde kullanılır. Masrafın seferi yalnızca oluştururken seçildiği için bugüne kadar tek yol masrafı reddedip yeni seferde yeniden girmekti (belge yeniden yüklenir, denetim izi kopar).
 
@@ -679,7 +705,7 @@ Karar (kullanıcı, 15 Kasım 2026: "İkisi de"; önce aktarma, sonra bildirim �
 
 **Kapsam dışı (bilerek):** sefer kartındaki masraf panelinden aktarma (onay kuyruğu Masraflar ekranıdır); hedef seçicide iptal edilmiş seferleri gizlemek (sunucu reddeder; arama tanımı süzgeç desteklemiyor); toplu aktarma.
 
-### Test sonuçları (bölüm 27)
+### Test sonuçları (bölüm 28)
 
 | Komut | Sonuç |
 | --- | --- |

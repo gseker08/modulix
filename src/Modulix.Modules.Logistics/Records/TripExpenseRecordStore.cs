@@ -184,7 +184,7 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
     }
 
     /// <summary>
-    /// Başka sefere aktarma (ADR-0038 bölüm 27; komut <see cref="Lifecycle.ILogisticsWorkflow.TransferExpenseAsync"/> kapıyı hedef seferle açar):
+    /// Başka sefere aktarma (ADR-0038 bölüm 28; komut <see cref="Lifecycle.ILogisticsWorkflow.TransferExpenseAsync"/> kapıyı hedef seferle açar):
     /// yalnızca iptal edilen seferin beklemedeki masrafı, iptal edilmemiş başka bir sefere taşınır. Durum değişmez (onaylayan yeni seferde karar
     /// verir); gerekçe durum gerekçesine yazılır, eski ve yeni sefer denetim kaydında görünür. Belgeler masrafa bağlıdır, onunla gider.
     /// </summary>

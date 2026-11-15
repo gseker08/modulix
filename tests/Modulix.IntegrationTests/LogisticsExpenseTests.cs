@@ -25,7 +25,7 @@ namespace Modulix.IntegrationTests;
 /// eylem listesinde görmez, okuma izni olmayan göremez). Makbuz ve fiş (bölüm 24): beklemede ve reddedilmişte eklenir ve silinir, onaylanmışta ve
 /// iptal edilmiş seferde 403; başka tenant 404; yalnızca okuyan 403. İptal edilmiş seferin masrafı (bölüm 25): düzenleme 409, karar komutları açık;
 /// başka tenant 404, okuyan 403. Gerekçeli onay ve iptal uyarısı (bölüm 26): iptal edilen seferin masrafını onaylamak gerekçe ister, iptal adımı bekleyen
-/// masraf sayısını masraf okuyana söyler; başka tenant 404, onay izni olmayan 403. Başka sefere aktarma (bölüm 27): iptal edilen seferin bekleyen
+/// masraf sayısını masraf okuyana söyler; başka tenant 404, onay izni olmayan 403. Başka sefere aktarma (bölüm 28): iptal edilen seferin bekleyen
 /// masrafı açık sefere gerekçeyle taşınır; kurallar 409/422; başka tenant 404; masraf yazma izni olmayan 403.
 /// </summary>
 public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
@@ -420,7 +420,7 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
     private static async Task<LogisticsActionDto> ActionAsync(HttpClient client, string kind, Guid id, string action) =>
         Assert.Single((await client.GetFromJsonAsync<List<LogisticsActionDto>>($"/api/logistics/{kind}/{id}/actions"))!, x => x.Action == action);
 
-    // --- iptal edilen seferin masrafını başka sefere aktarma (ADR-0038 bölüm 27) ---
+    // --- iptal edilen seferin masrafını başka sefere aktarma (ADR-0038 bölüm 28) ---
 
     /// <summary>
     /// Mutlu yol: iptal edilen seferin bekleyen masrafı (makbuzuyla) açık bir sefere aktarılır. Durum beklemede kalır, gerekçe masrafta görünür,
