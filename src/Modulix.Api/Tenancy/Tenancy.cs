@@ -137,20 +137,30 @@ public sealed class CompanyContextMiddleware(RequestDelegate next)
     }
 }
 
-/// <summary>Aktif ve doğrulanmış tenant yoksa isteği 403 ile durdurur.</summary>
-public sealed class RequireTenantFilter(HttpTenantContextAccessor tenant) : IEndpointFilter
+/// <summary>
+/// Aktif ve doğrulanmış tenant var mı; yoksa 403 yanıtı. Host içi süzgeç (<see cref="RequireTenantFilter"/>) ve modül uç
+/// noktalarının süzgeçleri (<c>Modulix.Core.Hosting</c>, ADR-0046) aynı kuralı buradan okur.
+/// </summary>
+public sealed class HttpActiveTenantGuard(HttpTenantContextAccessor tenant) : IActiveTenantGuard
 {
-    public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) =>
+    public IResult? Check() =>
         tenant.Current is not null
-            ? next(context)
-            : ValueTask.FromResult<object?>(tenant.TwoFactorRequiredTenantId is not null
+            ? null
+            : tenant.TwoFactorRequiredTenantId is not null
                 ? LocalizedProblems.Problem(
                     StatusCodes.Status403Forbidden,
                     ServerMessages.Access.TwoFactorRequiredTitle,
                     ServerMessages.Access.TwoFactorRequiredDetail,
                     new Dictionary<string, object?> { ["code"] = TenantProblems.TwoFactorRequired })
                 : LocalizedProblems.Problem(
-                    StatusCodes.Status403Forbidden, ServerMessages.Record.NoActiveTenant, ServerMessages.Access.NoActiveTenantDetail));
+                    StatusCodes.Status403Forbidden, ServerMessages.Record.NoActiveTenant, ServerMessages.Access.NoActiveTenantDetail);
+}
+
+/// <summary>Aktif ve doğrulanmış tenant yoksa isteği 403 ile durdurur.</summary>
+public sealed class RequireTenantFilter(IActiveTenantGuard guard) : IEndpointFilter
+{
+    public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) =>
+        guard.Check() is { } problem ? ValueTask.FromResult<object?>(problem) : next(context);
 }
 
 public static class TenancySetup
@@ -159,6 +169,7 @@ public static class TenancySetup
     {
         services.AddScoped<HttpTenantContextAccessor>();
         services.AddScoped<ITenantContextAccessor>(sp => sp.GetRequiredService<HttpTenantContextAccessor>());
+        services.AddScoped<IActiveTenantGuard, HttpActiveTenantGuard>();
         services.AddScoped<HttpCompanyContextAccessor>();
         services.AddScoped<ICompanyContextAccessor>(sp => sp.GetRequiredService<HttpCompanyContextAccessor>());
         services.AddSingleton<ITenantScopeFactory, TenantScopeFactory>();

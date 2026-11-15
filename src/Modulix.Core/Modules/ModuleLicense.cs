@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Modules;
+
 namespace Modulix.Core.Modules;
 
 /// <summary>
@@ -45,13 +47,10 @@ public static class EntitlementPhases
 /// Modül haklarının süre evresi (ADR-0028). Bir modül açıksa (<see cref="IModuleEntitlements.GetEnabledAsync"/>) okunabilir;
 /// yazma yalnızca <see cref="EntitlementPhase.ReadOnly"/> dışındaki evrelerde açıktır. Çekirdek her zaman yazılabilir.
 /// </summary>
-public interface IModuleLicense
+public interface IModuleLicense : IModuleWriteAccess
 {
     /// <summary>Tenant için açık modüllerin süre durumu; çekirdek ve kapalı modüller yoktur.</summary>
     Task<IReadOnlyDictionary<string, ModuleLicenseInfo>> GetAsync(Guid tenantId, CancellationToken cancellationToken);
-
-    /// <summary>Modül açıksa ve salt okunur değilse <c>true</c>.</summary>
-    Task<bool> IsWritableAsync(Guid tenantId, string moduleKey, CancellationToken cancellationToken);
 }
 
 public static class ModuleLicenseExtensions

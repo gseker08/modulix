@@ -52,26 +52,3 @@ public sealed class SessionLanguagePreferences(
             : await services.GetRequiredService<ITenantSettings>().GetValueAsync(CoreModule.SettingKeys.Language, cancellationToken);
 }
 
-/// <summary>
-/// Yanıtı yazılırken isteğin diline çevrilen sonuç: <paramref name="build"/> çeviri işleviyle asıl sonucu (problem ayrıntısı) kurar.
-/// Uç nokta süzgeçleri ve <c>ToProblem</c> gibi durumsuz yardımcılar sonucu eşzamanlı döndürür; dil yalnızca yanıt yazılırken
-/// (gerekirse) çözülür.
-/// </summary>
-public sealed class LocalizedResult(Func<Func<ServerMessage, string>, IResult> build) : IResult
-{
-    public async Task ExecuteAsync(HttpContext httpContext)
-    {
-        var services = httpContext.RequestServices;
-        var language = await services.GetRequiredService<IRequestLanguage>().GetAsync(httpContext.RequestAborted);
-        var catalog = services.GetRequiredService<ITextCatalog>();
-        await build(message => catalog.Translate(language, message)).ExecuteAsync(httpContext);
-    }
-}
-
-/// <summary>Çevrilen problem ayrıntıları.</summary>
-public static class LocalizedProblems
-{
-    /// <summary><see cref="Results.Problem(string?, string?, int?, string?, string?, IDictionary{string, object?}?)"/>, başlık ve ayrıntı isteğin dilinde.</summary>
-    public static IResult Problem(int statusCode, ServerMessage title, ServerMessage? detail = null, IDictionary<string, object?>? extensions = null) =>
-        new LocalizedResult(t => Results.Problem(statusCode: statusCode, title: t(title), detail: detail is null ? null : t(detail), extensions: extensions));
-}

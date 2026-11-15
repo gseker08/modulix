@@ -10,6 +10,7 @@ using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Communication;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Customs;
+using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Sectors;
@@ -101,6 +102,8 @@ public static class PersistenceSetup
         // Modül hakları ve izinler; ModuleCatalog'u host kaydeder (AddModulixModules).
         services.AddScoped<IModuleEntitlements, ModuleEntitlements>();
         services.AddScoped<IModuleLicense, ModuleLicense>();
+        // Uç nokta süzgeçlerinin (Core.Hosting) yazılabilirlik sorusu; aynı kapsamdaki IModuleLicense örneğini verir.
+        services.AddScoped<IModuleWriteAccess>(provider => provider.GetRequiredService<IModuleLicense>());
         services.AddScoped<IEntitlementResolver, Modulix.Infrastructure.Platform.EntitlementResolver>();
         services.AddScoped<IPlanAdministration, Modulix.Infrastructure.Platform.PlanAdministration>();
         services.AddScoped<ILicenseApplier, Modulix.Infrastructure.Platform.LicenseApplier>();
