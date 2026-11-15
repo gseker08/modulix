@@ -1,7 +1,9 @@
+using Modulix.Api.Localization;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;

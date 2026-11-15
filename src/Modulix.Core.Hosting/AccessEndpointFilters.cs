@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Tenancy;
 
@@ -23,7 +24,7 @@ public static class AccessEndpointFilters
             var access = context.HttpContext.RequestServices.GetRequiredService<ICurrentAccess>();
             return await access.HasPermissionAsync(permission, context.HttpContext.RequestAborted)
                 ? await next(context)
-                : Forbidden($"Bu işlem için '{permission}' izni gerekir.");
+                : Forbidden(ServerMessages.Access.PermissionRequired(permission));
         });
         return builder;
     }
@@ -44,7 +45,7 @@ public static class AccessEndpointFilters
             var granted = await access.GetPermissionsAsync(context.HttpContext.RequestAborted);
             return permissions.Any(granted.Contains)
                 ? await next(context)
-                : Forbidden($"Bu işlem için şu izinlerden biri gerekir: {string.Join(", ", permissions)}.");
+                : Forbidden(ServerMessages.Access.AnyPermissionRequired(string.Join(", ", permissions)));
         });
         return builder;
     }
@@ -65,14 +66,14 @@ public static class AccessEndpointFilters
             var access = services.GetRequiredService<ICurrentAccess>();
             if (!await access.IsModuleEnabledAsync(moduleKey, context.HttpContext.RequestAborted))
             {
-                return Forbidden($"'{moduleKey}' modülü bu tenant için açık değil.");
+                return Forbidden(ServerMessages.Access.ModuleDisabled(moduleKey));
             }
 
             if (!IsReadOnlySafe(context.HttpContext.Request)
                 && !await services.GetRequiredService<IModuleWriteAccess>().IsWritableAsync(
                     services.GetRequiredService<ITenantContextAccessor>().Current!.TenantId, moduleKey, context.HttpContext.RequestAborted))
             {
-                return Forbidden($"'{moduleKey}' modülünün lisans süresi doldu; modül salt okunur. Yöneticinizle iletişime geçin.");
+                return Forbidden(ServerMessages.Access.ModuleReadOnly(moduleKey));
             }
 
             return await next(context);
@@ -97,8 +98,8 @@ public static class AccessEndpointFilters
         HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method) || HttpMethods.IsOptions(request.Method)
         || request.Path.Value?.TrimEnd('/').EndsWith("/preview", StringComparison.OrdinalIgnoreCase) == true;
 
-    private static IResult Forbidden(string detail) =>
-        Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Yetkiniz yok.", detail: detail);
+    private static IResult Forbidden(ServerMessage detail) =>
+        LocalizedProblems.Problem(StatusCodes.Status403Forbidden, ServerMessages.Access.ForbiddenTitle, detail);
 }
 
 /// <summary><see cref="AccessEndpointFilters.PermissionCheckedInService{TBuilder}"/> işaretinin uç nokta metadata'sı.</summary>
