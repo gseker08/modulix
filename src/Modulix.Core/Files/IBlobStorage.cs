@@ -19,12 +19,21 @@ public interface IBlobStorage
     /// <summary>Tenant'ın bütün içeriğini <paramref name="directory"/> altına, anahtar adıyla kopyalar (tenant dışa aktarma). Kopyalanan dosya sayısını döner.</summary>
     Task<int> ExportTenantAsync(Guid tenantId, string directory, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Tenant'ın içeriklerini anahtar ve son yazılma zamanıyla listeler (yetim içerik temizliği, ADR-0040 dilim 3). Yarım yazılmış (geçici) içerik ve
+    /// anahtar biçimine uymayan dosya listelenmez.
+    /// </summary>
+    IAsyncEnumerable<StoredBlob> ListAsync(Guid tenantId, CancellationToken cancellationToken);
+
     /// <summary>Tenant'ın bütün içeriğini siler (tenant silme). Silinen dosya sayısını döner.</summary>
     Task<int> DeleteTenantAsync(Guid tenantId, CancellationToken cancellationToken);
 
     /// <summary>Deponun kullanılabilir olduğunu doğrular (yerel kök oluşturulabilir, kova erişilebilir); değilse hata fırlatır. <c>/health/ready</c> kullanır.</summary>
     Task CheckAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>Depodaki bir içerik: anahtarı ve son yazılma zamanı.</summary>
+public sealed record StoredBlob(string Key, DateTimeOffset LastModified);
 
 /// <summary>Dosya içeriğinin nerede tutulacağı.</summary>
 public enum BlobStorageProvider
@@ -81,4 +90,13 @@ public sealed class S3StorageOptions
 
     /// <summary>Yol biçimli adres (<c>uç-nokta/kova/anahtar</c>). Boşsa <see cref="ServiceUrl"/> verildiğinde açık, AWS'de kapalı.</summary>
     public bool? ForcePathStyle { get; set; }
+}
+
+/// <summary>
+/// Yetim içerik temizliği (ADR-0040 dilim 3): aktif tenant'ın deposunda üst verisi olmayan ve <c>grace</c>'ten eski içerikleri siler. Bekleme süresi,
+/// içeriği yazılmış ama üst verisi henüz kaydedilmemiş yüklemeyi (önce içerik, sonra üst veri) korur. Silinen içerik sayısını döner.
+/// </summary>
+public interface IOrphanBlobSweeper
+{
+    Task<int> SweepAsync(TimeSpan grace, CancellationToken cancellationToken);
 }

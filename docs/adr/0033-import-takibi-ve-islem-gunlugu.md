@@ -207,6 +207,6 @@ Bölüm 6'daki "kalıcı saklanmaz" ve Dilim 2'deki "bellekte bir saat" kararı 
 
 - **Şifreli:** içerik Data Protection ile şifrelenir (anahtar halkası veritabanında, bütün örnekler paylaşır). Amaç tenant'a bağlıdır: bir tenant'ın rapor dosyası başka tenant'ın deposuna kopyalansa da açılamaz. Koruma süre sınırlıdır; depodan silinmeyi kaçıran rapor da bir saat sonra açılamaz.
 - **Ömür bir saat:** koşu, rapor yazılmadan önce `ImportRun.ErrorReportExpiresAt` ile işaretlenir (migration `ImportErrorReportExpiry`, null'lanabilir tek kolon ve süzgeçli indeks; geriye uyumlu). `ImportReportCleanupWorker` 15 dakikada bir (`ImportReportCleanup:IntervalMinutes`) süresi dolan raporları siler ve işareti kaldırır. Askıdaki firmalar da taranır.
-- **Anahtar** koşudan türetilir (`ImportErrorReports.Key`), ayrıca saklanmaz. Depoya yazılamazsa koşu bozulmaz, işaret kaldırılır ve indirme 410 döner.
+- **Anahtar** koşudan türetilir (`ImportErrorReports.Key`), ayrıca saklanmaz. Depoya yazılamazsa koşu bozulmaz, işaret kaldırılır ve indirme 410 döner. Rapor `StoredFile` kaydı taşımadığı için ADR-0040 yetim içerik süpürücüsü de (`FileCleanup:OrphanGraceHours`, en az bir saat) onu ömrü bittikten sonra siler; bu ikinci bir güvenlik ağıdır.
 - Veritabanına satır değeri yazılmaması ve raporun yalnızca yükleyene verilmesi değişmedi.
 - **Bedeli:** kişisel veri en çok bir saat (+ temizlik aralığı) şifreli olarak depoda durur. Tenant dışa aktarması o anda var olan raporu şifreli dosya olarak içerir (firma açamaz); tenant silme raporu da siler.

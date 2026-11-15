@@ -87,6 +87,10 @@ adımları (UPDATE / INSERT...SELECT) RLS yüzünden oturum değeri olmadan 0 sa
 kapatıp açar (`ALTER SECURITY POLICY [core].[TenantIsolationPolicy] WITH (STATE = OFF/ON)`, OpportunityManagement
 örneği).
 
+Bu kural CI'da denetlenir: migration'a dokunan PR'da `.github/workflows/migration-compat.yml` bir önceki sürümün
+entegrasyon testlerini yeni şemaya karşı koşar (README > CI). Kırmızı sonuç, eski sürümün dağıtım sırasında yeni şemada
+çalışamayacağı anlamına gelir.
+
 Yeni tenant tablosu eklerken: migration'a girer ve RLS politikasına eklenir (`TenantIsolationSql.AddTable`),
 aksi halde `TableInventoryTests` kırılır.
 

@@ -50,3 +50,13 @@ public interface IFileLimits
 {
     long MaxFileBytes { get; }
 }
+
+/// <summary>
+/// Silinen kaydın dosyaları (ADR-0040 dilim 3). Kaydın bütün dosyalarının üst verisini siler ve her biri için denetim kaydı yazar (kaynak: arka plan işi,
+/// neden: bağlı kayıt silindi). İçerik burada silinmez: çağıran açık bir veritabanı işlemi içindedir ve işlem geri alınırsa içerik geri gelmezdi;
+/// üst verisi kalmayan içeriği yetim içerik temizliği siler. Tekrar çağrılması güvenlidir (silinecek dosya kalmamışsa 0).
+/// </summary>
+public interface IRecordFileCleanup
+{
+    Task<int> RemoveForRecordAsync(RecordRef record, CancellationToken cancellationToken);
+}

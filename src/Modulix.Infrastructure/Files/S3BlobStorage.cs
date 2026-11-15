@@ -125,6 +125,29 @@ internal sealed class S3BlobStorage : IBlobStorage, IDisposable
         return count;
     }
 
+    public async IAsyncEnumerable<StoredBlob> ListAsync(Guid tenantId, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        ListObjectsV2Request request = new() { BucketName = _bucket, Prefix = TenantPrefix(tenantId) };
+        ListObjectsV2Response response;
+        do
+        {
+            response = await _client.ListObjectsV2Async(request, cancellationToken);
+            foreach (S3Object item in response.S3Objects ?? [])
+            {
+                string name = item.Key[(item.Key.LastIndexOf('/') + 1)..];
+                if (BlobKeys.IsValid(name))
+                {
+                    yield return new StoredBlob(name, item.LastModified is { } modified
+                        ? new DateTimeOffset(DateTime.SpecifyKind(modified, DateTimeKind.Utc))
+                        : DateTimeOffset.UtcNow);
+                }
+            }
+
+            request.ContinuationToken = response.NextContinuationToken;
+        }
+        while (response.IsTruncated == true);
+    }
+
     public async Task<int> DeleteTenantAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         // Önce bütün anahtarlar toplanır: listeleme sürerken silmek sayfalamayı kaydırabilir.
