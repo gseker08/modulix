@@ -101,14 +101,14 @@ public static class LogisticsAccess
     ];
 
     /// <summary>
-    /// Masraf düzenlenebilir mi (ADR-0038 bölüm 25): beklemede ya da reddedilmiş masraf ve iptal edilmemiş sefer. Arayüz yalnızca düğmeyi gizler;
-    /// kararı sunucu verir. Sefer durumu bilinmiyorsa (boş) yalnızca masrafın durumuna bakılır.
+    /// Masraf düzenlenebilir mi (ADR-0038 bölüm 25): beklemede ya da reddedilmiş masraf ve iptal edilmemiş sefer (masraf kaydının <c>tripCancelled</c>
+    /// alanı). Arayüz yalnızca düğmeyi gizler; kararı sunucu verir.
     /// </summary>
-    public static bool ExpenseEditable(string? expenseStatus, string? tripStatus) =>
-        expenseStatus is "pending" or "rejected" && tripStatus != "cancelled";
+    public static bool ExpenseEditable(string? expenseStatus, bool tripCancelled) =>
+        expenseStatus is "pending" or "rejected" && !tripCancelled;
 
     /// <summary>Masrafın makbuzu ve fişi eklenip silinebilir mi (ADR-0038 bölüm 24): kaydın düzenleme kuralıyla aynı (<see cref="ExpenseEditable"/>).</summary>
-    public static bool ExpenseFilesWritable(string? expenseStatus, string? tripStatus) => ExpenseEditable(expenseStatus, tripStatus);
+    public static bool ExpenseFilesWritable(string? expenseStatus, bool tripCancelled) => ExpenseEditable(expenseStatus, tripCancelled);
 
     /// <summary>
     /// Teslim kanıtının fotoğrafı ve imzası eklenip silinebilir mi (ADR-0038 bölüm 24): sevkiyatın seferi açıkken; sefer tamamlanınca ya da iptal
@@ -170,8 +170,11 @@ public static class LogisticsAccess
     ];
 }
 
-/// <summary>Talep ve sevkiyat iş akışı eylemi (ADR-0038 K7): yapılabilir mi, değilse neden; gerekçe ister mi; yıkıcı mı (iptal, ret).</summary>
-public sealed record LogisticsActionDto(string Action, string Label, bool Allowed, string? Message, bool RequiresReason, bool Destructive);
+/// <summary>
+/// Talep ve sevkiyat iş akışı eylemi (ADR-0038 K7): yapılabilir mi, değilse neden; gerekçe ister mi; yıkıcı mı (iptal, ret). Uyarı eylemi engellemez,
+/// sonucunu anlatır; arayüz gerekçe ya da onay adımında gösterir (ADR-0038 bölüm 26).
+/// </summary>
+public sealed record LogisticsActionDto(string Action, string Label, bool Allowed, string? Message, bool RequiresReason, bool Destructive, string? Warning = null);
 
 /// <summary>İş akışı eylemi isteği; sürüm eşzamanlı değişikliği yakalar (409).</summary>
 public sealed record RunLogisticsActionRequest(string Action, long Version, string? Reason);

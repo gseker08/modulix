@@ -634,3 +634,30 @@ Bölüm 24'te kapsam dışı bırakılan açık. İptal edilen sefere masraf aç
 | `dotnet build` | Hatasız (SDK 10.0.404) |
 | `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Web.Tests` | 94/94 / 36/36 / 282/282 |
 | `... --filter "Logistics"` (yerel SQL Server) | 54/54 (2 yeni). **Mutlu yol ve kural:** açık seferin bekleyen masrafı düzenlenir; sefer iptal edilince bekleyen ve reddedilmiş masrafın düzenlemesi 409 ve değer değişmez; bekleyen reddedilir, reddedilen yeniden gönderilir. **Tenant izolasyonu ve yetki:** iptal edilmiş seferin masrafında başka tenant 404, yalnızca okuyan 403 (kural iletisi sızmaz). Kural kodu geri alınınca kural testi kırılıyor |
+
+## 26. İptal edilen seferin bekleyen masrafı: uyarı ve gerekçeli onay (15 Kasım 2026)
+
+Karar (kullanıcı, 15 Kasım 2026: "B + 3"). Bölüm 25'ten sonra iki soru açıktı: sefer iptal edilince bekleyen masraflar kendiliğinden reddedilsin mi, iptal edilen seferin masrafı onaylanabilsin mi.
+
+**Senaryolar:** sefer yalnızca Planlanıyor ya da Hazır durumdayken iptal edilir (yola çıkmış sefer iptal edilemez), yani masraf hep sefer başlamadan girilmiştir. Bekleyen masraf (1) gerçekten harcanmış olabilir: depoda yakıt, peşin geçiş ücreti, harcırah avansı; (2) tahmini girilmiş olup hiç harcanmamış olabilir; (3) yakıt gibi, sevkiyatlar başka sefere atanınca o seferde kullanılmış olabilir; (4) depoda yazılan ceza gibi nadir bir gerçek maliyet olabilir.
+
+**Reddedilen seçenekler:**
+- **Otomatik ret:** yalnızca (2)'de doğru; diğerlerinde gerçek harcamayı sessizce reddeder. Seferi iptal eden (sefer yazma izni) masraf onay iznine sahip olmayabilir; onun adına karar vermek yetki modeline aykırı.
+- **Onay yasağı:** (1) ve (4)'teki gerçek maliyeti kaybettirir.
+- **İptali engellemek** ("önce masrafları karara bağlayın"): onaylayan yokken operasyonu tıkar.
+
+**Çözüm:**
+- **Uyarı (B):** eylem listesine isteğe bağlı `warning` alanı eklendi (`LogisticsActionState`/`LogisticsActionDto`, geriye uyumlu). Sefer iptal eyleminde, seferin bekleyen masrafı varsa "Bu seferin N bekleyen masrafı var…" uyarısı gelir; sayı yalnızca masraf okuma izni olana söylenir. Eylem çubuğu uyarıyı gerekçe adımında gösterir; iptal engellenmez.
+- **Masraf kaydında `tripCancelled`:** hesaplanan alan. Masrafın kendi kuralını belirlediği için masraf alanıdır (düzenleme, belge, gerekçeli onay); seferin başka bilgisi açılmaz. Değer `LogisticsRecordStore.PrepareAsync` kancasıyla, liste sayfası için tek sorguda yüklenir (İK deposundaki desen). Masraflar ekranı satırda ve ayrıntıda "Sefer iptal edildi" rozeti gösterir (sefer durumu rozet tonu); ekran artık seferi ayrıca okumaz (bölüm 24'teki ek istek kalktı).
+- **Gerekçeli onay (3):** iptal edilen seferin masrafını onaylamak gerekçe ister (eylem listesinde `requiresReason` dinamik, gerekçesiz 422). Gerekçe masrafın durum gerekçesine (`statusReason`) ve denetim kaydına yazılır; ayrıntıda "Onay gerekçesi" olarak görünür. Ret zaten gerekçe istiyordu; açık seferde onay değişmedi. Firma onayı genel onay sürecine bağladıysa (ADR-0027) o kapı da sorulmaya devam eder.
+- Onaylanan masraf, geliri olmayan iptal edilmiş seferde kalır; bu "iptal maliyeti" olarak doğru bilgidir.
+
+**Kapsam dışı (bilerek):** masrafı başka sefere aktarma komutu (senaryo 3; gerçek ihtiyaçta, denetim kayıtlı ayrı iş akışı olarak); sefer iptalinde onaylayana bildirim şablonu (firma kural olarak kurabilir: `logistics.trip.updated` olayı, durum = iptal koşuluyla). **Açık ve koyu tema ekran görüntüsü alınmadı** (yeni ekran yok; var olan rozet ve uyarı sınıfları kullanıldı).
+
+### Test sonuçları (bölüm 26)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet build` | Hatasız (SDK 10.0.404) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Web.Tests` | 94/94 / 36/36 / 282/282 |
+| `... --filter "Logistics\|File"` (yerel SQL Server) | 103 geçti, 2 atlandı (önceden atlanan), 0 kırık; 2 yeni test. **Mutlu yol ve kural:** açık seferde onay gerekçesiz; iptal adımı "2 bekleyen masrafı" uyarısını verir ve engellenmez; iptalden sonra masraf ve liste `tripCancelled`; onay gerekçe ister (eylem listesi ve 422, masraf beklemede kalır), gerekçeyle onaylanır ve gerekçe masrafta kalır, ret değişmez, denetim kaydı. **Tenant izolasyonu ve yetki:** başka tenant eylemleri alamaz ve gerekçeyle de onaylayamaz (404); onay izni olmayan 403 alır ve onay eylemini görmez; seferi yönetip masrafları göremeyen kişiye iptal uyarısı sayı söylemez. Gerekçe kuralı geri alınınca kural testi kırılıyor |
