@@ -88,7 +88,8 @@ public static class PersistenceSetup
             options.UseModulixSqlServer(appConnectionString)
                 .AddInterceptors(
                     new TenantSessionContextInterceptor(tenantAccessor),
-                    new AccessCacheInvalidator(serviceProvider.GetRequiredService<AccessCache>()));
+                    new AccessCacheInvalidator(serviceProvider.GetRequiredService<AccessCache>()),
+                    DatabaseCommandDiagnostics.Instance);
         });
 
         services.AddScoped<IMembershipDirectory, MembershipDirectory>();
