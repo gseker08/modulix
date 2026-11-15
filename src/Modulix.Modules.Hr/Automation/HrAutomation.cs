@@ -91,7 +91,7 @@ public static class HrAutomation
             new("hr.survey.created", HrModule.Entities.Survey, DomainEventTypes.RecordCreated, "Anket hazırlandı"),
             new("hr.survey.updated", HrModule.Entities.Survey, DomainEventTypes.RecordUpdated, "Anket güncellendi, yanıta açıldı ya da kapandı"),
             new("hr.blog-post.created", HrModule.Entities.BlogPost, DomainEventTypes.RecordCreated, "Blog yazısı yazıldı"),
-            new("hr.blog-post.updated", HrModule.Entities.BlogPost, DomainEventTypes.RecordUpdated, "Blog yazısı güncellendi ya da yayınlandı"),
+            new("hr.blog-post.updated", HrModule.Entities.BlogPost, DomainEventTypes.RecordUpdated, "Blog yazısı güncellendi, onaya gönderildi, geri çevrildi ya da yayınlandı"),
             new("hr.photo-album.created", HrModule.Entities.PhotoAlbum, DomainEventTypes.RecordCreated, "Fotoğraf albümü açıldı"),
             new("hr.photo-album.updated", HrModule.Entities.PhotoAlbum, DomainEventTypes.RecordUpdated, "Fotoğraf albümü güncellendi ya da yayınlandı"),
         ],
@@ -176,6 +176,15 @@ public static class HrAutomation
             },
             new(HrModule.Entities.BlogPost, "title", "Başlık", AutomationFieldType.Text),
             new(HrModule.Entities.BlogPost, "isPublished", "Yayında", AutomationFieldType.Boolean),
+            new(HrModule.Entities.BlogPost, "status", "Durum", AutomationFieldType.Choice)
+            {
+                Options =
+                [
+                    new(BlogPost.Statuses.Draft, "Taslak"), new(BlogPost.Statuses.Submitted, "Onay bekliyor"),
+                    new(BlogPost.Statuses.Returned, "Geri çevrildi"), new(BlogPost.Statuses.Published, "Yayında"),
+                ],
+            },
+            new(HrModule.Entities.BlogPost, "authorUserId", "Yazan", AutomationFieldType.Lookup) { LookupKey = NotifyRecipientLookup },
             new(HrModule.Entities.PhotoAlbum, "title", "Başlık", AutomationFieldType.Text),
             new(HrModule.Entities.PhotoAlbum, "isPublished", "Yayında", AutomationFieldType.Boolean),
         ],

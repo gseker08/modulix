@@ -7,7 +7,7 @@ namespace Modulix.Modules.Hr.Automation;
 /// <summary>
 /// İK'nın başlangıç kuralı şablonları (ADR-0027 Dilim 3b; ADR-0042 bölüm 18). Firma "kullan" deyince şablon taslak kural olur (çalışmaz); yayın ve
 /// açma firmanın kararıdır. Bildirim şablonları alıcıyı kaydın kullanıcı alanına bağlar (sorumlu, onaylayan, zimmetli); alıcı kaydı göremiyorsa Core
-/// bildirimi göndermez. Süreç şablonları çalışana işe giriş ya da işten çıkış süreci başlatır; bildirim ya da e-posta göndermez, kayıt değiştirmez.
+/// bildirimi göndermez; alıcısı kayıtta olmayan şablonda (blog onayı) alıcıyı firma taslakta seçer. Süreç şablonları çalışana işe giriş ya da işten çıkış süreci başlatır; bildirim ya da e-posta göndermez, kayıt değiştirmez.
 /// </summary>
 public static class HrAutomationTemplates
 {
@@ -25,11 +25,18 @@ public static class HrAutomationTemplates
 
     public const string OffboardingOnTermination = "hr.offboarding-on-termination";
 
+    public const string BlogAwaitingReview = "hr.blog-review-notify";
+
+    public const string BlogReturned = "hr.blog-returned-notify";
+
+    public const string BlogPublished = "hr.blog-published-notify";
+
     private const string Task = HrModule.Entities.ChecklistTask;
     private const string Leave = HrModule.Entities.LeaveRequest;
     private const string Expense = HrModule.Entities.ExpenseClaim;
     private const string Assignment = HrModule.Entities.AssetAssignment;
     private const string Employee = HrModule.Entities.Employee;
+    private const string Blog = HrModule.Entities.BlogPost;
 
     private static string Var(string entity, string field) => "{{" + entity + "." + field + "}}";
 
@@ -110,6 +117,38 @@ public static class HrAutomationTemplates
                 new StatusTransitionTrigger($"{Employee}.status", null, Domain.Employee.Statuses.Terminated),
                 null,
                 [StartChecklist(Checklists.Kinds.Offboarding, $"{Employee}.terminationDate")])),
+
+        // Blog onay akışı (bölüm 27/28): onaya gelen yazıyı seçilen yöneticiye, kararı yazara bildirir.
+        new(
+            BlogAwaitingReview,
+            "Blog yazısı onaya gönderilince bildir",
+            "Çalışan yazısını onaya gönderince seçtiğiniz kişiye (blog yöneten) bildirim yazar. Kullandıktan sonra bildirimin kime gideceğini seçin.",
+            Blog,
+            new AutomationDefinition(
+                new StatusTransitionTrigger($"{Blog}.status", null, BlogPost.Statuses.Submitted),
+                null,
+                [new AutomationActionStep("bildir", HrAutomation.NotifyAction, new JsonObject { ["title"] = $"Onay bekleyen blog yazısı: {Var(Blog, "title")}" })]))
+        {
+            ToComplete = [new AutomationTemplateBlank("bildir", "recipientId")],
+        },
+        new(
+            BlogReturned,
+            "Blog yazısı geri çevrilince yazara bildir",
+            "Yöneten yazıyı geri çevirince yazarına bildirim yazar; gerekçe yazının içinde görülür.",
+            Blog,
+            new AutomationDefinition(
+                new StatusTransitionTrigger($"{Blog}.status", null, BlogPost.Statuses.Returned),
+                new ConditionLeaf($"{Blog}.authorUserId", AutomationOperator.IsNotEmpty, []),
+                [Notify($"{Blog}.authorUserId", $"Yazınız düzeltme için geri çevrildi: {Var(Blog, "title")}")])),
+        new(
+            BlogPublished,
+            "Blog yazısı yayınlanınca yazara bildir",
+            "Yazı yayınlanınca (onayla ya da doğrudan) yazarına bildirim yazar.",
+            Blog,
+            new AutomationDefinition(
+                new StatusTransitionTrigger($"{Blog}.status", null, BlogPost.Statuses.Published),
+                new ConditionLeaf($"{Blog}.authorUserId", AutomationOperator.IsNotEmpty, []),
+                [Notify($"{Blog}.authorUserId", $"Yazınız yayınlandı: {Var(Blog, "title")}")])),
     ];
 
     private static AutomationActionStep Notify(string recipientField, string title) =>
