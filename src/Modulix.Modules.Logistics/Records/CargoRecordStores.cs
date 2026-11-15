@@ -174,6 +174,18 @@ internal abstract class CargoRecordStore<TEntity>(LogisticsStoreContext context)
 
     protected override Task BeforeDeleteAsync(TEntity entity, CancellationToken cancellationToken) =>
         throw new RecordConflictException(DeleteMessage);
+
+    /// <summary>
+    /// Belgeler süreç kapanana kadar eklenir ve silinir (ADR-0038 bölüm 27); kayıt daha erken düzenlenemez hale gelse de belge (sipariş, irsaliye, CMR)
+    /// süreç boyunca gelir. Kapanınca dosyalar donar.
+    /// </summary>
+    protected override Task<string?> FileWriteDeniedAsync(TEntity entity, CancellationToken cancellationToken) =>
+        Task.FromResult(IsClosed(entity) ? ClosedFilesMessage : null);
+
+    /// <summary>Kayıt kapandı mı (talep: karar verildi ya da iptal; sevkiyat: teslim sonucu girildi ya da iptal).</summary>
+    protected abstract bool IsClosed(TEntity entity);
+
+    protected abstract string ClosedFilesMessage { get; }
 }
 
 /// <summary>
@@ -193,6 +205,10 @@ internal sealed class TransportRequestRecordStore(LogisticsStoreContext context)
     protected override string LockedMessage => "Onaylanan, reddedilen ya da iptal edilen talep değiştirilemez.";
 
     protected override string DeleteMessage => "Taşıma talebi silinmez; gerekirse iptal edin.";
+
+    protected override bool IsClosed(TransportRequest entity) => entity.Status != TransportRequest.Statuses.New;
+
+    protected override string ClosedFilesMessage => "Karara bağlanan ya da iptal edilen talebin belgeleri değiştirilemez; belgeyi sevkiyata ekleyin.";
 
     protected override IReadOnlyList<RecordField<TransportRequest>> Fields { get; } =
     [
@@ -242,6 +258,11 @@ internal sealed class ShipmentRecordStore(LogisticsStoreContext context) : Cargo
     protected override string LockedMessage => "Yüklemesi başlamış, teslim edilmiş ya da iptal edilmiş sevkiyatın yük bilgisi değiştirilemez.";
 
     protected override string DeleteMessage => "Sevkiyat silinmez; gerekirse iptal edin.";
+
+    protected override bool IsClosed(Shipment entity) => entity.Status is Shipment.Statuses.Delivered or Shipment.Statuses.Partial
+        or Shipment.Statuses.Failed or Shipment.Statuses.Cancelled;
+
+    protected override string ClosedFilesMessage => "Teslim sonucu girilen ya da iptal edilen sevkiyatın belgeleri değiştirilemez; teslim belgesini teslim kanıtına ekleyin.";
 
     protected override string? CreateBlockedMessage => Context.Gate.IsOpen ? null : "Sevkiyat yalnızca taşıma talebi onaylanınca oluşur.";
 
