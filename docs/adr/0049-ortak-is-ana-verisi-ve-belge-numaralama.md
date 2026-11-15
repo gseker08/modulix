@@ -1,6 +1,6 @@
 # ADR-0049: Ortak iş ana verisi ve belge numaralama
 
-- **Durum:** Dilim 1 (belge numaralama) 15 Kasım 2026'da teslim edildi (PR #395). Dilim 6a (firmanın tatil listesi ve takvim hesabı Core'da) 15 Kasım 2026'da teslim edildi (PR #397). Dilim 6b (destek SLA takvimi firmanın listesini uygular) 15 Kasım 2026'da teslim edilir. Diğer dilimler öneridir; "Açık kararlar" yanıtlanmadan kodlanmaz.
+- **Durum:** Dilim 1 (belge numaralama) 15 Kasım 2026'da teslim edildi (PR #395). Dilim 6a (firmanın tatil listesi ve takvim hesabı Core'da) 15 Kasım 2026'da teslim edildi (PR #397). Dilim 6b (destek SLA takvimi firmanın listesini uygular) ve 6c (firmanın haftalık mesai saatleri, firma iş takvimi) 15 Kasım 2026'da teslim edilir. Diğer dilimler öneridir; "Açık kararlar" yanıtlanmadan kodlanmaz.
 - **Kaynak:** [Core mimari değerlendirmesi](../core-mimari-degerlendirme-2026-11.md) H4, H5, H6; yol haritası Ç8.1 (seri yönetimi).
 
 > Numara notu: 15 Kasım 2026'da `main`'de en yüksek numara 0047'ydi, 0048 açık PR #394'te kullanılıyordu. Birleştirmeden önce numara yeniden kontrol edilmeli.
@@ -61,7 +61,13 @@ Tek Core takvimi (mesai saatleri + tatil günleri, tenant başına; ileride şir
 - **Seçenek:** SLA takviminde `UseTenantHolidays` (`support.SlaCalendars`). Yeni takvimde açık; seçenek gelmeden önce açılmış takvimler kapalı başlar (migration varsayılanı), böylece mevcut hedefler değişmez.
 - **Birleştirme:** `TenantHolidays.Apply` (`Core.Contracts.Calendar`, saf hesap). Takvimin kendi tatili aynı günde önceliklidir; firma listesindeki tam gün günü kapatır, yarım gün o günün ilk çalışma penceresinin başından 13:00'e kadar açık bırakır (o gün pencere yoksa kapalı); 7/24 takvime uygulanmaz. 13:00 bugün sabittir (Türkiye'de arife öğleden sonra tatil); firma ayarı olması gerekirse ayrı karar.
 - **Anlık görüntü:** liste, SLA örneği açılırken (ve yeniden seçimde) bugünden bir ay geri ile yaklaşık üç yıl ileri arasındaki günlerle görüntüye girer; liste sonradan değişse de açık örnek kendi görüntüsüyle yaşar.
-- **Kalan (dilim 6c ve sonrası):** firmanın haftalık mesai saatleri (bugün İK hafta sonunu sabit cumartesi–pazar sayar; onay eskalasyonu ve lojistik teslim süresi iş saatine geçmeden önce bu tanım gerekir), onay eskalasyonu ve teslim süresinin takvime geçmesi, platformun hazır tatil kataloğu (açık karar 3), `hr.Holidays` tablosunun kaldırılması.
+
+#### Dilim 6c: firmanın haftalık mesai saatleri (teslim edildi)
+
+- **Ayarlar (Core, "Çalışma takvimi" grubu):** `core.calendar.work-days` (Pazartesi–Cuma varsayılan; Pazartesi–Cuma + Cumartesi yarım gün; Pazartesi–Cumartesi; Pazar–Perşembe) ve `core.calendar.work-hours` (hazır aralıklar, varsayılan 09:00–18:00). Seçenekli ayar oldukları için mevcut ayar ekranında görünür; serbest saat girişi yoktur (çapraz doğrulama gerektirir, ihtiyaç doğarsa ayrı dilim). Seçenekler ve çözümleme `WorkWeek` (`Core.Contracts.Calendar`); bozuk değer varsayılana düşer.
+- **Sözleşme:** `ITenantWorkCalendar`: `GetWeekAsync` (saat dilimi + haftalık mesai) ve `GetAsync(from, to)` (tatil listesi uygulanmış). Uygulama ayar okuyucusunu çağrı anında çözer (kayıt depolarına verildiği için kurucuda alınırsa servis döngüsü oluşur).
+- **İK:** izin gün sayısı firmanın çalışma günlerine göre (`WorkWeek.DayWorth`: penceresi olmayan gün 0, haftanın en uzun gününün %60'ından kısa gün yarım, diğerleri 1). Varsayılan ayarla sonuç önceki sabit cumartesi–pazar kuralıyla aynıdır; açılmış taleplerin gün sayısı değişmez.
+- **Kalan:** onay eskalasyonunun iş saatine geçmesi (süreç başına seçenek; bugün adım açılışından itibaren duvar saati), lojistik teslim süresi, platformun hazır tatil kataloğu (açık karar 3), şube başına takvim, `hr.Holidays` tablosunun kaldırılması.
 
 ## Açık kararlar
 

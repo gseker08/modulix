@@ -8,6 +8,7 @@ using Modulix.Infrastructure.Identity;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Hr;
 using Modulix.Shared.Records;
+using Modulix.Shared.Settings;
 using static Modulix.Modules.Hr.HrModule.Permissions;
 using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
 
@@ -167,6 +168,51 @@ public class HrLeaveTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
             new RecordWriteRequest(new JsonObject { ["date"] = "2027-05-19", ["name"] = "Tekrar" })));
         Assert.True(sameDay.Errors.ContainsKey("date"));
         Assert.Equal(HttpStatusCode.NoContent, (await hr.DeleteAsync($"{Holidays}/{holiday.Id}?version={holiday.Version}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Leave_days_follow_the_company_work_week_setting_of_their_own_tenant_only()
+    {
+        // ADR-0049 dilim 6c: çalışma günleri firma ayarıdır (varsayılan Pazartesi–Cuma). 2027-03-01 Pazartesi … 2027-03-06 Cumartesi.
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var hrA = await LoginAsync(a.Hr);
+        using var hrB = await LoginAsync(b.Hr);
+        using var staffA = await LoginAsync(a.Staff);
+
+        Assert.Equal(5m, await PreviewDaysAsync(hrA, a.StaffEmployee));
+        await SetSettingAsync(hrA, "core.calendar.work-days", "mon-sat");
+        Assert.Equal(6m, await PreviewDaysAsync(hrA, a.StaffEmployee));
+        await SetSettingAsync(hrA, "core.calendar.work-days", "mon-fri-sat-half");
+        Assert.Equal(5.5m, await PreviewDaysAsync(hrA, a.StaffEmployee));
+
+        // Başka tenant'ın ayarı değişmez; ayarı yazma izni olmayan çalışan değiştiremez.
+        Assert.Equal(5m, await PreviewDaysAsync(hrB, b.StaffEmployee));
+        var denied = await staffA.PutAsJsonAsync("/api/settings",
+            new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { ["core.calendar.work-days"] = new("mon-fri", 2) }));
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+
+        // Seçenek dışı değer reddedilir.
+        var current = (await hrA.GetFromJsonAsync<SettingsResponse>("/api/settings"))!.Settings.First(x => x.Key == "core.calendar.work-days");
+        var invalid = await hrA.PutAsJsonAsync("/api/settings",
+            new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { ["core.calendar.work-days"] = new("tue-sat", current.Version) }));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+
+        static async Task<decimal> PreviewDaysAsync(HttpClient client, Guid employee)
+        {
+            var response = await client.PostAsJsonAsync("/api/hr/leave-requests/preview",
+                new LeavePreviewRequest(employee, "Excuse", new DateOnly(2027, 3, 1), new DateOnly(2027, 3, 6), false));
+            Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+            return (await response.Content.ReadFromJsonAsync<LeavePreviewDto>())!.Days;
+        }
+
+        static async Task SetSettingAsync(HttpClient client, string key, string value)
+        {
+            var current = (await client.GetFromJsonAsync<SettingsResponse>("/api/settings"))!.Settings.First(x => x.Key == key);
+            var response = await client.PutAsJsonAsync("/api/settings",
+                new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { [key] = new(value, current.Version) }));
+            Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        }
     }
 
     [Fact]

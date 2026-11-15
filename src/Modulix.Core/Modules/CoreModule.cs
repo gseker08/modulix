@@ -291,6 +291,11 @@ public sealed class CoreModule : IModule
         public const string Language = "core.regional.language";
         public const string RequireTwoFactor = "core.security.require-two-factor";
 
+        /// <summary>Firmanın çalışma günleri ve mesai saatleri (ADR-0049 dilim 6c); seçenekler <see cref="Contracts.Calendar.WorkWeek"/>'tedir.</summary>
+        public const string WorkDays = "core.calendar.work-days";
+
+        public const string WorkHours = "core.calendar.work-hours";
+
         /// <summary>Acil durdurma (ADR-0027): "Hayır" ise firmanın hiçbir kuralı çalışmaz; kuyruktaki çalışmalar iptal edilir.</summary>
         public const string AutomationEnabled = "core.automation.enabled";
 
@@ -310,6 +315,7 @@ public sealed class CoreModule : IModule
 
     private const string ProfileGroup = "Kuruluş profili";
     private const string RegionalGroup = "Bölgesel ayarlar";
+    private const string CalendarGroup = "Çalışma takvimi";
     private const string SecurityGroup = "Güvenlik";
     private const string AutomationGroup = "Otomasyon";
     private const string AiGroup = "Yapay zekâ";
@@ -345,6 +351,17 @@ public sealed class CoreModule : IModule
         new(SettingKeys.Format, "Tarih ve sayı biçimi", RegionalGroup, SettingType.Choice, RegionalOptions.DefaultFormat)
         {
             Options = RegionalOptions.Formats,
+        },
+        new(SettingKeys.WorkDays, "Çalışma günleri", CalendarGroup, SettingType.Choice, Contracts.Calendar.WorkWeek.DefaultDays)
+        {
+            Description = "İzin gün sayısı bu günlere göre hesaplanır; çalışılmayan günler ve Yönetim > Resmî tatiller listesindeki günler düşülür. "
+                + "Açılmış izin taleplerinin gün sayısı değişmez.",
+            Options = [.. Contracts.Calendar.WorkWeek.DayOptions.Select(o => new SettingOption(o.Value, o.Label))],
+        },
+        new(SettingKeys.WorkHours, "Mesai saatleri", CalendarGroup, SettingType.Choice, Contracts.Calendar.WorkWeek.DefaultHours)
+        {
+            Description = "Firmanın iş takvimini kullanan hesaplar (ör. iş saatiyle ölçülen süreler) bu saatleri kullanır. Saatler firmanın saat dilimindedir.",
+            Options = [.. Contracts.Calendar.WorkWeek.HourOptions.Select(o => new SettingOption(o.Value, o.Label))],
         },
         new(SettingKeys.Language, "Arayüz dili", RegionalGroup, SettingType.Choice, LanguageOptions.Default)
         {
