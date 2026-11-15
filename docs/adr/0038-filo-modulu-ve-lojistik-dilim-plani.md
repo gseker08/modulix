@@ -713,3 +713,22 @@ Karar (kullanıcı, 15 Kasım 2026: "İkisi de"; önce aktarma, sonra bildirim �
 | `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Web.Tests` | 111/111 / 36/36 / 282/282 |
 | `... --filter "Logistics\|File"` (yerel SQL Server) | 109 geçti, 2 atlandı (önceden atlanan), 1 kırık: `S3BlobStorageTests` yerelde S3 servisi gerektiriyor (CI kurar; bu değişiklikle ilgisiz). 4 yeni test. **Mutlu yol:** iptal edilen seferin bekleyen yakıt masrafı makbuzuyla açık sefere geçer; durum beklemede, gerekçe masrafta, sefer süzgeçleri yeni seferi gösterir, masraf yeniden düzenlenir ve gerekçesiz onaylanır, denetim kaydında `tripId` değişimi. **Kural:** gerekçesiz, iptal edilmiş/bilinmeyen/aynı hedef 422; açık seferdeki, reddedilmiş, onaylanmış masraf ve eski sürüm 409; masraf değişmez. **Tenant izolasyonu:** başka tenant 404; başka tenant'ın seferine aktarma 422. **Yetki:** yalnızca okuyan 403, masraf okuma izni olmayan 403. Durum ve kaynak kuralı geri alınınca kural testi kırılıyor |
 
+## 29. "Sefer iptal edilince bildir" şablonu (15 Kasım 2026)
+
+Karar (kullanıcı, 15 Kasım 2026: "İkisi de"; bölüm 28'den sonra ayrı PR). Bölüm 26'da reddedilen otomatik ret yerine kararı onaylayana bırakmıştık; onaylayanın iptali Masraflar kuyruğundaki rozetten görmesi gerekiyordu. Firma bu bildirimi kural olarak kendisi de kurabiliyordu; şablon bunu tek tıkla yapılır kılar.
+
+- **Şablon** `logistics.trip-cancelled-notify` ("Sefer iptal edilince bildir"): sefer kaydı, durum geçişi tetikleyicisi (`logistics.trip.status` → `cancelled`, kaynak durum serbest), koşulsuz, Core "Bildirim gönder". İleti: "Sefer iptal edildi: {sefer no} ({iptal gerekçesi}). Bekleyen masrafları Masraflar ekranında karara bağlayın." Alıcı diğer lojistik şablonlarındaki gibi taslakta boştur; firma seçmeden kural yayınlanamaz (ADR-0027 Dilim 3b). Alıcı seferi kendi yetkisiyle göremiyorsa Core bildirimi göndermez.
+- **Kural alanı:** sefer için `statusReason` ("İptal / durum gerekçesi") otomasyon alanı olarak beyan edildi; iletide kayıt değişkeni olarak kullanılır.
+- Şablon sayısı on bir. Bekleyen masraf sayısı iletide yok: kural koşulu ve değişkenleri yalnızca tetikleyen kaydın alanlarını okur; sayı iptal adımında masraf okuyana uyarı olarak zaten gösterilir (bölüm 26).
+- **Migration yok:** şablon kodda beyandır.
+
+**Kapsam dışı (bilerek):** yalnızca bekleyen masrafı olan seferde bildirmek (kural koşulu başka kayıt türünü saymaz); masrafı giren kişiye bildirim (masrafta sorumlu kullanıcı alanı yok).
+
+### Test sonuçları (bölüm 29)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet build` | Hatasız (SDK 10.0.404) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Core.Tests` | 111/111 / 36/36 / 1053/1053. Lojistik şablon testleri: on bir şablon sırayla kayıtlı; durum geçişi tetikleyicisi kaydın beyan edilmiş `status` alanına ve seçeneklerinden birine bağlı; her şablon alıcı seçilince doğrulamadan geçer |
+| `... --filter "AutomationTemplate"` (yerel SQL Server) | 10/10 (1 yeni). **Mutlu yol:** şablondan taslak, alıcı seçilip yayın; sefer API'den iptal edilir, outbox'taki gerçek güncelleme olayı otomasyon işleyicisine teslim edilir, alıcının kutusuna sefer numarası ve iptal gerekçesiyle bildirim düşer. **Kural:** iptal edilmeyen seferin güncellemesi kural çalıştırmaz. Mevcut testler: alıcısız yayın reddi (doğrulama), başka firmada kural açılmaz (tenant), yönetme/okuma izni olmayan şablonu kullanamaz (yetki); yeni şablon "her şablon yayın doğrulamasından geçer" testine de girer. Tetikleyici "tamamlandı"ya çevrilince yeni test kırılıyor |
+

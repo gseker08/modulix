@@ -34,7 +34,7 @@ public class LogisticsAutomationTemplateTests
         var registered = Catalog.AutomationTemplates.Where(t => t.ModuleKey == LogisticsModule.ModuleKey).Select(t => t.Template.Key).ToList();
 
         Assert.Equal(LogisticsAutomationTemplates.All.Select(t => t.Key), registered);
-        Assert.Equal(10, registered.Count);
+        Assert.Equal(11, registered.Count);
         Assert.Equal(registered.Count, registered.Distinct(StringComparer.Ordinal).Count());
         Assert.All(registered, key => Assert.StartsWith(LogisticsModule.ModuleKey + ".", key));
     }
@@ -117,6 +117,13 @@ public class LogisticsAutomationTemplateTests
                     Assert.NotNull(Catalog.FindBusinessEvent(domainEvent.EventKey));
                     break;
                 case RecordCreatedTrigger:
+                    break;
+                case StatusTransitionTrigger transition:
+                    // Durum geçişi kaydın beyan edilmiş durum alanına ve seçeneklerinden birine bağlanır (bölüm 29: sefer iptali).
+                    Assert.Equal(template.EntityKey + ".status", transition.Field);
+                    var status = Catalog.FindAutomationField(transition.Field);
+                    Assert.NotNull(status);
+                    Assert.Contains(transition.To, status!.Options!.Select(o => o.Key));
                     break;
                 default:
                     Assert.Fail($"Beklenmeyen tetikleyici: {template.Definition.Trigger.GetType().Name}");

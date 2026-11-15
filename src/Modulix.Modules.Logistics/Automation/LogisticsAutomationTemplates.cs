@@ -38,6 +38,8 @@ public static class LogisticsAutomationTemplates
 
     public const string TripOverdue = "logistics.trip-overdue-notify";
 
+    public const string TripCancelled = "logistics.trip-cancelled-notify";
+
     public const string ExpensePending = "logistics.expense-pending-reminder";
 
     private const string Request = LogisticsModule.Entities.TransportRequest;
@@ -129,6 +131,15 @@ public static class LogisticsAutomationTemplates
             new ConditionLeaf(
                 $"{Trip}.status", AutomationOperator.In, [Domain.Trip.Statuses.Planning, Domain.Trip.Statuses.Ready, Domain.Trip.Statuses.InProgress]),
             $"Planlanan bitişi geçti ({Var(Trip, "plannedEnd")}), sefer kapanmadı: {Var(Trip, "number")}"),
+        // ADR-0038 bölüm 26-29: sefer iptal edilince bekleyen masraflar beklemede kalır; onaylayan onaylar, reddeder ya da başka sefere aktarır.
+        Template(
+            TripCancelled,
+            "Sefer iptal edilince bildir",
+            "Sefer iptal edildiğinde seçtiğiniz kişiye (ör. masrafları onaylayan) bildirir; seferin bekleyen masrafları Masraflar ekranında onaylanır, reddedilir ya da başka sefere aktarılır.",
+            Trip,
+            new StatusTransitionTrigger($"{Trip}.status", null, Domain.Trip.Statuses.Cancelled),
+            null,
+            $"Sefer iptal edildi: {Var(Trip, "number")} ({Var(Trip, "statusReason")}). Bekleyen masrafları Masraflar ekranında karara bağlayın."),
         Template(
             ExpensePending,
             "3 gündür onay bekleyen masrafı hatırlat",

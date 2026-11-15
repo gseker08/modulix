@@ -189,6 +189,7 @@ public sealed class LogisticsModule : IModule, IModuleEndpoints
                 Options = [.. Domain.Trip.Statuses.All.Select(s => new AutomationOption(s, TripStatusLabels[s]))],
             },
             new(AutomationEntityKeys.Trip, "number", "Sefer no", AutomationFieldType.Text),
+            new(AutomationEntityKeys.Trip, "statusReason", "İptal / durum gerekçesi", AutomationFieldType.Text),
             new(AutomationEntityKeys.Trip, "plannedStart", "Planlanan başlangıç", AutomationFieldType.Date)
             {
                 Hint = "\"Sefere 1 gün kala hâlâ hazır olmayan sefer\" gibi uyarılar için tarihe bağlı tetikleyicide kullanın.",

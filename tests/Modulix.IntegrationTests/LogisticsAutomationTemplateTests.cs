@@ -8,14 +8,20 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Authorization;
 using Modulix.Core.Automation;
 using Modulix.Core.Contracts.Automation;
+using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Events;
 using Modulix.Core.Modules;
 using Modulix.Infrastructure.Automation;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Infrastructure.Platform;
 using Modulix.Modules.Logistics;
 using Modulix.Modules.Logistics.Automation;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Automation;
+using Modulix.Shared.Logistics;
 using Modulix.Shared.Notifications;
 using Modulix.Shared.Records;
 using static Modulix.Modules.Logistics.LogisticsModule.Permissions;
@@ -26,7 +32,7 @@ namespace Modulix.IntegrationTests;
 /// <summary>
 /// ADR-0038 bölüm 23: Lojistik başlangıç şablonları uçtan uca. Mutlu yol (şablon taslak açar, alıcı seçilince yayınlanır, tarama bildirimi yazar),
 /// doğrulama (alıcı seçilmeden yayınlanmaz), tenant izolasyonu (bir firmada kullanılan şablon diğerinde kural açmaz) ve yetki (yönetme izni ya da
-/// kayıt türünü okuma izni olmayan şablonu kullanamaz). Gerçek veritabanı, kayıt boru hattı ve Row-Level Security altında.
+/// kayıt türünü okuma izni olmayan şablonu kullanamaz). Bölüm 29: "Sefer iptal edilince bildir" gerçek iptal olayıyla bildirim yazar. Gerçek veritabanı, kayıt boru hattı ve Row-Level Security altında.
 /// </summary>
 public class LogisticsAutomationTemplateTests(CrmAutomationFixture fixture) : IClassFixture<CrmAutomationFixture>
 {
@@ -136,6 +142,69 @@ public class LogisticsAutomationTemplateTests(CrmAutomationFixture fixture) : IC
     }
 
     // --- yardımcılar ---
+
+    /// <summary>
+    /// ADR-0038 bölüm 29: "Sefer iptal edilince bildir" şablonu. Kural taslaktan alıcı seçilip yayınlanır; sefer iptal edilince gerçek kayıt olayı
+    /// otomasyon işleyicisine gider ve alıcının kutusuna sefer numarası ve iptal gerekçesiyle bildirim düşer. İptal edilmeyen seferin güncellemesi
+    /// kural çalıştırmaz.
+    /// </summary>
+    [Fact]
+    public async Task Cancelling_a_trip_notifies_the_chosen_recipient_with_the_trip_number_and_reason()
+    {
+        var s = await SetUpAsync();
+        using var admin = await LoginAsync(s.Admin);
+        using var dispatcher = await LoginAsync(s.Dispatcher);
+
+        var draft = await UseAsync(admin, LogisticsAutomationTemplates.TripCancelled);
+        Assert.Equal(LogisticsModule.Entities.Trip, draft.Rule.EntityKey);
+        await ChooseRecipientAsync(admin, draft, s.Dispatcher.Id);
+        var publish = await admin.PostAsJsonAsync($"/api/automation/rules/{draft.Rule.Id}/publish", new PublishAutomationRuleRequest(true, null));
+        Assert.True(publish.IsSuccessStatusCode, await publish.Content.ReadAsStringAsync());
+
+        var iso = Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var trip = await PostAsync(admin, Trips, new JsonObject { ["plannedStart"] = iso });
+        var kept = await PostAsync(admin, Trips, new JsonObject { ["plannedStart"] = iso });
+        var cancel = await admin.PostAsJsonAsync($"/api/logistics/trips/{trip.Id}/actions", new RunLogisticsActionRequest("cancel", trip.Version, "Müşteri vazgeçti"));
+        Assert.True(cancel.IsSuccessStatusCode, await cancel.Content.ReadAsStringAsync());
+        var edit = await admin.PutAsJsonAsync($"{Trips}/{kept.Id}", new RecordWriteRequest(new JsonObject { ["notes"] = "Rampa 3" }, kept.Version));
+        Assert.True(edit.IsSuccessStatusCode, await edit.Content.ReadAsStringAsync());
+
+        await DeliverUpdatesAsync(s.TenantId, trip.Id);
+        await DeliverUpdatesAsync(s.TenantId, kept.Id);
+        await RunAsync(s.TenantId);
+
+        var runs = (await admin.GetFromJsonAsync<AutomationRunPageDto>($"/api/automation/runs?ruleId={draft.Rule.Id}"))!;
+        Assert.Equal([trip.Id], runs.Items.Select(r => r.RecordId));
+        var notification = Assert.Single((await dispatcher.GetFromJsonAsync<NotificationPageDto>("/api/notifications"))!.Items);
+        Assert.Equal(
+            $"Sefer iptal edildi: {trip.Values["number"]!.GetValue<string>()} (Müşteri vazgeçti). Bekleyen masrafları Masraflar ekranında karara bağlayın.",
+            notification.Title);
+    }
+
+    private const string Trips = "/api/records/logistics.trip";
+
+    /// <summary>Kaydın outbox'taki güncelleme olaylarını otomasyon işleyicisine teslim eder (olay işleyicisi testte çalışmaz; AutomationRunTests deseni).</summary>
+    private async Task DeliverUpdatesAsync(Guid tenantId, Guid recordId)
+    {
+        List<Modulix.Infrastructure.Records.OutboxMessage> messages;
+        using (var read = fixture.Factory.OpenScope(tenantId))
+        {
+            messages = await read.ServiceProvider.GetRequiredService<ModulixDbContext>().OutboxMessages.AsNoTracking()
+                .Where(m => m.RecordId == recordId && m.EventType == DomainEventTypes.RecordUpdated).OrderBy(m => m.Sequence).ToListAsync();
+        }
+
+        Assert.NotEmpty(messages);
+        foreach (var message in messages)
+        {
+            var envelope = new EventEnvelope(
+                message.Id, tenantId, message.EventType, message.SchemaVersion, message.EntityKey, message.RecordId, message.Sequence, message.UserId, message.Source,
+                message.CorrelationId, message.CausationId, message.Depth, JsonNode.Parse(message.Payload)!.AsObject(), message.OccurredAt);
+            await using var scope = fixture.Extended.Services.GetRequiredService<ITenantScopeFactory>().Create(new TenantContext(tenantId, Guid.Empty, Guid.Empty));
+            scope.ServiceProvider.GetRequiredService<EventHandlingScope>().Begin(envelope, CoreModule.Subscriptions.Automation);
+            await scope.ServiceProvider.GetRequiredService<Modulix.Core.Automation.AutomationEventSubscriber>().HandleAsync(envelope, CancellationToken.None);
+            await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().SaveChangesAsync();
+        }
+    }
 
     private sealed record Setup(Modulix.Core.Platform.Tenant Tenant, Guid CustomerId, ModulixUser Admin, ModulixUser Dispatcher)
     {
