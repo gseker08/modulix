@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Credentials;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Credentials;
@@ -75,7 +76,7 @@ internal sealed class CredentialRecordStore(
         {
             errors.AddRange(new[] { "ownerEntityKey", "ownerId", "typeKey" }
                 .Where(f => !values.ContainsKey(f) || IsEmpty(values[f]))
-                .Select(f => new RecordFieldError(f, "Bu alan zorunludur.")));
+                .Select(f => new RecordFieldError(f, ServerMessages.Validation.Required)));
         }
 
         return errors;
@@ -309,7 +310,7 @@ internal sealed class CredentialRecordStore(
                 case "typeKey":
                     if (value is not string key)
                     {
-                        errors.Add(new RecordFieldError(name, "Bu alan zorunludur."));
+                        errors.Add(new RecordFieldError(name, ServerMessages.Validation.Required));
                         break;
                     }
 

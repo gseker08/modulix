@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Customization;
 
@@ -27,7 +28,7 @@ internal static class RecordCustomFields
 
         if (incoming is not null and not JsonObject)
         {
-            errors.Add(new RecordFieldError(RecordFields.Custom, "Özel alanlar nesne olmalıdır."));
+            errors.Add(new RecordFieldError(RecordFields.Custom, ServerMessages.Validation.CustomObject));
             return (values, errors);
         }
 
@@ -38,7 +39,7 @@ internal static class RecordCustomFields
         {
             if (!byKey.TryGetValue(key, out var field))
             {
-                errors.Add(new RecordFieldError(RecordFields.CustomPrefix + key, "Bilinmeyen alan."));
+                errors.Add(new RecordFieldError(RecordFields.CustomPrefix + key, ServerMessages.Validation.UnknownField));
                 continue;
             }
 
@@ -64,7 +65,7 @@ internal static class RecordCustomFields
             // Eski kayıt zorunlu alan eklenmeden önce açılmış olabilir: yalnızca boşaltma denemesi reddedilir.
             if (operation == RecordOperation.Create || sent?.ContainsKey(field.Key) == true)
             {
-                errors.Add(new RecordFieldError(RecordFields.CustomPrefix + field.Key, "Bu alan zorunludur."));
+                errors.Add(new RecordFieldError(RecordFields.CustomPrefix + field.Key, ServerMessages.Validation.Required));
             }
         }
 
@@ -118,11 +119,11 @@ internal static class RecordCustomFields
             var field = fields.FirstOrDefault(f => f.Key == key);
             if (field is null || field.Type != CustomFieldType.Choice)
             {
-                errors.Add(new RecordFieldError(name, "Bilinmeyen filtre."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownFilter));
             }
             else if (field.Options.All(o => o.Key != value))
             {
-                errors.Add(new RecordFieldError(name, "Geçersiz filtre değeri."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.InvalidFilterValue));
             }
             else
             {

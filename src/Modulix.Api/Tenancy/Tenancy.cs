@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Api.Localization;
 using Modulix.Api.Platform;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
@@ -142,15 +144,13 @@ public sealed class RequireTenantFilter(HttpTenantContextAccessor tenant) : IEnd
         tenant.Current is not null
             ? next(context)
             : ValueTask.FromResult<object?>(tenant.TwoFactorRequiredTenantId is not null
-                ? Results.Problem(
-                    statusCode: StatusCodes.Status403Forbidden,
-                    title: "Bu firma iki adımlı doğrulama istiyor.",
-                    detail: "Devam etmeden önce Hesabım sayfasından iki adımlı doğrulamayı açın.",
-                    extensions: new Dictionary<string, object?> { ["code"] = TenantProblems.TwoFactorRequired })
-                : Results.Problem(
-                    statusCode: StatusCodes.Status403Forbidden,
-                    title: "Aktif tenant yok.",
-                    detail: "Bir tenant seçin. Üyeliğiniz kaldırıldıysa bu tenant'a artık erişemezsiniz."));
+                ? LocalizedProblems.Problem(
+                    StatusCodes.Status403Forbidden,
+                    ServerMessages.Access.TwoFactorRequiredTitle,
+                    ServerMessages.Access.TwoFactorRequiredDetail,
+                    new Dictionary<string, object?> { ["code"] = TenantProblems.TwoFactorRequired })
+                : LocalizedProblems.Problem(
+                    StatusCodes.Status403Forbidden, ServerMessages.Record.NoActiveTenant, ServerMessages.Access.NoActiveTenantDetail));
 }
 
 public static class TenancySetup

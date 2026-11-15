@@ -80,6 +80,7 @@ builder.Services.AddSingleton(builder.Configuration.GetSection("Customization:Li
 builder.Services.AddModulixDataProtection(builder.Configuration);
 builder.Services.AddModulixAuth();
 builder.Services.AddModulixTenancy();
+builder.Services.AddModulixServerLocalization();
 
 builder.Services.AddModulixModules(ModulixModules.Create());
 builder.Services.AddScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, Modulix.Api.Contracts.HostFollowUpActivities>();
