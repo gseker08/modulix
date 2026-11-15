@@ -28,52 +28,6 @@ internal static class EmployeeNames
 }
 
 /// <summary>
-/// Resmî tatil ve idari izin günleri (ADR-0042 dilim 2). Tarih tenant içinde tektir; yanlış girilen gün silinebilir. Listedeki değişiklik
-/// açılmış taleplerin gün sayısını değiştirmez (talep açılırken hesaplanır).
-/// </summary>
-internal sealed class HolidayRecordStore(HrStoreContext context) : HrRecordStore<Holiday>(context)
-{
-    public override string EntityKey => HrModule.Entities.Holiday;
-
-    protected override string ReadPermission => HrModule.Permissions.LeavesRead;
-
-    protected override string WritePermission => HrModule.Permissions.LeavesManage;
-
-    protected override IReadOnlyList<RecordField<Holiday>> Fields { get; } =
-    [
-        Field.Date<Holiday>("date", h => h.Date, (h, v) => h.Date = v!.Value, required: true),
-        Field.Text<Holiday>("name", Holiday.NameMaxLength, h => h.Name, (h, v) => h.Name = v!, required: true),
-        Field.Flag<Holiday>("halfDay", h => h.HalfDay, (h, v) => h.HalfDay = v),
-    ];
-
-    protected override IReadOnlyDictionary<string, RecordFilter<Holiday>> Filters { get; } = new Dictionary<string, RecordFilter<Holiday>>
-    {
-        ["year"] = (q, v) => int.TryParse(v, out var year) && year is >= 2000 and <= 2100 ? q.Where(h => h.Date.Year == year) : null,
-    };
-
-    protected override IOrderedQueryable<Holiday> Order(IQueryable<Holiday> source) => source.OrderBy(h => h.Date);
-
-    protected override IReadOnlyCollection<string>? SortKeys { get; } = WithDescending("date", "name");
-
-    protected override IOrderedQueryable<Holiday> Order(IQueryable<Holiday> source, string? sort) => sort?.TrimStart('-') switch
-    {
-        "date" => By(source, h => h.Date, sort.StartsWith('-')),
-        "name" => By(source, h => h.Name, sort.StartsWith('-')).ThenBy(h => h.Date),
-        _ => Order(source),
-    };
-
-    protected override IQueryable<Holiday> Search(IQueryable<Holiday> source, string term) => source.Where(h => h.Name.Contains(term));
-
-    protected override async Task AppliedAsync(Holiday entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
-    {
-        if (await Context.Data.Set<Holiday>().AsNoTracking().AnyAsync(h => h.Date == entity.Date && h.Id != entity.Id, cancellationToken))
-        {
-            throw new RecordValidationException([new RecordFieldError("date", "Bu tarih tatil listesinde zaten var.")]);
-        }
-    }
-}
-
-/// <summary>
 /// Yıllık izin hakkı (ADR-0042 dilim 2). Çalışan ve yıl yalnızca oluştururken verilir; bir çalışanın bir yılda tek hakkı olur. Hak ve devreden gün
 /// İK tarafından girilir; kullanılan gün yalnızca izin talebi iş akışınca güncellenir ve hak, kullanılandan aşağı çekilemez. Kayıt sahibi çalışanın
 /// kullanıcısıdır (veri kapsamı "kendi" olan çalışan yalnızca kendi hakkını görür). İzin kullanılmış hak silinmez.

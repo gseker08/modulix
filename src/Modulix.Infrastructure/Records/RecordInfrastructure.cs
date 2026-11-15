@@ -304,6 +304,8 @@ public static class RecordsSetup
         services.AddScoped<IRecordStore, PartyRelationshipRecordStore>();
         services.AddScoped<IRecordStore, PlaceRecordStore>();
         services.AddScoped<IRecordStore, CredentialRecordStore>();
+        services.AddScoped<IRecordStore, HolidayRecordStore>();
+        services.AddScoped<Modulix.Core.Contracts.Calendar.IHolidayCalendar, HolidayCalendar>();
         services.AddScoped<ICredentialDirectory, CredentialDirectory>();
         return services;
     }

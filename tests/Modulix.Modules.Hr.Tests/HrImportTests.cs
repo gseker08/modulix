@@ -11,15 +11,18 @@ public class HrImportTests
     private static readonly ModuleCatalog Catalog = ModuleCatalog.Create(new HrModule());
 
     [Fact]
-    public void The_real_catalog_registers_asset_leave_balance_and_holiday_imports_with_the_module_permissions()
+    public void The_real_catalog_registers_asset_and_leave_balance_imports_with_the_module_permissions()
     {
         var asset = Catalog.FindImport(HrModule.Entities.Asset)!.Value.Definition;
         var balance = Catalog.FindImport(HrModule.Entities.LeaveBalance)!.Value.Definition;
-        var holiday = Catalog.FindImport(HrModule.Entities.Holiday)!.Value.Definition;
 
         Assert.Equal(HrModule.Permissions.AssetsManage, asset.CreatePermission);
         Assert.Equal(HrModule.Permissions.LeavesManage, balance.CreatePermission);
-        Assert.Equal(HrModule.Permissions.LeavesManage, holiday.CreatePermission);
+
+        // Tatil listesi Core'dadır (ADR-0049 dilim 6a): içe aktarma tanımı da çekirdeğin, İK'nın değil.
+        Assert.Null(Catalog.FindImport("hr.holiday"));
+        var holiday = Catalog.FindImport(Modulix.Core.Contracts.Calendar.CalendarEntities.Holiday)!.Value.Definition;
+        Assert.Equal(Modulix.Core.Modules.CoreModule.Permissions.ManageHolidays, holiday.CreatePermission);
 
         // Envanter no ve tatil günü kesin eşleşmedir; izin hakkı çalışana sicil numarasıyla bağlanır.
         Assert.Equal([new ImportMatchRule("assetTag", null, Exact: true)], asset.MatchRules);

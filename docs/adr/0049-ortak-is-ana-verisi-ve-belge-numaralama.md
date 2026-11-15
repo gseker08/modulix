@@ -1,6 +1,6 @@
 # ADR-0049: Ortak iş ana verisi ve belge numaralama
 
-- **Durum:** Dilim 1 (belge numaralama) bu belgeyle birlikte teslim edilir, 15 Kasım 2026. Dilim 2 ve sonrası öneridir; "Açık kararlar" yanıtlanmadan kodlanmaz.
+- **Durum:** Dilim 1 (belge numaralama) 15 Kasım 2026'da teslim edildi (PR #395). Dilim 6a (firmanın tatil listesi ve takvim hesabı Core'da) 15 Kasım 2026'da teslim edilir. Diğer dilimler öneridir; "Açık kararlar" yanıtlanmadan kodlanmaz.
 - **Kaynak:** [Core mimari değerlendirmesi](../core-mimari-degerlendirme-2026-11.md) H4, H5, H6; yol haritası Ç8.1 (seri yönetimi).
 
 > Numara notu: 15 Kasım 2026'da `main`'de en yüksek numara 0047'ydi, 0048 açık PR #394'te kullanılıyordu. Birleştirmeden önce numara yeniden kontrol edilmeli.
@@ -48,6 +48,14 @@ Kur tablosu ve tanımları `crm` şemasından `core` şemasına taşınır; CRM,
 ### Dilim 6: çalışma takvimi
 
 Tek Core takvimi (mesai saatleri + tatil günleri, tenant başına; ileride şirket/şube başına). Destek SLA'sı ve İK izin hesabı buna geçer; onay eskalasyonu ve lojistik teslim süresi yeni kullanıcılardır.
+
+#### Dilim 6a: firmanın tatil listesi ve takvim hesabı (teslim edildi)
+
+- **Tatil listesi Core'da:** `core.Holidays` (tenant tablosu, RLS altında, `ICompanyShared`; `UNIQUE(TenantId, Date)`), kayıt türü `core.holiday` (kayıt boru hattı, denetim kaydı, içe aktarma). Okuma her üyeye açık, yazma `core.holidays.manage`.
+- **Sözleşme:** `Modulix.Core.Contracts.Calendar.IHolidayCalendar` (aralıktaki tatil günleri). Saf hesaplayıcı `WorkCalendar` (+ `CalendarSpec`, `CalendarSpecParser`) destek modülünden aynı ad alanına taşındı; SLA'ya özgü `SlaClock` destekte kaldı.
+- **İK geçişi:** izin gün sayısı `IHolidayCalendar`'dan okunur. `hr.holiday` kayıt türü, içe aktarma tanımı ve denetim tanımı kaldırıldı; ekran Yönetim'e taşındı (eski adres açılır).
+- **Veri:** migration `hr.Holidays` satırlarını kimlik, sürüm ve zamanlarıyla `core.Holidays`'e kopyalar (RLS kopya süresince kapatılır) ve `core.holidays.manage` iznini `hr.leaves.manage` taşıyan rollere ekler. `hr.Holidays` tablosu kesintisiz dağıtım için bir sürüm daha durur, sonraki migration'da kaldırılır. Dağıtım sırasında eski sürümün yazdığı tatil (kopyadan sonra) yeni listeye geçmez; dağıtım penceresinde tatil düzenlenmemelidir.
+- **Kalan (dilim 6b):** destek SLA takviminin firmanın tatil listesini de uygulaması (takvim başına seçenek; anlık görüntüye girer), onay eskalasyonu ve teslim süresinin takvime geçmesi, platformun hazır tatil kataloğu (açık karar 3), firmanın haftalık mesai saatleri (bugün İK hafta sonunu sabit cumartesi–pazar sayar).
 
 ## Açık kararlar
 

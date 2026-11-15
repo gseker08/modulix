@@ -55,7 +55,6 @@ public sealed class HrModule : IModule
         public const string Employee = "hr.employee";
         public const string LeaveRequest = "hr.leave-request";
         public const string LeaveBalance = "hr.leave-balance";
-        public const string Holiday = "hr.holiday";
         public const string ExpenseClaim = "hr.expense-claim";
         public const string ExpenseLine = "hr.expense-line";
         public const string Asset = "hr.asset";
@@ -328,10 +327,6 @@ public sealed class HrModule : IModule
         {
             UserFields = ["authorUserId"],
         },
-        new(Entities.Holiday, "Resmî tatil", Permissions.LeavesRead, new Dictionary<string, string>
-        {
-            ["date"] = "Tarih", ["name"] = "Ad", ["halfDay"] = "Yarım gün",
-        }, "name"),
     ];
 
     IReadOnlyList<SensitiveFields> IModule.SensitiveFields { get; } =
@@ -549,7 +544,6 @@ public sealed class HrModule : IModule
         services.AddScoped<IRecordStore, EmployeeRecordStore>();
         services.AddScoped<IRecordStore, LeaveRequestRecordStore>();
         services.AddScoped<IRecordStore, LeaveBalanceRecordStore>();
-        services.AddScoped<IRecordStore, HolidayRecordStore>();
         services.AddScoped<ILeaveWorkflow, LeaveWorkflow>();
         services.AddScoped<IRecordStore, ExpenseClaimRecordStore>();
         services.AddScoped<IRecordStore, ExpenseLineRecordStore>();

@@ -304,7 +304,6 @@ public class HrModuleTests
         Assert.Equal(HrModule.Permissions.LeavesManage, HrAccess.LeavesManage);
         Assert.Equal(HrModule.Entities.LeaveRequest, HrAccess.LeaveRequestEntityKey);
         Assert.Equal(HrModule.Entities.LeaveBalance, HrAccess.LeaveBalanceEntityKey);
-        Assert.Equal(HrModule.Entities.Holiday, HrAccess.HolidayEntityKey);
         Assert.Equal(HrModule.Lists.LeaveType, HrAccess.LeaveTypeList);
         Assert.Equal(HrLookupDefinitions.LeaveRequestEmployee, HrAccess.LeaveRequestEmployeeLookup);
         Assert.Equal(HrLookupDefinitions.LeaveBalanceEmployee, HrAccess.LeaveBalanceEmployeeLookup);

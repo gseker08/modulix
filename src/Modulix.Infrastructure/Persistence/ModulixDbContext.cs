@@ -189,6 +189,9 @@ public class ModulixDbContext(
     /// <summary>Kullanıcının kişisel liste görünümleri (ADR-0034).</summary>
     public DbSet<Modulix.Core.Views.GridView> GridViews => Set<Modulix.Core.Views.GridView>();
 
+    /// <summary>Firmanın resmî tatil listesi (ADR-0049 dilim 6a).</summary>
+    public DbSet<Modulix.Core.Calendar.Holiday> Holidays => Set<Modulix.Core.Calendar.Holiday>();
+
     /// <summary>Belge serisi sayaçları (ADR-0049).</summary>
     public DbSet<Modulix.Core.Numbering.NumberCounter> NumberCounters => Set<Modulix.Core.Numbering.NumberCounter>();
 
