@@ -20,6 +20,48 @@ public sealed record CalendarSpec(string TimeZoneId, bool AlwaysOpen, IReadOnlyL
     public static CalendarSpec TwentyFourSeven { get; } = new("UTC", true, [], []);
 }
 
+/// <summary>
+/// Firmanın resmî tatil listesini (<see cref="IHolidayCalendar"/>) bir takvim tanımına ekler (ADR-0049 dilim 6b). Takvimin kendi tatili aynı günde önceliklidir
+/// (ör. destek ekibinin o gün çalışması). Tam gün tatil günü kapatır; yarım gün (arife) o günün ilk çalışma penceresinin başından <see cref="HalfDayEnd"/>'e kadar
+/// açık bırakır (o gün çalışma penceresi yoksa gün zaten kapalıdır). 7/24 takvime tatil uygulanmaz.
+/// </summary>
+public static class TenantHolidays
+{
+    /// <summary>Yarım gün tatilde çalışmanın bittiği yerel saat (Türkiye'de arife öğleden sonra tatildir).</summary>
+    public static readonly TimeOnly HalfDayEnd = new(13, 0);
+
+    public static CalendarSpec Apply(CalendarSpec spec, IEnumerable<HolidayDay> holidays)
+    {
+        if (spec.AlwaysOpen)
+        {
+            return spec;
+        }
+
+        var merged = spec.Holidays.ToDictionary(h => h.Date);
+        foreach (var holiday in holidays)
+        {
+            if (merged.ContainsKey(holiday.Date))
+            {
+                continue;
+            }
+
+            if (!holiday.HalfDay)
+            {
+                merged[holiday.Date] = new CalendarHoliday(holiday.Date, holiday.Name, null, null);
+                continue;
+            }
+
+            var windows = spec.Weekly.Where(w => w.Day == holiday.Date.DayOfWeek).OrderBy(w => w.Start).ToList();
+            var end = windows.Count == 0 ? (TimeOnly?)null : (windows[^1].End < HalfDayEnd ? windows[^1].End : HalfDayEnd);
+            merged[holiday.Date] = windows.Count > 0 && windows[0].Start < end
+                ? new CalendarHoliday(holiday.Date, holiday.Name, windows[0].Start, end)
+                : new CalendarHoliday(holiday.Date, holiday.Name, null, null);
+        }
+
+        return spec with { Holidays = [.. merged.Values.OrderBy(h => h.Date)] };
+    }
+}
+
 /// <summary>Takvim tanımının metin biçimleri (veritabanında JSON) ve doğrulaması.</summary>
 public static class CalendarSpecParser
 {

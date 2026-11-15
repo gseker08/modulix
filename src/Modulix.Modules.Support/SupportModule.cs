@@ -300,7 +300,7 @@ public sealed class SupportModule : IModule
         },
         new(Entities.SlaCalendar, "SLA takvimi", Permissions.SlaManage, new Dictionary<string, string>
         {
-            ["name"] = "Ad", ["timeZoneId"] = "Saat dilimi", ["isAlwaysOpen"] = "7/24", ["weeklyHours"] = "Çalışma saatleri", ["holidays"] = "Tatiller", ["isActive"] = "Etkin",
+            ["name"] = "Ad", ["timeZoneId"] = "Saat dilimi", ["isAlwaysOpen"] = "7/24", ["weeklyHours"] = "Çalışma saatleri", ["holidays"] = "Tatiller", ["useTenantHolidays"] = "Firmanın tatil listesi", ["isActive"] = "Etkin",
         }, "name")
         {
             UserFields = ["createdBy", "updatedBy"],

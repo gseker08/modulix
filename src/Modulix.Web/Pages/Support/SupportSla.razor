@@ -84,6 +84,10 @@
                             }
                             <FieldError Field="weeklyHours" Errors="calErrors" />
                         </div>
+                        <div class="span-12 form-check">
+                            <input id="cal-tenant-holidays" class="form-check-input" type="checkbox" @bind="cal.UseTenantHolidays" />
+                            <label class="form-check-label" for="cal-tenant-holidays">@Texts.Get("support.sla.useTenantHolidays")</label>
+                        </div>
                         <div class="span-12">
                             <label class="form-label" for="cal-holidays">@Texts.Get("support.sla.holidays")</label>
                             <textarea id="cal-holidays" class="form-control" rows="4" @bind="cal.HolidaysText" placeholder="2026-10-29; Cumhuriyet Bayramı&#10;2026-10-28; Arife; 09:00-13:00"></textarea>
@@ -399,7 +403,7 @@
     private void EditCalendar(SlaCalendarDto c)
     {
         cal = CalForm.New();
-        cal.Id = c.Id; cal.Version = c.Version; cal.Name = c.Name; cal.TimeZoneId = c.TimeZoneId; cal.AlwaysOpen = c.IsAlwaysOpen; cal.IsActive = c.IsActive;
+        cal.Id = c.Id; cal.Version = c.Version; cal.Name = c.Name; cal.TimeZoneId = c.TimeZoneId; cal.AlwaysOpen = c.IsAlwaysOpen; cal.IsActive = c.IsActive; cal.UseTenantHolidays = c.UseTenantHolidays;
         foreach (var day in cal.Days.Values) { day.Enabled = false; }
         foreach (var w in ParseWeekly(c.WeeklyHours))
         {
@@ -425,7 +429,7 @@
         var weekly = cal.Days.Where(d => d.Value.Enabled).Select(d => new { day = d.Key, start = d.Value.Start.ToString("HH:mm", CultureInfo.InvariantCulture), end = d.Value.End.ToString("HH:mm", CultureInfo.InvariantCulture) });
         var request = new SaveSlaCalendarRequest(
             cal.Id is null ? 0 : cal.Version, cal.Name, cal.TimeZoneId, cal.AlwaysOpen, cal.AlwaysOpen ? null : JsonSerializer.Serialize(weekly, Json),
-            cal.AlwaysOpen || holidays.Count == 0 ? null : JsonSerializer.Serialize(holidays, Json), cal.IsActive);
+            cal.AlwaysOpen || holidays.Count == 0 ? null : JsonSerializer.Serialize(holidays, Json), cal.IsActive, cal.UseTenantHolidays);
         if (await RunAsync(() => cal.Id is null ? Api.PostAsync<SlaCalendarDto>("/api/support/sla-calendars", request) : Api.PutAsync<SlaCalendarDto>($"/api/support/sla-calendars/{cal.Id}", request),
                 Texts.Get("support.sla.calendarSaved"), e => calErrors = e))
         {
@@ -558,6 +562,7 @@
         public string Name { get; set; } = string.Empty;
         public string TimeZoneId { get; set; } = "Europe/Istanbul";
         public bool AlwaysOpen { get; set; }
+        public bool UseTenantHolidays { get; set; } = true;
         public bool IsActive { get; set; } = true;
         public string HolidaysText { get; set; } = string.Empty;
         public Dictionary<int, DayRow> Days { get; } = Enumerable.Range(0, 7).ToDictionary(d => d, d => new DayRow { Enabled = d is >= 1 and <= 5 });

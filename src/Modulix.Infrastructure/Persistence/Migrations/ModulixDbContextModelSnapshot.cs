@@ -14267,6 +14267,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("UseTenantHolidays")
+                        .HasColumnType("bit");
+
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");

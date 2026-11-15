@@ -4203,6 +4203,7 @@
   "support.sla.dayStart": "{0} başlanğıc",
   "support.sla.dayEnd": "{0} son",
   "support.sla.holidays": "Bayramlar (hər sətirdə bir)",
+  "support.sla.useTenantHolidays": "Şirkətin rəsmi bayram siyahısını da tətbiq et (İdarəetmə > Rəsmi bayramlar; burada daxil edilən bayramlar eyni gündə üstündür)",
   "support.sla.holidayFormat": "Format: {0} (tam gün bağlı) və ya {1} (yalnız həmin pəncərə açıq, yarım gün).",
   "support.sla.holidayFormatDay": "yyyy-MM-dd; ad",
   "support.sla.holidayFormatWindow": "yyyy-MM-dd; ad; SS:dd-SS:dd",
