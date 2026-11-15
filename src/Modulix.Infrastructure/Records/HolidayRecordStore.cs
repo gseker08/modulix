@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Calendar;
 using Modulix.Core.Contracts.Calendar;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Modules;
 using Modulix.Infrastructure.Persistence;
@@ -59,7 +60,7 @@ internal sealed class HolidayRecordStore(ModulixDbContext db) : IRecordStore
         {
             errors.AddRange(new[] { DateField, NameField }
                 .Where(f => !values.ContainsKey(f) || values[f] is null)
-                .Select(f => new RecordFieldError(f, "Bu alan zorunludur.")));
+                .Select(f => new RecordFieldError(f, ServerMessages.Validation.Required)));
         }
 
         return errors;

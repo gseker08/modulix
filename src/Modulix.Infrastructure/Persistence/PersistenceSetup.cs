@@ -10,6 +10,7 @@ using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Communication;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Customs;
+using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Sectors;
@@ -101,6 +102,8 @@ public static class PersistenceSetup
         // Modül hakları ve izinler; ModuleCatalog'u host kaydeder (AddModulixModules).
         services.AddScoped<IModuleEntitlements, ModuleEntitlements>();
         services.AddScoped<IModuleLicense, ModuleLicense>();
+        // Uç nokta süzgeçlerinin (Core.Hosting) yazılabilirlik sorusu; aynı kapsamdaki IModuleLicense örneğini verir.
+        services.AddScoped<IModuleWriteAccess>(provider => provider.GetRequiredService<IModuleLicense>());
         services.AddScoped<IEntitlementResolver, Modulix.Infrastructure.Platform.EntitlementResolver>();
         services.AddScoped<IPlanAdministration, Modulix.Infrastructure.Platform.PlanAdministration>();
         services.AddScoped<ILicenseApplier, Modulix.Infrastructure.Platform.LicenseApplier>();
@@ -191,7 +194,14 @@ public static class PersistenceSetup
         services.AddScoped<FormLayoutService>();
         services.AddScoped<IFormLayoutService>(sp => sp.GetRequiredService<FormLayoutService>());
         services.AddScoped<Modulix.Core.Views.IGridViewService, Modulix.Infrastructure.Views.GridViewService>();
-        services.AddSingleton<Modulix.Core.Files.IBlobStorage, Modulix.Infrastructure.Files.LocalBlobStorage>();
+        // Depo türü Storage:Provider ile seçilir: yerel disk ya da S3 uyumlu nesne deposu (mimari değerlendirme A4).
+        services.AddSingleton<Modulix.Core.Files.IBlobStorage>(sp =>
+        {
+            Microsoft.Extensions.Options.IOptions<Modulix.Core.Files.FileStorageOptions> storage = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Modulix.Core.Files.FileStorageOptions>>();
+            return storage.Value.Provider == Modulix.Core.Files.BlobStorageProvider.S3
+                ? new Modulix.Infrastructure.Files.S3BlobStorage(storage)
+                : new Modulix.Infrastructure.Files.LocalBlobStorage(storage);
+        });
         services.AddScoped<Modulix.Infrastructure.Files.FileStore>();
         services.AddScoped<Modulix.Core.Contracts.Files.IFileStore>(sp => sp.GetRequiredService<Modulix.Infrastructure.Files.FileStore>());
         services.AddScoped<Modulix.Core.Contracts.Files.IFileLimits>(sp => sp.GetRequiredService<Modulix.Infrastructure.Files.FileStore>());

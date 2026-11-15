@@ -1,4 +1,6 @@
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Core.Contracts.Records;
 
@@ -117,10 +119,30 @@ public static class RecordFields
 
 public sealed record RecordPage(IReadOnlyList<RecordData> Items, int Page, int PageSize, int TotalCount);
 
+/// <summary>
+/// Alan hatası. <see cref="Message"/> Türkçe kaynak metindir; <see cref="MessageKey"/> doluysa HTTP sınırında isteğin diline
+/// çevrilir (ADR-0034 §6). Anahtarsız hata olduğu gibi gösterilir.
+/// </summary>
 public sealed record RecordFieldError(string Field, string Message)
 {
+    /// <summary>Çevrilebilir iletiyle alan hatası (<see cref="ServerMessages"/>).</summary>
+    public RecordFieldError(string field, ServerMessage message)
+        : this(field, message.Text)
+    {
+        MessageKey = message.Key;
+        MessageArgs = message.Args;
+    }
+
     /// <summary>Hatanın makinece okunan türü; ileti değişse de içe aktarma gibi çağıranlar ayırt edebilsin diye. Çoğu hatada boştur.</summary>
     public string? Code { get; init; }
+
+    /// <summary>İletinin sözlük anahtarı (<c>server.*</c>); boşsa ileti çevrilmez.</summary>
+    [JsonIgnore]
+    public string? MessageKey { get; init; }
+
+    /// <summary>Anahtarın yer tutucu değerleri.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<object?>? MessageArgs { get; init; }
 }
 
 /// <summary><see cref="RecordFieldError.Code"/> değerleri.</summary>
@@ -141,7 +163,28 @@ public enum RecordErrorCode
     Conflict,
 }
 
-public sealed record RecordError(RecordErrorCode Code, string Message, IReadOnlyList<RecordFieldError>? FieldErrors = null);
+/// <summary>
+/// Kayıt işleminin hatası. <see cref="Code"/> makinece okunur ve dile göre değişmez; <see cref="Message"/> Türkçe kaynak metindir,
+/// <see cref="MessageKey"/> doluysa HTTP sınırında isteğin diline çevrilir (ADR-0034 §6).
+/// </summary>
+public sealed record RecordError(RecordErrorCode Code, string Message, IReadOnlyList<RecordFieldError>? FieldErrors = null)
+{
+    /// <summary>Çevrilebilir iletiyle hata (<see cref="ServerMessages"/>).</summary>
+    public RecordError(RecordErrorCode code, ServerMessage message, IReadOnlyList<RecordFieldError>? fieldErrors = null)
+        : this(code, message.Text, fieldErrors)
+    {
+        MessageKey = message.Key;
+        MessageArgs = message.Args;
+    }
+
+    /// <summary>İletinin sözlük anahtarı (<c>server.*</c>); boşsa ileti çevrilmez.</summary>
+    [JsonIgnore]
+    public string? MessageKey { get; init; }
+
+    /// <summary>Anahtarın yer tutucu değerleri.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<object?>? MessageArgs { get; init; }
+}
 
 public sealed class RecordResult<T>
 {
@@ -160,6 +203,10 @@ public sealed class RecordResult<T>
     public static RecordResult<T> Ok(T value) => new(value, null);
 
     public static RecordResult<T> Fail(RecordErrorCode code, string message, IReadOnlyList<RecordFieldError>? fieldErrors = null) =>
+        new(default, new RecordError(code, message, fieldErrors));
+
+    /// <summary>Çevrilebilir iletiyle hata (<see cref="ServerMessages"/>).</summary>
+    public static RecordResult<T> Fail(RecordErrorCode code, ServerMessage message, IReadOnlyList<RecordFieldError>? fieldErrors = null) =>
         new(default, new RecordError(code, message, fieldErrors));
 }
 
@@ -304,13 +351,20 @@ public interface IRecordStore
 }
 
 /// <summary>Eşzamanlı değişiklik veya benzersizlik ihlali.</summary>
-public sealed class RecordConflictException(string message, Exception? innerException = null) : Exception(message, innerException);
+/// <remarks>İleti düz metin de olabilir (örtük dönüşüm); <see cref="ServerMessages"/> iletisi verilirse istemciye isteğin dilinde gider.</remarks>
+public sealed class RecordConflictException(ServerMessage message, Exception? innerException = null) : Exception(message.Text, innerException)
+{
+    public ServerMessage ServerMessage { get; } = message;
+}
 
 /// <summary>
 /// Kayıt türünde izin olduğu hâlde bu kayıt üzerinde işlem yetkisi yok (ör. süreli belgenin sahip kaydında güncelleme izni yok); boru hattı
 /// "yetkisiz" (403) döner. Kaydın varlığı zaten görünürken kullanılır; görünmeyen kayıt için depo "bulunamadı" döner.
 /// </summary>
-public sealed class RecordAccessDeniedException(string message) : Exception(message);
+public sealed class RecordAccessDeniedException(ServerMessage message) : Exception(message.Text)
+{
+    public ServerMessage ServerMessage { get; } = message;
+}
 
 /// <summary>
 /// Kayıtları başka bir listede tanıtmak için kısa ad (ör. araç → plaka, sürücü → kişinin adı). Süreli belge listesi sahip kaydı bununla gösterir

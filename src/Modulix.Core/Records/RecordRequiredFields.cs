@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 
 namespace Modulix.Core.Records;
@@ -19,7 +20,7 @@ internal static class RecordRequiredFields
             var (sent, node) = Find(values, key);
             if (operation == RecordOperation.Create ? IsEmpty(node) : sent && IsEmpty(node))
             {
-                yield return new RecordFieldError(key, "Bu alan zorunludur.");
+                yield return new RecordFieldError(key, ServerMessages.Validation.Required);
             }
         }
     }

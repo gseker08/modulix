@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Core.Customization;
 
@@ -19,7 +20,7 @@ public static class CustomFieldRules
     /// Değeri doğrular ve saklanacak hale getirir. Pasif seçenek yeni değer olarak verilemez; kayıtta zaten varsa
     /// (<paramref name="previous"/>) korunabilir.
     /// </summary>
-    public static (JsonNode? Value, string? Error) Normalize(CustomFieldInfo field, JsonNode? node, JsonNode? previous = null)
+    public static (JsonNode? Value, ServerMessage? Error) Normalize(CustomFieldInfo field, JsonNode? node, JsonNode? previous = null)
     {
         if (node is null)
         {
@@ -32,12 +33,12 @@ public static class CustomFieldRules
             {
                 if (!TryString(node, out var text))
                 {
-                    return (null, "Metin olmalıdır.");
+                    return (null, ServerMessages.Validation.Text);
                 }
 
                 var max = field.Type == CustomFieldType.Text ? TextMaxLength : MultilineTextMaxLength;
                 text = text.Trim();
-                return text.Length > max ? (null, $"En fazla {max} karakter olabilir.") : (text.Length == 0 ? null : text, null);
+                return text.Length > max ? (null, ServerMessages.Validation.MaxLength(max)) : (text.Length == 0 ? null : text, null);
             }
 
             case CustomFieldType.Number:
@@ -46,17 +47,17 @@ public static class CustomFieldRules
                 if (node is not JsonValue value || value.GetValueKind() != JsonValueKind.Number
                     || !decimal.TryParse(value.ToJsonString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
                 {
-                    return (null, "Sayı olmalıdır.");
+                    return (null, ServerMessages.Validation.Number);
                 }
 
-                return Math.Abs(number) >= NumberLimit ? (null, "Sayı çok büyük.") : (number, null);
+                return Math.Abs(number) >= NumberLimit ? (null, ServerMessages.Validation.NumberTooLarge) : (number, null);
             }
 
             case CustomFieldType.Date:
             {
                 if (!TryString(node, out var text))
                 {
-                    return (null, "Tarih olmalıdır.");
+                    return (null, ServerMessages.Validation.Date);
                 }
 
                 if (text.Length == 0)
@@ -66,19 +67,19 @@ public static class CustomFieldRules
 
                 return DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
                     ? (date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), null)
-                    : (null, "Tarih yyyy-aa-gg biçiminde olmalıdır.");
+                    : (null, ServerMessages.Validation.DateFormat);
             }
 
             case CustomFieldType.YesNo:
                 return node is JsonValue flag && flag.GetValueKind() is JsonValueKind.True or JsonValueKind.False
                     ? (flag.GetValue<bool>(), null)
-                    : (null, "Evet ya da hayır olmalıdır.");
+                    : (null, ServerMessages.Validation.YesNo);
 
             case CustomFieldType.Choice:
             {
                 if (!TryString(node, out var key))
                 {
-                    return (null, "Bir seçenek olmalıdır.");
+                    return (null, ServerMessages.Validation.Choice);
                 }
 
                 if (key.Length == 0)
@@ -87,14 +88,14 @@ public static class CustomFieldRules
                 }
 
                 var kept = previous is JsonValue old && old.TryGetValue<string>(out var oldKey) && oldKey == key;
-                return Selectable(field, key, kept) ? (key, null) : (null, "Geçersiz seçenek.");
+                return Selectable(field, key, kept) ? (key, null) : (null, ServerMessages.Validation.InvalidChoice);
             }
 
             case CustomFieldType.MultiChoice:
             {
                 if (node is not JsonArray array || !array.All(i => i is JsonValue v && v.TryGetValue<string>(out _)))
                 {
-                    return (null, "Seçenek listesi olmalıdır.");
+                    return (null, ServerMessages.Validation.ChoiceList);
                 }
 
                 var previousKeys = previous is JsonArray old
@@ -103,7 +104,7 @@ public static class CustomFieldRules
                 var keys = array.Select(i => i!.GetValue<string>()).Distinct(StringComparer.Ordinal).ToList();
                 if (keys.Any(k => !Selectable(field, k, previousKeys.Contains(k))))
                 {
-                    return (null, "Geçersiz seçenek.");
+                    return (null, ServerMessages.Validation.InvalidChoice);
                 }
 
                 // Seçenek sırasıyla saklanır; aynı seçim farklı sırayla gelince değişiklik sayılmaz.
@@ -112,7 +113,7 @@ public static class CustomFieldRules
             }
 
             default:
-                return (null, "Bilinmeyen alan tipi.");
+                return (null, ServerMessages.Validation.UnknownFieldType);
         }
     }
 

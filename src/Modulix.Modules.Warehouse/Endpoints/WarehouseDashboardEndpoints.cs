@@ -1,21 +1,22 @@
-using Modulix.Api.Access;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Warehouse.Dashboard;
 using Modulix.Shared.Warehouse;
 
-namespace Modulix.Api.Warehouse;
+namespace Modulix.Modules.Warehouse.Endpoints;
 
 /// <summary>
 /// Depo ve antrepo panosu (<c>GET /api/warehouse/dashboard</c>). Panoyu açmak tesis okuma iznine bağlıdır; diğer bölümler kendi okuma izinleriyle sunucuda
 /// süzülür (izni olmayana bölüm boş gelir). Tesis başka tenant'ınsa ya da yoksa 404; dönem yalnızca 7, 14 ya da 30 gündür.
 /// </summary>
-public static class WarehouseDashboardEndpoints
+internal static class WarehouseDashboardEndpoints
 {
-    public static IEndpointRouteBuilder MapWarehouseDashboardEndpoints(this IEndpointRouteBuilder app)
+    /// <summary><paramref name="routes"/> host tarafından <c>/api/warehouse</c> grubu olarak, oturum ve modül kontrolüyle sarılmış gelir (ADR-0046).</summary>
+    public static void MapEndpoints(IEndpointRouteBuilder routes)
     {
-        var group = app.MapGroup("/api/warehouse")
-            .RequireAuthorization()
-            .RequireModule(WarehouseAccess.ModuleKey)
-            .WithTags("Warehouse");
+        var group = routes.MapGroup(string.Empty).WithTags("Warehouse");
 
         group.MapGet("/dashboard", async (Guid? facilityId, int? days, IWarehouseDashboard dashboard, CancellationToken ct) =>
             {
@@ -31,8 +32,6 @@ public static class WarehouseDashboardEndpoints
                 return v is null ? Results.NotFound() : Results.Ok(Map(v));
             })
             .RequirePermission(WarehouseAccess.FacilitiesRead);
-
-        return app;
     }
 
     private static WarehouseDashboardDto Map(WarehouseDashboardView v) => new(

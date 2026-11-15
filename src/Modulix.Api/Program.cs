@@ -1,3 +1,4 @@
+using Modulix.Api;
 using Modulix.Api.Access;
 using Modulix.Api.Account;
 using Modulix.Api.Audit;
@@ -24,7 +25,6 @@ using Modulix.Api.Platform;
 using Modulix.Api.Records;
 using Modulix.Api.Settings;
 using Modulix.Api.Customs;
-using Modulix.Api.Warehouse;
 using Modulix.Api.Sectors;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
@@ -44,8 +44,6 @@ using Modulix.Modules.Contracts;
 using Modulix.Modules.Orders;
 using Modulix.Api.Contracts;
 using Modulix.Api.Orders;
-using Modulix.Api.Logistics;
-using Modulix.Api.Hr;
 using Modulix.Api.Support;
 using Modulix.Modules.Marketing;
 using Modulix.Modules.Warehouse;
@@ -80,6 +78,7 @@ builder.Services.AddSingleton(builder.Configuration.GetSection("Customization:Li
 builder.Services.AddModulixDataProtection(builder.Configuration);
 builder.Services.AddModulixAuth();
 builder.Services.AddModulixTenancy();
+builder.Services.AddModulixServerLocalization();
 
 builder.Services.AddModulixModules(ModulixModules.Create());
 builder.Services.AddScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, Modulix.Api.Contracts.HostFollowUpActivities>();
@@ -94,7 +93,6 @@ builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modu
 builder.Services.AddScoped<Modulix.Modules.Crm.Reporting.ISalesReportingPolicyProvider, Modulix.Api.Crm.SalesReportingPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Contracts.Lifecycle.IContractPolicyProvider, Modulix.Api.Contracts.ContractPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Orders.Lifecycle.IOrderPolicyProvider, Modulix.Api.Orders.OrderPolicyProvider>();
-builder.Services.AddScoped<Modulix.Modules.Logistics.Lifecycle.ILogisticsPolicyProvider, Modulix.Api.Logistics.LogisticsPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Support.Lifecycle.ISupportPolicyProvider, Modulix.Api.Support.SupportPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Marketing.Runs.IMarketingPolicyProvider, Modulix.Api.Marketing.MarketingPolicyProvider>();
 builder.Services.Configure<Modulix.Api.Communication.CommunicationCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Communication.CommunicationCleanupOptions.SectionName));
@@ -156,9 +154,10 @@ builder.Services.Configure<PublicLinkOptions>(builder.Configuration.GetSection(P
 // Hesap güvenliği (Y7a): "Şifremi unuttum" sınırları "Account" bölümünde.
 builder.Services.Configure<AccountOptions>(builder.Configuration.GetSection(AccountOptions.SectionName));
 // Sağlık uçları: /health/live yalnızca sürecin ayakta olduğunu söyler (yeniden başlatma kararı, bağımlılık denetlenmez);
-// /health/ready trafik alabilir mi sorusudur (veritabanı); /health bütün denetimleri (olay birikimi dahil) gösterir.
+// /health/ready trafik alabilir mi sorusudur (veritabanı, dosya deposu); /health bütün denetimleri (olay birikimi dahil) gösterir.
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ModulixDbContext>("database", tags: [ReadyTag])
+    .AddCheck<Modulix.Api.Files.BlobStorageHealthCheck>("storage", tags: [ReadyTag])
     .AddCheck<EventHealthCheck>("events");
 
 var app = builder.Build();
@@ -275,14 +274,12 @@ app.MapSectorEndpoints();
 app.MapGtipEndpoints();
 app.MapRegimeProfileEndpoints();
 app.MapRegimeCheckEndpoints();
-app.MapWarehouseDashboardEndpoints();
+app.MapModuleEndpoints();
 app.MapRuleEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapContractsEndpoints();
 app.MapOrdersEndpoints();
-app.MapLogisticsEndpoints();
-app.MapHrEndpoints();
 app.MapSupportEndpoints();
 app.MapMarketingEndpoints();
 app.MapLeadIntakeEndpoints();

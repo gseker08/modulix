@@ -22,8 +22,8 @@ migration'lar, gizli/yetki yapılandırması, yedekleme ve eski tenant veritaban
 ## Yerel kurulum
 
 ```bash
-# SQL Server + Mailpit
-docker compose up -d --wait sqlserver mailpit
+# SQL Server + Mailpit + S3 test deposu (S3 adaptörünün entegrasyon testleri için; .env'de S3_SECRET_KEY)
+docker compose up -d --wait sqlserver mailpit s3
 # Veritabanı, şemalar ve kullanıcılar
 docker compose run --rm db-init
 ```
@@ -125,8 +125,17 @@ gerekirse yedek ayrı bir sunucuya yüklenir ve o tenant oradan dışa aktarıl�
 **Dosya içerikleri (ADR-0040):** kayıtlara eklenen dosyaların üst verisi `core.StoredFiles` tablosunda, içeriği ise depolama dizinindedir
 (`Storage:LocalRoot`; boşsa uygulamanın çalışma dizini altında `App_Data/blobs`). **Veritabanı yedeği dosya içeriğini kapsamaz**: dizin de
 aynı zamanda yedeklenmeli ve geri yüklemede veritabanıyla aynı ana döndürülmelidir (aksi halde üst veri olup içeriği olmayan dosyalar 404 verir).
-Dizin web köküne ve statik dosya sunumuna dışında kalmalı; konteynerde kalıcı bir birime bağlanmalıdır. Tek düğümlü kurulum varsayılır
-(çok düğümlü dağıtım nesne depolama adaptörünü bekler). Tek dosya sınırı `Storage:MaxFileBytes` (varsayılan 10 MB).
+Dizin web köküne ve statik dosya sunumuna dışında kalmalı; konteynerde kalıcı bir birime bağlanmalıdır. Yerel disk yalnızca tek düğümlü kurulum içindir.
+Tek dosya sınırı `Storage:MaxFileBytes` (varsayılan 10 MB).
+
+**Çok düğümlü dağıtım: S3 uyumlu nesne deposu.** `Storage:Provider=S3` ile içerik bir kovada tutulur (AWS S3, Cloudflare R2, Ceph RGW, Versity vb.):
+`Storage:S3:Bucket` (zorunlu; kovayı uygulama oluşturmaz), `Storage:S3:ServiceUrl` (AWS dışı uç nokta; boşsa AWS bölge uç noktası),
+`Storage:S3:Region`, `Storage:S3:Prefix` (kova paylaşılıyorsa kök, ör. `modulix`), `Storage:S3:ForcePathStyle`. Erişim anahtarları
+(`Storage__S3__AccessKey`, `Storage__S3__SecretKey`) ortam değişkeni ya da gizli bilgi deposuyla verilir; ikisi de boşsa AWS'nin varsayılan
+kimlik zinciri (rol, ortam, profil) kullanılır. Nesne anahtarı `{önek}/{tenantId}/{ilk iki karakter}/{depolama anahtarı}` düzenindedir; yazma
+koşulludur (var olan nesne ezilmez). Kova erişilemezse `/health/ready` 503 döner. Kovada sürümleme ve sunucu tarafı şifreleme açık tutulmalı,
+kova herkese açık olmamalıdır; yedek kovanın sürümleme/çoğaltma özelliğiyle veritabanı yedeğiyle aynı ana döndürülebilecek şekilde alınır.
+Yerelden S3'e geçişte mevcut içerik `{kök}/{tenantId}/…` dizininden aynı göreli yolla (`{önek}/` altına) kopyalanır.
 `tenant-export` içeriği `<dizin>/files/` altına depolama anahtarı adıyla kopyalar (anahtar ↔ dosya adı eşlemesi `core.StoredFiles.json`'dadır);
 `tenant-delete` veritabanı işlemi kesinleştikten sonra tenant'ın içerik dizinini de siler. İçerik silinemezse komut hata verir ve tekrar çalıştırılmalıdır.
 

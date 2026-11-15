@@ -1,8 +1,11 @@
 using System.Text.Json.Nodes;
 using Modulix.Api.Audit;
+using Modulix.Api.Localization;
 using Modulix.Api.Tenancy;
 using Modulix.Core.Audit;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Localization;
 using Modulix.Shared.Records;
 
 namespace Modulix.Api.Records;
@@ -103,32 +106,14 @@ public static class RecordEndpoints
 
     /// <summary>Güncelleme ve silme kaydın okunan sürümünü ister; sürümsüz istek son yazanın ezmesine yol açacağı için 428 alır.</summary>
     internal static IResult VersionRequired() =>
-        Results.Problem(
-            statusCode: StatusCodes.Status428PreconditionRequired,
-            title: "Kaydın sürümü gerekli.",
-            detail: "Güncelleme ve silme isteğinde okuduğunuz kaydın version değeri gönderilmelidir.",
-            extensions: new Dictionary<string, object?> { ["code"] = "VersionRequired" });
+        LocalizedProblems.Problem(
+            StatusCodes.Status428PreconditionRequired,
+            ServerMessages.Record.VersionRequiredTitle,
+            ServerMessages.Record.VersionRequiredDetail,
+            new Dictionary<string, object?> { ["code"] = "VersionRequired" });
 
     private static RecordResponse ToResponse(RecordData data) => new(data.EntityKey, data.Id, data.Version, data.Values);
 
-    internal static IResult ToProblem(RecordError error)
-    {
-        var extensions = new Dictionary<string, object?> { ["code"] = error.Code.ToString() };
-
-        return error.Code switch
-        {
-            RecordErrorCode.ValidationFailed => Results.ValidationProblem(
-                (error.FieldErrors ?? Array.Empty<RecordFieldError>())
-                    .GroupBy(e => e.Field)
-                    .ToDictionary(g => g.Key, g => g.Select(e => e.Message).ToArray()),
-                title: error.Message,
-                statusCode: StatusCodes.Status422UnprocessableEntity,
-                extensions: extensions),
-            RecordErrorCode.NotFound or RecordErrorCode.UnknownEntity =>
-                Results.Problem(statusCode: StatusCodes.Status404NotFound, title: error.Message, extensions: extensions),
-            RecordErrorCode.Conflict =>
-                Results.Problem(statusCode: StatusCodes.Status409Conflict, title: error.Message, extensions: extensions),
-            _ => Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: error.Message, extensions: extensions),
-        };
-    }
+    /// <summary>Uygulama <see cref="RecordProblems"/>'tedir (modül uç noktalarıyla ortak, ADR-0046); host içi çağrılar için bırakıldı.</summary>
+    internal static IResult ToProblem(RecordError error) => RecordProblems.ToProblem(error);
 }

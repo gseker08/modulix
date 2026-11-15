@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Credentials;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
@@ -226,16 +227,16 @@ internal sealed class EfUnitOfWork(ModulixDbContext db) : IUnitOfWork
         }
         catch (DbUpdateConcurrencyException exception)
         {
-            throw new RecordConflictException("Kayıt siz düzenlerken değişti. Güncel halini alıp tekrar deneyin.", exception);
+            throw new RecordConflictException(ServerMessages.Record.Concurrency, exception);
         }
         catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
         {
-            throw new RecordConflictException("Aynı anahtarla bir kayıt zaten var.", exception);
+            throw new RecordConflictException(ServerMessages.Record.DuplicateKey, exception);
         }
         catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 547 })
         {
             // Yabancı anahtar: silinmek istenen kayda bağlı başka kayıtlar var.
-            throw new RecordConflictException("Bu kayda bağlı başka kayıtlar olduğu için işlem yapılamadı.", exception);
+            throw new RecordConflictException(ServerMessages.Record.HasDependents, exception);
         }
     }
 }

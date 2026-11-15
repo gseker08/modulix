@@ -1,17 +1,24 @@
 @* Taşıma talebi ve sevkiyat iş akışı eylemleri (ADR-0038 K7): onayla, reddet, planlandı, yükleme başladı, yola çıktı, iptal. Eylemler ve ön koşul
    sonucu sunucudan gelir (/api/logistics/{tür}/{id}/actions); kullanıcının izni olmayan eylem hiç gelmez, yapılamayan eylem nedeniyle pasif
-   görünür. Gerekçe isteyen eylem (ret, iptal) önce gerekçe sorar. Kararı sunucu verir; sürüm değiştiyse 409 iletisi gösterilir. *@
+   görünür. Gerekçe isteyen eylem (ret, iptal; iptal edilen seferin masrafının onayı) önce gerekçe sorar; sunucunun uyarısı (ör. seferin bekleyen
+   masrafları) bu adımda gösterilir (ADR-0038 bölüm 26). Kararı sunucu verir; sürüm değiştiyse 409 iletisi gösterilir. *@
 @inject ApiClient Api
 
 @if (actions is { Count: > 0 })
 {
+    @if (pending?.Warning is { Length: > 0 } warning)
+    {
+        <div id="action-warning" class="alert alert-warning" role="status">@warning</div>
+    }
+
     <section class="list-toolbar" aria-label="İş akışı eylemleri">
         @if (pending is { } asking)
         {
             <label class="visually-hidden" for="action-reason">Gerekçe</label>
-            <input id="action-reason" class="form-control" maxlength="500" placeholder="@($"{asking.Label} gerekçesi")" @bind="reason" @bind:event="oninput" />
+            <input id="action-reason" class="form-control" maxlength="500" placeholder="Gerekçe yazın" aria-describedby="@(asking.Warning is { Length: > 0 } ? "action-warning" : null)" @bind="reason" @bind:event="oninput" />
             <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => pending = null">Vazgeç</button>
-            <button type="button" class="btn btn-outline-danger" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" @onclick="() => RunAsync(asking)">@asking.Label</button>
+            <button type="button" class="@(asking.Destructive ? "btn btn-outline-danger" : "btn btn-tonal")" disabled="@(busy || string.IsNullOrWhiteSpace(reason))"
+                    aria-busy="@(busy ? "true" : null)" @onclick="() => RunAsync(asking)">@asking.Label</button>
         }
         else
         {
