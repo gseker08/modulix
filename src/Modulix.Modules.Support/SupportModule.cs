@@ -389,14 +389,24 @@ public sealed class SupportModule : IModule
             [Entities.Ticket],
             [Permissions.TicketsRead, Permissions.TicketsWrite]),
         EventSubscription.For<SupportSchedulerAnchor>(
-            "support.scheduler",
+            SupportJobs.Identity,
             [DomainEventTypes.RecordDeleted],
             [Entities.Ticket],
             [Permissions.TicketsRead, Permissions.TicketsWrite, Permissions.TicketsAssign, Permissions.TicketsClose]),
     ];
 
+    /// <summary>
+    /// Zamanlanmış iş (ADR-0046): host'taki tek zamanlayıcı 5 dakikada bir, destek modülü yazılabilir olan her tenant için SLA turunu çalıştırır.
+    /// Yapılandırma <c>Jobs:support.jobs</c>; eski <c>SupportJobs</c> bölümü okunmaya devam eder.
+    /// </summary>
+    IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
+    [
+        ModuleJobDefinition.For<SupportJobs>(SupportJobs.JobKey, TimeSpan.FromSeconds(300), SupportJobs.Identity) with { LegacySection = "SupportJobs" },
+    ];
+
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<SupportJobs>();
         services.AddScoped<SupportStoreContext>();
         services.AddScoped<TicketWorkflowGate>();
         services.AddScoped<SupportReader>();

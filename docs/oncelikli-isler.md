@@ -45,6 +45,39 @@ firma alt profili, sektör bilgisi tablosu, AI erişimi menüsü) bu sıraya al�
 - **Depo seçim kutuları:** hareketin lokasyon seçimi tesise bağlı değil (hareketin tesisi yok); çok tesisli müşteride uzun liste olursa tesis süzgeci eklenmeli.
 - **CRM kampanya bağı:** müşteri adayı/fırsat listesinde kampanya sütunu ve süzgeç seçicisi, kampanya raporuna elle bağlanan kayıtların girmesi (atıf modeli kararı), içe aktarma ve rapor veri kümesinde kampanya sütunu; formdaki alan tarayıcıda gözle doğrulanmadı.
 
+## A3. Güncel sıra: önce Core, sonra CRM (15 Kasım 2026)
+
+Kaynaklar: ADR-0046 ve ADR-0049 durum satırları, `core-mimari-degerlendirme-2026-11.md`, `crm-eksik-surecler-epicleri.md`. Açık PR'lar
+(#417 müşteri adayı skorlama dilim 1, #416 çeviri 18b) sıraya alındı ama dokunulmadı.
+
+**Core (karar beklemeden yapılabilir, sırayla)**
+
+| Sıra | İş | Kaynak | Durum |
+|------|----|--------|-------|
+| C1 | Kalan modül işlerinin tek zamanlayıcıya taşınması: Destek → `QuoteExpiry` → `ContractJobs` → `MarketingSend` (iş başına bir PR) | ADR-0046 dilim 4, E3 | Destek yapıldı (15 Kasım); diğer üçü sırada |
+| C2 | Orta modüllerin uç noktaları modüle (Sipariş, Destek, Marketing) | ADR-0046 dilim 5, H3 | Sırada |
+| C3 | Büyük modüllerin uç noktaları modüle (Sözleşme, CRM; CRM birden çok PR) | ADR-0046 dilim 6, H3 | C2'den sonra |
+| C4 | Customs'ın Antrepo'ya taşınması ve Core hazır listelerindeki sektör sözlüğü | ADR-0046 dilim 7, H1, H2 | C3'ten bağımsız başlanabilir |
+| C5 | Seriyi firma yapılandırır (önek, basamak, sıfırlama; yönetim ekranı) | ADR-0049 dilim 2 | Açık kararlar listesinde değil |
+| C6 | Modül bağımlılık beyanı (`IModule` + lisans atamada denetim) | H7 | Önce kısa ADR |
+| C7 | Kapanış: `Program.cs`'te modüle özel satır kalmadığını denetleyen mimari test | ADR-0046 dilim 8 | En son |
+
+Core'da karar bekleyenler: ADR-0049 dilim 3 (numara biçimi) ve 5 (kur kaynağı), entegrasyon katmanı (E1), belge çıktısı (E2), portal kimliği (E4),
+saklama politikası (E5), yapay zekâ çekirdeği (E6, ADR-0047).
+
+**CRM (Core sırasından sonra; karar beklemeyenler)**
+
+| Sıra | İş | Kaynak | Durum |
+|------|----|--------|-------|
+| R1 | Müşteri adayı skorlama dilim 2–4 (davranış puanı, azalma/eşik olayı, puan açıklaması) | CRM epik E1 | Dilim 1 PR #417'de; birleşince devam |
+| R2 | Canlı panolar ve pano bileşenleri (A-11 ekip/departman kırılımı ile) | CRM epik E2 | Sırada |
+| R3 | Birleşik 360° müşteri zaman çizelgesi | CRM epik E9 | Sırada |
+| R4 | Çalışma alanı rengi ve rol bazlı menü | CRM epik E8 | Önce tasarım sisteminde "firmanın değiştirebileceği tokenlar" |
+| R5 | Müşteri yolculukları + görsel süreç tasarımcısı (ortak akış modeli) | CRM epik E4, E6 | `fake` sağlayıcıyla |
+| R6 | Kod yazmadan özel tablolar | CRM epik E5 | Önce ADR |
+
+CRM'de karar bekleyenler: A-12 bağları (ürün önceliği), çok kanallı gönderim/İYS (E3), yapay zekâ asistanı (E7), kampanya atıf modeli.
+
 ## B. Karar bekleyen (kod yazılmaz)
 
 - **Ürün kararı:** ADR-0029 sektör/faaliyet (kabul), ADR-0031 rentcar (kabul + pilot), ADR-0038 filo/lojistik (dilim 0 kararları: Ç0.4, Ç4 asgari, Ç8.1, ADR-0037 dilim 1), çoklu pipeline (0017), ürün varyantı (0018), kayıt bazlı `OwningUnitId` (0026), paylaşılan/takım görünümü (0036), otomatik lead atama kuralları (0014), yeniden yönlendirme ve SLA yeniden seçimi (0024), kampanya atıf modeli (0025).

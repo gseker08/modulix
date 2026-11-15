@@ -56,7 +56,6 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
             .UseSetting("QuoteExpiry:WorkerEnabled", "false")
             .UseSetting("ContractJobs:WorkerEnabled", "false")
             .UseSetting("Jobs:WorkerEnabled", "false")
-            .UseSetting("SupportJobs:WorkerEnabled", "false")
             .UseSetting("Automation:WorkerEnabled", "false")
             .UseSetting("Approvals:WorkerEnabled", "false")
             .UseSetting("MarketingSend:WorkerEnabled", "false")
