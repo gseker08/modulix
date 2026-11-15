@@ -38,7 +38,6 @@ public static class HrAccess
     public const string EmployeePositionEntityKey = "hr.employee-position";
     public const string LeaveRequestEntityKey = "hr.leave-request";
     public const string LeaveBalanceEntityKey = "hr.leave-balance";
-    public const string HolidayEntityKey = "hr.holiday";
     public const string LeaveTypeList = "hr.leave-type";
     public const string LeaveRequestEmployeeLookup = "hr.leave-request.employee";
     public const string LeaveBalanceEmployeeLookup = "hr.leave-balance.employee";

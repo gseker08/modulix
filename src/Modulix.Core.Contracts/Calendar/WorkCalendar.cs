@@ -1,10 +1,11 @@
 using System.Globalization;
 using System.Text.Json;
 
-namespace Modulix.Modules.Support.Sla;
+namespace Modulix.Core.Contracts.Calendar;
 
-// SLA iş takvimi (ADR-0024 dilim 2). Saf hesap: veri erişimi yok, saat parametreyle verilir. Zaman UTC saklanır; süre, takvimin saat dilimindeki çalışma
-// pencerelerine göre hesaplanır (hafta sonu, tatil, yarım gün, yaz/kış saati). Kodda önceden iş takvimi altyapısı yoktu; bu sınıf destek modülüne aittir.
+// İş takvimi hesabı (ADR-0024 dilim 2'de destek modülünde yazıldı; ADR-0049 dilim 6a ile ortak çekirdeğe alındı). Saf hesap: veri erişimi yok, saat
+// parametreyle verilir. Zaman UTC saklanır; süre, takvimin saat dilimindeki çalışma pencerelerine göre hesaplanır (hafta sonu, tatil, yarım gün, yaz/kış saati).
+// Firmanın resmî tatil listesi <see cref="IHolidayCalendar"/> ile okunur; SLA, izin, onay ve teslim süresi aynı hesaplayıcıyı kullanır.
 
 /// <summary>Haftanın bir günü için çalışma penceresi (yerel saat). Bir günde birden çok pencere (öğle arası) olabilir; pencereler çakışamaz.</summary>
 public sealed record DayHours(DayOfWeek Day, TimeOnly Start, TimeOnly End);
@@ -249,20 +250,3 @@ public sealed class WorkCalendar
     }
 }
 
-/// <summary>SLA sayacı hesapları: harcanan iş süresi, hedef anı ve eşik anları. Hedef ve eşikler gerçek takvim anlarıdır; işin çalıştığı ana bağlı değildir.</summary>
-public static class SlaClock
-{
-    /// <summary>Çalışan sayaç için hedef anı: çalışmaya başlanan andan, hedefin kalan iş süresi kadar sonrası.</summary>
-    public static DateTimeOffset DueAt(WorkCalendar calendar, DateTimeOffset runningSince, TimeSpan target, TimeSpan worked) =>
-        calendar.AddWorkingTime(runningSince, Max(TimeSpan.Zero, target - worked));
-
-    /// <summary>Hedefin yüzdesine ulaşılan an (yüzde 100 hedeftir; 100 üstü ihlal sonrasıdır).</summary>
-    public static DateTimeOffset ThresholdAt(WorkCalendar calendar, DateTimeOffset runningSince, TimeSpan target, TimeSpan worked, int percent) =>
-        calendar.AddWorkingTime(runningSince, Max(TimeSpan.Zero, TimeSpan.FromTicks(target.Ticks * percent / 100) - worked));
-
-    /// <summary>Şu ana kadar harcanan iş süresi: duraklatma öncesi birikmiş süre + çalışan dilim.</summary>
-    public static TimeSpan WorkedAt(WorkCalendar calendar, TimeSpan worked, DateTimeOffset? runningSince, DateTimeOffset now) =>
-        worked + (runningSince is { } since ? calendar.WorkingTimeBetween(since, now) : TimeSpan.Zero);
-
-    private static TimeSpan Max(TimeSpan a, TimeSpan b) => a > b ? a : b;
-}

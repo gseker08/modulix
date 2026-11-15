@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Calendar;
 using Modulix.Modules.Support.Sla;
 
 namespace Modulix.Modules.Support.Tests;

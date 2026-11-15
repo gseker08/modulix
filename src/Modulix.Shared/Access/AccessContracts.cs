@@ -197,6 +197,13 @@ public static class CoreAccess
     public const string ManageUsers = "core.users.manage";
     public const string ManageRoles = "core.roles.manage";
     public const string ManageSettings = "core.settings.manage";
+
+    /// <summary>Firmanın resmî tatil listesi (ADR-0049 dilim 6a): okuma her üyeye açık, yazma bu izinle.</summary>
+    public const string ManageHolidays = "core.holidays.manage";
+
+    /// <summary>Tatil listesinin kayıt türü: <c>/api/records/core.holiday</c>.</summary>
+    public const string HolidayEntityKey = "core.holiday";
+
     public const string ReadAudit = "core.audit.read";
 
     /// <summary>Özelleştirme (Y9): özel alanlar, listeler ve sektör profili.</summary>
@@ -246,5 +253,5 @@ public static class CoreAccess
     public static IReadOnlyList<string> AdministrationPermissions { get; } =
         [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies, ReadCommunication, ManageCommunication, SuppressCommunication,
          ReadAutomation, ManageAutomation, PublishAutomation, RunAutomation, ReadAutomationLogs, ApproveAutomation, ManageApprovals,
-         RunImports, ReadImports, RollbackImports, ImportPeople];
+         RunImports, ReadImports, RollbackImports, ImportPeople, ManageHolidays];
 }

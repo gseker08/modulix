@@ -427,7 +427,12 @@ public class AppNavigationTests
         Assert.Equal(["Çalışanlar", "Rehber", "Organizasyon şeması", "İzinlerim"],
             Nav([HrAccess.ModuleKey], [HrAccess.EmployeesRead, HrAccess.LeavesRead, HrAccess.LeavesRequest]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
         Assert.Contains("İzin talepleri", Nav([HrAccess.ModuleKey], [HrAccess.LeavesApprove]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
-        Assert.Equal(["İzin talepleri", "İzin hakları", "Resmî tatiller"], Nav([HrAccess.ModuleKey], [HrAccess.LeavesManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal(["İzin talepleri", "İzin hakları"], Nav([HrAccess.ModuleKey], [HrAccess.LeavesManage]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+
+        // Tatil listesi Core'dadır (ADR-0049 dilim 6a): İK menüsünde ve Yönetim'de çekirdeğin tatil izniyle görünür; İK izni yetmez.
+        Assert.Equal(["İzin talepleri", "İzin hakları", "Resmî tatiller"],
+            Nav([HrAccess.ModuleKey], [HrAccess.LeavesManage, CoreAccess.ManageHolidays]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
+        Assert.Equal("yonetim/resmi-tatiller", Nav([], [CoreAccess.ManageHolidays]).Find("admin.holidays")!.Route);
 
         // Masraf: çalışan "Masraflarım"ı, onaylayan/İK/finans "Masraf beyanları"nı görür.
         Assert.Equal(["Masraflarım"], Nav([HrAccess.ModuleKey], [HrAccess.ExpensesRead, HrAccess.ExpensesRequest]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));

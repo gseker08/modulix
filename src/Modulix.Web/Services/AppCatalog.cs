@@ -259,7 +259,7 @@ public static class AppCatalog
         new("hr.my-leaves", Hr, "İzinlerim", "calendar", "ik/izinlerim", 40, HrAccess.ModuleKey, HrAccess.LeavesRequest, Tone: AppTone.Teal),
         new("hr.leave-requests", Hr, "İzin talepleri", "check-circle", "ik/izin-talepleri", 50, HrAccess.ModuleKey, AnyPermission: [HrAccess.LeavesApprove, HrAccess.LeavesManage]),
         new("hr.leave-balances", Hr, "İzin hakları", "star", "ik/izin-haklari", 60, HrAccess.ModuleKey, HrAccess.LeavesManage, Tone: AppTone.Teal),
-        new("hr.holidays", Hr, "Resmî tatiller", "sun", "ik/resmi-tatiller", 70, HrAccess.ModuleKey, HrAccess.LeavesManage),
+        new("hr.holidays", Hr, "Resmî tatiller", "sun", "ik/resmi-tatiller", 70, HrAccess.ModuleKey, CoreAccess.ManageHolidays), // liste Core'dadır (ADR-0049 dilim 6a)
         new("hr.my-expenses", Hr, "Masraflarım", "wallet", "ik/masraflarim", 80, HrAccess.ModuleKey, HrAccess.ExpensesRequest, Tone: AppTone.Teal),
         new("hr.my-assets", Hr, "Zimmetlerim", "package", "ik/zimmetlerim", 100, HrAccess.ModuleKey, HrAccess.AssetsRead, Tone: AppTone.Teal),
         new("hr.assets", Hr, "Demirbaşlar", "clipboard-list", "ik/demirbaslar", 110, HrAccess.ModuleKey, HrAccess.AssetsManage),
@@ -296,6 +296,7 @@ public static class AppCatalog
         new("admin.roles", Admin, "Roller", "key", "yonetim/roller", 40, Permission: CoreAccess.ManageRoles, Tone: AppTone.Teal),
         new("admin.companies", Admin, "Şirketler", "landmark", "yonetim/sirketler", 50, Permission: CoreAccess.ManageCompanies),
         new("admin.settings", Admin, "Kuruluş ayarları", "wrench", "yonetim/ayarlar", 60, Permission: CoreAccess.ManageSettings, Tone: AppTone.Teal),
+        new("admin.holidays", Admin, "Resmî tatiller", "sun", "yonetim/resmi-tatiller", 62, Permission: CoreAccess.ManageHolidays),
         new("admin.ai-access", Admin, "Yapay zekâ erişimi", "zap", "yonetim/yapay-zeka", 65, Permission: CoreAccess.ManageSettings),
         new("admin.audit", Admin, "Denetim kaydı", "history", "yonetim/denetim", 70, Permission: CoreAccess.ReadAudit),
         new("admin.import-log", Admin, "İşlem günlüğü", "history", "yonetim/gunluk", 72, AnyPermission: [CoreAccess.ReadImports, CoreAccess.RunImports]),

@@ -239,8 +239,8 @@ public sealed class LeaveRequest : HrEntity
 }
 
 /// <summary>
-/// Resmî tatil ve idari izin günü (ADR-0042 dilim 2): izin gün sayısından düşülür. Firma kendi listesini girer; tarihler koda yazılmaz
-/// (dinî bayramlar her yıl değişir). Yarım gün tatil (arife) yarım gün düşer.
+/// Eski resmî tatil tablosu (ADR-0042 dilim 2). Liste Core'a taşındı (ADR-0049 dilim 6a, <c>core.Holidays</c>): satırlar taşıma migration'ında
+/// kopyalandı, artık okunmaz ve yazılmaz. Tablo geriye uyumluluk için (kesintisiz dağıtım) bir sonraki sürüme kadar durur, sonra kaldırılır.
 /// </summary>
 public sealed class Holiday : HrEntity
 {

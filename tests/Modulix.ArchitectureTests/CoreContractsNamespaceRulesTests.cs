@@ -18,6 +18,7 @@ public partial class CoreContractsNamespaceRulesTests
         "Modulix.Core.Contracts.Approvals",
         "Modulix.Core.Contracts.Authorization",
         "Modulix.Core.Contracts.Automation",
+        "Modulix.Core.Contracts.Calendar", // iş takvimi hesabı ve firmanın tatil listesi (ADR-0049 dilim 6a)
         "Modulix.Core.Contracts.Communication",
         "Modulix.Core.Contracts.Credentials",
         "Modulix.Core.Contracts.Customization",
