@@ -255,7 +255,8 @@ public class ModuleCatalogTests
 
         Assert.Equal(["sales.any-change", "sales.party-renamed"], catalog.SubscriptionsFor(DomainEventTypes.RecordUpdated, SharedEntities.Party).Select(s => s.Subscription.Key));
         Assert.Equal(["sales.any-change"], catalog.SubscriptionsFor(DomainEventTypes.RecordCreated, "sales.order").Select(s => s.Subscription.Key));
-        Assert.Empty(catalog.SubscriptionsFor(DomainEventTypes.RecordDeleted, "sales.order"));
+        // Silinme olayını bu modülde dinleyen yok; yalnızca Core'un dosya temizliği her kayıt türünün silinmesini alır (ADR-0040 dilim 3).
+        Assert.Equal([CoreModule.Subscriptions.FileCleanup], catalog.SubscriptionsFor(DomainEventTypes.RecordDeleted, "sales.order").Select(s => s.Subscription.Key));
         Assert.Equal("sales", catalog.FindSubscription("sales.party-renamed")!.Value.ModuleKey);
         Assert.Null(catalog.FindSubscription("sales.yok"));
     }

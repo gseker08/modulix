@@ -523,3 +523,15 @@ Karar (kullanıcı, 14 Kasım 2026: "Core + masraf düzeltmesi"; blog yazar mode
 | `dotnet test tests/Modulix.ArchitectureTests` | 94/94 geçti |
 | `dotnet test tests/Modulix.Modules.Hr.Tests` | 57/57 geçti |
 | `HrExpenseTests` (+1 entegrasyon testi) | Kapsadıkları: taslakta sahibi ve İK ekler; gönderimden sonra sahibi, İK ve onaylayan ekleyemez ve silemez (403); onaylayan okur ve indirir; izinsiz kullanıcı ve başka tenant ulaşamaz. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |
+
+## 26. Silinen kaydın dosya temizliği (öncelik 4c, 15 Kasım 2026)
+
+Öncelik listesinin (4) son maddesidir ve Core'da çözüldü: ADR-0040 K8. Silinen İK kaydının (duyuru, blog yazısı, albüm, masraf satırı) ekleri `record.deleted` olayıyla metadata'dan silinir ve denetime yazılır; içerik `files.cleanup` işiyle bekleme süresinden sonra silinir. İK'da modüle özel kod yoktur. Bu maddeyle bölüm 18'deki öncelik listesi tamamlandı; blog yazar modeli bilerek sonraya kaldı (bölüm 25).
+
+### Test sonuçları (bölüm 26)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.ArchitectureTests` | 111/111 geçti |
+| `dotnet test tests/Modulix.Core.Tests` | 1053/1053 geçti |
+| `FileCleanupTests` (2 entegrasyon testi, İK duyurusu üzerinden) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |

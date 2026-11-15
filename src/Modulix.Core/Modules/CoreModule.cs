@@ -184,6 +184,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>Kayda bağlı onayın bütünlüğü (ADR-0027 Dilim 4c): korunan alan değişince bekleyen talep geçersizleşir.</summary>
         public const string Approvals = "core.approvals";
+
+        /// <summary>Silinen kaydın dosyaları (ADR-0040 dilim 3): bütün kayıt türlerinin silinme olayında kaydın dosyaları silinir.</summary>
+        public const string FileCleanup = "core.file-cleanup";
     }
 
     /// <summary>Denetim kayıt türleri (Y5). Yönetim kayıtlarının değerleri her denetim okuruna açıktır.</summary>
@@ -822,6 +825,8 @@ public sealed class CoreModule : IModule
             Subscriptions.Approvals, [DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
         EventSubscription.For<AutomationEventSubscriber>(
             Subscriptions.Automation, [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
+        EventSubscription.For<Files.FileCleanupSubscriber>(
+            Subscriptions.FileCleanup, [DomainEventTypes.RecordDeleted], [], []) with { Ordered = false },
     ];
 
     /// <summary>
@@ -841,6 +846,7 @@ public sealed class CoreModule : IModule
         services.AddScoped<AssignmentEmailSubscriber>();
         services.AddScoped<AutomationEventSubscriber>();
         services.AddScoped<ApprovalRecordSubscriber>();
+        services.AddScoped<Files.FileCleanupSubscriber>();
 
         // "Onaya gönder" aksiyonu ve yayındaki süreç adı denetimi (Dilim 4c-2).
         services.AddScoped<Modulix.Core.Approvals.RequestApprovalAction>();
