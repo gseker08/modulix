@@ -62,6 +62,11 @@ public static class SettingKeys
     public const string Language = "core.regional.language";
     public const string RequireTwoFactor = "core.security.require-two-factor";
 
+    /// <summary>Firmanın çalışma günleri ve mesai saatleri (ADR-0049 dilim 6c).</summary>
+    public const string WorkDays = "core.calendar.work-days";
+
+    public const string WorkHours = "core.calendar.work-hours";
+
     /// <summary>Otomasyon acil durdurma anahtarı (ADR-0027): "false" ise firmanın hiçbir kuralı çalışmaz.</summary>
     public const string AutomationEnabled = "core.automation.enabled";
 

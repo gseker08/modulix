@@ -264,6 +264,31 @@ public class HrModuleTests
     }
 
     [Theory]
+    // 2026-11-16 Pazartesi … 2026-11-22 Pazar (ADR-0049 dilim 6c: çalışma günleri firma ayarıdır).
+    [InlineData("mon-fri", "2026-11-16", "2026-11-22", false, 5)]
+    [InlineData("mon-sat", "2026-11-16", "2026-11-22", false, 6)]
+    [InlineData("mon-fri-sat-half", "2026-11-16", "2026-11-22", false, 5.5)]
+    [InlineData("mon-fri-sat-half", "2026-11-21", "2026-11-21", true, 0.5)] // yarım Cumartesi yarım gün talebi
+    [InlineData("sun-thu", "2026-11-16", "2026-11-22", false, 5)]
+    [InlineData("sun-thu", "2026-11-20", "2026-11-21", false, 0)] // Cuma–Cumartesi hafta sonu
+    public void Leave_days_follow_the_company_work_week(string days, string start, string end, bool halfDay, double expected)
+    {
+        var worths = LeaveCalendar.DayWorths(Modulix.Core.Contracts.Calendar.WorkWeek.Weekly(days, "09:00-18:00"));
+
+        Assert.Equal((decimal)expected, LeaveCalendar.WorkingDays(DateOnly.Parse(start), DateOnly.Parse(end), halfDay, new Dictionary<DateOnly, bool>(), worths));
+    }
+
+    [Fact]
+    public void A_holiday_on_a_half_working_saturday_removes_it_and_a_half_holiday_keeps_at_most_half()
+    {
+        var worths = LeaveCalendar.DayWorths(Modulix.Core.Contracts.Calendar.WorkWeek.Weekly("mon-fri-sat-half", "09:00-18:00"));
+        var saturday = new DateOnly(2026, 11, 21);
+
+        Assert.Equal(0m, LeaveCalendar.WorkingDays(saturday, saturday, false, new Dictionary<DateOnly, bool> { [saturday] = false }, worths));
+        Assert.Equal(0.5m, LeaveCalendar.WorkingDays(saturday, saturday, false, new Dictionary<DateOnly, bool> { [saturday] = true }, worths));
+    }
+
+    [Theory]
     [InlineData("10000000146", true)]
     [InlineData("12345678950", true)]
     [InlineData("10000000147", false)] // son hane yanlış
