@@ -10,7 +10,8 @@ namespace Modulix.Modules.Logistics.Records;
 /// Sefer masrafı deposu (ADR-0038 K10, dilim 8). Masraf bir sefere bağlıdır (yalnızca oluştururken); iptal edilmiş sefere masraf açılmaz. Tür
 /// firmanın listesindendir ve kural türün kategorisine bakar: yakıtta litre zorunludur (kilometre isteğe bağlı), yakıt dışında litre ve kilometre
 /// girilmez; sürücüye rücu bayrağı yalnızca ceza kategorisinde işaretlenir. Tutar sıfırdan büyük, para birimi üç harflidir; KDV payı tutarı aşamaz;
-/// masraf tarihi ileri bir gün olamaz. Beklemedeki ve reddedilmiş masraf düzenlenir (reddedilen düzeltilip yeniden gönderilir); onaylanmış masraf
+/// masraf tarihi ileri bir gün olamaz. Beklemedeki ve reddedilmiş masraf düzenlenir (reddedilen düzeltilip yeniden gönderilir), seferi iptal
+/// edilmişse düzenlenmez (ADR-0038 bölüm 25; karar komutları açık kalır); onaylanmış masraf
 /// değişmez: onay tutara bağlıdır. Durum yalnızca iş akışı komutuyla (onay, ret, yeniden gönderme) değişir. Masraf silinmez (K12): yanlış masraf reddedilir. Makbuz ve fiş kayda Core dosya deposuyla
 /// eklenir (okuma = masraf okuma izni, ekleme ve silme = masraf yazma izni ve kaydın kuralı, ADR-0038 bölüm 24: onaylanmış masrafta ve iptal edilmiş
 /// seferde belge eklenmez, silinmez).
@@ -92,12 +93,16 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
             throw new RecordConflictException("Onaylanmış masraf değiştirilemez; hatalıysa yeni masraf girin.");
         }
 
-        if (isNew)
+        // İptal edilen sefere masraf açılmaz; beklemedeki ya da reddedilmiş masrafı da artık düzenlenmez (ADR-0038 bölüm 25). Karar komutları
+        // (onay, ret, yeniden gönderme) kapıdan geçer ve açık kalır: iptal edilen seferin bekleyen masrafı reddedilerek kapatılır.
+        if (isNew || !Context.Gate.IsOpen)
         {
             var tripStatus = await Context.Data.Set<Trip>().AsNoTracking().Where(t => t.Id == entity.TripId).Select(t => t.Status).SingleAsync(cancellationToken);
             if (tripStatus == Trip.Statuses.Cancelled)
             {
-                throw new RecordConflictException("İptal edilen sefere masraf eklenmez.");
+                throw new RecordConflictException(isNew
+                    ? "İptal edilen sefere masraf eklenmez."
+                    : "İptal edilen seferin masrafı düzenlenmez; gerekirse masrafı reddedin.");
             }
         }
 
@@ -171,9 +176,9 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
         throw new RecordConflictException("Masraf silinmez; hatalı masrafı reddedin.");
 
     /// <summary>
-    /// Makbuz ve fiş kuralı kaydın güncelleme kuralıyla aynıdır (ADR-0038 bölüm 24): beklemedeki ve reddedilmiş masrafın belgesi değişir (reddedilen
-    /// masraf belgesi düzeltilip yeniden gönderilir); onaylanmış masrafın belgesi değişmez (onay belgeye de bağlıdır). İptal edilmiş seferin masrafına
-    /// belge eklenmez ve silinmez (iptal edilen sefere masraf da açılmaz).
+    /// Makbuz ve fiş kuralı kaydın güncelleme kuralıyla aynıdır (ADR-0038 bölüm 24 ve 25): beklemedeki ve reddedilmiş masrafın belgesi değişir
+    /// (reddedilen masraf belgesi düzeltilip yeniden gönderilir); onaylanmış masrafın belgesi değişmez (onay belgeye de bağlıdır). İptal edilmiş
+    /// seferin masrafına belge eklenmez ve silinmez (masrafın kendisi de düzenlenmez).
     /// </summary>
     protected override async Task<string?> FileWriteDeniedAsync(TripExpense entity, CancellationToken cancellationToken)
     {
