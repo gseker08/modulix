@@ -18,14 +18,17 @@ public partial class CoreContractsNamespaceRulesTests
         "Modulix.Core.Contracts.Approvals",
         "Modulix.Core.Contracts.Authorization",
         "Modulix.Core.Contracts.Automation",
+        "Modulix.Core.Contracts.Calendar", // iş takvimi hesabı ve firmanın tatil listesi (ADR-0049 dilim 6a)
         "Modulix.Core.Contracts.Communication",
         "Modulix.Core.Contracts.Credentials",
         "Modulix.Core.Contracts.Customization",
+        "Modulix.Core.Contracts.Diagnostics", // ortak gözlemleme: arka plan işçisi tur ölçümü (IJobMetrics, A2)
         "Modulix.Core.Contracts.Events",
         "Modulix.Core.Contracts.Files",
         "Modulix.Core.Contracts.Localization",
         "Modulix.Core.Contracts.Modules",
         "Modulix.Core.Contracts.Notifications",
+        "Modulix.Core.Contracts.Numbering", // ortak belge numaralama (ADR-0049)
         "Modulix.Core.Contracts.Persistence",
         "Modulix.Core.Contracts.Pricing", // ortak hesap çekirdeği: para, birim, indirim, teklif toplamı (ADR-0044 karar 2)
         "Modulix.Core.Contracts.Records",

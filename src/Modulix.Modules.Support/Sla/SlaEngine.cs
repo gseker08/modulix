@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Calendar;
 using Modulix.Modules.Support.Domain;
 using Modulix.Modules.Support.Lifecycle;
 using Modulix.Modules.Support.Records;

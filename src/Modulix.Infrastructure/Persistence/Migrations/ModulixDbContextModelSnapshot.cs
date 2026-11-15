@@ -22,6 +22,25 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DataProtectionKeys", "platform");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
                 {
                     b.Property<int>("Id")
@@ -777,6 +796,43 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("AutomationScanCursors", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Calendar.Holiday", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("HalfDay")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("Holidays", "core");
                 });
 
             modelBuilder.Entity("Modulix.Core.Communication.CommunicationLinkToken", b =>
@@ -2429,6 +2485,36 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "UserId", "ReadAt", "CreatedAt");
 
                     b.ToTable("Notifications", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Numbering.NumberCounter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("LastValue")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Period")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SeriesKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "SeriesKey", "Period")
+                        .IsUnique();
+
+                    b.ToTable("NumberCounters", "core");
                 });
 
             modelBuilder.Entity("Modulix.Core.Organization.Branch", b =>
@@ -10803,6 +10889,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid>("BallotId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Choice")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -10819,7 +10908,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<int?>("Rating")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("ResponseId")
+                    b.Property<Guid?>("ResponseId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("SurveyId")
@@ -17426,8 +17515,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("TenantId", "ResponseId")
                         .HasPrincipalKey("TenantId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Modulix.Modules.Hr.Domain.SurveyQuestion", b =>

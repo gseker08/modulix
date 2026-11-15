@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -116,8 +117,10 @@ public sealed class MarketingSendRunner(IServiceScopeFactory scopes, TimeProvide
 /// başarısız olursa diğerleri etkilenmez. Bir turda iş bulunduysa kısa, bulunmadıysa uzun beklenir. Aynı hata ileti her turda yinelenmez: yalnızca değişince günlüğe yazılır.
 /// </summary>
 public sealed class MarketingSendWorker(
-    IServiceScopeFactory scopes, MarketingSendRunner runner, IOptions<MarketingSendOptions> options, ILogger<MarketingSendWorker> logger) : BackgroundService
+    IServiceScopeFactory scopes, MarketingSendRunner runner, IOptions<MarketingSendOptions> options, IJobMetrics metrics, ILogger<MarketingSendWorker> logger) : BackgroundService
 {
+    public const string JobName = "marketing.send";
+
     private readonly Dictionary<Guid, string> lastErrors = [];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -153,9 +156,12 @@ public sealed class MarketingSendWorker(
                     }
                     catch (Exception exception)
                     {
+                        metrics.TenantFailed(JobName);
                         logger.LogWarning(exception, "Tenant {TenantId} pazarlama gönderimi bu turda çalıştırılamadı.", tenantId);
                     }
                 }
+
+                metrics.TurnCompleted(JobName);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -163,6 +169,7 @@ public sealed class MarketingSendWorker(
             }
             catch (Exception exception)
             {
+                metrics.TurnFailed(JobName);
                 logger.LogError(exception, "Pazarlama gönderim turu çalıştırılamadı.");
             }
 

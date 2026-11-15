@@ -424,8 +424,10 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
 /// Zamanlanmış raporları düzenli aralıklarla çalıştırır (<c>ReportJobs:WorkerEnabled</c> ile kapatılır). Etkin her tenant ayrı çalışır; biri başarısız olursa
 /// diğerleri etkilenmez. Tenant bağlamı olmadan zamanlama sorgulanamadığı için (Row-Level Security) turda her etkin tenant için hafif bir sorgu atılır.
 /// </summary>
-public sealed class ReportScheduleWorker(IServiceScopeFactory scopes, ReportScheduleRunner runner, IOptions<ReportJobsOptions> options, ILogger<ReportScheduleWorker> logger) : BackgroundService
+public sealed class ReportScheduleWorker(IServiceScopeFactory scopes, ReportScheduleRunner runner, IOptions<ReportJobsOptions> options, Modulix.Core.Contracts.Diagnostics.IJobMetrics metrics, ILogger<ReportScheduleWorker> logger) : BackgroundService
 {
+    public const string JobName = "reports.schedule";
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
@@ -460,9 +462,12 @@ public sealed class ReportScheduleWorker(IServiceScopeFactory scopes, ReportSche
                     }
                     catch (Exception exception)
                     {
+                        metrics.TenantFailed(JobName);
                         logger.LogWarning(exception, "Tenant {TenantId} zamanlanmış raporları bu turda çalıştırılamadı.", tenantId);
                     }
                 }
+
+                metrics.TurnCompleted(JobName);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -470,6 +475,7 @@ public sealed class ReportScheduleWorker(IServiceScopeFactory scopes, ReportSche
             }
             catch (Exception exception)
             {
+                metrics.TurnFailed(JobName);
                 logger.LogError(exception, "Zamanlanmış raporlar çalıştırılamadı.");
             }
 

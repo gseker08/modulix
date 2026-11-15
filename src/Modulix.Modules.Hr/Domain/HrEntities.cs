@@ -31,6 +31,17 @@ public abstract class HrEntity : ITenantEntity, ICompanyShared
     /// <summary>Firmanın tanımladığı özel alanların değerleri (Y9a), JSON nesnesi; boşsa null.</summary>
     public string? CustomFields { get; internal set; }
 
+    /// <summary>
+    /// Tam anonim kayıt (ADR-0042 bölüm 24: kimliği gizli anketin cevabı): sıralı kimlik ve saniyeli zaman yazma anını belli ederdi; kimlik
+    /// rastgele, zaman verilen gündür (anketin açıldığı gün).
+    /// </summary>
+    internal void Anonymize(DateTimeOffset day)
+    {
+        Id = Guid.NewGuid();
+        CreatedAt = new DateTimeOffset(day.UtcDateTime.Date, TimeSpan.Zero);
+        UpdatedAt = CreatedAt;
+    }
+
     internal void Touch()
     {
         UpdatedAt = DateTimeOffset.UtcNow;
@@ -228,8 +239,8 @@ public sealed class LeaveRequest : HrEntity
 }
 
 /// <summary>
-/// Resmî tatil ve idari izin günü (ADR-0042 dilim 2): izin gün sayısından düşülür. Firma kendi listesini girer; tarihler koda yazılmaz
-/// (dinî bayramlar her yıl değişir). Yarım gün tatil (arife) yarım gün düşer.
+/// Eski resmî tatil tablosu (ADR-0042 dilim 2). Liste Core'a taşındı (ADR-0049 dilim 6a, <c>core.Holidays</c>): satırlar taşıma migration'ında
+/// kopyalandı, artık okunmaz ve yazılmaz. Tablo geriye uyumluluk için (kesintisiz dağıtım) bir sonraki sürüme kadar durur, sonra kaldırılır.
 /// </summary>
 public sealed class Holiday : HrEntity
 {
@@ -848,7 +859,17 @@ public sealed class SurveyAnswer : HrEntity
 {
     public const int TextMaxLength = 2000;
 
-    public Guid ResponseId { get; internal set; }
+    /// <summary>
+    /// Katılım satırı; kimliği gizli ankette (bölüm 24) boştur: cevap katılıma, dolayısıyla kişiye bağlanmaz. Katılım ayrı tutulur (tekrar yanıtı
+    /// engellemek için).
+    /// </summary>
+    public Guid? ResponseId { get; internal set; }
+
+    /// <summary>
+    /// Bir yanıt formunun cevaplarını bir arada tutan pusula kimliği (cevaplayan sayısı buna göre sayılır). Kimliği açık ankette katılımın kimliği,
+    /// kimliği gizli ankette rastgeledir ve başka hiçbir yerde saklanmaz.
+    /// </summary>
+    public Guid BallotId { get; internal set; }
 
     public Guid SurveyId { get; internal set; }
 

@@ -1,10 +1,13 @@
+using Modulix.Core.Contracts.Diagnostics;
 using Modulix.Infrastructure.Approvals;
 
 namespace Modulix.Api.Approvals;
 
 /// <summary>Süresi geçen onay adımlarını düzenli aralıkla işler (<c>Approvals:WorkerEnabled</c> ile kapatılır). Bir firmanın hatası diğerlerini etkilemez.</summary>
-public sealed class ApprovalEscalationWorker(ApprovalEscalationRunner runner, IConfiguration configuration, ILogger<ApprovalEscalationWorker> logger) : BackgroundService
+public sealed class ApprovalEscalationWorker(ApprovalEscalationRunner runner, IConfiguration configuration, IJobMetrics metrics, ILogger<ApprovalEscalationWorker> logger) : BackgroundService
 {
+    public const string JobName = "approvals.escalation";
+
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(5);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -35,9 +38,12 @@ public sealed class ApprovalEscalationWorker(ApprovalEscalationRunner runner, IC
                     }
                     catch (Exception exception)
                     {
+                        metrics.TenantFailed(JobName);
                         logger.LogWarning(exception, "Tenant {TenantId} onay süre aşımı turu çalıştırılamadı.", tenantId);
                     }
                 }
+
+                metrics.TurnCompleted(JobName);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -45,6 +51,7 @@ public sealed class ApprovalEscalationWorker(ApprovalEscalationRunner runner, IC
             }
             catch (Exception exception)
             {
+                metrics.TurnFailed(JobName);
                 logger.LogWarning(exception, "Onay süre aşımı turu başlatılamadı.");
             }
         }

@@ -26,7 +26,7 @@ public class HrLeaveTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
     private const string People = "/api/records/core.person";
     private const string Requests = "/api/records/hr.leave-request";
     private const string Balances = "/api/records/hr.leave-balance";
-    private const string Holidays = "/api/records/hr.holiday";
+    private const string Holidays = "/api/records/core.holiday"; // tatil listesi Core'dadır (ADR-0049 dilim 6a)
 
     [Fact]
     public async Task Employee_requests_annual_leave_manager_approves_and_balance_follows_the_decisions()

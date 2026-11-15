@@ -149,7 +149,7 @@
                         <td data-label="Tutar">@FleetLabels.Money(expense.Values["amount"]?.GetValue<decimal>(), WarehouseLabels.Text(expense, "currency"))</td>
                         <td data-label="Durum"><span class="badge @StatusBadge(status)">@StatusLabel(status)</span></td>
                         <td class="row-menu-cell actions">
-                            @if ((status is "pending" or "rejected") && CanWrite)
+                            @if (CanWrite && LogisticsAccess.ExpenseEditable(status, WarehouseLabels.Text(Trip, "status")))
                             {
                                 <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => Edit(expense)">Düzenle</button>
                             }
@@ -168,7 +168,7 @@
                     {
                         <tr>
                             <td colspan="6">
-                                <AttachmentPanel EntityKey="@LogisticsAccess.TripExpenseEntityKey" RecordId="expense.Id" CanWrite="CanWrite" Title="Makbuz ve fiş" EmptyText="Makbuz ya da fiş eklenmedi." />
+                                <AttachmentPanel EntityKey="@LogisticsAccess.TripExpenseEntityKey" RecordId="expense.Id" CanWrite="@(CanWrite && LogisticsAccess.ExpenseFilesWritable(status, WarehouseLabels.Text(Trip, "status")))" Title="Makbuz ve fiş" EmptyText="Makbuz ya da fiş eklenmedi." />
                             </td>
                         </tr>
                     }

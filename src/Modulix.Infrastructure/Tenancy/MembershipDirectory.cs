@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Organization;
 using Modulix.Core.Platform;
+using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Persistence;
 
 namespace Modulix.Infrastructure.Tenancy;
@@ -9,8 +11,11 @@ namespace Modulix.Infrastructure.Tenancy;
 /// <summary>
 /// ADR-0020: platform verisi (üyelik, tenant) her istekte okunur; tenant verisi (erişilebilir şirketler) yalnızca aktif
 /// tenant varken. Tenant DbContext'i bu yüzden tembel çözülür: aktif tenant olmayan akışlarda (ör. giriş) kurulmaz.
+/// Her istekte sorulan etkin üyelik ve erişilebilir şirketler kısa süre önbellekte tutulur (ADR-0048); destek üyeliği, süresi
+/// dolunca hemen düşmesi için önbelleğe girmez.
 /// </summary>
-internal sealed class MembershipDirectory(ModulixDbContext db, TimeProvider time) : IMembershipDirectory
+internal sealed class MembershipDirectory(ModulixDbContext db, TimeProvider time, AccessCache cache, ITenantContextAccessor tenantAccessor)
+    : IMembershipDirectory
 {
     public async Task<IReadOnlyList<MembershipSummary>> GetActiveForUserAsync(Guid userId, CancellationToken cancellationToken)
     {
@@ -26,7 +31,14 @@ internal sealed class MembershipDirectory(ModulixDbContext db, TimeProvider time
             .ToListAsync(cancellationToken);
     }
 
-    public Task<MembershipSummary?> FindActiveAsync(Guid userId, Guid tenantId, CancellationToken cancellationToken)
+    public async Task<MembershipSummary?> FindActiveAsync(Guid userId, Guid tenantId, CancellationToken cancellationToken)
+    {
+        // Yalnızca etkin (destek olmayan) üyelik saklanır; üyeliği olmayan ve destek üyeliği her istekte veritabanına sorulur.
+        return await cache.GetOrLoadAsync(
+            "membership", tenantId, userId, db, () => ReadActiveAsync(userId, tenantId, cancellationToken), store: found => found is { IsSupport: false });
+    }
+
+    private Task<MembershipSummary?> ReadActiveAsync(Guid userId, Guid tenantId, CancellationToken cancellationToken)
     {
         var now = time.GetUtcNow();
         return (
@@ -45,7 +57,12 @@ internal sealed class MembershipDirectory(ModulixDbContext db, TimeProvider time
             .Where(m => m.Id == membershipId)
             .ExecuteUpdateAsync(set => set.SetProperty(m => m.LastSignInAt, time.GetUtcNow()), cancellationToken);
 
-    public async Task<CompanyAccess> GetAccessibleCompaniesAsync(Guid membershipId, CancellationToken cancellationToken)
+    public Task<CompanyAccess> GetAccessibleCompaniesAsync(Guid membershipId, CancellationToken cancellationToken) =>
+        tenantAccessor.Current is { } tenant
+            ? cache.GetOrLoadAsync("companies", tenant.TenantId, membershipId, db, () => ReadAccessibleCompaniesAsync(membershipId, cancellationToken))
+            : ReadAccessibleCompaniesAsync(membershipId, cancellationToken);
+
+    private async Task<CompanyAccess> ReadAccessibleCompaniesAsync(Guid membershipId, CancellationToken cancellationToken)
     {
         // Tenant verisi: yalnızca aktif tenant varken çağrılır (CompanyContextMiddleware). Tenant DbContext'i burada çözülür.
 

@@ -41,6 +41,14 @@ public sealed record RecordCommand(
 {
     /// <summary>Değişikliğin nedeni; olaya yazılır (ör. <see cref="Events.EventReasons.Transfer"/>), abonelikler buna göre davranır.</summary>
     public string? Reason { get; init; }
+
+    /// <summary>
+    /// Anonim oluşturma (ADR-0042 bölüm 24: tam anonim anket cevabı). Yalnızca <see cref="IRecordStore.AllowsAnonymousWrites"/> diyen depoda
+    /// kabul edilir. Yetki ve doğrulama her zamanki gibi işler, ama yazan kişi hiçbir yere bağlanmaz: denetim satırı kullanıcısız, kayıt
+    /// kimliksiz, değersiz ve iz kimliksizdir, zamanı yalnızca gündür; olay yayımlanmaz. "Her önemli yazma denetim kaydına yazılır" kuralının
+    /// bilinçli istisnasıdır: yazmanın olduğu denetlenir, kimin ve neyin yazdığı denetlenmez.
+    /// </summary>
+    public bool Anonymous { get; init; }
 }
 
 /// <summary>
@@ -248,6 +256,12 @@ public interface IRecordStore
     bool UsesOwnerScope => OwnerField is not null;
 
     /// <summary>
+    /// Depo anonim oluşturmayı (<see cref="RecordCommand.Anonymous"/>) kabul eder mi? Varsayılan hayır: anonim yazma denetim kuralının istisnasıdır,
+    /// yalnızca kimliği hiçbir yerde saklanmaması gereken kayıt türü (tam anonim anket cevabı) açar.
+    /// </summary>
+    bool AllowsAnonymousWrites => false;
+
+    /// <summary>
     /// Veri kapsamının hangi kayıt türüne göre çözüleceği (ADR-0030): rolün kapsamı ve platform tavanı bu anahtarla aranır.
     /// Varsayılan kendi anahtarıdır. Görünürlüğü ana kaydına bağlı alt kayıt deposu (ör. fırsat iletişimcisi, aktivite notu)
     /// ana türünün anahtarını verir; böylece alt kayıt ana kaydın kapsamını izler.
@@ -308,8 +322,9 @@ public interface IRecordLabelProvider
 }
 
 /// <summary>
-/// Kayıt türü iznine ek olarak kayıt düzeyinde yazma kuralı olan depolar (ör. süreli belge: sahip kaydın güncelleme izni ve modül lisansı) bunu uygular.
-/// Kayda bağlı yan yazmalar (dosya ekleme ve silme, ADR-0040) tür izninden sonra bunu da sorar; dönen ileti doluysa işlem yetkisizdir.
+/// Kayıt türü iznine ek olarak kayıt düzeyinde yazma kuralı olan depolar (ör. süreli belge: sahip kaydın güncelleme izni ve modül lisansı; İK masraf
+/// satırı: taslak beyan, sahibi ya da İK) bunu uygular. Kayda bağlı yan yazmalar (dosya ekleme ve silme, ADR-0040) tür izninden sonra bunu da sorar;
+/// dönen ileti doluysa işlem yetkisizdir. Kaydın güncellemesini durum ya da kişiyle sınırlayan depo bu kuralı vermezse dosya, kaydın kuralını atlatır.
 /// </summary>
 public interface IRecordWriteGuard
 {

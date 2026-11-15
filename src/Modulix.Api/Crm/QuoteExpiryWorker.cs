@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -107,8 +108,10 @@ public sealed class QuoteExpiryRunner(IServiceScopeFactory scopes, TimeProvider 
 /// çalışır; biri başarısız olursa diğerleri etkilenmez ve bir sonraki turda yeniden denenir.
 /// </summary>
 public sealed class QuoteExpiryWorker(
-    IServiceScopeFactory scopes, QuoteExpiryRunner runner, IOptions<QuoteExpiryOptions> options, ILogger<QuoteExpiryWorker> logger) : BackgroundService
+    IServiceScopeFactory scopes, QuoteExpiryRunner runner, IOptions<QuoteExpiryOptions> options, IJobMetrics metrics, ILogger<QuoteExpiryWorker> logger) : BackgroundService
 {
+    public const string JobName = "crm.quote-expiry";
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
@@ -144,9 +147,12 @@ public sealed class QuoteExpiryWorker(
                     }
                     catch (Exception exception)
                     {
+                        metrics.TenantFailed(JobName);
                         logger.LogWarning(exception, "Tenant {TenantId} teklif süre dolumu bu turda çalıştırılamadı.", tenantId);
                     }
                 }
+
+                metrics.TurnCompleted(JobName);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -154,6 +160,7 @@ public sealed class QuoteExpiryWorker(
             }
             catch (Exception exception)
             {
+                metrics.TurnFailed(JobName);
                 logger.LogError(exception, "Teklif süre dolumu çalıştırılamadı.");
             }
 

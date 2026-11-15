@@ -25,6 +25,9 @@ public sealed class CoreModule : IModule
         /// <summary>Kuruluş ve modül ayarlarını yazar; okumak için izin gerekmez.</summary>
         public const string ManageSettings = "core.settings.manage";
 
+        /// <summary>Firmanın resmî tatil listesini yazar (ADR-0049 dilim 6a); okumak için izin gerekmez.</summary>
+        public const string ManageHolidays = "core.holidays.manage";
+
         public const string ReadAudit = "core.audit.read";
 
         /// <summary>Özelleştirme (Y9): özel alanlar, listeler ve sektör profili.</summary>
@@ -109,6 +112,7 @@ public sealed class CoreModule : IModule
         new(Permissions.ManageUsers, "Kullanıcıları ve kullanıcıların rollerini yönetir", "Kullanıcılar"),
         new(Permissions.ManageRoles, "Rolleri ve izinlerini yönetir", "Roller"),
         new(Permissions.ManageSettings, "Kuruluş ve modül ayarlarını değiştirir", "Kuruluş ayarları"),
+        new(Permissions.ManageHolidays, "Firmanın resmî tatil listesini düzenler", "Resmî tatiller"),
         new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
         new(Permissions.ManageCustomization, "Özel alanları ve listeleri düzenler", "Özelleştirme"),
         new(Permissions.ManageCompanies, "İşletici şirketleri ve kullanıcıların şirket görevlerini yönetir", "Şirketler"),
@@ -151,6 +155,15 @@ public sealed class CoreModule : IModule
         ])
         {
             MatchRules = [new("email", "email")],
+        },
+        new(Modulix.Core.Contracts.Calendar.CalendarEntities.Holiday, "Resmî tatil", Permissions.ManageHolidays,
+        [
+            new("date", "Tarih", ImportFieldType.Date, Required: true),
+            new("name", "Ad", Required: true),
+            new("halfDay", "Yarım gün", ImportFieldType.YesNo),
+        ])
+        {
+            MatchRules = [new("date", null, Exact: true)],
         },
     ];
 
@@ -463,6 +476,10 @@ public sealed class CoreModule : IModule
 
     IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
     [
+        new(Modulix.Core.Contracts.Calendar.CalendarEntities.Holiday, "Resmî tatil", null, new Dictionary<string, string>
+        {
+            ["date"] = "Tarih", ["name"] = "Ad", ["halfDay"] = "Yarım gün",
+        }, "name"),
         new(CredentialEntities.Credential, "Süreli belge", null, new Dictionary<string, string>
         {
             ["ownerEntityKey"] = "Sahip kayıt türü", ["ownerId"] = "Sahip kayıt", ["typeKey"] = "Belge türü", ["documentNo"] = "Belge no",

@@ -570,6 +570,14 @@ public sealed class LogisticsModule : IModule, IModuleEndpoints
         new(SharedEntities.Party, Entities.TripExpense, "supplierPartyId", "sefer masrafı (tedarikçi)"),
     ];
 
+    /// <summary>Sefer numarası ortak belge serisinden verilir (ADR-0049): <c>SF-yıl-sıra</c>, her yıl 1'den başlar.</summary>
+    public const string TripNumberSeries = "logistics.trip";
+
+    IReadOnlyList<Modulix.Core.Contracts.Numbering.NumberSeriesDefinition> IModule.NumberSeries { get; } =
+    [
+        new(TripNumberSeries, "Sefer", TripRecordStore.NumberPrefix),
+    ];
+
     /// <summary>Sürücü yetkinlikleri (ehliyet, SRC, psikoteknik...) Core süreli belgesidir (ADR-0038 K2, K3); sürücü kartının "Belgeler" bölümünde yönetilir.</summary>
     IReadOnlyList<CredentialOwner> IModule.CredentialOwners { get; } =
     [

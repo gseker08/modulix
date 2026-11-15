@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Diagnostics;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -85,8 +86,10 @@ public sealed class CommunicationCleanupRunner(IServiceScopeFactory scopes)
 /// olursa diğerleri etkilenmez ve bir sonraki turda yeniden denenir.
 /// </summary>
 public sealed class CommunicationCleanupWorker(
-    IServiceScopeFactory scopes, CommunicationCleanupRunner runner, IOptions<CommunicationCleanupOptions> options, ILogger<CommunicationCleanupWorker> logger) : BackgroundService
+    IServiceScopeFactory scopes, CommunicationCleanupRunner runner, IOptions<CommunicationCleanupOptions> options, IJobMetrics metrics, ILogger<CommunicationCleanupWorker> logger) : BackgroundService
 {
+    public const string JobName = "communication.cleanup";
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
@@ -132,9 +135,12 @@ public sealed class CommunicationCleanupWorker(
                     }
                     catch (Exception exception)
                     {
+                        metrics.TenantFailed(JobName);
                         logger.LogWarning(exception, "Tenant {TenantId} gönderim günlüğü temizliği bu turda çalıştırılamadı.", tenantId);
                     }
                 }
+
+                metrics.TurnCompleted(JobName);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -142,6 +148,7 @@ public sealed class CommunicationCleanupWorker(
             }
             catch (Exception exception)
             {
+                metrics.TurnFailed(JobName);
                 logger.LogError(exception, "Gönderim günlüğü temizliği çalıştırılamadı.");
             }
 

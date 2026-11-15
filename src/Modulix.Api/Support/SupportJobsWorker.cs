@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -101,8 +102,10 @@ public sealed class SupportJobsRunner(IServiceScopeFactory scopes, TimeProvider 
 /// SLA zamanlanmış işini düzenli aralıklarla çalıştırır (<c>SupportJobs:WorkerEnabled</c> ile kapatılır). Destek modülü açık her tenant ayrı çalışır; biri başarısız
 /// olursa diğerleri etkilenmez ve bir sonraki turda (kaçırılanlar dahil) yeniden denenir.
 /// </summary>
-public sealed class SupportJobsWorker(IServiceScopeFactory scopes, SupportJobsRunner runner, IOptions<SupportJobsOptions> options, ILogger<SupportJobsWorker> logger) : BackgroundService
+public sealed class SupportJobsWorker(IServiceScopeFactory scopes, SupportJobsRunner runner, IOptions<SupportJobsOptions> options, IJobMetrics metrics, ILogger<SupportJobsWorker> logger) : BackgroundService
 {
+    public const string JobName = "support.jobs";
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
@@ -133,9 +136,12 @@ public sealed class SupportJobsWorker(IServiceScopeFactory scopes, SupportJobsRu
                     }
                     catch (Exception exception)
                     {
+                        metrics.TenantFailed(JobName);
                         logger.LogWarning(exception, "Tenant {TenantId} SLA işleri bu turda çalıştırılamadı.", tenantId);
                     }
                 }
+
+                metrics.TurnCompleted(JobName);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -143,6 +149,7 @@ public sealed class SupportJobsWorker(IServiceScopeFactory scopes, SupportJobsRu
             }
             catch (Exception exception)
             {
+                metrics.TurnFailed(JobName);
                 logger.LogError(exception, "SLA işleri çalıştırılamadı.");
             }
 

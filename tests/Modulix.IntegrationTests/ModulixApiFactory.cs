@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Modulix.Api.Tenancy;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
@@ -11,6 +14,7 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Organization;
 using Modulix.Core.Platform;
+using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Organization;
 using Modulix.Infrastructure.Persistence;
@@ -65,8 +69,23 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
             // Oturumsuz kimlik uçlarının IP başına hız sınırı testlerde pratikte kapalıdır; sınırı sınayan test düşürür (HardeningTests).
             .UseSetting("Auth:RateLimitPerMinute", "100000")
 
+            // Oturum açmış isteklerin kişi ve firma başına genel sınırı da testlerde kapalıdır; sınırı sınayan test açar (HardeningTests).
+            .UseSetting("RateLimiting:UserPerMinute", "0")
+            .UseSetting("RateLimiting:TenantPerMinute", "0")
+
             // Sözleşme imza simülasyonunun webhook gizli anahtarı (yalnızca testlerde; gerçek ortamda ortam değişkeniyle verilir).
-            .UseSetting("ContractSignature:Simulation:WebhookSecret", ModulixApiFactory.SignatureWebhookSecret);
+            .UseSetting("ContractSignature:Simulation:WebhookSecret", ModulixApiFactory.SignatureWebhookSecret)
+
+            // Yetki önbelleği (ADR-0048) bu fabrikanın ve WithWebHostBuilder ile türetilen bütün sunucuların ortak örneğidir. Testler
+            // veriyi çoğu zaman bir sunucunun kapsamından değiştirip başka bir türetilmiş sunucuya istek atar; gerçekte bu iki ayrı sunucu
+            // örneğidir ve değişiklik en geç 30 saniyede görünür. Testler aynı süreçteki anında geçersiz kılmayı sınar.
+            .ConfigureTestServices(services =>
+            {
+                services.RemoveAll<AccessCache>();
+                services.AddSingleton(sharedAccessCache);
+            });
+
+    private readonly AccessCache sharedAccessCache = new(new MemoryCache(new MemoryCacheOptions()));
 
     /// <summary>Çerezleri saklayan, HTTPS üzerinden konuşan istemci (oturum çerezi Secure).</summary>
     public HttpClient CreateBrowserClient() =>
