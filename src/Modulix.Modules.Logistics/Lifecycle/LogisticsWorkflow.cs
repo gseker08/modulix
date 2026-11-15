@@ -8,8 +8,11 @@ using Modulix.Modules.Logistics.Records;
 
 namespace Modulix.Modules.Logistics.Lifecycle;
 
-/// <summary>Bir eylemin kullanıcı için durumu: yapılabilir mi, yapılamıyorsa nedeni. İzni olmayan eylem listede hiç yer almaz.</summary>
-public sealed record LogisticsActionState(string Action, string Label, bool Allowed, string? Message, bool RequiresReason, bool Destructive);
+/// <summary>
+/// Bir eylemin kullanıcı için durumu: yapılabilir mi, yapılamıyorsa nedeni. İzni olmayan eylem listede hiç yer almaz. Uyarı eylemi engellemez,
+/// sonucunu anlatır (ör. iptal edilen seferin bekleyen masrafları; ADR-0038 bölüm 26).
+/// </summary>
+public sealed record LogisticsActionState(string Action, string Label, bool Allowed, string? Message, bool RequiresReason, bool Destructive, string? Warning = null);
 
 /// <summary>
 /// Taşıma talebi, sevkiyat, sefer ve sefer masrafı iş akışı (ADR-0038 K7, K10, dilim 4–5, 8). Durum yalnızca bu komutlarla değişir; her geçiş kayıt boru hattından geçer
@@ -114,7 +117,9 @@ internal sealed class LogisticsWorkflow(
         foreach (var t in LogisticsTransitions.All.Where(t => t.EntityKey == entityKey && granted.Contains(t.Permission)))
         {
             var denied = !t.From.Contains(status) ? t.DeniedMessage : await PreconditionAsync(entityKey, id, t.Action, cancellationToken);
-            actions.Add(new LogisticsActionState(t.Action, t.Label, denied is null, denied, t.RequiresReason, t.Destructive));
+            var reasonRequired = t.RequiresReason || await ReasonRequiredAsync(entityKey, id, t.Action, cancellationToken);
+            var warning = denied is null ? await WarningAsync(entityKey, id, t.Action, granted, cancellationToken) : null;
+            actions.Add(new LogisticsActionState(t.Action, t.Label, denied is null, denied, reasonRequired, t.Destructive, warning));
         }
 
         return RecordResult<IReadOnlyList<LogisticsActionState>>.Ok([.. actions]);
@@ -145,7 +150,7 @@ internal sealed class LogisticsWorkflow(
         }
 
         var trimmed = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
-        if (transition.RequiresReason && trimmed is null)
+        if (trimmed is null && (transition.RequiresReason || await ReasonRequiredAsync(entityKey, id, transition.Action, cancellationToken)))
         {
             return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", [new RecordFieldError("reason", "Gerekçe zorunludur.")]);
         }
@@ -206,6 +211,37 @@ internal sealed class LogisticsWorkflow(
             return await pipeline.UpdateAsync(new RecordCommand(entityKey, id, new JsonObject { ["status"] = transition.To }, version), cancellationToken);
         }
     }
+
+    /// <summary>
+    /// Geçiş tablosunda gerekçe istemeyen eylemin bu kayıtta gerekçe istediği durum (ADR-0038 bölüm 26): iptal edilen seferin masrafını onaylamak.
+    /// Sefer yola çıkmadan gerçek bir harcama yapılmış olabilir (depoda yakıt, peşin geçiş ücreti, harcırah avansı); onay yasak değildir ama
+    /// onaylayan nedenini yazar. Gerekçe masrafın durum gerekçesine ve denetim kaydına yazılır.
+    /// </summary>
+    private async Task<bool> ReasonRequiredAsync(string entityKey, Guid id, string action, CancellationToken cancellationToken) =>
+        entityKey == LogisticsModule.Entities.TripExpense && action == LogisticsActions.Approve && await ExpenseTripCancelledAsync(id, cancellationToken);
+
+    /// <summary>
+    /// Eylemi engellemeyen uyarı (ADR-0038 bölüm 26). Sefer iptalinde bekleyen masraflar beklemede kalır, onaylayan karar verir; sayı yalnızca masraf
+    /// okuma izni olana söylenir. İptal edilen seferin masrafını onaylarken gerekçe istendiği söylenir.
+    /// </summary>
+    private async Task<string?> WarningAsync(string entityKey, Guid id, string action, IReadOnlySet<string> granted, CancellationToken cancellationToken)
+    {
+        if (entityKey == LogisticsModule.Entities.Trip && action == LogisticsActions.Cancel && granted.Contains(LogisticsModule.Permissions.ExpensesRead))
+        {
+            var pending = await context.Data.Set<TripExpense>().CountAsync(e => e.TripId == id && e.Status == TripExpense.Statuses.Pending, cancellationToken);
+            return pending == 0 ? null
+                : $"Bu seferin {pending} bekleyen masrafı var. Sefer iptal edilince masraflar beklemede kalır ve düzenlenemez; onaylayan onaylar ya da reddeder.";
+        }
+
+        return entityKey == LogisticsModule.Entities.TripExpense && action == LogisticsActions.Approve && await ExpenseTripCancelledAsync(id, cancellationToken)
+            ? "Sefer iptal edildi; onay için gerekçe yazın (ör. harcama sefer iptalinden önce yapıldı)."
+            : null;
+    }
+
+    private Task<bool> ExpenseTripCancelledAsync(Guid expenseId, CancellationToken cancellationToken) =>
+        context.Data.Set<TripExpense>().Where(e => e.Id == expenseId)
+            .Join(context.Data.Set<Trip>(), e => e.TripId, t => t.Id, (e, t) => t.Status)
+            .AnyAsync(status => status == Trip.Statuses.Cancelled, cancellationToken);
 
     /// <summary>
     /// Durum dışı ön koşul (409 iletisi): sefer bütün duraklara varış girilmeden tamamlanmaz; yüklemesi başlamış sevkiyatı olan sefer iptal edilmez.

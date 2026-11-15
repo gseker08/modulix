@@ -14,6 +14,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Modulix.Core.Contracts\Modulix.Core.Contracts.csproj" />
+    <ProjectReference Include="..\Modulix.Core.Hosting\Modulix.Core.Hosting.csproj" />
     <ProjectReference Include="..\Modulix.Core\Modulix.Core.csproj" />
     <ProjectReference Include="..\Modulix.Infrastructure\Modulix.Infrastructure.csproj" />
     <ProjectReference Include="..\Modulix.Modules.Crm\Modulix.Modules.Crm.csproj" />

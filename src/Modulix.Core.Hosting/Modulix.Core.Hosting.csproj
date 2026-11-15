@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Modüllerin uç nokta yazabilmesi için ASP.NET (ADR-0046). Core.Contracts ASP.NET'e başvurmaz; o yüzden ayrı proje. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Modulix.Core.Contracts\Modulix.Core.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

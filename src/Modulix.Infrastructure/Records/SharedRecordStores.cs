@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Modules;
@@ -56,7 +57,7 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
         {
             if (!FieldsByName.TryGetValue(name, out var field))
             {
-                errors.Add(new RecordFieldError(name, "Bilinmeyen alan."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownField));
             }
             else if (field.Parse(node).Error is { } error)
             {
@@ -68,7 +69,7 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
         {
             errors.AddRange(Fields
                 .Where(f => f.Required && !values.ContainsKey(f.Name))
-                .Select(f => new RecordFieldError(f.Name, "Bu alan zorunludur.")));
+                .Select(f => new RecordFieldError(f.Name, ServerMessages.Validation.Required)));
         }
 
         return errors;
@@ -568,7 +569,7 @@ internal sealed class PartyRelationshipRecordStore(ModulixDbContext db, ModuleCa
 internal sealed class SharedField<TEntity>(
     string name,
     bool required,
-    Func<JsonNode, (object? Value, string? Error)> parse,
+    Func<JsonNode, (object? Value, ServerMessage? Error)> parse,
     Func<TEntity, JsonNode?> read,
     Action<TEntity, object?> write)
 {
@@ -582,12 +583,12 @@ internal sealed class SharedField<TEntity>(
 
     public string? NotFoundMessage { get; init; }
 
-    public (object? Value, string? Error) Parse(JsonNode? node)
+    public (object? Value, ServerMessage? Error) Parse(JsonNode? node)
     {
         // Boş metin de boş değer sayılır.
         if (node is null || (node.GetValueKind() == JsonValueKind.String && string.IsNullOrWhiteSpace(node.GetValue<string>())))
         {
-            return required ? (null, "Bu alan zorunludur.") : (null, null);
+            return required ? (null, ServerMessages.Validation.Required) : (null, null);
         }
 
         return parse(node);
@@ -611,7 +612,7 @@ internal static class SharedField
             {
                 if (node is not JsonArray array || array.Any(i => i is not JsonValue v || v.GetValueKind() != JsonValueKind.String))
                 {
-                    return (null, "Metin listesi bekleniyor.");
+                    return (null, ServerMessages.Validation.TextList);
                 }
 
                 var (codes, error) = PartyRelationshipRules.Normalize(array.Select(i => i!.GetValue<string>()));
@@ -626,7 +627,7 @@ internal static class SharedField
             node => node.GetValueKind() == JsonValueKind.String
                     && DateOnly.TryParseExact(node.GetValue<string>(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
                 ? (date, null)
-                : (null, "Tarih yyyy-AA-gg biçiminde olmalıdır."),
+                : (null, ServerMessages.Validation.DateFormat),
             e => get(e) is { } value ? value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
             (e, v) => set(e, (DateOnly?)v));
 
@@ -659,11 +660,11 @@ internal static class SharedField
             {
                 if (node.GetValueKind() != JsonValueKind.Number || !node.AsValue().TryGetValue<decimal>(out var number))
                 {
-                    return (null, "Sayı olmalıdır.");
+                    return (null, ServerMessages.Validation.Number);
                 }
 
                 return number < min || number > max
-                    ? (null, $"{min.ToString(CultureInfo.InvariantCulture)} ile {max.ToString(CultureInfo.InvariantCulture)} arasında olmalıdır.")
+                    ? (null, ServerMessages.Validation.Range(min.ToString(CultureInfo.InvariantCulture), max.ToString(CultureInfo.InvariantCulture)))
                     : (number, null);
             },
             e => get(e) is { } value ? JsonValue.Create(value) : null,
@@ -672,7 +673,7 @@ internal static class SharedField
     /// <summary>Evet/hayır alanı; boş değer <paramref name="whenEmpty"/> olur.</summary>
     public static SharedField<T> Flag<T>(string name, Func<T, bool> get, Action<T, bool> set, bool whenEmpty = false) =>
         new(name, required: false,
-            node => node.GetValueKind() is JsonValueKind.True or JsonValueKind.False ? (node.GetValue<bool>(), null) : (null, "Evet ya da hayır olmalıdır."),
+            node => node.GetValueKind() is JsonValueKind.True or JsonValueKind.False ? (node.GetValue<bool>(), null) : (null, ServerMessages.Validation.YesNo),
             e => get(e),
             (e, v) => set(e, v is bool flag ? flag : whenEmpty));
 
@@ -680,7 +681,7 @@ internal static class SharedField
         new(name, required: false, node =>
             {
                 var text = ParseText(node, maxLength);
-                return text.Error is null && text.Value is string value && !IsEmail(value) ? (null, "Geçerli bir e-posta adresi girin.") : text;
+                return text.Error is null && text.Value is string value && !IsEmail(value) ? (null, ServerMessages.Validation.Email) : text;
             },
             e => get(e),
             (e, v) => set(e, (string?)v));
@@ -705,20 +706,20 @@ internal static class SharedField
             NotFoundMessage = "Firma bulunamadı.",
         };
 
-    private static (object? Value, string? Error) ParseId(JsonNode node) =>
+    private static (object? Value, ServerMessage? Error) ParseId(JsonNode node) =>
         node.GetValueKind() == JsonValueKind.String && Guid.TryParse(node.GetValue<string>(), CultureInfo.InvariantCulture, out var id) && id != Guid.Empty
             ? (id, null)
-            : (null, "Geçerli bir kayıt kimliği olmalıdır.");
+            : (null, ServerMessages.Validation.RecordId);
 
-    private static (object? Value, string? Error) ParseText(JsonNode node, int maxLength)
+    private static (object? Value, ServerMessage? Error) ParseText(JsonNode node, int maxLength)
     {
         if (node.GetValueKind() != JsonValueKind.String)
         {
-            return (null, "Metin olmalıdır.");
+            return (null, ServerMessages.Validation.Text);
         }
 
         var text = node.GetValue<string>().Trim();
-        return text.Length > maxLength ? (null, $"En fazla {maxLength} karakter olabilir.") : (text, null);
+        return text.Length > maxLength ? (null, ServerMessages.Validation.MaxLength(maxLength)) : (text, null);
     }
 
     private static bool IsEmail(string value)
@@ -785,7 +786,7 @@ internal sealed class PlaceRecordStore(ModulixDbContext db, ModuleCatalog catalo
         place.NormalizedName = PlaceRules.NormalizeName(place.Name);
         if (place.NormalizedName.Length == 0)
         {
-            errors.Add(new RecordFieldError("name", "Bu alan zorunludur."));
+            errors.Add(new RecordFieldError("name", ServerMessages.Validation.Required));
         }
 
         if (!IsoCountryCodes.IsValid(place.CountryCode))
