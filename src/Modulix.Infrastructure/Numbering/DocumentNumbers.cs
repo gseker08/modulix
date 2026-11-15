@@ -35,10 +35,14 @@ internal sealed class DocumentNumbers(ModulixDbContext db, ModuleCatalog modules
 
     public async Task<string> NextAsync(string seriesKey, Func<int, CancellationToken, Task<long>>? seedLastValue = null, CancellationToken cancellationToken = default)
     {
-        var series = modules.FindNumberSeries(seriesKey)
+        var declared = modules.FindNumberSeries(seriesKey)
             ?? throw new InvalidOperationException($"Belge serisi beyan edilmemiş: '{seriesKey}'. Modül seriyi IModule.NumberSeries ile bildirmelidir.");
         var tenantId = tenantAccessor.Current?.TenantId
             ?? throw new InvalidOperationException("Belge numarası tenant bağlamı olmadan verilemez.");
+
+        // Firmanın yapılandırması (dilim 2a): önek, basamak ve sıfırlama; yoksa beyan edilen varsayılan.
+        var setting = await db.NumberSeriesSettings.AsNoTracking().SingleOrDefaultAsync(s => s.SeriesKey == seriesKey, cancellationToken);
+        var series = setting?.Apply(declared) ?? declared;
 
         var year = (await Clock.GetAsync(cancellationToken)).Today.Year;
         var period = series.PeriodOf(year);

@@ -28,6 +28,7 @@ public sealed partial class ModuleCatalog
     private readonly List<SharedRecordAccess> sharedAccess = [];
     private readonly Dictionary<string, (string ModuleKey, CredentialOwner Owner)> credentialOwners = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Modulix.Core.Contracts.Numbering.NumberSeriesDefinition> numberSeries = new(StringComparer.Ordinal);
+    private readonly List<(string ModuleKey, Modulix.Core.Contracts.Numbering.NumberSeriesDefinition Series)> numberSeriesOwners = [];
     private readonly Dictionary<string, (string ModuleKey, EventSubscription Subscription)> subscriptions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, BusinessEventDefinition Definition)> businessEvents = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, ModuleJobDefinition Job)> jobs = new(StringComparer.Ordinal);
@@ -168,6 +169,8 @@ public sealed partial class ModuleCatalog
                     throw new InvalidOperationException(
                         $"Geçersiz belge serisi: '{series.Key}' ({module.Key}). Anahtar modül anahtarıyla başlamalı ve bir kez bildirilmeli; önek büyük harf ve rakamdan oluşmalı, basamak sayısı {Modulix.Core.Contracts.Numbering.NumberSeriesDefinition.MinDigits}-{Modulix.Core.Contracts.Numbering.NumberSeriesDefinition.MaxDigits} olmalı.");
                 }
+
+                numberSeriesOwners.Add((module.Key, series));
             }
 
             foreach (var businessEvent in module.BusinessEvents)
@@ -357,6 +360,9 @@ public sealed partial class ModuleCatalog
     /// <summary>Beyan edilmiş belge serisi (ADR-0049); bildirilmemişse null.</summary>
     public Modulix.Core.Contracts.Numbering.NumberSeriesDefinition? FindNumberSeries(string seriesKey) =>
         numberSeries.GetValueOrDefault(seriesKey);
+
+    /// <summary>Beyan edilmiş belge serileri, modül ve beyan sırasıyla (ADR-0049 dilim 2a: firma yönetimi listesi).</summary>
+    public IReadOnlyList<(string ModuleKey, Modulix.Core.Contracts.Numbering.NumberSeriesDefinition Series)> NumberSeries => numberSeriesOwners;
 
     /// <summary>Süreli belge taşıyabilen kayıt türleri, modül ve tanım sırasıyla.</summary>
     public IEnumerable<(string ModuleKey, CredentialOwner Owner)> CredentialOwners =>

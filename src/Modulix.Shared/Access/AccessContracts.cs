@@ -208,6 +208,9 @@ public static class CoreAccess
     /// <summary>Firmanın resmî tatil listesi (ADR-0049 dilim 6a): okuma her üyeye açık, yazma bu izinle.</summary>
     public const string ManageHolidays = "core.holidays.manage";
 
+    /// <summary>Belge numarası serileri (ADR-0049 dilim 2a): yapılandırma ve sayacı ileri alma.</summary>
+    public const string ManageNumbering = "core.numbering.manage";
+
     public const string ReadAudit = "core.audit.read";
 
     /// <summary>Özelleştirme (Y9): özel alanlar, listeler ve sektör profili.</summary>
@@ -257,5 +260,5 @@ public static class CoreAccess
     public static IReadOnlyList<string> AdministrationPermissions { get; } =
         [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies, ReadCommunication, ManageCommunication, SuppressCommunication,
          ReadAutomation, ManageAutomation, PublishAutomation, RunAutomation, ReadAutomationLogs, ApproveAutomation, ManageApprovals,
-         RunImports, ReadImports, RollbackImports, ImportPeople, ManageHolidays];
+         RunImports, ReadImports, RollbackImports, ImportPeople, ManageHolidays, ManageNumbering];
 }

@@ -195,6 +195,8 @@ public class ModulixDbContext(
     /// <summary>Belge serisi sayaçları (ADR-0049).</summary>
     public DbSet<Modulix.Core.Numbering.NumberCounter> NumberCounters => Set<Modulix.Core.Numbering.NumberCounter>();
 
+    public DbSet<Modulix.Core.Numbering.NumberSeriesSetting> NumberSeriesSettings => Set<Modulix.Core.Numbering.NumberSeriesSetting>();
+
     /// <summary>Kayıtlara bağlı dosyaların üst verisi (ADR-0040); içerik depolama adaptöründedir.</summary>
     public DbSet<Modulix.Core.Files.StoredFile> StoredFiles => Set<Modulix.Core.Files.StoredFile>();
 

@@ -98,6 +98,7 @@ public static class PersistenceSetup
         services.AddScoped<IModuleData, ModuleData>();
         services.AddScoped<ITransactionLock, SqlTransactionLock>();
         services.AddScoped<Modulix.Core.Contracts.Numbering.IDocumentNumbers, Modulix.Infrastructure.Numbering.DocumentNumbers>();
+        services.AddScoped<Modulix.Core.Numbering.INumberSeriesAdmin, Modulix.Infrastructure.Numbering.NumberSeriesAdmin>();
 
         // Modül hakları ve izinler; ModuleCatalog'u host kaydeder (AddModulixModules).
         services.AddScoped<IModuleEntitlements, ModuleEntitlements>();

@@ -2529,6 +2529,47 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("NumberCounters", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Numbering.NumberSeriesSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("Digits")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Prefix")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("Reset")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SeriesKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "SeriesKey")
+                        .IsUnique();
+
+                    b.ToTable("NumberSeriesSettings", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Organization.Branch", b =>
                 {
                     b.Property<Guid>("Id")
