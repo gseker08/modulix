@@ -138,6 +138,12 @@ public interface IModule
     /// </summary>
     ModuleReporting Reports => ModuleReporting.None;
 
+    /// <summary>
+    /// Modülün zamanlanmış işleri (ADR-0046): host'taki tek zamanlayıcı her işi, modülü açık her tenant için ayrı çalıştırır. Anahtar modül
+    /// anahtarıyla başlar; sistem kimliği modülün kendi olay aboneliğidir; beyan açılışta doğrulanır. Modül kendi <c>BackgroundService</c>'ini yazmaz.
+    /// </summary>
+    IReadOnlyList<ModuleJobDefinition> Jobs => [];
+
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
     {

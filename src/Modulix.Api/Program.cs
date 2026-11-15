@@ -149,9 +149,10 @@ builder.Services.AddHostedService<Modulix.Api.Crm.QuoteExpiryWorker>();
 builder.Services.Configure<Modulix.Api.Contracts.ContractJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Contracts.ContractJobsOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Contracts.ContractJobsRunner>();
 builder.Services.AddHostedService<Modulix.Api.Contracts.ContractJobsWorker>();
-builder.Services.Configure<Modulix.Api.Orders.OrderJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Orders.OrderJobsOptions.SectionName));
-builder.Services.AddSingleton<Modulix.Api.Orders.OrderJobsRunner>();
-builder.Services.AddHostedService<Modulix.Api.Orders.OrderJobsWorker>();
+
+// Modüllerin zamanlanmış işleri tek zamanlayıcıdan çalışır (ADR-0046); işler modül kaydından (IModule.Jobs) okunur.
+builder.Services.AddSingleton<Modulix.Api.Jobs.ModuleJobRunner>();
+builder.Services.AddHostedService<Modulix.Api.Jobs.ModuleJobsWorker>();
 
 // Kullanıcı yönetimi: davet sınırı "Users" bölümünde; e-postadaki bağlantıların kökü App:PublicUrl (üretimde zorunlu).
 builder.Services.Configure<UserAdministrationOptions>(builder.Configuration.GetSection(UserAdministrationOptions.SectionName));

@@ -68,13 +68,6 @@ public partial class ApiModuleFolderRulesTests
             "Modulix.Core.Platform",
             "Modulix.Infrastructure",
         ],
-        ["Orders"] =
-        [
-            "Modulix.Core.Events",
-            "Modulix.Core.Modules",
-            "Modulix.Core.Platform",
-            "Modulix.Infrastructure",
-        ],
         ["Support"] =
         [
             "Modulix.Api.Crm",
