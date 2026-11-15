@@ -8,14 +8,14 @@
 {
     @if (pending?.Warning is { Length: > 0 } warning)
     {
-        <div class="alert alert-warning" role="status">@warning</div>
+        <div id="action-warning" class="alert alert-warning" role="status">@warning</div>
     }
 
     <section class="list-toolbar" aria-label="İş akışı eylemleri">
         @if (pending is { } asking)
         {
             <label class="visually-hidden" for="action-reason">Gerekçe</label>
-            <input id="action-reason" class="form-control" maxlength="500" placeholder="@($"{asking.Label} gerekçesi")" @bind="reason" @bind:event="oninput" />
+            <input id="action-reason" class="form-control" maxlength="500" placeholder="Gerekçe yazın" aria-describedby="@(asking.Warning is { Length: > 0 } ? "action-warning" : null)" @bind="reason" @bind:event="oninput" />
             <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => pending = null">Vazgeç</button>
             <button type="button" class="@(asking.Destructive ? "btn btn-outline-danger" : "btn btn-tonal")" disabled="@(busy || string.IsNullOrWhiteSpace(reason))"
                     aria-busy="@(busy ? "true" : null)" @onclick="() => RunAsync(asking)">@asking.Label</button>

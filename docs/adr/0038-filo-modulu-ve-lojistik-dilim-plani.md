@@ -652,7 +652,7 @@ Karar (kullanıcı, 15 Kasım 2026: "B + 3"). Bölüm 25'ten sonra iki soru aç�
 - **Gerekçeli onay (3):** iptal edilen seferin masrafını onaylamak gerekçe ister (eylem listesinde `requiresReason` dinamik, gerekçesiz 422). Gerekçe masrafın durum gerekçesine (`statusReason`) ve denetim kaydına yazılır; ayrıntıda "Onay gerekçesi" olarak görünür. Ret zaten gerekçe istiyordu; açık seferde onay değişmedi. Firma onayı genel onay sürecine bağladıysa (ADR-0027) o kapı da sorulmaya devam eder.
 - Onaylanan masraf, geliri olmayan iptal edilmiş seferde kalır; bu "iptal maliyeti" olarak doğru bilgidir.
 
-**Kapsam dışı (bilerek):** masrafı başka sefere aktarma komutu (senaryo 3; gerçek ihtiyaçta, denetim kayıtlı ayrı iş akışı olarak); sefer iptalinde onaylayana bildirim şablonu (firma kural olarak kurabilir: `logistics.trip.updated` olayı, durum = iptal koşuluyla). **Açık ve koyu tema ekran görüntüsü alınmadı** (yeni ekran yok; var olan rozet ve uyarı sınıfları kullanıldı).
+**Kapsam dışı (bilerek):** masrafı başka sefere aktarma komutu (senaryo 3; gerçek ihtiyaçta, denetim kayıtlı ayrı iş akışı olarak); sefer iptalinde onaylayana bildirim şablonu (firma kural olarak kurabilir: `logistics.trip.updated` olayı, durum = iptal koşuluyla). **Arayüz tarayıcıda denetlendi** (örnek veriyle, açık ve koyu tema): Masraflar kuyruğunda ve ayrıntıda "Sefer iptal edildi" rozeti, onay ve iptal adımında uyarı, gerekçeyle onaylanan masrafta "Onay gerekçesi" satırı; yeni CSS sınıfı ya da token yok. Denetimde gerekçe kutusunun yer tutucusu ("Onayla gerekçesi", "İptal et gerekçesi") düzeltildi: artık "Gerekçe yazın"; uyarı kutuya `aria-describedby` ile bağlı.
 
 ### Test sonuçları (bölüm 26)
 
