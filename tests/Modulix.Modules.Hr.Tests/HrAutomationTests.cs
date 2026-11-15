@@ -22,8 +22,25 @@ public partial class HrAutomationTests
         Assert.NotNull(Catalog.FindAutomationAction(HrAutomation.StartChecklist));
         Assert.Equal(HrAutomationTemplates.All.Select(t => t.Key),
             Catalog.AutomationTemplates.Where(t => t.ModuleKey == HrModule.ModuleKey).Select(t => t.Template.Key));
-        Assert.Equal(7, HrAutomationTemplates.All.Count);
+        Assert.Equal(10, HrAutomationTemplates.All.Count);
         Assert.All(HrAutomationTemplates.All, t => Assert.StartsWith(HrModule.ModuleKey + ".", t.Key));
+
+        // Yalnızca blog onay bildiriminin alıcısı kayıtta yoktur; firma taslakta seçer (bölüm 28).
+        var blank = Assert.Single(HrAutomationTemplates.All, t => t.ToComplete.Count > 0);
+        Assert.Equal(HrAutomationTemplates.BlogAwaitingReview, blank.Key);
+        Assert.Equal("recipientId", Assert.Single(blank.ToComplete).Parameter);
+    }
+
+    [Fact]
+    public void Blog_rules_run_with_both_the_read_and_the_manage_permission_so_they_can_read_drafts()
+    {
+        // Blog deposu okumada "blog okuma", taslak için "blog yönetimi" ister; kuralın kimliği ikisini de taşımalı (bölüm 28).
+        foreach (var template in HrAutomationTemplates.All.Where(t => t.EntityKey == HrModule.Entities.BlogPost))
+        {
+            var identity = AutomationRuleIdentity.Permissions(template.EntityKey, template.Definition, Catalog);
+            Assert.Contains(HrModule.Permissions.BlogRead, identity);
+            Assert.Contains(HrModule.Permissions.BlogManage, identity);
+        }
     }
 
     [Fact]
@@ -58,6 +75,7 @@ public partial class HrAutomationTests
         [
             "hr.employee.userId", "hr.leave-request.employeeUserId", "hr.leave-request.approverUserId", "hr.expense-claim.employeeUserId",
             "hr.expense-claim.approverUserId", "hr.asset-assignment.employeeUserId", "hr.checklist-task.assigneeUserId", "hr.checklist-task.employeeUserId",
+            "hr.blog-post.authorUserId",
         ];
         var recipients = Declared.Fields.Where(f => f.LookupKey == HrAutomation.NotifyRecipientLookup).Select(f => f.Key).ToList();
 

@@ -522,7 +522,7 @@ Karar (kullanıcı, 14 Kasım 2026: "Core + masraf düzeltmesi"; blog yazar mode
 |---|---|
 | `dotnet test tests/Modulix.ArchitectureTests` | 94/94 geçti |
 | `dotnet test tests/Modulix.Modules.Hr.Tests` | 57/57 geçti |
-| `HrExpenseTests` (+1 entegrasyon testi) | Kapsadıkları: taslakta sahibi ve İK ekler; gönderimden sonra sahibi, İK ve onaylayan ekleyemez ve silemez (403); onaylayan okur ve indirir; izinsiz kullanıcı ve başka tenant ulaşamaz. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |
+| `HrExpenseTests` (+1 entegrasyon testi) | Kapsadıkları: taslakta sahibi ve İK ekler; gönderimden sonra sahibi, İK ve onaylayan ekleyemez ve silemez (403); onaylayan okur ve indirir; izinsiz kullanıcı ve başka tenant ulaşamaz. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır; ilk çalışmada kuralın kaydı okuyamadığını yakaladı). |
 
 ## 26. Silinen kaydın dosya temizliği (öncelik 4c, 15 Kasım 2026)
 
@@ -534,7 +534,7 @@ Karar (kullanıcı, 14 Kasım 2026: "Core + masraf düzeltmesi"; blog yazar mode
 |---|---|
 | `dotnet test tests/Modulix.ArchitectureTests` | 111/111 geçti |
 | `dotnet test tests/Modulix.Core.Tests` | 1053/1053 geçti |
-| `FileCleanupTests` (2 entegrasyon testi, İK duyurusu üzerinden) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |
+| `FileCleanupTests` (2 entegrasyon testi, İK duyurusu üzerinden) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır; ilk çalışmada kuralın kaydı okuyamadığını yakaladı). |
 
 ## 27. Çalışanın blog yazısı ve onay akışı (15 Kasım 2026)
 
@@ -574,5 +574,25 @@ Karar (kullanıcı, 15 Kasım 2026: "Yaz, onaya gönder"). Bölüm 25'te bilerek
 | `dotnet test tests/Modulix.ArchitectureTests` | 111/111 geçti |
 | `dotnet test tests/Modulix.Modules.Hr.Tests` | 64/64 geçti (rol şablonları ve paylaşılan sabitler genişletildi) |
 | `dotnet test tests/Modulix.Core.Tests` | 1053/1053 geçti |
-| `HrBlogAuthorTests` (4 yeni entegrasyon testi) | Mutlu yol (yaz, ek, gönder, geri çevir, düzelt, yeniden gönder, yayınla; okur görür), doğrulama ve kural (yazar yayınlayamaz, kilitli yazı ve ekleri, gerekçesiz geri çevirme, durum dışı ve bilinmeyen eylem, eski sürüm), tenant izolasyonu (404), yetki (okur yazamaz, yazar başkasının taslağını göremez ve değiştiremez, yazar karar veremez). Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |
+| `HrBlogAuthorTests` (4 yeni entegrasyon testi) | Mutlu yol (yaz, ek, gönder, geri çevir, düzelt, yeniden gönder, yayınla; okur görür), doğrulama ve kural (yazar yayınlayamaz, kilitli yazı ve ekleri, gerekçesiz geri çevirme, durum dışı ve bilinmeyen eylem, eski sürüm), tenant izolasyonu (404), yetki (okur yazamaz, yazar başkasının taslağını göremez ve değiştiremez, yazar karar veremez). Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır; ilk çalışmada kuralın kaydı okuyamadığını yakaladı). |
 | `Modulix.Web` derlemesi | Yerel SDK 10.0.115'teki bilinen Razor hataları dışında yeni hata yok (önce/sonra aynı 204 satır); Razor sayfaları CI'daki SDK ile derlenir |
+
+## 28. Blog onay bildirimleri (15 Kasım 2026)
+
+Bölüm 27'de kapsam dışı bırakılan bildirimler, İK'nın bildirim düzeniyle (bölüm 18) başlangıç kuralı şablonu olarak eklendi. Firma şablonu kullanıp yayınlayınca çalışır; kodda sabit bildirim yoktur.
+
+- **Otomasyon alanları:** `hr.blog-post.status` (seçim: taslak, onay bekliyor, geri çevrildi, yayında) ve `hr.blog-post.authorUserId` ("Bildirim gönder → Kime"ye bağlanabilir).
+- **Şablonlar** (durum geçişi tetikleyicisi, Core "Bildirim gönder"):
+  - `hr.blog-review-notify`: yazı onaya gönderilince bildirir. Alıcı kayıtta olmadığı için firma taslakta seçer (`ToComplete`); seçilmeden kural yayınlanamaz.
+  - `hr.blog-returned-notify`: yazı geri çevrilince yazara bildirir. Gerekçe bildirimde değil, yazıda görülür.
+  - `hr.blog-published-notify`: yazı yayınlanınca (onayla ya da doğrudan) yazara bildirir.
+- **Kuralın kimliği:** blog deposu okumada `hr.blog.read`, taslak ve onay bekleyen yazıyı görmek için `hr.blog.manage` ister. Otomasyon kayıt türünün izni `hr.blog.manage`'dir; blog alanları (`title`, `isPublished`, `status`, `authorUserId`) `hr.blog.read` okuma iznini taşır. Bu alanları kullanan kural (şablonların hepsi başlığı kullanır) iki izinle çalışır; yoksa kural kaydı okuyamaz ve bildirim gitmez (ilk CI çalışmasında yakalandı).
+- **Yetki:** Core bildirimi alıcı kaydı kendi yetkisiyle göremiyorsa göndermez. Onay bildiriminin alıcısı olarak yönetim izni olmayan biri seçilirse onay bekleyen taslağı göremez ve bildirim almaz.
+
+### Test sonuçları (bölüm 28)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 65/65 geçti (şablon sayısı, bildirime bağlanabilen alanlar, alıcısı taslakta seçilen tek şablon, blog kurallarının kimliği okuma ve yönetim iznini taşır: alan izni geri alınınca kırılıyor) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Core.Tests` | 111/111 / 1067/1067 geçti |
+| `HrAutomationTests` (1 yeni entegrasyon testi, 1 genişletilen) | **Bütün şablonlar** gerçek yayın doğrulamasından geçer (alıcı seçilerek). **Blog bildirimleri:** alıcı seçilmeden yayın reddedilir; onaya gönderilen yazı seçilen yönetene bildirilir; geri çevirme ve yayın yazara bildirilir. **Yetki:** yazıyı göremeyen alıcıya bildirim gitmez. **Tenant izolasyonu:** B firmasında bildirim yoktur. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır; ilk çalışmada kuralın kaydı okuyamadığını yakaladı). |
