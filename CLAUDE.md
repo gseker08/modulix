@@ -14,7 +14,7 @@ dotnet test tests/Modulix.ArchitectureTests      # veritabanı gerekmez, hızlı
 dotnet test tests/Modulix.Core.Tests             # birim
 dotnet test tests/Modulix.Modules.Crm.Tests      # birim
 dotnet test tests/Modulix.Modules.Contracts.Tests # birim (sözleşme kuralları)
-dotnet test tests/Modulix.IntegrationTests       # SQL Server + Mailpit gerekir
+dotnet test tests/Modulix.IntegrationTests       # SQL Server + Mailpit + S3 test deposu (compose s3) gerekir
 dotnet run --project src/Modulix.Api             # API + arayüz; /health
 dotnet run --project src/Modulix.Api -- migrate  # bekleyen migration'lar (tek zincir); db-up.ps1 bunu çağırır
 dotnet run --project src/Modulix.Api -- tenant-export <slug> [--dir <dizin>]   # tenant verisini TenantId ile JSON olarak dışa aktarır
