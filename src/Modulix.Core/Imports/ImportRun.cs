@@ -139,6 +139,12 @@ public sealed class ImportRun : ITenantEntity, ICompanyShared
     /// <summary>Kullanıcıya gösterilen kısa sonuç; satır değeri ve kişisel veri içermez.</summary>
     public string? Note { get; private set; }
 
+    /// <summary>
+    /// Hatalı satır raporunun silineceği an. Rapor şifreli olarak dosya deposunda durur (ADR-0033 K4 değişikliği, 15.11.2026);
+    /// temizlik işi bu ana gelen raporu siler ve alanı boşaltır. Boşsa koşunun saklanan raporu yoktur.
+    /// </summary>
+    public DateTimeOffset? ErrorReportExpiresAt { get; private set; }
+
     public bool IsTerminal => Status is ImportRunStatus.Succeeded or ImportRunStatus.PartiallySucceeded
         or ImportRunStatus.Failed or ImportRunStatus.Cancelled or ImportRunStatus.RolledBack;
 
@@ -229,6 +235,22 @@ public sealed class ImportRun : ITenantEntity, ICompanyShared
         Status = ImportRunStatus.Failed;
         Finish(note, now);
     }
+
+    /// <summary>
+    /// Rapor depoya yazılmadan önce işaretlenir: yazma sırasında süreç çökse de temizlik işi raporu bulur. Yalnızca çalışan koşuya rapor eklenir.
+    /// </summary>
+    public void MarkErrorReport(DateTimeOffset expiresAt)
+    {
+        if (Status != ImportRunStatus.Running)
+        {
+            throw new InvalidOperationException("Yalnızca çalışan içe aktarmaya hata raporu eklenir.");
+        }
+
+        ErrorReportExpiresAt = expiresAt;
+    }
+
+    /// <summary>Rapor depodan silindi.</summary>
+    public void ClearErrorReport() => ErrorReportExpiresAt = null;
 
     /// <summary>Çalışan koşunun o ana kadarki sayıları: ekran ilerlemeyi gösterir, çökmede alınan satır sayısı bilinir.</summary>
     public void ReportProgress(int created, int failed)

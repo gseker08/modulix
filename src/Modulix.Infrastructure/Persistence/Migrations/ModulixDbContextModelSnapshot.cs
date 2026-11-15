@@ -2256,6 +2256,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<DateTimeOffset?>("ErrorReportExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<int>("FailedCount")
                         .HasColumnType("int");
 
@@ -2317,6 +2320,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "CreatedAt");
+
+                    b.HasIndex("TenantId", "ErrorReportExpiresAt")
+                        .HasFilter("[ErrorReportExpiresAt] IS NOT NULL");
 
                     b.HasIndex("TenantId", "EntityKey", "CreatedAt");
 

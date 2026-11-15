@@ -139,14 +139,14 @@ Mutlu yol (yükle, uygula, sonuç); hata/doğrulama (her hata kodu, biçim, dosy
 - Kuru çalışma aynı yoldan geçer, satırın işlemi geri alınır. Doğrulama birebir aynıdır; yalnızca günlüğe koşu satırı yazılır.
 - Mükerrer yalnızca uyarıdır (`duplicate-possible`): `MatchFields` kullanıcının kapsamında sorgulanır, dosya içi tekrar da uyarılır.
 - Tenant başına tek koşu `sp_getapplock` oturum kilidiyle sağlanır (409). Kilit koşu sonunda açıkça bırakılır: kapanan bağlantı havuza döner ve SQL oturumu kilidi tutmaya devam eder. Kilit alındığında "çalışıyor" görünen koşu çökmüş sayılır ve `Failed` yapılır.
-- Hata raporu bellekte bir saat tutulur, veritabanına yazılmaz ve **yalnızca yükleyene** verilir: dosya, firmanın günlüğünü gören birinin görme yetkisi olmayan değerleri taşıyabilir. Süresi dolunca 410 döner.
+- Hata raporu bir saat tutulur, veritabanına yazılmaz ve **yalnızca yükleyene** verilir: dosya, firmanın günlüğünü gören birinin görme yetkisi olmayan değerleri taşıyabilir. Süresi dolunca 410 döner. (15 Kasım 2026'dan beri bellekte değil, şifreli olarak dosya deposundadır; aşağıdaki nota bakın.)
 
 **Bu ADR'den bilinçli sapmalar (Dilim 2):**
 
 - Arka plan işi kalıcı kuyruktan değil **uygulama içi görevden** çalışır: dosya yalnızca koşu boyunca bellektedir, checkpoint yoktur ve dosya başına sınır **2.000 satırdır**. Uygulama kapanırken koşu sıradaki satırda durur ve `Cancelled` olur; çökerse sonraki koşu onu `Failed` yapar. Yarıda kalan dosya yeniden yüklenirse alınmış satırlar yinelenir (mükerrer uyarısı çıkar); Ç7.2 kabulü bu yüzden henüz karşılanmıyor. Kalıcı kuyruk geçici dosya deposu ister.
 - Hız pilot ölçümü bekliyor: yerel test ortamında (SQL günlüğü açık) kuru çalışma satır başına yaklaşık 0,3 saniye, uygulama 0,7 saniye sürdü. Üretim süresi ölçülmedi.
 - Yalnızca oluşturma vardır; `UpdatedCount` ve `SkippedCount` bu dilimde 0 kalır.
-- Hata raporu tek uygulama örneği varsayar (`IMemoryCache`). Birden çok örnekte rapor başka örneğe düşerse 410 döner.
+- ~~Hata raporu tek uygulama örneği varsayar (`IMemoryCache`).~~ Kapandı (15 Kasım 2026): rapor paylaşımlı dosya deposunda; aşağıdaki nota bakın.
 
 **Dilim 3:** uygulandı (`gseker/import-dilim3`).
 
@@ -200,3 +200,13 @@ Mutlu yol (yükle, uygula, sonuç); hata/doğrulama (her hata kodu, biçim, dosy
 ### Not: Core kişi içe aktarması (14 Kasım 2026, ADR-0042 bölüm 21)
 
 Core artık `core.person` için içe aktarma tanımı beyan eder (izin `core.people.import`). Kişinin yazma izni kişiyi kullanan modüllerden geldiğinden içe aktarıcı ayrıca bunlardan birine sahip olmalıdır; kayıt boru hattı her satırda denetler. Modüller kişiye bağlı kayıtlarını (ör. İK çalışan kartı) kişi e-postasıyla bağlayarak içe aktarır.
+
+### Not: Hata raporu dosya deposunda (15 Kasım 2026, mimari değerlendirme A4)
+
+Bölüm 6'daki "kalıcı saklanmaz" ve Dilim 2'deki "bellekte bir saat" kararı çok düğümlü dağıtım için değişti (kullanıcı onayıyla). Rapor `IMemoryCache` yerine dosya deposunda (`IBlobStorage`; yerel disk ya da S3) durur, böylece koşuyu işlemeyen bir örnek de raporu verir.
+
+- **Şifreli:** içerik Data Protection ile şifrelenir (anahtar halkası veritabanında, bütün örnekler paylaşır). Amaç tenant'a bağlıdır: bir tenant'ın rapor dosyası başka tenant'ın deposuna kopyalansa da açılamaz. Koruma süre sınırlıdır; depodan silinmeyi kaçıran rapor da bir saat sonra açılamaz.
+- **Ömür bir saat:** koşu, rapor yazılmadan önce `ImportRun.ErrorReportExpiresAt` ile işaretlenir (migration `ImportErrorReportExpiry`, null'lanabilir tek kolon ve süzgeçli indeks; geriye uyumlu). `ImportReportCleanupWorker` 15 dakikada bir (`ImportReportCleanup:IntervalMinutes`) süresi dolan raporları siler ve işareti kaldırır. Askıdaki firmalar da taranır.
+- **Anahtar** koşudan türetilir (`ImportErrorReports.Key`), ayrıca saklanmaz. Depoya yazılamazsa koşu bozulmaz, işaret kaldırılır ve indirme 410 döner.
+- Veritabanına satır değeri yazılmaması ve raporun yalnızca yükleyene verilmesi değişmedi.
+- **Bedeli:** kişisel veri en çok bir saat (+ temizlik aralığı) şifreli olarak depoda durur. Tenant dışa aktarması o anda var olan raporu şifreli dosya olarak içerir (firma açamaz); tenant silme raporu da siler.
