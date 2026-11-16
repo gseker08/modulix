@@ -49,6 +49,12 @@ public interface IQuoteSharing
     /// <summary>Belge verisini oluşturur (yazmaz). Yalnızca sunulmuş ya da sonuçlanmış tekliften; <c>crm.quotes.share</c> ister.</summary>
     Task<RecordResult<QuoteDocumentSnapshot>> BuildSnapshotAsync(Guid quoteId, QuoteSellerInfo seller, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Teklifin müşterisinin dili (ADR-0034 §6, dilim 22c): teklifin kişisinin yazışma dili → firmasınınki → tenant varsayılanı. Belge ve
+    /// bağlantı e-postası bu dilde üretilir; teklif bulunamazsa tenant varsayılanı.
+    /// </summary>
+    Task<Modulix.Core.Contracts.Localization.LocalizedTexts> CustomerTextsAsync(Guid quoteId, CancellationToken cancellationToken);
+
     /// <summary>Üretilen PDF'i sabitler. Teklif revizyonu başına tek belge vardır; varsa mevcut belge döner (değiştirilmez).</summary>
     Task<RecordResult<QuoteDocumentInfo>> StoreDocumentAsync(
         Guid quoteId, QuoteDocumentSnapshot snapshot, byte[] pdf, int templateVersion, CancellationToken cancellationToken);

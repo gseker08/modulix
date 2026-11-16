@@ -11960,5 +11960,19 @@
   "crm.public-quote.role.package-child": "Package component",
   "crm.public-quote.payment-terms": "Payment terms",
   "crm.public-quote.delivery-terms": "Delivery terms",
-  "crm.public-quote.commercial-terms": "Commercial terms"
+  "crm.public-quote.commercial-terms": "Commercial terms",
+  "crm.quote-pdf.subject": "Quote",
+  "crm.quote-pdf.heading": "QUOTE",
+  "crm.quote-pdf.number": "No: {0}  ·  Revision V{1}",
+  "crm.quote-pdf.date": "Date: {0}",
+  "crm.quote-pdf.valid-until": "Valid until: {0}",
+  "crm.quote-pdf.to": "TO",
+  "crm.quote-pdf.tax-number": "Tax no: {0}",
+  "crm.quote-pdf.recurring": "Recurring: {0}",
+  "crm.quote-pdf.period.monthly": "monthly",
+  "crm.quote-pdf.period.quarterly": "quarterly",
+  "crm.quote-pdf.period.yearly": "yearly",
+  "crm.quote-pdf.net-total-excl-vat": "Net total (excl. VAT)",
+  "crm.quote-pdf.grand-total": "GRAND TOTAL",
+  "crm.quote-pdf.page": "{0} V{1}  ·  Page"
 }

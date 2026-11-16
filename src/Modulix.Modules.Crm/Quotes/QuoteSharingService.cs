@@ -41,10 +41,21 @@ internal static class QuoteSharingJson
 /// önce kayıt boru hattında doğrulanır; bulunamayan/kapsam dışı teklif 404 alır.
 /// </summary>
 internal sealed class QuoteSharing(
-    IRecordPipeline pipeline, QuoteWorkflowGate gate, ICurrentAccess access, QuoteReader reader, TimeProvider time) : IQuoteSharing
+    IRecordPipeline pipeline, QuoteWorkflowGate gate, ICurrentAccess access, QuoteReader reader, TimeProvider time, IRecipientLanguage languages) : IQuoteSharing
 {
     private const string Key = CrmModule.Entities.Quote;
     private const int MaxPdfBytes = 8 * 1024 * 1024;
+
+    public async Task<LocalizedTexts> CustomerTextsAsync(Guid quoteId, CancellationToken cancellationToken)
+    {
+        if (await reader.QuoteAsync(quoteId, cancellationToken) is not { } quote)
+        {
+            return await languages.ForExternalAsync(cancellationToken);
+        }
+
+        var (personId, partyId) = await reader.RecipientAsync(quote, cancellationToken);
+        return await languages.ForContactAsync(personId, partyId, cancellationToken);
+    }
     private const int MaxLinkDays = 180;
 
     /// <summary>Belge üretimi paylaşım izniyle ya da sunum izniyle yapılır (sunum sırasında belge sunan kişi adına üretilir).</summary>

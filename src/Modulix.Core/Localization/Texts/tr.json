@@ -11960,5 +11960,19 @@
   "crm.public-quote.role.package-child": "Paket bileşeni",
   "crm.public-quote.payment-terms": "Ödeme koşulları",
   "crm.public-quote.delivery-terms": "Teslimat koşulları",
-  "crm.public-quote.commercial-terms": "Ticari koşullar"
+  "crm.public-quote.commercial-terms": "Ticari koşullar",
+  "crm.quote-pdf.subject": "Teklif",
+  "crm.quote-pdf.heading": "TEKLİF",
+  "crm.quote-pdf.number": "No: {0}  ·  Revizyon V{1}",
+  "crm.quote-pdf.date": "Tarih: {0}",
+  "crm.quote-pdf.valid-until": "Geçerlilik: {0}",
+  "crm.quote-pdf.to": "SAYIN",
+  "crm.quote-pdf.tax-number": "VKN/TCKN: {0}",
+  "crm.quote-pdf.recurring": "Tekrarlayan: {0}",
+  "crm.quote-pdf.period.monthly": "aylık",
+  "crm.quote-pdf.period.quarterly": "üç aylık",
+  "crm.quote-pdf.period.yearly": "yıllık",
+  "crm.quote-pdf.net-total-excl-vat": "Net toplam (KDV hariç)",
+  "crm.quote-pdf.grand-total": "GENEL TOPLAM",
+  "crm.quote-pdf.page": "{0} V{1}  ·  Sayfa"
 }

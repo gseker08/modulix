@@ -11960,5 +11960,19 @@
   "crm.public-quote.role.package-child": "Paket komponenti",
   "crm.public-quote.payment-terms": "Ödəniş şərtləri",
   "crm.public-quote.delivery-terms": "Çatdırılma şərtləri",
-  "crm.public-quote.commercial-terms": "Kommersiya şərtləri"
+  "crm.public-quote.commercial-terms": "Kommersiya şərtləri",
+  "crm.quote-pdf.subject": "Təklif",
+  "crm.quote-pdf.heading": "TƏKLİF",
+  "crm.quote-pdf.number": "№: {0}  ·  Redaksiya V{1}",
+  "crm.quote-pdf.date": "Tarix: {0}",
+  "crm.quote-pdf.valid-until": "Etibarlıdır: {0}",
+  "crm.quote-pdf.to": "HÖRMƏTLİ",
+  "crm.quote-pdf.tax-number": "VÖEN: {0}",
+  "crm.quote-pdf.recurring": "Təkrarlanan: {0}",
+  "crm.quote-pdf.period.monthly": "aylıq",
+  "crm.quote-pdf.period.quarterly": "rüblük",
+  "crm.quote-pdf.period.yearly": "illik",
+  "crm.quote-pdf.net-total-excl-vat": "Xalis cəm (ƏDV-siz)",
+  "crm.quote-pdf.grand-total": "ÜMUMİ CƏM",
+  "crm.quote-pdf.page": "{0} V{1}  ·  Səhifə"
 }
