@@ -1235,6 +1235,10 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         services.AddScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, CrmFollowUpActivities>();
         // Ana bilgisayarın (API) sistem kimliği köprüsü bu doğrudan uygulamayı kendi CRM sistem kimliği altında çağırır (aşağıdaki "crm.follow-up" aboneliği).
         services.AddKeyedScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, CrmFollowUpActivities>("direct");
+        // Müşteri zaman çizelgesinin CRM kaynakları (E9); başka modüller kendi kaynağını aynı sözleşmeyle kaydeder.
+        services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, ActivityTimelineSource>();
+        services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, OpportunityTimelineSource>();
+        services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, QuoteTimelineSource>();
         services.AddScoped<CrmFollowUpAnchor>();
         services.AddScoped<CrmFollowUpActivities>();
         services.AddScoped<CrmAutomationRecordSource>();

@@ -107,6 +107,8 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
         ["contactId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(x => x.ContactId == id) : null,
         ["opportunityId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(x => x.OpportunityId == id) : null,
         ["familyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(x => x.FamilyId == id) : null,
+        // Müşteri zaman çizelgesinin sayfalama imleci (sınır hariç).
+        ["createdBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(x => x.CreatedAt < time) : null,
         [OwnerField] = (q, v, ctx) => FilterValue.User(v, ctx) is { } owner ? q.Where(x => x.OwnerId == owner) : null,
         ["number"] = (q, v, _) => v.Trim() is { Length: > 0 } number ? q.Where(x => x.QuoteNumber == number) : null,
         ["status"] = (q, v, _) => QuoteStatus.All.Contains(v) ? q.Where(x => x.Status == v) : null,
