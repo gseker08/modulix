@@ -1148,16 +1148,27 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         public const string ForecastBestCaseMinProbability = "crm.forecast.best-case-min-probability";
     }
 
-    /// <summary>CRM uç noktaları (<c>/api/crm</c>) modüldedir (ADR-0046); teklif uçları henüz host'tadır.</summary>
+    /// <summary>CRM uç noktaları (<c>/api/crm</c>) modüldedir (ADR-0046); grup host tarafından açılır.</summary>
     public void MapEndpoints(IEndpointRouteBuilder routes) => CrmEndpoints.MapEndpoints(routes);
 
-    /// <summary>Herkese açık müşteri adayı formu (<c>/api/public/lead-forms/{tenant}/{formKey}</c>): form anahtarı, izinli kaynak, sır ve hız sınırıyla korunur.</summary>
-    public void MapPublicEndpoints(IEndpointRouteBuilder routes) => LeadIntakeEndpoints.MapPublic(routes);
+    /// <summary>
+    /// Herkese açık uçlar: müşteri adayı formu (<c>/api/public/lead-forms/{tenant}/{formKey}</c>; form anahtarı, izinli kaynak, sır, hız sınırı) ve teklif
+    /// müşteri sayfası (<c>/api/public/quotes/{tenant}</c>; bağlantı belirteci, hız ve gövde sınırı).
+    /// </summary>
+    public void MapPublicEndpoints(IEndpointRouteBuilder routes)
+    {
+        LeadIntakeEndpoints.MapPublic(routes);
+        QuoteSharingEndpoints.MapPublic(routes);
+    }
 
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddScoped<Modulix.Modules.Crm.Opportunities.IOpportunityPolicyProvider, OpportunityPolicyProvider>();
         services.AddLeadIntakeRateLimit();
+        services.AddQuotePublicRateLimit();
+        services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, QuotePolicyProvider>();
+        services.AddScoped<QuoteDocumentService>();
+        services.AddScoped<QuoteDelivery>();
         services.AddScoped<Modulix.Modules.Crm.Reporting.ISalesReportingPolicyProvider, SalesReportingPolicyProvider>();
         services.AddScoped<LeadScoreJob>();
         services.AddScoped<LeadScoreJobAnchor>();

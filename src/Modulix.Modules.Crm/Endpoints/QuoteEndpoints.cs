@@ -1,19 +1,21 @@
 using System.Globalization;
-using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
-using Modulix.Core.Contracts.Tenancy;
+using System.Text.Json;
+using System.Text;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
+using Microsoft.Extensions.Logging;
 using Modulix.Core.Contracts.Records;
-using Modulix.Modules.Crm.Contracts.Sales;
 using Modulix.Core.Contracts.Settings;
-using Modulix.Modules.Crm;
+using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Hosting;
+using Modulix.Modules.Crm.Contracts.Sales;
 using Modulix.Modules.Crm.Quotes;
 using Modulix.Shared.Crm;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// Teklif uç noktaları (/api/crm/quotes, /api/crm/quote-lines; ADR-0019). Başlık ve kalem CRUD'u kayıt boru hattından geçer; durum,
@@ -46,7 +48,7 @@ internal static class QuoteEndpoints
         crm.MapPost("/opportunities/{id:guid}/primary-quote", async (Guid id, SetPrimaryQuoteRequest r, IQuoteOpportunitySync sync, CancellationToken ct) =>
         {
             var result = await sync.SetPrimaryAsync(id, r.Version, r.QuoteId, ct);
-            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<OpportunityDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<OpportunityDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(CrmModule.Permissions.OpportunitiesRead);
 
         quotes.MapGet("/report", ReportAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
@@ -104,19 +106,19 @@ internal static class QuoteEndpoints
     private static async Task<IResult> Run(Task<RecordResult<RecordData>> action) => Ok(await action);
 
     private static IResult Ok(RecordResult<RecordData> result) =>
-        result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<QuoteDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<QuoteDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
 
     private static IResult Created(RecordResult<RecordData> result) =>
         result.IsSuccess
             ? Results.Created($"/api/crm/quotes/{result.Value!.Id}", ResourceEndpoints.ToDto<QuoteDto>(result.Value))
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
 
     private static async Task<IResult> HistoryAsync(Guid id, IQuoteWorkflow workflow, CancellationToken ct)
     {
         var result = await workflow.HistoryAsync(id, ct);
         return result.IsSuccess
             ? Results.Ok(result.Value!.Select(h => new QuoteHistoryDto(h.Id, h.Kind, h.At, h.ActorId, h.FromStatus, h.ToStatus, h.Reason)).ToList())
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
     }
 
     private static async Task<IResult> ActionsAsync(Guid id, IQuoteWorkflow workflow, CancellationToken ct)
@@ -124,7 +126,7 @@ internal static class QuoteEndpoints
         var result = await workflow.ActionsAsync(id, ct);
         return result.IsSuccess
             ? Results.Ok(result.Value!.Select(a => new QuoteActionStateDto(a.Action, a.Allowed, a.Code, a.Message)).ToList())
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
     }
 
     private static async Task<IResult> ApprovalRequirementsAsync(Guid id, IQuoteWorkflow workflow, CancellationToken ct)
@@ -135,7 +137,7 @@ internal static class QuoteEndpoints
                 result.Value!.Required, [.. result.Value.Matches.Select(m => new QuoteApprovalMatchDto(m.RuleId, m.RuleVersion, m.Name, m.Reason, m.ApproverId, m.Step))],
                 result.Value.ThresholdReason, result.Value.Restricted, result.Value.CanDecide, result.Value.Note,
                 [.. result.Value.Steps.Select(s => new QuoteApprovalStepDto(s.Step, s.Approvers, s.Completed, s.ApprovedBy))], result.Value.CurrentStep, result.Value.ActingAsDelegate))
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
     }
 
     private static async Task<IResult> CompareAsync(Guid id, Guid with, IQuoteComparison comparison, CancellationToken ct)
@@ -143,7 +145,7 @@ internal static class QuoteEndpoints
         var result = await comparison.CompareAsync(with, id, ct);
         if (!result.IsSuccess)
         {
-            return RecordEndpoints.ToProblem(result.Error!);
+            return RecordProblems.ToProblem(result.Error!);
         }
 
         static QuoteFieldChangeDto Map(QuoteFieldChange c) => new(c.Field, c.Label, c.Before, c.After);
@@ -166,7 +168,7 @@ internal static class QuoteEndpoints
         var result = await report.BuildAsync(new QuoteReportQuery(from ?? new DateOnly(today.Year, today.Month, 1), to ?? today, ownerId), ct);
         return result.IsSuccess
             ? Results.Ok(JsonSerializer.Deserialize<QuoteReportDto>(JsonSerializer.Serialize(result.Value, JsonSerializerOptions.Web), JsonSerializerOptions.Web))
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
     }
 
     private static async Task<IResult> MarginReportAsync(DateOnly? from, DateOnly? to, Guid? ownerId, IQuoteReport report, TimeProvider time, CancellationToken ct)
@@ -175,7 +177,7 @@ internal static class QuoteEndpoints
         var result = await report.BuildMarginAsync(new QuoteReportQuery(from ?? new DateOnly(today.Year, today.Month, 1), to ?? today, ownerId), ct);
         return result.IsSuccess
             ? Results.Ok(JsonSerializer.Deserialize<QuoteMarginReportDto>(JsonSerializer.Serialize(result.Value, JsonSerializerOptions.Web), JsonSerializerOptions.Web))
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
     }
 
     private const int ExportMaxRows = 5000;
@@ -187,14 +189,14 @@ internal static class QuoteEndpoints
     private static async Task<IResult> ExportAsync(
         HttpRequest http, string? search, IRecordPipeline pipeline, IRecordExportAudit exportAudit, CancellationToken ct)
     {
-        var filters = RecordEndpoints.FiltersFrom(http) ?? new Dictionary<string, string>();
+        var filters = RecordRequests.FiltersFrom(http) ?? new Dictionary<string, string>();
         var items = new List<RecordData>();
         for (var page = 1; items.Count < ExportMaxRows; page++)
         {
             var result = await pipeline.QueryAsync(new RecordQuery(CrmModule.Entities.Quote, page, RecordQuery.MaxPageSize, search, filters), ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             items.AddRange(result.Value!.Items);
@@ -228,7 +230,7 @@ internal static class QuoteEndpoints
     }
 }
 
-/// <summary>Teklif politikasını tenant ayarlarından okur (modül ayar altyapısına erişemez).</summary>
+/// <summary>Teklif politikasını tenant ayarlarından okur (<see cref="ITenantSettingReader"/>); modülün kendi <c>ConfigureServices</c>'inde kaydolur (ADR-0046).</summary>
 internal sealed class QuotePolicyProvider(IServiceProvider services) : IQuotePolicyProvider
 {
     public async Task<QuotePolicySettings> GetAsync(CancellationToken cancellationToken)

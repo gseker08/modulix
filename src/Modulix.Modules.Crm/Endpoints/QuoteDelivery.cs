@@ -4,7 +4,7 @@ using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Modules.Crm.Quotes;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>Bir paylaşım bağlantısının e-posta gönderim durumu. <see cref="Status"/> <see cref="QuoteDeliveryStatus"/> değerlerinden biridir.</summary>
 public sealed record QuoteLinkDelivery(string Status, string? Error, DateTimeOffset? ProviderAcceptedAt);
