@@ -1,25 +1,19 @@
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.EntityFrameworkCore;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
-using Modulix.Core.Contracts.Events;
-using Modulix.Core.Contracts.Persistence;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Records;
-using Modulix.Core.Contracts.Tenancy;
-using Modulix.Core.Events;
-using Modulix.Core.Modules;
-using Modulix.Core.Platform;
-using Modulix.Infrastructure.Persistence;
-using Modulix.Infrastructure.Platform;
-using Modulix.Modules.Support;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Support.Lifecycle;
 using Modulix.Shared.Support;
 
-namespace Modulix.Api.Support;
+namespace Modulix.Modules.Support.Endpoints;
 
 /// <summary>
 /// Dilim 4 uç noktaları (ADR-0024): ekler, gelen kanal girişi, memnuniyet anketi, CSV dışa aktarma ve toplu işlem.
@@ -32,18 +26,28 @@ namespace Modulix.Api.Support;
 internal static class SupportChannelEndpoints
 {
     public const string SurveyPolicy = "support-survey";
+
+    /// <summary>Anketin sistem kimliği: yalnızca talebi okur, tarihçe ve son hareket yazar (<see cref="SupportSurveyAnchor"/>).</summary>
+    private const string SurveyIdentity = "support.survey";
     private const int ExportMaxRows = 5000;
     private const int SurveyBodyMaxBytes = 4 * 1024;
     private static readonly JsonSerializerOptions Json = JsonSerializerOptions.Web;
 
-    public static IServiceCollection AddSupportSurveyRateLimit(this IServiceCollection services, IConfiguration configuration) =>
+    /// <summary>
+    /// Herkese açık anketin hız sınırı politikası (IP + tenant başına dakikada <c>SupportSurveyPublic:RateLimitPerMinute</c>, en az 2, varsayılan 30). Modülün
+    /// <c>ConfigureServices</c>'inde kaydolur; sınır yapılandırmadan istek anında okunur.
+    /// </summary>
+    public static IServiceCollection AddSupportSurveyRateLimit(this IServiceCollection services) =>
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            var permits = Math.Max(2, configuration.GetValue("SupportSurveyPublic:RateLimitPerMinute", 30));
-            options.AddPolicy(SurveyPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
-                $"survey|{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["tenant"]}",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(SurveyPolicy, context =>
+            {
+                var permits = Math.Max(2, context.RequestServices.GetRequiredService<IConfiguration>().GetValue("SupportSurveyPublic:RateLimitPerMinute", 30));
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    $"survey|{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["tenant"]}",
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
+            });
         });
 
     /// <summary>Oturumlu uçlar: <c>group</c> /api/support, <c>tickets</c> /api/support/tickets.</summary>
@@ -57,7 +61,7 @@ internal static class SupportChannelEndpoints
                 r.AutoSubmitted, r.Precedence, r.SuppressAutoResponse, r.NullReturnPath), ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             var dto = new InboundResultDto(result.Value!.Outcome, result.Value.TicketId, result.Value.MessageId, result.Value.TicketNumber);
@@ -73,7 +77,7 @@ internal static class SupportChannelEndpoints
         tickets.MapGet("/{id:guid}/attachments", async (Guid id, ITicketAttachments attachments, CancellationToken ct) =>
         {
             var result = await attachments.ListAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<AttachmentDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<AttachmentDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
         // Gövde ham dosyadır (JSON/base64 şişmesi yok); ad sorgudadır. Sınır sunucuda uygulanır, istemci başlığına güvenilmez.
@@ -104,7 +108,7 @@ internal static class SupportChannelEndpoints
             }
 
             var result = await attachments.AddAsync(id, messageId, fileName, buffer.ToArray(), ct);
-            return result.IsSuccess ? Results.Created($"{Prefix}/tickets/{id}/attachments", Map<AttachmentDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Created($"{Prefix}/tickets/{id}/attachments", Map<AttachmentDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
         tickets.MapGet("/{id:guid}/attachments/{attachmentId:guid}/file", async (Guid id, Guid attachmentId, ITicketAttachments attachments, HttpContext http, CancellationToken ct) =>
@@ -112,7 +116,7 @@ internal static class SupportChannelEndpoints
             var result = await attachments.GetAsync(id, attachmentId, ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             http.Response.Headers.CacheControl = "private, no-store";
@@ -125,31 +129,31 @@ internal static class SupportChannelEndpoints
         tickets.MapGet("/{id:guid}/links", async (Guid id, ITicketLinks links, CancellationToken ct) =>
         {
             var result = await links.ListAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<TicketLinkDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketLinkDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapPost("/{id:guid}/links", async (Guid id, AddTicketLinkRequest r, ITicketLinks links, CancellationToken ct) =>
         {
             var result = await links.AddAsync(id, r.EntityKey, r.RecordId, ct);
-            return result.IsSuccess ? Results.Created($"{Prefix}/tickets/{id}/links", Map<List<TicketLinkDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Created($"{Prefix}/tickets/{id}/links", Map<List<TicketLinkDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapDelete("/{id:guid}/links/{linkId:guid}", async (Guid id, Guid linkId, ITicketLinks links, CancellationToken ct) =>
         {
             var result = await links.RemoveAsync(id, linkId, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<TicketLinkDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketLinkDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
         // Memnuniyet anketleri (personel görünümü; belirteç dönmez).
         tickets.MapGet("/{id:guid}/surveys", async (Guid id, ITicketSurveys surveys, CancellationToken ct) =>
         {
             var result = await surveys.ListAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<SurveyDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<SurveyDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
         // Toplu işlem: her talep kendi eyleminin izin, kapsam ve kuralıyla çalışır; sonuçlar talep başına döner (atomik değildir).
         tickets.MapPost("/bulk", async (BulkTicketsRequest r, ITicketBulk bulk, CancellationToken ct) =>
         {
             var result = await bulk.RunAsync(r.Action, r.Ids ?? [], new BulkInput(r.Reason, r.OwnerId, r.QueueId), ct);
-            return result.IsSuccess ? Results.Ok(Map<List<BulkTicketResultDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<BulkTicketResultDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
         tickets.MapGet("/export", ExportAsync).RequirePermission(SupportModule.Permissions.TicketsExport);
@@ -158,17 +162,17 @@ internal static class SupportChannelEndpoints
         tickets.MapGet("/{id:guid}/corrective-actions", async (Guid id, ICorrectiveActions actions, CancellationToken ct) =>
         {
             var result = await actions.ListAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<CorrectiveActionDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<CorrectiveActionDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapPost("/{id:guid}/corrective-actions", async (Guid id, AddCorrectiveActionRequest r, ICorrectiveActions actions, CancellationToken ct) =>
         {
             var result = await actions.AddAsync(id, r.Title, r.OwnerId, r.DueDate, ct);
-            return result.IsSuccess ? Results.Created($"{Prefix}/tickets/{id}/corrective-actions", Map<List<CorrectiveActionDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Created($"{Prefix}/tickets/{id}/corrective-actions", Map<List<CorrectiveActionDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapPost("/{id:guid}/corrective-actions/{actionId:guid}/status", async (Guid id, Guid actionId, SetCorrectiveActionStatusRequest r, ICorrectiveActions actions, CancellationToken ct) =>
         {
             var result = await actions.SetStatusAsync(id, actionId, r.Status, r.Note, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<CorrectiveActionDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<CorrectiveActionDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
         // Raporlar: veri çağıranın izin ve veri kapsamıyla kayıt boru hattından okunur (liste ekranını aşmaz); her sayı bir kırılım süzgeci taşır.
@@ -176,12 +180,12 @@ internal static class SupportChannelEndpoints
         reports.MapGet("/overview", async (DateOnly? from, DateOnly? to, string? granularity, string? typeKey, Guid? queueId, Guid? categoryId, string? priority, Guid? partyId, ISupportReports service, CancellationToken ct) =>
         {
             var result = await service.OverviewAsync(new ReportQuery(from, to, granularity, typeKey, queueId, categoryId, priority, partyId), ct);
-            return result.IsSuccess ? Results.Ok(Map<ReportOverviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<ReportOverviewDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.ReportsRead);
         reports.MapGet("/complaints", async (DateOnly? from, DateOnly? to, int? minOccurrences, string? typeKey, Guid? queueId, Guid? categoryId, string? priority, Guid? partyId, ISupportReports service, CancellationToken ct) =>
         {
             var result = await service.ComplaintsAsync(new ReportQuery(from, to, null, typeKey, queueId, categoryId, priority, partyId), minOccurrences, ct);
-            return result.IsSuccess ? Results.Ok(Map<ComplaintReviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<ComplaintReviewDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.ReportsRead);
     }
 
@@ -194,14 +198,14 @@ internal static class SupportChannelEndpoints
     private static async Task<IResult> ExportAsync(
         HttpRequest http, string? search, IRecordPipeline pipeline, IRecordExportAudit exportAudit, CancellationToken ct)
     {
-        var filters = RecordEndpoints.FiltersFrom(http) ?? new Dictionary<string, string>();
+        var filters = RecordRequests.FiltersFrom(http) ?? new Dictionary<string, string>();
         var items = new List<RecordData>();
         for (var page = 1; items.Count < ExportMaxRows; page++)
         {
             var result = await pipeline.QueryAsync(new RecordQuery(SupportModule.Entities.Ticket, page, RecordQuery.MaxPageSize, search, filters), ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             items.AddRange(result.Value!.Items);
@@ -230,23 +234,23 @@ internal static class SupportChannelEndpoints
 
     // ---- herkese açık anket uçları
 
-    public static IEndpointRouteBuilder MapSupportSurveyPublicEndpoints(this IEndpointRouteBuilder app)
+    /// <summary><paramref name="routes"/> host tarafından oturumsuz <c>/api/public</c> grubu olarak gelir (ADR-0046); yollar <c>/api/public/support-survey/{tenant}/…</c>.</summary>
+    public static void MapPublic(IEndpointRouteBuilder routes)
     {
-        var group = app.MapGroup("/api/public/support-survey/{tenant}").AllowAnonymous().WithTags("Destek memnuniyet anketi (herkese açık)");
+        var group = routes.MapGroup("/support-survey/{tenant}").WithTags("Destek memnuniyet anketi (herkese açık)");
         group.MapPost("/view", ViewAsync).RequireRateLimiting(SurveyPolicy);
         group.MapPost("/answer", AnswerAsync).RequireRateLimiting(SurveyPolicy);
-        return app;
     }
 
     private static async Task<IResult> ViewAsync(
-        string tenant, PublicSurveyTokenRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, PublicSurveyTokenRequest request, HttpContext http, IPublicTenantScopes scopes, CancellationToken ct)
     {
         if (Guard(http) is { } rejected)
         {
             return rejected;
         }
 
-        if (await OpenAsync(tenant, http, platform, scopes, time, ct) is not { } opened)
+        if (await scopes.OpenAsync(tenant, SurveyIdentity, write: false, http.TraceIdentifier, ct) is not { } opened)
         {
             return Unknown();
         }
@@ -257,14 +261,14 @@ internal static class SupportChannelEndpoints
     }
 
     private static async Task<IResult> AnswerAsync(
-        string tenant, PublicSurveyAnswerRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, PublicSurveyAnswerRequest request, HttpContext http, IPublicTenantScopes scopes, CancellationToken ct)
     {
         if (Guard(http) is { } rejected)
         {
             return rejected;
         }
 
-        if (await OpenAsync(tenant, http, platform, scopes, time, ct, write: true) is not { } opened)
+        if (await scopes.OpenAsync(tenant, SurveyIdentity, write: true, http.TraceIdentifier, ct) is not { } opened)
         {
             return Unknown();
         }
@@ -285,36 +289,6 @@ internal static class SupportChannelEndpoints
         }
 
         return http.Request.ContentLength > SurveyBodyMaxBytes ? Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "Gövde çok büyük.") : null;
-    }
-
-    /// <summary>Tenant adresteki anahtardan (tenant kimliği, N biçimi ya da kısa ad) çözülür; sistem kimliği "support.survey" yalnızca talebi okur ve tarihçe yazar.</summary>
-    private static async Task<AsyncServiceScope?> OpenAsync(
-        string tenant, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct, bool write = false)
-    {
-        var key = tenant.Trim().ToLowerInvariant();
-        var query = platform.Tenants.AsNoTracking().Where(t => TenantStatusRules.Operational.Contains(t.Status));
-        var found = Guid.TryParseExact(key, "N", out var id)
-            ? await query.Where(t => t.Id == id).Select(t => t.Id).FirstOrDefaultAsync(ct)
-            : await query.Where(t => t.Slug == key).Select(t => t.Id).FirstOrDefaultAsync(ct);
-        if (found == Guid.Empty)
-        {
-            return null;
-        }
-
-        var scope = scopes.Create(new TenantContext(found, Guid.Empty, Guid.Empty));
-
-        // Lisans (ADR-0028): modül kapalıysa bağlantı çalışmaz; salt okunursa anket görüntülenir, yanıt yazılamaz.
-        if (!await scope.ServiceProvider.GetRequiredService<IModuleLicense>().AllowsAsync(found, SupportModule.ModuleKey, write, ct))
-        {
-            await scope.DisposeAsync();
-            return null;
-        }
-
-        var cause = new EventEnvelope(
-            Guid.NewGuid(), found, DomainEventTypes.RecordDeleted, 1, SupportModule.Entities.Ticket, Guid.Empty, null, Guid.Empty,
-            ExecutionSource.Import, http.TraceIdentifier, null, 0, new JsonObject(), time.GetUtcNow());
-        scope.ServiceProvider.GetRequiredService<EventHandlingScope>().Begin(cause, "support.survey");
-        return scope;
     }
 
     private static IResult Unknown() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Bağlantı geçersiz.");
