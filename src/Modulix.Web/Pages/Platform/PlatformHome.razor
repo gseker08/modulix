@@ -31,6 +31,24 @@
         </section>
     }
 
+    @* Bağımlılığı eksik firmalar (ADR-0051): yalnızca rapor; hak firma sayfasından değiştirilir. *@
+    @if (gaps is { Count: > 0 })
+    {
+        <section class="detail-section" aria-label="@Texts.Get("platform.home.dependencyGaps")">
+            <div class="section-header"><h2>@Texts.Get("platform.home.dependencyGaps")</h2></div>
+            <p class="text-muted">@Texts.Get("platform.home.dependencyGapsIntro")</p>
+            <ul>
+                @foreach (var gap in gaps)
+                {
+                    <li>
+                        <a href="platform/firmalar/@gap.TenantId">@gap.TenantName</a>:
+                        @string.Join(" ", gap.Missing.Select(m => Texts.Get("platform.dependency.missingRequired", ModuleName(m.ModuleKey), ModuleName(m.DependencyKey), m.Reason)))
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+
     <div class="tiles">
         <a class="tile" href="platform/firmalar"><strong>@Texts.Get("nav.app.platform.tenants")</strong><span>@Texts.Get("platform.home.tile.tenants")</span></a>
         <a class="tile" href="platform/moduller"><strong>@Texts.Get("nav.app.platform.modules")</strong><span>@Texts.Get("platform.home.tile.modules")</span></a>
@@ -69,6 +87,8 @@
 @code {
     private PlatformOverviewResponse? overview;
     private int? failedDeliveries;
+    private IReadOnlyList<PlatformDependencyGapDto>? gaps;
+    private PlatformModulesResponse? modules;
     private string email = string.Empty;
     private string? notice;
     private bool failed;
@@ -79,7 +99,14 @@
     {
         overview = (await Api.GetAsync<PlatformOverviewResponse>("/api/platform/overview")).Value;
         failedDeliveries = (await Api.GetAsync<EventSummaryResponse>("/api/platform/events/summary")).Value?.Failed;
+        gaps = (await Api.GetAsync<List<PlatformDependencyGapDto>>("/api/platform/dependency-gaps")).Value;
+        if (gaps is { Count: > 0 })
+        {
+            modules = (await Api.GetAsync<PlatformModulesResponse>("/api/platform/modules")).Value;
+        }
     }
+
+    private string ModuleName(string key) => modules?.Modules.FirstOrDefault(m => m.Key == key)?.DisplayName ?? key;
 
     private async Task ResetTwoFactorAsync()
     {

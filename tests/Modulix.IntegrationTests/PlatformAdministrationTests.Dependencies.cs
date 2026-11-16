@@ -153,4 +153,81 @@ public partial class PlatformAdministrationTests
         Assert.Equal(HttpStatusCode.NoContent, (await SetModuleAsync(platform, tenant.Id, "support", true)).StatusCode);
         Assert.Equal(["marketing", "support"], (await EnabledModulesAsync(platform, tenant.Id)).Order());
     }
+
+    // ADR-0051 dilim 3: bağımlılık bilgisi, firmadaki eksik bağımlılıklar ve "bağımlılığı eksik firmalar" raporu.
+
+    private static Task<List<PlatformDependencyGapDto>?> GapsAsync(HttpClient platform) =>
+        platform.GetFromJsonAsync<List<PlatformDependencyGapDto>>("/api/platform/dependency-gaps");
+
+    private static async Task<IReadOnlyList<MissingDependencyDto>> MissingAsync(HttpClient platform, Guid tenantId) =>
+        (await platform.GetFromJsonAsync<PlatformTenantDetailResponse>($"/api/platform/tenants/{tenantId}"))!.Tenant.MissingDependencies ?? [];
+
+    [Fact]
+    public async Task Modules_list_their_dependencies_and_a_tenant_shows_what_is_missing()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        using var platform = await LoginAsync(await CreatePlatformAdministratorAsync());
+
+        // Modül listesi ve katalog beyanı taşır: Pazarlama → CRM zorunlu, Sipariş → CRM isteğe bağlı.
+        var modules = (await platform.GetFromJsonAsync<PlatformModulesResponse>("/api/platform/modules"))!.Modules;
+        var marketing = Assert.Single(modules.Single(m => m.Key == Marketing).Dependencies!);
+        Assert.Equal((Crm, true), (marketing.ModuleKey, marketing.Required));
+        Assert.False(string.IsNullOrWhiteSpace(marketing.DisplayName));
+        Assert.Contains(modules.Single(m => m.Key == "orders").Dependencies!, d => d.ModuleKey == Crm && !d.Required);
+        Assert.Empty(modules.Single(m => m.Key == Crm).Dependencies!);
+        var catalog = await platform.GetFromJsonAsync<List<CatalogModuleDto>>("/api/platform/catalog");
+        Assert.Contains(catalog!.Single(m => m.Key == Marketing).Dependencies!, d => d.ModuleKey == Crm && d.Required);
+
+        // İsteğe bağlı eksik işlemi engellemez, firma detayında gerekçesiyle görünür; sağlayan açılınca kalkar.
+        Assert.Empty(await MissingAsync(platform, tenant.Id));
+        Assert.Equal(HttpStatusCode.NoContent, (await SetModuleAsync(platform, tenant.Id, "orders", true)).StatusCode);
+        var missing = Assert.Single(await MissingAsync(platform, tenant.Id));
+        Assert.Equal(("orders", Crm, false), (missing.ModuleKey, missing.DependencyKey, missing.Required));
+        Assert.False(string.IsNullOrWhiteSpace(missing.Reason));
+        Assert.Equal(HttpStatusCode.NoContent, (await SetModuleAsync(platform, tenant.Id, Crm, true)).StatusCode);
+        Assert.Empty(await MissingAsync(platform, tenant.Id));
+    }
+
+    [Fact]
+    public async Task The_gap_report_lists_only_operational_tenants_with_a_missing_required_dependency()
+    {
+        var broken = await factory.CreateTenantAsync();
+        var optionalOnly = await factory.CreateTenantAsync();
+        var healthy = await factory.CreateTenantAsync();
+        var closed = await factory.CreateTenantAsync();
+        using var platform = await LoginAsync(await CreatePlatformAdministratorAsync());
+
+        // Mevcut ihlal: kural gelmeden önce CRM'siz açılmış Pazarlama.
+        await EnableDirectlyAsync(broken.Id, Marketing);
+        await EnableDirectlyAsync(closed.Id, Marketing);
+        Assert.Equal(HttpStatusCode.NoContent, (await SetModuleAsync(platform, optionalOnly.Id, "orders", true)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SetModuleAsync(platform, healthy.Id, Crm, true)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SetModuleAsync(platform, healthy.Id, Marketing, true)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await platform.PostAsJsonAsync(
+            $"/api/platform/tenants/{closed.Id}/close", new TenantReasonRequest("Rapor testi"))).StatusCode);
+
+        var gaps = (await GapsAsync(platform))!;
+        var gap = gaps.Single(g => g.TenantId == broken.Id);
+        var missing = Assert.Single(gap.Missing);
+        Assert.Equal((Marketing, Crm, true), (missing.ModuleKey, missing.DependencyKey, missing.Required));
+        Assert.DoesNotContain(gaps, g => g.TenantId == optionalOnly.Id || g.TenantId == healthy.Id || g.TenantId == closed.Id);
+
+        // Rapor hiçbir hakkı değiştirmez; eksik giderilince firma listeden çıkar.
+        Assert.Equal(["marketing"], await EnabledModulesAsync(platform, broken.Id));
+        Assert.Equal(HttpStatusCode.NoContent, (await SetModuleAsync(platform, broken.Id, Crm, true)).StatusCode);
+        Assert.DoesNotContain((await GapsAsync(platform))!, g => g.TenantId == broken.Id);
+    }
+
+    [Fact]
+    public async Task Only_platform_administrators_read_the_gap_report()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        var tenantAdmin = await factory.CreateUserAsync(tenant);
+        await MakeAdministratorAsync(tenant.Id, tenantAdmin);
+        using var tenantClient = await LoginAsync(tenantAdmin);
+        using var anonymous = factory.CreateBrowserClient();
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await tenantClient.GetAsync("/api/platform/dependency-gaps")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/platform/dependency-gaps")).StatusCode);
+    }
 }
