@@ -6,7 +6,7 @@ namespace Modulix.Core.Settings;
 public static class RegionalOptions
 {
     public const string DefaultTimeZone = "Europe/Istanbul";
-    public const string DefaultCurrency = "TRY";
+    public const string DefaultCurrency = Modulix.Core.Contracts.Settings.RegionalSettingKeys.DefaultCurrency;
     public const string DefaultFormat = "tr-TR";
 
     public static IReadOnlyList<SettingOption> TimeZones { get; } =

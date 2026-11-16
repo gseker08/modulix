@@ -1148,7 +1148,7 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         public const string ForecastBestCaseMinProbability = "crm.forecast.best-case-min-probability";
     }
 
-    /// <summary>CRM uç noktaları (<c>/api/crm</c>) modüldedir (ADR-0046); teklif ve satış planlama uçları henüz host'tadır.</summary>
+    /// <summary>CRM uç noktaları (<c>/api/crm</c>) modüldedir (ADR-0046); teklif uçları henüz host'tadır.</summary>
     public void MapEndpoints(IEndpointRouteBuilder routes) => CrmEndpoints.MapEndpoints(routes);
 
     /// <summary>Herkese açık müşteri adayı formu (<c>/api/public/lead-forms/{tenant}/{formKey}</c>): form anahtarı, izinli kaynak, sır ve hız sınırıyla korunur.</summary>
@@ -1158,6 +1158,7 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
     {
         services.AddScoped<Modulix.Modules.Crm.Opportunities.IOpportunityPolicyProvider, OpportunityPolicyProvider>();
         services.AddLeadIntakeRateLimit();
+        services.AddScoped<Modulix.Modules.Crm.Reporting.ISalesReportingPolicyProvider, SalesReportingPolicyProvider>();
         services.AddScoped<LeadScoreJob>();
         services.AddScoped<LeadScoreJobAnchor>();
         services.AddScoped<LeadScoreReader>();
