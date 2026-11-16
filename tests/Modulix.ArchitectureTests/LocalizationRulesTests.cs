@@ -37,6 +37,36 @@ public partial class LocalizationRulesTests
         Assert.True(other.IsSubsetOf(source), $"{language}.json'da tr.json'da olmayan anahtarlar: {string.Join(", ", other.Except(source).Order())}");
     }
 
+    /// <summary>
+    /// JSON okuyucusu tekrarlanan anahtarda son değeri sessizce tutar; bu yüzden sözlük ham olarak taranır ve aynı anahtar
+    /// ikinci kez yazılmışsa test kırılır (birinin metni fark edilmeden ötekini ezmesin).
+    /// </summary>
+    [Theory]
+    [InlineData("tr")]
+    [InlineData("en")]
+    [InlineData("az")]
+    public void Dictionaries_do_not_contain_duplicate_keys(string language)
+    {
+        byte[] json = File.ReadAllBytes(Path.Combine(TextsDirectory, language + ".json"));
+        Utf8JsonReader reader = new(json, new JsonReaderOptions { CommentHandling = JsonCommentHandling.Skip });
+        HashSet<string> seen = [];
+        List<string> duplicates = [];
+
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == 1)
+            {
+                string key = reader.GetString()!;
+                if (!seen.Add(key))
+                {
+                    duplicates.Add(key);
+                }
+            }
+        }
+
+        Assert.True(duplicates.Count == 0, $"{language}.json'da birden çok kez geçen anahtarlar: {string.Join(", ", duplicates.Distinct().Order())}");
+    }
+
     [Theory]
     [InlineData("tr")]
     [InlineData("en")]

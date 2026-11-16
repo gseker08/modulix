@@ -433,14 +433,24 @@ public sealed class ContractsModule : IModule
             [Permissions.ContractsRead, Permissions.SignaturesProviderEvents]),
         // Zamanlanmış işlerin sistem kimliği (yenileme hatırlatması, otomatik uzatma, yürürlük geçişi, imza ve taahhüt süreleri): olay işlemez, izinlerini tanımlar.
         EventSubscription.For<ContractSchedulerAnchor>(
-            "contracts.scheduler",
+            ContractJobs.Identity,
             [DomainEventTypes.RecordDeleted],
             [Entities.Contract],
             [Permissions.ContractsRead, Permissions.ContractsWrite, Permissions.RenewalsManage, Permissions.SignaturesManage, Permissions.CommitmentsWrite]),
     ];
 
+    /// <summary>
+    /// Zamanlanmış iş (ADR-0046): host'taki tek zamanlayıcı 15 dakikada bir, sözleşme modülü yazılabilir olan her tenant için turu çalıştırır.
+    /// Yapılandırma <c>Jobs:contracts.jobs</c>; eski <c>ContractJobs</c> bölümü okunmaya devam eder.
+    /// </summary>
+    IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
+    [
+        ModuleJobDefinition.For<ContractJobs>(ContractJobs.JobKey, TimeSpan.FromSeconds(900), ContractJobs.Identity) with { LegacySection = "ContractJobs" },
+    ];
+
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<ContractJobs>();
         services.AddScoped<ContractsStoreContext>();
         services.AddScoped<ContractWorkflowGate>();
         services.AddScoped<ContractReader>();

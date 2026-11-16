@@ -61,13 +61,6 @@ public partial class ApiModuleFolderRulesTests
             "Modulix.Api.Users",
             "Modulix.Core.Customs",
         ],
-        ["Marketing"] =
-        [
-            "Modulix.Core.Events",
-            "Modulix.Core.Modules",
-            "Modulix.Core.Platform",
-            "Modulix.Infrastructure",
-        ],
         ["Support"] =
         [
             "Modulix.Api.Crm",

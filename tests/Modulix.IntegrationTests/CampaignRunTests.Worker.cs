@@ -15,7 +15,7 @@ namespace Modulix.IntegrationTests;
 /// </summary>
 public partial class CampaignRunTests
 {
-    private MarketingSendRunner Worker => host.Services.GetRequiredService<MarketingSendRunner>();
+    private MarketingSendRunner Worker => new(host.Services);
 
     private async Task<(int Processed, bool Completed)> WorkUntilDoneAsync(Guid tenantId)
     {
