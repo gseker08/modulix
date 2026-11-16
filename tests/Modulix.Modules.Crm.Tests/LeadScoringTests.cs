@@ -87,6 +87,24 @@ public class LeadScoringTests
         Assert.False(LeadScoring.NeedsBehavior([Rule("country", LeadScoreOperator.EqualsTo, "TR", 10), Rule("contacts", LeadScoreOperator.AtLeast, "1", 10, active: false)]));
     }
 
+    [Fact]
+    public void Inactive_days_with_negative_points_decay_the_score()
+    {
+        var lead = new Lead { Country = "TR" };
+        var rules = new[]
+        {
+            Rule("country", LeadScoreOperator.EqualsTo, "TR", 40),
+            Rule("inactiveDays", LeadScoreOperator.AtLeast, "14", -15),
+            Rule("inactiveDays", LeadScoreOperator.AtLeast, "30", -15),
+        };
+
+        Assert.Equal(40, LeadScoring.Calculate(lead, rules, new LeadBehavior(1, 0, 0, InactiveDays: 13)));
+        Assert.Equal(25, LeadScoring.Calculate(lead, rules, new LeadBehavior(1, 0, 0, InactiveDays: 14)));
+        Assert.Equal(10, LeadScoring.Calculate(lead, rules, new LeadBehavior(1, 0, 0, InactiveDays: 45)));
+        Assert.Equal(0, LeadScoring.Calculate(new Lead(), rules, new LeadBehavior(0, 0, 0, InactiveDays: 45)));
+        Assert.True(LeadScoring.NeedsBehavior(rules));
+    }
+
     [Theory]
     [InlineData("1", 1)]
     [InlineData(" 03 ", 3)]

@@ -9,7 +9,7 @@ namespace Modulix.Modules.Crm.Records;
 /// Toplu yeniden puanlamanın (ADR-0050, dilim 1b) salt okunur taraması: puanı etkin kurallarla tutmayan açık adayları bulur. Yazma kayıt
 /// boru hattındadır (<see cref="LeadScoreJob"/>); okuyucu yalnızca kimlik döner.
 /// </summary>
-internal sealed class LeadScoreReader(IModuleData data)
+internal sealed class LeadScoreReader(IModuleData data, TimeProvider time)
 {
     /// <summary>Puanı eskimiş açık adaylar (kimlik sırasıyla), en çok <paramref name="limit"/> tane.</summary>
     public async Task<List<Guid>> StaleOpenLeadsAsync(int limit, CancellationToken cancellationToken)
@@ -22,15 +22,17 @@ internal sealed class LeadScoreReader(IModuleData data)
             open = open.Where(l => l.Score != 0);
         }
 
-        // Davranış sayaçları (dilim 2) yalnızca bir etkin kural kullanıyorsa, tenant için bir kez okunur.
-        IReadOnlyDictionary<Guid, LeadBehavior> behaviors = LeadScoring.NeedsBehavior(rules)
-            ? await new LeadBehaviorReader(data).ForTenantAsync(cancellationToken)
-            : new Dictionary<Guid, LeadBehavior>();
+        // Davranış sayaçları (dilim 2-3) yalnızca bir etkin kural kullanıyorsa, tenant için bir kez okunur.
+        Func<Lead, LeadBehavior?> behaviors = _ => null;
+        if (LeadScoring.NeedsBehavior(rules))
+        {
+            behaviors = await new LeadBehaviorReader(data, time.GetUtcNow()).ForTenantAsync(cancellationToken);
+        }
 
         List<Guid> stale = [];
         await foreach (Lead lead in open.OrderBy(l => l.Id).AsAsyncEnumerable().WithCancellation(cancellationToken))
         {
-            if (LeadScoring.Calculate(lead, rules, behaviors.GetValueOrDefault(lead.Id)) != lead.Score)
+            if (LeadScoring.Calculate(lead, rules, behaviors(lead)) != lead.Score)
             {
                 stale.Add(lead.Id);
                 if (stale.Count == limit)
@@ -56,7 +58,7 @@ internal sealed class LeadScoreReader(IModuleData data)
         }
 
         List<LeadScoreRule> rules = await data.Set<LeadScoreRule>().AsNoTracking().Where(r => r.IsActive).ToListAsync(cancellationToken);
-        LeadBehavior? behavior = LeadScoring.NeedsBehavior(rules) ? await new LeadBehaviorReader(data).ForLeadAsync(lead, cancellationToken) : null;
+        LeadBehavior? behavior = LeadScoring.NeedsBehavior(rules) ? await new LeadBehaviorReader(data, time.GetUtcNow()).ForLeadAsync(lead, cancellationToken) : null;
         return LeadScoring.Calculate(lead, rules, behavior) != lead.Score;
     }
 

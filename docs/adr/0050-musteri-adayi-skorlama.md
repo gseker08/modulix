@@ -1,7 +1,8 @@
 # ADR-0050: Müşteri adayı skorlama
 
 - **Durum:** Dilim 1 (kural modeli, kayıtta hesaplama, liste sütunu ve sıralama, kural ekranı) 15 Kasım 2026'da teslim edildi (PR #417).
-  Dilim 1b (toplu yeniden hesaplama, PR #441) ve dilim 2 (davranış puanı) 16 Kasım 2026'da teslim edilir. Diğer dilimler öneridir.
+  Dilim 1b (toplu yeniden hesaplama, PR #441), dilim 2 (davranış puanı, PR #449) ve dilim 3 (zamanla azalma ve eşik) 16 Kasım 2026'da
+  teslim edildi. Dilim 4 öneridir.
 - **Kaynak:** [CRM eksik süreç epic listesi](../crm-eksik-surecler-epicleri.md) E1.
 
 ## Bağlam
@@ -93,6 +94,23 @@ Müşteri adayları listesine "Puan" sütunu eklenir (`sort=score`/`-score`, eş
 - ADR-0039 iş olaylarından şimdilik yararlanılmaz: kampanya yanıtı ve teklif görüntüleme için yayınlanan bir iş olayı yok; teklif adaya değil
   fırsata bağlıdır. Pazarlama modülü yanıt olayı yayınladığında yeni bir sayaç bu dilimin kalıbıyla eklenir.
 
+### Zamanla azalma ve eşik (dilim 3)
+
+- **Azalma bir sayaçtır:** `inactiveDays` (hareketsiz gün sayısı) son gerçekleşen temastan (dilim 2'deki temas tanımı; gizli aktivite
+  sayılmaz), temas yoksa adayın oluşturulmasından bu yana geçen tam gündür. Firma azalmayı eksi puanlı "en az N gün" kurallarıyla ifade eder
+  (ör. en az 14 gün → -15, en az 30 gün → -15). Ayrı bir azalma ayarı, yarı ömür formülü ya da migration yoktur; kademeler firmanındır.
+- Gün geçtikçe değişen tek girdi budur. Olay olmadan değiştiği için toplu yeniden puanlama işi (dilim 1b) her turda yansıtır; gün sınırını
+  geçen aday bir sonraki turda güncellenir. Yeni gerçekleşen temas hareketsizliği sıfırlar ve `crm.lead-behavior-score` ile hemen yansır.
+  Saat, işte `TimeProvider`dan, kayıtta kayıt deposunun saatinden okunur.
+- **Eşik ayrı bir iş olayı değildir:** epic notundaki `crm.lead.score-changed` iş olayı yayınlanmaz. Puan değişikliği zaten `RecordUpdated`
+  olayının farkında eski/yeni değerle taşınır; ayrı olay aynı bilgiyi ikinci kez yazardı. Bunun yerine puan kural altyapısına (ADR-0027)
+  `crm.lead.score` sayı alanı olarak beyan edilir: "puan değişti" tetikleyicisi + yeni puan ≥ eşik + eski puan < eşik koşulu yalnızca eşiğin
+  aşıldığı değişiklikte tetikler. Eşik firmanındır (kuralın koşulu).
+- Hazır şablon `crm.lead-score-threshold-follow-up` ("Puanı eşiği aşan müşteri adayı için takip"): eski < 70 ≤ yeni ve aday açıksa
+  sorumluya bugüne takip aktivitesi açar. Atama ve bildirim de aynı tetikleyiciyle otomasyonun kendi aksiyonlarıyla kurulur; CRM yeni aksiyon
+  eklemez.
+- Puan alanının okuma izni yoktur: puan, adayı görebilen herkese görünür (Yetki bölümü).
+
 ## Sonuçlar
 
 - Kural değişikliği açık adaylara birkaç dakika içinde yansır (dilim 1b). Yeniden puanlama `RecordUpdated` olayı ürettiği için aday
@@ -108,7 +126,7 @@ Müşteri adayları listesine "Puan" sütunu eklenir (`sort=score`/`-score`, eş
 | 1 | Kural modeli, kayıtta hesaplama, liste sütunu/sıralama/süzgeç, kural ekranı | Teslim |
 | 1b | Toplu yeniden hesaplama: kural değişince arka plan işçisi açık adayları sistem adına, kayıt boru hattından yeniden puanlar | Teslim |
 | 2 | Davranış puanı: gerçekleşen temas, toplantı ve tekrar başvuru sayaçları ("en az N"); aktivite olayına abone | Teslim; kampanya yanıtı Pazarlama iş olayını bekliyor |
-| 3 | Zamanla azalma (hareketsiz gün sayısı) ve eşik olayı `crm.lead.score-changed`; atama/bildirim otomasyonla (ADR-0027) | Öneri |
+| 3 | Zamanla azalma (hareketsiz gün sayısı) ve eşik: puan otomasyon alanı ve eşik şablonu; ayrı iş olayı yok | Teslim |
 | 4 | Puan açıklaması: kartta hangi kuralın kaç puan verdiği | Öneri |
 
 ## Açık kararlar

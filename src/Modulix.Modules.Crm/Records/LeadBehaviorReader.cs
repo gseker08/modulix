@@ -6,10 +6,11 @@ using Modulix.Modules.Crm.Leads;
 namespace Modulix.Modules.Crm.Records;
 
 /// <summary>
-/// Müşteri adayı davranış sayaçlarını (<see cref="LeadBehavior"/>, ADR-0050 dilim 2) CRM'in kendi tablolarından türetir. Salt okunurdur; puan bir
+/// Müşteri adayı davranış sayaçlarını (<see cref="LeadBehavior"/>, ADR-0050 dilim 2-3) CRM'in kendi tablolarından türetir. Salt okunurdur; puan bir
 /// sunucu kararı olduğu için okuma çağıranın kapsamına bağlı değildir, ama özel aktiviteler sayılmaz (puan varlıklarını sezdirmesin).
+/// Hareketsiz gün sayısı <paramref name="now"/> anına göre hesaplanır.
 /// </summary>
-internal sealed class LeadBehaviorReader(IModuleData data)
+internal sealed class LeadBehaviorReader(IModuleData data, DateTimeOffset now)
 {
     private const string MeetingType = "Meeting";
 
@@ -22,14 +23,15 @@ internal sealed class LeadBehaviorReader(IModuleData data)
                 && ((lead.NormalizedEmail != null && l.NormalizedEmail == lead.NormalizedEmail)
                     || (lead.NormalizedPhone != null && l.NormalizedPhone == lead.NormalizedPhone)))
             .CountAsync(cancellationToken);
-        return Count(activities, repeats);
+        return Count(lead, activities, repeats);
     }
 
     /// <summary>
     /// Tenant'ın bütün adaylarının sayaçları (toplu yeniden puanlama). Aday kimliği listesiyle süzülmez (SQL parametre sınırı); tamamlanmış aday
-    /// aktiviteleri ve adayların iletişim anahtarları birer sorguyla okunur, sayım bellekte yapılır. Listede olmayan adayın sayaçları sıfırdır.
+    /// aktiviteleri ve adayların iletişim anahtarları birer sorguyla okunur, sayım bellekte yapılır. Dönen fonksiyon her aday için sayaçları verir;
+    /// aktivitesi ve tekrar başvurusu olmayan adayın hareketsiz gün sayısı oluşturulduğu andan sayılır.
     /// </summary>
-    public async Task<IReadOnlyDictionary<Guid, LeadBehavior>> ForTenantAsync(CancellationToken cancellationToken)
+    public async Task<Func<Lead, LeadBehavior>> ForTenantAsync(CancellationToken cancellationToken)
     {
         List<ContactRow> activities = await Rows(CompletedActivities()).ToListAsync(cancellationToken);
         var keys = await data.Set<Lead>().AsNoTracking()
@@ -51,18 +53,8 @@ internal sealed class LeadBehaviorReader(IModuleData data)
             }
         }
 
-        Dictionary<Guid, LeadBehavior> result = [];
-        foreach (IGrouping<Guid, ContactRow> group in activities.GroupBy(a => a.LeadId))
-        {
-            result[group.Key] = Count([.. group], repeats.GetValueOrDefault(group.Key));
-        }
-
-        foreach ((Guid id, int count) in repeats.Where(r => !result.ContainsKey(r.Key)))
-        {
-            result[id] = new LeadBehavior(0, 0, count);
-        }
-
-        return result;
+        ILookup<Guid, ContactRow> byLead = activities.ToLookup(a => a.LeadId);
+        return lead => Count(lead, [.. byLead[lead.Id]], repeats.GetValueOrDefault(lead.Id));
     }
 
     private IQueryable<Activity> CompletedActivities() =>
@@ -70,13 +62,27 @@ internal sealed class LeadBehaviorReader(IModuleData data)
 
     // Projeksiyon en sonda: süzgeçler entity üzerinde kalsın ki SQL'e çevrilsin.
     private static IQueryable<ContactRow> Rows(IQueryable<Activity> source) =>
-        source.Select(a => new ContactRow(a.LeadId!.Value, a.Type, a.Outcome));
+        source.Select(a => new ContactRow(a.LeadId!.Value, a.Type, a.Outcome, a.CompletedAt!.Value));
 
-    private static LeadBehavior Count(IReadOnlyCollection<ContactRow> activities, int repeats)
+    private LeadBehavior Count(Lead lead, IReadOnlyCollection<ContactRow> activities, int repeats)
     {
         List<ContactRow> contacts = [.. activities.Where(a => LeadRules.CountsAsContact(a.Type, a.Outcome, completed: true))];
-        return new LeadBehavior(contacts.Count, contacts.Count(a => a.Type == MeetingType), repeats);
+        return new LeadBehavior(contacts.Count, contacts.Count(a => a.Type == MeetingType), repeats, InactiveDays(lead, contacts));
     }
 
-    private sealed record ContactRow(Guid LeadId, string Type, string? Outcome);
+    /// <summary>
+    /// Son gerçekleşen temastan (yoksa adayın oluşturulmasından; geriye tarihli temas oluşturmadan önce sayılmaz) bu yana geçen tam gün sayısı.
+    /// </summary>
+    private int InactiveDays(Lead lead, List<ContactRow> contacts)
+    {
+        DateTimeOffset last = contacts.Count == 0 ? lead.CreatedAt : contacts.Max(a => a.CompletedAt);
+        if (last < lead.CreatedAt)
+        {
+            last = lead.CreatedAt;
+        }
+
+        return Math.Max(0, (int)Math.Floor((now - last).TotalDays));
+    }
+
+    private sealed record ContactRow(Guid LeadId, string Type, string? Outcome, DateTimeOffset CompletedAt);
 }
