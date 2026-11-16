@@ -57,6 +57,12 @@ internal sealed class SectorProfileService(
             var modulesBefore = await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken);
             var before = Snapshot(row.ProfileKey, modulesBefore);
 
+            if (plan.ModulesToEnable.Count > 0)
+            {
+                // Profil, zorunlu bağımlılığı eksik bırakan modül kümesi açamaz (ADR-0051).
+                ModuleDependencyRules.EnsureRequiredSatisfied(catalog, modulesBefore.Concat(plan.ModulesToEnable), "profile", ignore: modulesBefore);
+            }
+
             foreach (var module in plan.ModulesToEnable)
             {
                 await entitlements.SetEnabledAsync(tenant.TenantId, module, enabled: true, cancellationToken);

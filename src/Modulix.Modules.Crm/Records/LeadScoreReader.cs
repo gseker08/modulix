@@ -22,10 +22,15 @@ internal sealed class LeadScoreReader(IModuleData data)
             open = open.Where(l => l.Score != 0);
         }
 
+        // Davranış sayaçları (dilim 2) yalnızca bir etkin kural kullanıyorsa, tenant için bir kez okunur.
+        IReadOnlyDictionary<Guid, LeadBehavior> behaviors = LeadScoring.NeedsBehavior(rules)
+            ? await new LeadBehaviorReader(data).ForTenantAsync(cancellationToken)
+            : new Dictionary<Guid, LeadBehavior>();
+
         List<Guid> stale = [];
         await foreach (Lead lead in open.OrderBy(l => l.Id).AsAsyncEnumerable().WithCancellation(cancellationToken))
         {
-            if (LeadScoring.Calculate(lead, rules) != lead.Score)
+            if (LeadScoring.Calculate(lead, rules, behaviors.GetValueOrDefault(lead.Id)) != lead.Score)
             {
                 stale.Add(lead.Id);
                 if (stale.Count == limit)
@@ -37,4 +42,25 @@ internal sealed class LeadScoreReader(IModuleData data)
 
         return stale;
     }
+
+    /// <summary>
+    /// Tek adayın puanı eskimiş mi (dilim 2: aktivite değişince)? Açık değilse ya da yoksa false. Hesap aday kaydedilirken yapılanın aynısıdır
+    /// (<c>LeadRecordStore</c>); yalnızca değişecekse yazılsın diye önceden bakılır (boş güncelleme de denetim satırı ve olay üretir).
+    /// </summary>
+    public async Task<bool> IsStaleAsync(Guid leadId, CancellationToken cancellationToken)
+    {
+        Lead? lead = await data.Set<Lead>().AsNoTracking().SingleOrDefaultAsync(l => l.Id == leadId, cancellationToken);
+        if (lead is null || !LeadStatus.IsOpen(lead.Status))
+        {
+            return false;
+        }
+
+        List<LeadScoreRule> rules = await data.Set<LeadScoreRule>().AsNoTracking().Where(r => r.IsActive).ToListAsync(cancellationToken);
+        LeadBehavior? behavior = LeadScoring.NeedsBehavior(rules) ? await new LeadBehaviorReader(data).ForLeadAsync(lead, cancellationToken) : null;
+        return LeadScoring.Calculate(lead, rules, behavior) != lead.Score;
+    }
+
+    /// <summary>Aktivitenin bugün bağlı olduğu aday (silinmişse ya da adaya bağlı değilse null).</summary>
+    public Task<Guid?> LeadOfActivityAsync(Guid activityId, CancellationToken cancellationToken) =>
+        data.Set<Activity>().AsNoTracking().Where(a => a.Id == activityId).Select(a => a.LeadId).SingleOrDefaultAsync(cancellationToken);
 }

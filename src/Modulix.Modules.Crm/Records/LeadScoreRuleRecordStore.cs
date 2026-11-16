@@ -73,6 +73,18 @@ internal sealed class LeadScoreRuleRecordStore(CrmStoreContext context) : CrmRec
         {
             errors.Add(new RecordFieldError("value", "Karşılaştırılacak değeri girin."));
         }
+        else if (entity.Operator == LeadScoreOperator.AtLeast)
+        {
+            // Sayaç değeri kanonik biçimde saklanır ("03" → "3").
+            if (LeadScoring.ParseCount(entity.Value) is { } count)
+            {
+                entity.Value = count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+            else
+            {
+                errors.Add(new RecordFieldError("value", $"1 ile {LeadScoreOperator.MaxCount} arasında bir tam sayı girin."));
+            }
+        }
         else
         {
             entity.Value = entity.Value.Trim();

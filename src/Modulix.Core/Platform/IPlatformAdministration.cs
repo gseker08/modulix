@@ -208,11 +208,13 @@ public interface IPlatformAdministration
     /// çekirdek modül için <see cref="ArgumentException"/> (ParamName <c>moduleKey</c>). <paramref name="terms"/> (kaynak,
     /// bitiş, not) yalnızca açarken geçerlidir; bitiş tarihi geçince modül ek sürede çalışır, ek süre de bitince salt okunur olur (<see cref="EntitlementPhase"/>).
     /// <paramref name="reason"/> platform denetim kaydına yazılır; kapatırken ve bitiş tarihini ileri alırken (süre uzatma)
-    /// zorunludur (<see cref="ArgumentException"/>, ParamName <c>reason</c>).
+    /// zorunludur (<see cref="ArgumentException"/>, ParamName <c>reason</c>). Zorunlu bağımlılığı (ADR-0051) kapalı modül açılmaz,
+    /// bağımlısı açık modül kapatılmaz (<see cref="ArgumentException"/>, ParamName <c>moduleKey</c>);
+    /// <paramref name="checkDependencies"/> yalnızca sonuç kümesini önceden denetleyen toplu işlemlerde (plan atama) kapatılır.
     /// </summary>
     Task SetModuleAsync(
         Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken,
-        EntitlementTerms? terms = null, string? reason = null);
+        EntitlementTerms? terms = null, string? reason = null, bool checkDependencies = true);
 
     /// <summary>
     /// Firmanın kayıt görünürlük tavanları (ADR-0030) ve tavan konabilecek türler (firmada açık modüllerin, kapsamı kayıt

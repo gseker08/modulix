@@ -266,7 +266,6 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
             throw new RecordValidationException(errors);
         }
 
-        entity.Number = TicketNumbers.New(DateTimeOffset.UtcNow);
         entity.CreatedBy = Context.CurrentUserId;
         entity.OwnerId = ownerId;
         entity.QueueId = queueId;
@@ -360,6 +359,8 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
 
     protected override async Task CreatedAsync(SupportTicket entity, CancellationToken cancellationToken)
     {
+        // Numara doğrulamadan sonra alınır: reddedilen ya da tekrar sayılan istek sıra harcamaz (ADR-0049 dilim 3b).
+        entity.Number = await Context.Numbers.NextAsync(SupportModule.TicketNumberSeries, cancellationToken: cancellationToken);
         entity.LastActivityAt = DateTimeOffset.UtcNow;
         entity.Priority = await PriorityMatrices.ComputeAsync(Context, entity.Impact, entity.Urgency, cancellationToken);
 

@@ -4,7 +4,6 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Contracts;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Platform;

@@ -83,6 +83,10 @@ public class LeadScoringTests(ModulixApiFactory factory) : IClassFixture<Modulix
         await AssertInvalidAsync(client, "field", Rule("Bütçe", "estimatedBudget", LeadScoreCatalog.IsSet, null, 10));
         await AssertInvalidAsync(client, "operator", Rule("E-posta içerir", "email", LeadScoreCatalog.Contains, "ornek", 10));
         await AssertInvalidAsync(client, "value", Rule("Boş değer", "country", LeadScoreCatalog.EqualsTo, " ", 10));
+        await AssertInvalidAsync(client, "value", Rule("Sıfır temas", "contacts", LeadScoreCatalog.AtLeast, "0", 10));
+        await AssertInvalidAsync(client, "value", Rule("Yazıyla", "contacts", LeadScoreCatalog.AtLeast, "iki", 10));
+        await AssertInvalidAsync(client, "operator", Rule("Ülke en az", "country", LeadScoreCatalog.AtLeast, "1", 10));
+        await AssertInvalidAsync(client, "operator", Rule("Temas dolu", "contacts", LeadScoreCatalog.IsSet, null, 10));
     }
 
     [Fact]
@@ -174,6 +178,29 @@ public class LeadScoringTests(ModulixApiFactory factory) : IClassFixture<Modulix
         Assert.Equal(new LeadScoreJobRun(0, 0, 0), await RunJobAsync(tenantA.Id));
         Assert.Equal(0, (await GetLeadAsync(clientB, leadB.Id)).Score);
         Assert.Equal(new LeadScoreJobRun(0, 0, 0), await RunJobAsync(tenantB.Id));
+    }
+
+    [Fact]
+    public async Task Repeat_inquiries_from_the_same_person_are_counted_within_the_tenant_only()
+    {
+        var (tenant, admin) = await SetUpAsync();
+        var (_, otherAdmin) = await SetUpAsync();
+        using var client = await LoginAsync(admin);
+        using var other = await LoginAsync(otherAdmin);
+        await CreateRuleAsync(client, "Tekrar başvuran", "repeatInquiries", LeadScoreCatalog.AtLeast, "1", 40);
+
+        // Başka tenant'taki aynı e-posta tekrar sayılmaz.
+        await CreateLeadAsync(other, new SaveLeadRequest("Öteki firma", LastName: "Ak", Email: "ali@ornek.test"));
+        var first = await CreateLeadAsync(client, new SaveLeadRequest("İlk talep", LastName: "Ak", Email: "ali@ornek.test"));
+        Assert.Equal(0, first.Score);
+
+        // Aynı kişi yeniden başvurur (e-posta büyük harfle; normalleştirilmiş e-posta eşleşir): yeni aday kaydedilirken puanlanır, eski aday toplu işle güncellenir.
+        var second = await CreateLeadAsync(client, new SaveLeadRequest("İkinci talep", LastName: "Ak", Email: "ALI@ornek.test"));
+        Assert.Equal(40, second.Score);
+        Assert.Equal(0, (await GetLeadAsync(client, first.Id)).Score);
+        Assert.Equal(new LeadScoreJobRun(1, 1, 0), await RunJobAsync(tenant.Id));
+        Assert.Equal(40, (await GetLeadAsync(client, first.Id)).Score);
+        Assert.Equal(new LeadScoreJobRun(0, 0, 0), await RunJobAsync(tenant.Id));
     }
 
     [Fact]

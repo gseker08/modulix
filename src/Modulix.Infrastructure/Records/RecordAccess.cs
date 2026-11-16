@@ -20,6 +20,11 @@ internal sealed class RecordAccess(
     public async Task<bool> HidesOutOfScopeSharedRecordsAsync(CancellationToken cancellationToken) =>
         tenant.Current is { } current && await dataScope.HidesOutOfScopeSharedAsync(current, cancellationToken);
 
+    public async Task<IReadOnlySet<string>> GetHiddenFieldsAsync(string entityKey, IReadOnlySet<string> hiddenWithoutTenant, CancellationToken cancellationToken) =>
+        tenant.Current is { } current
+            ? await services.GetRequiredService<IFieldAccessService>().GetHiddenFieldsAsync(current, entityKey, cancellationToken)
+            : hiddenWithoutTenant;
+
     public async Task<bool> CanAsync(string entityKey, RecordOperation operation, CancellationToken cancellationToken) =>
         tenant.Current is { } current
         && await services.GetRequiredService<IPermissionService>().HasPermissionAsync(current, entityKey, operation, cancellationToken);

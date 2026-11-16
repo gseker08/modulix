@@ -81,8 +81,9 @@ internal sealed class TicketInbound(
         }
 
         var info = new InboundInfo(channel, externalId, message.InReplyTo?.Trim(), sender);
+        var tagged = await TaggedTicketAsync(message.Subject, cancellationToken);
         Guid? parentId = null;
-        if (await MatchAsync(message, sender, cancellationToken) is { } match)
+        if (await MatchAsync(message, sender, tagged?.Id, cancellationToken) is { } match)
         {
             // Birleştirilmiş talebin yeni mesajı hedefe gider; kapalı/iptal talebe mesaj eklenmez, ilişkili yeni talep açılır.
             var target = match;
@@ -103,13 +104,14 @@ internal sealed class TicketInbound(
             parentId = target.Id;
         }
 
-        return await CreateAsync(message, channel, externalId, sender, body, info, parentId, cancellationToken);
+        return await CreateAsync(message, channel, externalId, sender, body, info, parentId, tagged?.Number, cancellationToken);
     }
 
     private async Task<RecordResult<InboundResult>> CreateAsync(
-        InboundMessage message, string channel, string externalId, string? sender, string body, InboundInfo info, Guid? parentId, CancellationToken cancellationToken)
+        InboundMessage message, string channel, string externalId, string? sender, string body, InboundInfo info, Guid? parentId, string? taggedNumber,
+        CancellationToken cancellationToken)
     {
-        var subject = InboundRules.CleanSubject(message.Subject);
+        var subject = InboundRules.CleanSubject(message.Subject, taggedNumber);
         if (subject.Length == 0)
         {
             subject = "(Konusuz)";
@@ -157,7 +159,7 @@ internal sealed class TicketInbound(
     private sealed record Match(Guid Id, string Status, Guid? MergedIntoId);
 
     /// <summary>Mesaj kimliği zincirine, yoksa konudaki talep numarasına göre talebi bulur; gönderen talebin adresiyle uyuşmalı ve talep çağıranın kapsamında olmalıdır.</summary>
-    private async Task<Match?> MatchAsync(InboundMessage message, string? sender, CancellationToken cancellationToken)
+    private async Task<Match?> MatchAsync(InboundMessage message, string? sender, Guid? taggedTicketId, CancellationToken cancellationToken)
     {
         if (sender is null)
         {
@@ -174,11 +176,7 @@ internal sealed class TicketInbound(
             ticketId = byThread;
         }
 
-        if (ticketId is null && InboundRules.TicketNumberFromSubject(message.Subject) is { } number)
-        {
-            ticketId = await context.Data.Set<SupportTicket>().AsNoTracking().Where(t => t.Number == number).Select(t => (Guid?)t.Id).FirstOrDefaultAsync(cancellationToken);
-        }
-
+        ticketId ??= taggedTicketId;
         if (ticketId is not { } id)
         {
             return null;
@@ -205,6 +203,32 @@ internal sealed class TicketInbound(
         }
 
         return new Match(id, ticket.Status, ticket.MergedIntoId);
+    }
+
+    /// <summary>
+    /// Konudaki köşeli parantezli etiketlerden gerçek bir talep numarası olan ilki (ADR-0049 dilim 3b). Önek firma başına yapılandırılabildiği ve eski
+    /// talepler <c>TK-…</c> numarasını koruduğu için kalıp değil kayıt aranır. Bulunan numara tek başına yetki vermez: eşleşme için gönderen ve kapsam
+    /// <see cref="MatchAsync"/> içinde ayrıca denetlenir; burada yalnızca talebin kimliği ve konudan atılacak etiket belirlenir.
+    /// </summary>
+    private async Task<(Guid Id, string Number)?> TaggedTicketAsync(string? subject, CancellationToken cancellationToken)
+    {
+        var candidates = InboundRules.TicketNumberCandidates(subject);
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        var found = await context.Data.Set<SupportTicket>().AsNoTracking().Where(t => candidates.Contains(t.Number))
+            .Select(t => new { t.Id, t.Number }).ToListAsync(cancellationToken);
+        foreach (var candidate in candidates)
+        {
+            if (found.FirstOrDefault(t => t.Number.Equals(candidate, StringComparison.OrdinalIgnoreCase)) is { } ticket)
+            {
+                return (ticket.Id, ticket.Number);
+            }
+        }
+
+        return null;
     }
 
     private async Task<InboundResult?> DuplicateAsync(string channel, string externalId, CancellationToken cancellationToken)

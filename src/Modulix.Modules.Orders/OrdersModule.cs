@@ -110,6 +110,12 @@ public sealed class OrdersModule : IModule, IModuleEndpoints
 
     public string DisplayName => "Siparişler";
 
+    /// <summary>CRM olmadan sipariş elle açılır; tekliften dönüşüm ve takip aktivitesi CRM'den gelir (ADR-0051).</summary>
+    public IReadOnlyList<ModuleDependency> Dependencies { get; } =
+    [
+        new ModuleDependency("crm", ModuleDependencyKind.Optional, "Kabul edilmiş tekliften sipariş oluşturma ve takip aktivitesi"),
+    ];
+
     IReadOnlyList<PermissionDefinition> IModule.Permissions { get; } =
     [
         new(Permissions.OrdersRead, "Siparişleri, kalemlerini ve tarihçesini görüntüler", "Siparişler"),

@@ -14,12 +14,16 @@ public static class LeadScoreCatalog
     public const string IsSet = "isSet";
     public const string IsEmpty = "isEmpty";
 
+    /// <summary>Davranış sayacı (dilim 2): en az N; değer 1..1000 tam sayı.</summary>
+    public const string AtLeast = "atLeast";
+
     public sealed record ScoreFieldOption(string Key, string Label, IReadOnlyList<string> Operators);
 
     private static readonly string[] CodeOperators = [EqualsTo, NotEquals, IsSet, IsEmpty];
     private static readonly string[] TextOperators = [EqualsTo, NotEquals, Contains, IsSet, IsEmpty];
     private static readonly string[] CodeListOperators = [Contains, IsSet, IsEmpty];
     private static readonly string[] PresenceOperators = [IsSet, IsEmpty];
+    private static readonly string[] CountOperators = [AtLeast];
 
     public static readonly IReadOnlyList<ScoreFieldOption> Fields =
     [
@@ -40,6 +44,9 @@ public static class LeadScoreCatalog
         new("website", "Web sitesi", PresenceOperators),
         new("companyId", "Mevcut firma", PresenceOperators),
         new("campaignId", "Kampanya", PresenceOperators),
+        new("contacts", "Gerçekleşen temas sayısı", CountOperators),
+        new("meetings", "Yapılan toplantı sayısı", CountOperators),
+        new("repeatInquiries", "Tekrar başvuru sayısı", CountOperators),
     ];
 
     public static ScoreFieldOption? Find(string? key) => Fields.FirstOrDefault(f => f.Key == key);
@@ -51,6 +58,7 @@ public static class LeadScoreCatalog
         Contains => "içerir",
         IsSet => "dolu",
         IsEmpty => "boş",
+        AtLeast => "en az",
         _ => op,
     };
 

@@ -56,10 +56,10 @@ Kaynaklar: ADR-0046 ve ADR-0049 durum satırları, `core-mimari-degerlendirme-20
 |------|----|--------|-------|
 | C1 | Kalan modül işlerinin tek zamanlayıcıya taşınması: Destek → `QuoteExpiry` → `ContractJobs` → `MarketingSend` (iş başına bir PR) | ADR-0046 dilim 4, E3 | Yapıldı (15-16 Kasım): Destek, `QuoteExpiry`, `ContractJobs`, `MarketingSend` (kuyruk moduyla) |
 | C2 | Orta modüllerin uç noktaları modüle (Sipariş, Destek, Marketing) | ADR-0046 dilim 5, H3 | Yapıldı (16 Kasım): Sipariş, Pazarlama, Destek; ortak `ResourceEndpoints`, `IRecordExportAudit`, `CsvText`, `IModulePublicEndpoints`, `IPublicTenantScopes` |
-| C3 | Büyük modüllerin uç noktaları modüle (Sözleşme, CRM; CRM birden çok PR) | ADR-0046 dilim 6, H3 | C2'den sonra |
+| C3 | Büyük modüllerin uç noktaları modüle (Sözleşme, CRM; CRM birden çok PR) | ADR-0046 dilim 6, H3 | Sürüyor: Sözleşme ve CRM çekirdek uçları yapıldı (16 Kasım); sırada CRM teklif, satış planlama, web formu |
 | C4 | Customs'ın Antrepo'ya taşınması ve Core hazır listelerindeki sektör sözlüğü | ADR-0046 dilim 7, H1, H2 | C3'ten bağımsız başlanabilir |
 | C5 | Seriyi firma yapılandırır (önek, basamak, sıfırlama; yönetim ekranı) | ADR-0049 dilim 2 | Açık kararlar listesinde değil |
-| C6 | Modül bağımlılık beyanı (`IModule` + lisans atamada denetim) | H7 | ADR-0051 öneri olarak yazıldı (16 Kasım); açık sorular karar bekliyor, sonra dilim 1 |
+| C6 | Modül bağımlılık beyanı (`IModule` + lisans atamada denetim) | H7 | Sürüyor: ADR-0051 kabul edildi, dilim 1 (beyan, katalog doğrulaması, mimari test) ve dilim 2 (hak yazılırken zorunlu bağımlılık denetimi) yapıldı (16 Kasım); sırada dilim 3 (isteğe bağlı uyarı, platform ve firma ekranı) |
 | C7 | Kapanış: `Program.cs`'te modüle özel satır kalmadığını denetleyen mimari test | ADR-0046 dilim 8 | En son |
 
 Core'da karar bekleyenler: ADR-0049 dilim 3 (numara biçimi) ve 5 (kur kaynağı), entegrasyon katmanı (E1), belge çıktısı (E2), portal kimliği (E4),

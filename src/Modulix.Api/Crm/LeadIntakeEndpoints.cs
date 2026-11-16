@@ -59,7 +59,7 @@ internal static class LeadIntakeEndpoints
 
         // Form yönetimi (oturumlu): izin crm.lead-forms.manage.
         var admin = app.MapGroup("/api/crm").RequireAuthorization().RequireModule(CrmModule.ModuleKey).WithTags("CRM");
-        CrmEndpoints.MapResource<LeadFormDto, SaveLeadFormRequest>(admin, "lead-forms", CrmModule.Entities.LeadForm,
+        ResourceEndpoints.MapResource<LeadFormDto, SaveLeadFormRequest>(admin, "/api/crm", "lead-forms", CrmModule.Entities.LeadForm,
             CrmModule.Permissions.LeadFormsManage, CrmModule.Permissions.LeadFormsManage);
         admin.MapPost("/lead-forms/{id:guid}/secret", RotateSecretAsync).RequirePermission(CrmModule.Permissions.LeadFormsManage);
         return app;
@@ -69,7 +69,7 @@ internal static class LeadIntakeEndpoints
     {
         var result = await admin.RotateSecretAsync(id, request.Version, ct);
         return result.IsSuccess
-            ? Results.Ok(new LeadFormSecretDto(CrmEndpoints.ToDto<LeadFormDto>(result.Value!.Form), result.Value.Secret))
+            ? Results.Ok(new LeadFormSecretDto(ResourceEndpoints.ToDto<LeadFormDto>(result.Value!.Form), result.Value.Secret))
             : RecordEndpoints.ToProblem(result.Error!);
     }
 

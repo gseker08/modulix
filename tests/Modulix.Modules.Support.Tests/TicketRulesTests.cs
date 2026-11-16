@@ -174,13 +174,4 @@ public class TicketRulesTests
     {
         Assert.Equal(counts, FirstResponseRules.Counts(visibility, direction, automatic, delivery));
     }
-
-    [Fact]
-    public void Ticket_numbers_are_unambiguous_and_well_formed()
-    {
-        var number = TicketNumbers.New(new DateTimeOffset(2026, 11, 2, 0, 0, 0, TimeSpan.Zero));
-
-        Assert.Matches("^TK-20261102-[A-HJ-NP-Z2-9]{6}$", number);
-        Assert.NotEqual(number, TicketNumbers.New(DateTimeOffset.UtcNow));
-    }
 }

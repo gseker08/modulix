@@ -130,6 +130,29 @@ public class SupportTicketTests(ModulixApiFactory factory) : IClassFixture<Modul
     private static async Task<int> CountAsync(HttpClient client, string query = "") =>
         (await client.GetFromJsonAsync<PagedResult<TicketDto>>($"/api/support/tickets?pageSize=1{query}"))!.TotalCount;
 
+    // ---- Talep numarası ortak belge serisinden gelir (ADR-0049 dilim 3b): ardışık, doğrulamadan sonra, firma başına; izinsiz istek sıra harcamaz
+
+    [Fact]
+    public async Task Ticket_numbers_are_consecutive_per_tenant_and_rejected_or_unauthorized_requests_consume_none()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var agentA = await LoginAsync(a.Agent);
+        using var viewerA = await LoginAsync(a.Viewer);
+        using var agentB = await LoginAsync(b.Agent);
+
+        // Yetki: talep oluşturma izni olmayan kullanıcı numara alamaz.
+        Assert.Equal(HttpStatusCode.Forbidden, (await viewerA.PostAsJsonAsync("/api/support/tickets", new SaveTicketRequest(Subject: "Yetkisiz", PartyId: a.PartyId))).StatusCode);
+        Assert.Matches(@"^DT-\d{4}-00001$", (await CreateForAsync(agentA, a, "İlk talep")).Number);
+
+        // Doğrulama: konusuz talep reddedilir; numara doğrulamadan sonra alındığı için sıra ilerlemez.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await agentA.PostAsJsonAsync("/api/support/tickets", new SaveTicketRequest(Subject: " ", PartyId: a.PartyId))).StatusCode);
+        Assert.Matches(@"^DT-\d{4}-00002$", (await CreateForAsync(agentA, a, "İkinci talep")).Number);
+
+        // Tenant izolasyonu: B kendi sırasından başlar.
+        Assert.Matches(@"^DT-\d{4}-00001$", (await CreateForAsync(agentB, b, "B'nin ilk talebi")).Number);
+    }
+
     // ---- Mutlu yol: CRM kapalıyken müşteri kimliğiyle talep açılır, atanır, yanıtlanır, çözülür ve kapanır
 
     [Fact]
@@ -140,7 +163,7 @@ public class SupportTicketTests(ModulixApiFactory factory) : IClassFixture<Modul
         using var lead = await LoginAsync(s.Lead);
 
         var created = await CreateForAsync(agent, s);
-        Assert.Matches("^TK-\\d{8}-[A-HJ-NP-Z2-9]{6}$", created.Number);
+        Assert.Matches(@"^DT-\d{4}-00001$", created.Number);
         Assert.Equal(("New", "Normal", "Support", "User"), (created.Status, created.Priority, created.TypeKey, created.Channel));
         Assert.Equal(s.PartyId, created.PartyId);
         Assert.Null(created.OwnerId);

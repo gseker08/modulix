@@ -48,7 +48,7 @@ Kodda dört değil sekiz kopya üretici vardı (teklif `TK`, sipariş `SP`, tesl
 
 - **Sıralı seriye geçenler (3a):** teklif, sipariş, teslimat, operasyon işi, sözleşme. Varsayılan biçim seferle aynı: `önek-yıl-sıra`, 5 basamak, yıllık sıfırlama; firma Yönetim > Belge numaraları'ndan değiştirir.
 - **Önek çakışmaları:** operasyon işi `IS` oldu (eski `OP` fırsatla karışıyordu). Destek talebi geçtiğinde `DT` olacak (bugün teklifle aynı `TK`).
-- **Destek talebi (3b, sonra):** gelen e-posta konudaki `[TK-…]` numarasıyla talebe bağlanıyor; rastgele sonek bunu tahmin edilemez kılıyor ve ayrıştırıcı öneki sabit arıyor. Geçişten önce gönderen denetimi incelenecek ve ayrıştırıcı firmanın önekini tanıyacak.
+- **Destek talebi (3b, aşağıda teslim edildi):** gelen e-posta konudaki `[TK-…]` numarasıyla talebe bağlanıyor; rastgele sonek bunu tahmin edilemez kılıyor ve ayrıştırıcı öneki sabit arıyor. Geçişten önce gönderen denetimi incelenecek ve ayrıştırıcı firmanın önekini tanıyacak.
 - **Fırsat ve müşteri adayı:** belge değil, iç takip kaydı; toplu içe aktarmayla çok sayıda açılıyor. Şimdilik rastgele kalıyor.
 - **Geçmeyenler:** üç üretici tek ortak yardımcıya indi (`Core.Contracts.Numbering.RandomDocumentNumber`); davranışları değişmedi.
 
@@ -59,6 +59,17 @@ Kodda dört değil sekiz kopya üretici vardı (teklif `TK`, sipariş `SP`, tesl
 - **Numara ne zaman alınır:** doğrulamadan sonra, kayıt eklenmeden hemen önce (`CreatedAsync`); reddedilen istek sıra harcamaz. CRM depo tabanına bunun için beklemeli `CreatedAsync` kancası eklendi.
 - **Teklif revizyonu** ailenin numarasını taşır, seriden sıra almaz; çoğaltma yeni ailedir ve yeni numara alır.
 - **Yönetim listesi:** firmada açık olmayan modülün serisi listelenmez ve yapılandırılamaz (404).
+
+#### Dilim 3b: destek talebi ortak seride (teslim edildi)
+
+İnceleme (16.11.2026): gelen mesaj, konudaki numarayı bulsa bile ancak gönderen talebin başvuran ya da alıcı adresiyse talebe eklenir; kapsam da ayrıca denetlenir. Numarayı tahmin etmek tek başına talebe mesaj sokmaz, bu yüzden sıralı numara eşleştirmede açık açmaz. Herkese açık anket numarayla değil kişiye özel bağlantıyla çalışır.
+
+- **Seri:** `support.ticket`, önek `DT` (`DT-2026-00001`); `TK` teklifte kaldı. Eski talepler `TK-20261101-AB12CD` numarasını korur; veri taşıma ve migration yok, seri 1'den başlar.
+- **Numara ne zaman alınır:** doğrulamadan ve tekrar korumasından sonra (`CreatedAsync`); reddedilen ya da tekrar sayılan istek sıra harcamaz.
+- **Eşleştirme önekten bağımsız:** firma öneki değiştirebildiği ve eski talepler `TK-…` taşıdığı için konuda kalıp aranmaz. Köşeli parantezli etiketler (en çok 5; boş, boşluklu ya da 30 karakterden uzun olanlar hariç) gerçek talep numaralarıyla karşılaştırılır, sırayla ilk bulunan alınır (`InboundRules.TicketNumberCandidates`). `[acil]` gibi etiketler kayıt bulmaz.
+- **Konu temizliği:** yeni talep açılırken konudan yalnızca gerçek bir talebe ait numara etiketi atılır; başka köşeli etiket konuda kalır. Hiçbir talep bulunmazsa eski `[TK-…]` kalıbı yine atılır.
+- **Kabul edilen risk:** rastgele sonek, başvuranın adresini taklit eden gönderen için ek bir engeldi; sıralı numarada bu engel yok. Gönderen adresinin doğrulanması (SPF/DKIM/DMARC) e-posta alıcısının işidir ve alıcı yazılırken zorunlu tutulmalıdır (bugün alıcı kurulu değil, giriş yetkili bir entegrasyon kullanıcısının çağırdığı adaptör sözleşmesidir). Sıralı numara müşteriye firmanın talep hacmini de gösterir; istemeyen firma sayacı ileri alarak başlangıcı değiştirebilir.
+- **Kalan:** fırsat ve müşteri adayı rastgele sonekli (karar yukarıda).
 
 Aşağıdaki özgün not tarihçe için duruyor:
 

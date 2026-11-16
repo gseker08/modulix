@@ -1,13 +1,15 @@
-using System.Text;
 using System.Text.Json.Nodes;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
+using System.Text;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
-using Modulix.Modules.Crm;
+using Modulix.Core.Hosting;
 using Modulix.Shared.Crm;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// Mükerrer önerisi (ADR-0013): <c>GET /api/crm/companies/duplicates</c> ve <c>GET /api/crm/contacts/duplicates</c>. Kayıt
@@ -41,7 +43,7 @@ internal static class DuplicateEndpoints
             var exact = await pipeline.QueryAsync(Query(CrmModule.Entities.Company, null, ("taxNumber", number)), ct);
             if (!exact.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(exact.Error!);
+                return RecordProblems.ToProblem(exact.Error!);
             }
 
             foreach (var item in exact.Value!.Items.Where(i => i.Id != excludeId))
@@ -73,7 +75,7 @@ internal static class DuplicateEndpoints
             var similar = await pipeline.QueryAsync(Query(CrmModule.Entities.Company, term), ct);
             if (!similar.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(similar.Error!);
+                return RecordProblems.ToProblem(similar.Error!);
             }
 
             foreach (var item in similar.Value!.Items.Where(i => i.Id != excludeId && SimilarNames(key, NameKey(i.Values["name"]?.GetValue<string>() ?? string.Empty))))
@@ -112,7 +114,7 @@ internal static class DuplicateEndpoints
             var byName = await pipeline.QueryAsync(Query(CrmModule.Entities.Contact, last), ct);
             if (!byName.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(byName.Error!);
+                return RecordProblems.ToProblem(byName.Error!);
             }
 
             var wanted = Fold($"{firstName} {last}");

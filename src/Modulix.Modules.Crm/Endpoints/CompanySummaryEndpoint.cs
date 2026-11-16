@@ -1,12 +1,14 @@
 using System.Globalization;
-using Modulix.Api.Records;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
-using Modulix.Core.Records;
-using Modulix.Modules.Crm;
+using Modulix.Core.Hosting;
 using Modulix.Shared.Crm;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// GET /api/crm/companies/{id}/summary (ADR-0010): firma detayının özetleri. Sayılar ve toplamlar kayıt boru hattından,
@@ -71,18 +73,21 @@ internal static class CompanySummaryEndpoint
         return (total, !amountsVisible ? null : [.. sums.Select(s => new CurrencyTotal(s.Key, s.Value.Amount, s.Value.Count))]);
     }
 
+    /// <summary>Oturumsuz çağrıda (uç nokta oturum ister; savunma için) tutar gizli sayılır.</summary>
+    private static readonly IReadOnlySet<string> AmountOnly = new HashSet<string> { "amount" };
+
     public static async Task<IResult> GetAsync(
-        Guid id, IRecordPipeline pipeline, IFieldAccessService fieldAccess, ITenantContextAccessor tenant, CancellationToken ct)
+        Guid id, IRecordPipeline pipeline, IRecordAccess access, CancellationToken ct)
     {
         // Firma çağıranın kapsamında değilse özet de yoktur (404).
         var company = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Company, id), ct);
         if (!company.IsSuccess)
         {
-            return RecordEndpoints.ToProblem(company.Error!);
+            return RecordProblems.ToProblem(company.Error!);
         }
 
         // Tutar alanı hassastır (Y8b): izin yoksa toplamlar hiç verilmez (boş liste "sıfır" anlamına gelirdi).
-        var hidden = await fieldAccess.GetHiddenFieldsAsync(tenant.Current!, CrmModule.Entities.Opportunity, ct);
+        var hidden = await access.GetHiddenFieldsAsync(CrmModule.Entities.Opportunity, AmountOnly, ct);
         var amountsVisible = !hidden.Contains("amount");
         var (open, openTotals) = await OpportunitiesAsync(pipeline, id, CrmModule.StageCategories.Open, amountsVisible);
         var (won, wonTotals) = await OpportunitiesAsync(pipeline, id, CrmModule.StageCategories.Won, amountsVisible);

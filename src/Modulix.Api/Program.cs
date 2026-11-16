@@ -42,7 +42,6 @@ using Modulix.Modules.Crm;
 using Modulix.Modules.Logistics;
 using Modulix.Modules.Contracts;
 using Modulix.Modules.Orders;
-using Modulix.Api.Contracts;
 using Modulix.Modules.Marketing;
 using Modulix.Modules.Warehouse;
 using Modulix.Modules.Fleet;
@@ -79,17 +78,15 @@ builder.Services.AddModulixTenancy();
 builder.Services.AddModulixServerLocalization();
 
 builder.Services.AddModulixModules(ModulixModules.Create());
-builder.Services.AddScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, Modulix.Api.Contracts.HostFollowUpActivities>();
+builder.Services.AddScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, Modulix.Api.HostFollowUpActivities>();
 
 // Sektör profilleri (Y9c): tanımlar açılışta modül kataloğuna göre doğrulanır.
 builder.Services.AddSingleton(sp => new SectorProfileCatalog(SectorProfiles.Create(), sp.GetRequiredService<ModuleCatalog>()));
 builder.Services.AddSingleton(sp => new SubProfileStarterCatalog(SubProfileStarters.Create(), sp.GetRequiredService<ModuleCatalog>()));
 
 builder.Services.AddModulixRecords();
-builder.Services.AddScoped<Modulix.Modules.Crm.Opportunities.IOpportunityPolicyProvider, Modulix.Api.Crm.OpportunityPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modulix.Api.Crm.QuotePolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Crm.Reporting.ISalesReportingPolicyProvider, Modulix.Api.Crm.SalesReportingPolicyProvider>();
-builder.Services.AddScoped<Modulix.Modules.Contracts.Lifecycle.IContractPolicyProvider, Modulix.Api.Contracts.ContractPolicyProvider>();
 builder.Services.Configure<Modulix.Api.Communication.CommunicationCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Communication.CommunicationCleanupOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Imports.ImportErrorReports>();
 builder.Services.Configure<Modulix.Api.Imports.ImportReportCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Imports.ImportReportCleanupOptions.SectionName));
@@ -111,7 +108,6 @@ builder.Services.Configure<Modulix.Infrastructure.Automation.AutomationOptions>(
 builder.Services.Configure<Modulix.Core.Files.FileStorageOptions>(builder.Configuration.GetSection(Modulix.Core.Files.FileStorageOptions.SectionName));
 builder.Services.AddHostedService<Modulix.Api.Automation.AutomationWorker>();
 builder.Services.AddHostedService<ApprovalEscalationWorker>();
-builder.Services.AddSingleton<Modulix.Modules.Contracts.Lifecycle.IContractPdfRenderer, Modulix.Api.Contracts.ContractPdfRenderer>();
 builder.Services.AddScoped<Modulix.Api.Crm.QuoteDocumentService>();
 builder.Services.AddScoped<Modulix.Api.Crm.QuoteDelivery>();
 
@@ -128,7 +124,6 @@ builder.Services.AddLeadIntakeRateLimit(builder.Configuration);
 builder.Services.AddQuotePublicRateLimit(builder.Configuration);
 builder.Services.AddScoped<IPublicTenantScopes, Modulix.Api.PublicTenantScopes>();
 builder.Services.AddCommunicationPublicRateLimit(builder.Configuration);
-builder.Services.AddContractSignatureRateLimit(builder.Configuration);
 builder.Services.AddHostedService<EventDispatchWorker>();
 builder.Services.Configure<Modulix.Api.Platform.PlatformOptions>(builder.Configuration.GetSection(Modulix.Api.Platform.PlatformOptions.SectionName));
 builder.Services.Configure<Modulix.Infrastructure.Modules.LicenseOptions>(builder.Configuration.GetSection(Modulix.Infrastructure.Modules.LicenseOptions.SectionName));
@@ -268,11 +263,9 @@ app.MapModuleEndpoints();
 app.MapRuleEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
-app.MapContractsEndpoints();
 app.MapLeadIntakeEndpoints();
 app.MapQuotePublicEndpoints();
 app.MapCommunicationPublicEndpoints();
-app.MapContractSignatureWebhook();
 app.MapPlatformEndpoints();
 app.MapPlatformEventEndpoints();
 app.MapPlatformPlanEndpoints();

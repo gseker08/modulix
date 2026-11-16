@@ -11,8 +11,12 @@ namespace Modulix.Modules.Support.Records;
 /// <summary>Kayıt depolarının ihtiyaç duyduğu servisler: veri, tenant üyeleri, seçim listeleri, isteği yapan kullanıcı ve iş akışı kapısı.</summary>
 internal sealed class SupportStoreContext(
     IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access,
-    ICurrentAccess permissions, TicketWorkflowGate gate, TimeProvider time, IServiceProvider services, IRecordCommandContext? command = null)
+    ICurrentAccess permissions, TicketWorkflowGate gate, TimeProvider time, IServiceProvider services,
+    Modulix.Core.Contracts.Numbering.IDocumentNumbers numbers, IRecordCommandContext? command = null)
 {
+    /// <summary>Ortak belge serileri (ADR-0049): talep numarası buradan alınır.</summary>
+    public Modulix.Core.Contracts.Numbering.IDocumentNumbers Numbers => numbers;
+
     /// <summary>
     /// Başka bir modülün kaydını kayıt boru hattından <b>çağıranın yetkisi ve veri kapsamıyla</b> okur (destek karşı modülün tablosunu görmez). Kayıt yoksa, okunamıyorsa, modül kapalıysa ya da
     /// yetki yoksa aynı sonuç (null) döner. Boru hattı yazma sırasında geç çözülür (depolar boru hattına bağlı olduğundan döngüsel bağımlılık oluşmaz).

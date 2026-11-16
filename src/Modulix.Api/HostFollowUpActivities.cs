@@ -6,10 +6,10 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
 using Modulix.Infrastructure.Platform;
 
-namespace Modulix.Api.Contracts;
+namespace Modulix.Api;
 
 /// <summary>
-/// Takip aktivitesi köprüsü (ana bilgisayar). Kullanıcı isteğinde aktivite çağıranın kimliği ve yetkisiyle açılır (CRM uygulaması doğrudan çağrılır; yetki yoksa hata sonuçla döner).
+/// Takip aktivitesi köprüsü (ana bilgisayar; iki modülü bağladığı için modül klasöründe değil host kökündedir, ADR-0046). Kullanıcı isteğinde aktivite çağıranın kimliği ve yetkisiyle açılır (CRM uygulaması doğrudan çağrılır; yetki yoksa hata sonuçla döner).
 /// Sözleşme zamanlanmış işi (<c>contracts.scheduler</c> sistem kimliği) aktivite izni taşıyamaz (bir aboneliğin yalnızca kendi modülünün izinleri olabilir); bu durumda aktivite ayrı bir
 /// kapsamda, CRM'in "crm.follow-up" sistem kimliğiyle (yalnızca aktivite izinleri) açılır. Yükseltme yalnızca izin verilen sistem kimlikleri içindir; sıradan kullanıcı bu yoldan yetki kazanmaz.
 /// Sistem yolunda aktivite açılır ancak çağıranın kayıt görünürlüğü olmadığından kayda bağlanamaz (sözleşme numarası ve başlığı konu ve açıklamadadır).

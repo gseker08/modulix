@@ -1,9 +1,12 @@
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Hosting;
+using Modulix.Modules.Contracts.Endpoints;
 using Modulix.Modules.Contracts.Lifecycle;
 using Modulix.Modules.Contracts.Records;
 
@@ -13,7 +16,7 @@ namespace Modulix.Modules.Contracts;
 /// Sözleşme yönetimi (EPIC 7, ADR-0022): şablon, sürüm, onay, imza, taahhüt ve yenileme. Sektörden bağımsızdır; müşteri ve kişiler
 /// ortak kayıttır (ADR-0006), CRM tablolarına bağlanmaz. Yalnızca <c>Modulix.Core.Contracts</c>'a başvurur.
 /// </summary>
-public sealed class ContractsModule : IModule
+public sealed class ContractsModule : IModule, IModuleEndpoints, IModulePublicEndpoints
 {
     public const string ModuleKey = "contracts";
 
@@ -124,6 +127,12 @@ public sealed class ContractsModule : IModule
     public string Key => ModuleKey;
 
     public string DisplayName => "Sözleşmeler";
+
+    /// <summary>CRM olmadan sözleşme elle açılır; tekliften taslak ve takip aktivitesi CRM'den gelir (ADR-0051).</summary>
+    public IReadOnlyList<ModuleDependency> Dependencies { get; } =
+    [
+        new ModuleDependency("crm", ModuleDependencyKind.Optional, "Kabul edilmiş tekliften sözleşme taslağı ve takip aktivitesi"),
+    ];
 
     IReadOnlyList<PermissionDefinition> IModule.Permissions { get; } =
     [
@@ -456,8 +465,17 @@ public sealed class ContractsModule : IModule
         ModuleJobDefinition.For<ContractJobs>(ContractJobs.JobKey, TimeSpan.FromSeconds(900), ContractJobs.Identity) with { LegacySection = "ContractJobs" },
     ];
 
+    /// <summary>Sözleşme uç noktaları (<c>/api/contracts</c>) modüldedir (ADR-0046); grup host tarafından açılır.</summary>
+    public void MapEndpoints(IEndpointRouteBuilder routes) => ContractsEndpoints.MapEndpoints(routes);
+
+    /// <summary>İmza sağlayıcısı webhook'u (<c>/api/public/contracts/signature/{provider}/events</c>): HMAC imzası, hız sınırı ve gövde sınırıyla korunur.</summary>
+    public void MapPublicEndpoints(IEndpointRouteBuilder routes) => ContractSignatureEndpoints.MapPublic(routes);
+
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<IContractPolicyProvider, ContractPolicyProvider>();
+        services.AddSingleton<IContractPdfRenderer, ContractPdfRenderer>();
+        services.AddContractSignatureRateLimit();
         services.AddScoped<ContractJobs>();
         services.AddScoped<ContractsStoreContext>();
         services.AddScoped<ContractWorkflowGate>();
