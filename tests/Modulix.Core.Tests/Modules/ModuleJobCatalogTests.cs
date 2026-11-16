@@ -45,6 +45,39 @@ public class ModuleJobCatalogTests
         Rejected(ModuleJobDefinition.For<DemoJob>("sales.reminders", TimeSpan.Zero, "sales.scheduler"));
 
     [Fact]
+    public void A_queue_job_declares_a_busy_interval_shorter_than_its_interval()
+    {
+        var catalog = new ModuleCatalog(
+            [new CoreModule(), new JobModule("sales", ModuleJobDefinition.For<DemoJob>("sales.send", Interval, "sales.scheduler") with { BusyInterval = TimeSpan.FromSeconds(2) })]);
+
+        Assert.Equal(TimeSpan.FromSeconds(2), catalog.FindJob("sales.send")!.Value.Job.BusyInterval);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(900)]
+    [InlineData(1200)]
+    public void A_busy_interval_that_is_not_shorter_than_the_interval_is_rejected(int seconds) =>
+        Rejected(ModuleJobDefinition.For<DemoJob>("sales.send", Interval, "sales.scheduler") with { BusyInterval = TimeSpan.FromSeconds(seconds) });
+
+    [Fact]
+    public void The_job_context_reads_positive_integer_settings_and_falls_back_otherwise()
+    {
+        var context = new ModuleJobContext(Guid.NewGuid())
+        {
+            Settings = new Dictionary<string, string?> { ["BatchSize"] = "250", ["Zero"] = "0", ["Text"] = "çok", ["Empty"] = null },
+        };
+
+        Assert.Equal(250, context.PositiveInt("BatchSize", 100));
+        Assert.Equal(100, context.PositiveInt("Zero", 100));
+        Assert.Equal(100, context.PositiveInt("Text", 100));
+        Assert.Equal(100, context.PositiveInt("Empty", 100));
+        Assert.Equal(100, context.PositiveInt("Missing", 100));
+        Assert.Equal(7, new ModuleJobContext(Guid.NewGuid()).PositiveInt("BatchSize", 7));
+    }
+
+    [Fact]
     public void A_job_runner_must_implement_the_job_interface() =>
         Rejected(new ModuleJobDefinition("sales.reminders", Interval, typeof(string), "sales.scheduler"));
 

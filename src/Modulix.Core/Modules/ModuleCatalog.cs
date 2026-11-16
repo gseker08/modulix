@@ -521,8 +521,8 @@ public sealed partial class ModuleCatalog
     [GeneratedRegex("^[a-z][a-z0-9]*(\\.[a-z0-9]+(-[a-z0-9]+)*)+$")]
     private static partial Regex SubscriptionKeyPattern();
 
-    // Anahtar modülle başlar ve abonelik anahtarıyla aynı biçimdedir (yapılandırma ve kilit adı olur); aralık pozitiftir; iş sınıfı
-    // IModuleJob uygular; sistem kimliği modülün kendi aboneliğidir (işin izinleri oradan gelir).
+    // Anahtar modülle başlar ve abonelik anahtarıyla aynı biçimdedir (yapılandırma ve kilit adı olur); aralık pozitiftir, kuyruk işinin yoğun aralığı
+    // ondan kısadır; iş sınıfı IModuleJob uygular; sistem kimliği modülün kendi aboneliğidir (işin izinleri oradan gelir).
     private static void ValidateJob(IModule module, ModuleJobDefinition job)
     {
         var key = job.Key;
@@ -535,6 +535,11 @@ public sealed partial class ModuleCatalog
         if (job.DefaultInterval <= TimeSpan.Zero)
         {
             throw new InvalidOperationException($"'{key}' işinin aralığı pozitif olmalı.");
+        }
+
+        if (job.BusyInterval is { } busy && (busy <= TimeSpan.Zero || busy >= job.DefaultInterval))
+        {
+            throw new InvalidOperationException($"'{key}' işinin yoğun aralığı pozitif ve olağan aralıktan kısa olmalı.");
         }
 
         if (!typeof(IModuleJob).IsAssignableFrom(job.Runner) || job.Runner.IsAbstract)

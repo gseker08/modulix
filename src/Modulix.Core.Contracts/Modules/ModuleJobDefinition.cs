@@ -21,20 +21,46 @@ public sealed record ModuleJobDefinition(string Key, TimeSpan DefaultInterval, T
     /// </summary>
     public string? LegacySection { get; init; }
 
+    /// <summary>
+    /// Kuyruk işi: doluysa iş, turunda <see cref="ModuleJobResult.HasMoreWork"/> bildirdiğinde bir sonraki tur <see cref="DefaultInterval"/> yerine
+    /// bu kadar sonra başlar (sıradaki satırlar beklemesin). Kuyruk işlerinde en kısa aralık normal işlerinkinden düşüktür. Yapılandırma
+    /// <c>Jobs:&lt;anahtar&gt;:BusyIntervalSeconds</c> (eski bölümde <c>BusyIntervalSeconds</c>). Aralıkla çalışan işte verilmez.
+    /// </summary>
+    public TimeSpan? BusyInterval { get; init; }
+
     public static ModuleJobDefinition For<TJob>(string key, TimeSpan defaultInterval, string identity, bool requiresWritableModule = true)
         where TJob : class, IModuleJob =>
         new(key, defaultInterval, typeof(TJob), identity, requiresWritableModule);
 }
 
-/// <summary>İşin çalıştığı tenant. Tenant bağlamı ve sistem kimliği zamanlayıcı tarafından kurulmuştur; iş servislerini kurucusundan alır.</summary>
-public sealed record ModuleJobContext(Guid TenantId);
+/// <summary>
+/// İşin çalıştığı tenant. Tenant bağlamı ve sistem kimliği zamanlayıcı tarafından kurulmuştur; iş servislerini kurucusundan alır.
+/// <see cref="Settings"/> işin yapılandırma bölümündeki (<c>Jobs:&lt;anahtar&gt;</c>, verilmeyen ad için eski bölüm) düz değerlerdir; iş kendi
+/// ayarlarını (ör. parti boyutu) buradan okur, yapılandırma kitaplığına başvurmaz.
+/// </summary>
+public sealed record ModuleJobContext(Guid TenantId)
+{
+    public IReadOnlyDictionary<string, string?> Settings { get; init; } = new Dictionary<string, string?>();
+
+    /// <summary>Ayardaki pozitif tam sayı; yoksa, sayı değilse ya da pozitif değilse <paramref name="fallback"/>.</summary>
+    public int PositiveInt(string name, int fallback) =>
+        Settings.TryGetValue(name, out var value) && int.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int parsed) && parsed > 0
+            ? parsed
+            : fallback;
+}
 
 /// <summary>
-/// Tur özeti. <see cref="Summary"/> doluysa zamanlayıcı günlüğe yazar (yalnızca bir şey yapıldığında doldurun; her turda gürültü olmasın).
-/// <see cref="Details"/> modülün kendi özet nesnesidir; testler ve tanılama için taşınır, zamanlayıcı yorumlamaz.
+/// Tur özeti. <see cref="Summary"/> doluysa zamanlayıcı günlüğe yazar (yalnızca bir şey yapıldığında doldurun; her turda gürültü olmasın);
+/// <see cref="IsWarning"/> açıksa uyarı düzeyinde. <see cref="Details"/> modülün kendi özet nesnesidir; testler ve tanılama için taşınır,
+/// zamanlayıcı yorumlamaz. <see cref="HasMoreWork"/> yalnızca kuyruk işlerinde (<see cref="ModuleJobDefinition.BusyInterval"/>) anlamlıdır:
+/// sırada iş kaldıysa bir sonraki tur kısa aralıkla başlar.
 /// </summary>
 public sealed record ModuleJobResult(string? Summary = null, object? Details = null)
 {
+    public bool IsWarning { get; init; }
+
+    public bool HasMoreWork { get; init; }
+
     public static ModuleJobResult Nothing { get; } = new();
 }
 
