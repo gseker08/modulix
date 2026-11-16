@@ -15,12 +15,12 @@
             @Detail
             @if (Partial)
             {
-                <span class="badge stage-onhold" title="@PartialHint">Kısmi</span>
+                <span class="badge stage-onhold" title="@PartialHint">@Texts.Get("crm.sales.partial")</span>
             }
         </span>
         @if (Trend is not null)
         {
-            <Sparkline Values="Trend" Label="@($"{Label} eğilimi")" />
+            <Sparkline Values="Trend" Label="@Texts.Get("crm.dashboard.kpi-trend", Label)" />
         }
     </div>
 </div>

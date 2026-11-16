@@ -4,33 +4,33 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Resmî tatiller · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.admin.holidays") · Modulix</PageTitle>
 
 @* Firmanın resmî tatil ve idari izin günleri (ADR-0049 dilim 6a: liste Core'dadır; ADR-0042 dilim 2'de İK ekranıydı, eski adres de açılır). Ayar ekranı,
    sekmeli form kuralının dışındadır. İzin gün sayısından düşülür; tarihler koda yazılmaz (dinî bayramlar her yıl değişir). Listeyi her üye okur, yazmak
    core.holidays.manage ister. Listedeki değişiklik açılmış taleplerin gün sayısını değiştirmez. *@
 <AuthGate>
-    <PageHeader Title="Resmî tatiller" Icon="calendar" Subtitle="Firmanın resmî tatil ve idari izin günleri; izin gün sayısı ve iş takvimi bu listeyi kullanır." />
+    <PageHeader Title="@Texts.Get("nav.app.admin.holidays")" Icon="calendar" Subtitle="@Texts.Get("admin.holidays.intro")" />
 
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <ViewTabs Items="YearOptions" Value="@year.ToString(System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="ChooseYearAsync" Label="Yıl" />
+    <ViewTabs Items="YearOptions" Value="@year.ToString(System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="ChooseYearAsync" Label="@Texts.Get("admin.holidays.year")" />
 
     @if (Session.Can(CoreAccess.ManageHolidays))
     {
-        <form class="list-toolbar" novalidate @onsubmit="AddAsync" @onsubmit:preventDefault aria-label="Tatil günü ekle">
-            <label class="visually-hidden" for="holiday-date">Tarih</label>
+        <form class="list-toolbar" novalidate @onsubmit="AddAsync" @onsubmit:preventDefault aria-label="@Texts.Get("admin.holidays.add")">
+            <label class="visually-hidden" for="holiday-date">@Texts.Get("admin.holidays.col.date")</label>
             <input id="holiday-date" class="form-control w-auto" type="date" required aria-required="true" @bind="newDate" />
-            <label class="visually-hidden" for="holiday-name">Ad</label>
-            <input id="holiday-name" class="form-control" maxlength="150" placeholder="Ad (ör. Cumhuriyet Bayramı)" required aria-required="true" @bind="newName" />
+            <label class="visually-hidden" for="holiday-name">@Texts.Get("common.field.name")</label>
+            <input id="holiday-name" class="form-control" maxlength="150" placeholder="@Texts.Get("admin.holidays.name-placeholder")" required aria-required="true" @bind="newName" />
             <div class="form-check">
                 <input id="holiday-half" class="form-check-input" type="checkbox" @bind="newHalfDay" />
-                <label class="form-check-label" for="holiday-half">Yarım gün (arife)</label>
+                <label class="form-check-label" for="holiday-half">@Texts.Get("admin.holidays.half-day-eve")</label>
             </div>
-            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : null)"><AppIcon Name="plus" Size="16" /> Ekle</button>
+            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("common.add")</button>
         </form>
         <FieldError Field="date" Errors="errors" />
         <FieldError Field="name" Errors="errors" />
@@ -42,31 +42,31 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Icon="calendar" Title="@($"{year} yılı için tatil günü girilmedi.")" Text="Hafta sonları her zaman düşülür." />
+        <EmptyState Icon="calendar" Title="@Texts.Get("admin.holidays.empty", year)" Text="@Texts.Get("admin.holidays.empty-help")" />
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">@year yılı tatil günleri</caption>
+            <caption class="visually-hidden">@Texts.Get("admin.holidays.caption", year)</caption>
             <thead>
                 <tr>
-                    <th scope="col"><SortHeader Label="Tarih" ColumnIcon="calendar" Asc="date" Desc="-date" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><SortHeader Label="Ad" ColumnIcon="tag" Asc="name" Desc="-name" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><AppIcon Name="clock" Size="14" /> Süre</th>
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("admin.holidays.col.date")" ColumnIcon="calendar" Asc="date" Desc="-date" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("common.field.name")" ColumnIcon="tag" Asc="name" Desc="-name" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><AppIcon Name="clock" Size="14" /> @Texts.Get("admin.holidays.col.duration")</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var holiday in page.Items)
                 {
                     <tr>
-                        <td data-label="Tarih" class="primary">@HrLabels.Date(WarehouseLabels.Text(holiday, "date"))</td>
-                        <td data-label="Ad">@WarehouseLabels.Text(holiday, "name")</td>
-                        <td data-label="Süre">@(WarehouseLabels.Flag(holiday, "halfDay") ? "Yarım gün" : "Tam gün")</td>
+                        <td data-label="@Texts.Get("admin.holidays.col.date")" class="primary">@HrLabels.Date(WarehouseLabels.Text(holiday, "date"))</td>
+                        <td data-label="@Texts.Get("common.field.name")">@WarehouseLabels.Text(holiday, "name")</td>
+                        <td data-label="@Texts.Get("admin.holidays.col.duration")">@(WarehouseLabels.Flag(holiday, "halfDay") ? Texts.Get("admin.holidays.half-day") : Texts.Get("admin.holidays.full-day"))</td>
                         <td class="row-menu-cell">
                             @if (Session.Can(CoreAccess.ManageHolidays))
                             {
-                                <RowMenu Label="@($"{WarehouseLabels.Text(holiday, "name")} eylemleri")">
+                                <RowMenu Label="@Texts.Get("hr.content.row-actions", WarehouseLabels.Text(holiday, "name"))">
                                     <RowMenuDelete OnConfirm="() => DeleteAsync(holiday)" />
                                 </RowMenu>
                             }

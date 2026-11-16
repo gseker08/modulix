@@ -58,5 +58,6 @@ internal static class CrmEndpoints
             CrmModule.Permissions.ActivitiesRead, CrmModule.Permissions.ActivitiesWrite);
         ActivityEndpoints.Map(crm);
         LeadEndpoints.Map(crm);
+        LeadIntakeEndpoints.MapAdmin(crm);
     }
 }
