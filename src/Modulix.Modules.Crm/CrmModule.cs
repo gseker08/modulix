@@ -29,6 +29,17 @@ public sealed class CrmModule : IModule
 {
     public const string ModuleKey = "crm";
 
+    /// <summary>
+    /// Teklif numarası ortak belge serisinden verilir (ADR-0049 dilim 3a): <c>TK-yıl-sıra</c>; revizyonlar ailenin numarasını taşır. Önceki kayıtlar
+    /// rastgele sonekli numarasını korur. Fırsat ve müşteri adayı belge değildir, sıralı seriye geçmedi.
+    /// </summary>
+    public const string QuoteNumberSeries = "crm.quote";
+
+    IReadOnlyList<Modulix.Core.Contracts.Numbering.NumberSeriesDefinition> IModule.NumberSeries { get; } =
+    [
+        new(QuoteNumberSeries, "Teklif", "TK"),
+    ];
+
     public static class Permissions
     {
         public const string CompaniesRead = "crm.companies.read";

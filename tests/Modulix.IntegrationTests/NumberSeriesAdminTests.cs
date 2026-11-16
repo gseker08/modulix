@@ -104,6 +104,7 @@ public class NumberSeriesAdminTests(ModulixApiFactory factory) : IClassFixture<M
     public async Task Users_without_the_numbering_permission_cannot_read_or_change_series()
     {
         var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, LogisticsModule.ModuleKey, enabled: true);
         var user = await factory.CreateUserAsync(tenant);
         await factory.CreateRoleAsync(tenant.Id, [CoreModule.Permissions.ManageSettings, LogisticsModule.Permissions.TripsWrite], user);
         using var client = await LoginAsync(user);
@@ -114,9 +115,25 @@ public class NumberSeriesAdminTests(ModulixApiFactory factory) : IClassFixture<M
         Assert.Matches(@"^SF-\d{4}-00001$", await NextAsync(tenant.Id));
     }
 
+    [Fact]
+    public async Task Series_of_a_module_that_is_not_enabled_are_hidden_and_cannot_be_changed()
+    {
+        // Lojistik açık, CRM kapalı: teklif serisi listelenmez ve yapılandırılamaz (ADR-0049 dilim 3a).
+        var (_, admin) = await SetUpAsync();
+        using var client = await LoginAsync(admin);
+        var quote = Modulix.Modules.Crm.CrmModule.QuoteNumberSeries;
+
+        var listed = await ReadAsync<List<NumberSeriesDto>>(await client.GetAsync(Series), HttpStatusCode.OK);
+        Assert.Contains(listed, s => s.Key == Trip);
+        Assert.DoesNotContain(listed, s => s.Key == quote);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsJsonAsync($"{Series}/{quote}", new ConfigureNumberSeriesRequest("TKL", 5, "Yearly", 0))).StatusCode);
+    }
+
     private async Task<(Guid TenantId, ModulixUser Admin)> SetUpAsync()
     {
         var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, LogisticsModule.ModuleKey, enabled: true);
+        await factory.SetModuleAsync(tenant.Id, Modulix.Modules.Crm.CrmModule.ModuleKey, enabled: false);
         var admin = await factory.CreateUserAsync(tenant);
         await factory.MakeAdministratorAsync(tenant.Id, admin);
         return (tenant.Id, admin);
