@@ -1083,6 +1083,22 @@ public sealed class CrmModule : IModule
             [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated],
             [Entities.Activity],
             [Permissions.ActivitiesRead, Permissions.ActivitiesViewPrivate, Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite]),
+        // Toplu yeniden puanlama işinin (ADR-0050 dilim 1b) sistem kimliği: olay işlemez. Atama izni yalnızca sorumlusu boş adayları
+        // (atama havuzu) görmek içindir; iş sorumlu ya da durum yazmaz, boş değerli güncellemeyle puanı yeniden hesaplatır.
+        EventSubscription.For<LeadScoreJobAnchor>(
+            LeadScoreJob.Identity,
+            [DomainEventTypes.RecordDeleted],
+            [Entities.LeadScoreRule],
+            [Permissions.LeadsRead, Permissions.LeadsUpdate, Permissions.LeadsAssign]),
+    ];
+
+    /// <summary>
+    /// Zamanlanmış iş (ADR-0046): müşteri adayı puanlarını kural değişikliğinden sonra yeniden hesaplar (ADR-0050 dilim 1b).
+    /// Yapılandırma <c>Jobs:crm.lead-scoring</c>.
+    /// </summary>
+    IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
+    [
+        ModuleJobDefinition.For<LeadScoreJob>(LeadScoreJob.JobKey, TimeSpan.FromMinutes(5), LeadScoreJob.Identity),
     ];
 
     /// <summary>Tenant ayar anahtarları.</summary>
@@ -1111,6 +1127,9 @@ public sealed class CrmModule : IModule
 
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<LeadScoreJob>();
+        services.AddScoped<LeadScoreJobAnchor>();
+        services.AddScoped<LeadScoreReader>();
         services.AddScoped<CrmStoreContext>();
         services.AddScoped<ISharedRecordVisibility, CrmSharedRecordVisibility>();
         services.AddScoped<IRecordStore, CompanyRecordStore>();
