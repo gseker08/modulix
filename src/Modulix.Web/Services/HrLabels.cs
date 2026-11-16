@@ -66,7 +66,10 @@ public static class HrLabels
         return string.Concat(first is { Length: > 0 } f ? f[..1] : string.Empty, last is { Length: > 0 } l ? l[..1] : string.Empty).ToUpper(System.Globalization.CultureInfo.GetCultureInfo("tr-TR"));
     }
 
-    public static string LeaveStatus(string? key) => HrAccess.LeaveStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>İzin talebi durumları; metin sözlükten (<c>hr.leave-status.&lt;değer&gt;</c>), yoksa Türkçe kaynak (ADR-0034, İK dilim 19d).</summary>
+    public static IReadOnlyList<(string Key, string Label)> LeaveStatuses => WarehouseLabels.Translate("hr.leave-status", HrAccess.LeaveStatuses);
+
+    public static string LeaveStatus(string? key) => LeaveStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Bekleyen dikkat tonu, onaylanan başarı tonu, reddedilen kayıp tonu, iptal nötr ton.</summary>
     public static string LeaveStatusBadge(string? key) => key switch
@@ -78,7 +81,8 @@ public static class HrLabels
     };
 
     /// <summary>Gün sayısı: "3 gün", "0,5 gün".</summary>
-    public static string Days(decimal? days) => days is { } d ? $"{d.ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))} gün" : "—";
+    public static string Days(decimal? days) =>
+        days is { } d ? string.Format(System.Globalization.CultureInfo.InvariantCulture, Texts.GetOr("hr.leave.days", "{0} gün"), d.ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))) : "—";
 
     public static decimal? Decimal(RecordResponse record, string field) => record.Values[field]?.GetValue<decimal>();
 
@@ -87,7 +91,7 @@ public static class HrLabels
     {
         var start = Date(WarehouseLabels.Text(request, "startDate"));
         var end = Date(WarehouseLabels.Text(request, "endDate"));
-        var half = WarehouseLabels.Flag(request, "halfDay") ? " (yarım gün)" : string.Empty;
+        var half = WarehouseLabels.Flag(request, "halfDay") ? " (" + Texts.GetOr("hr.leave.half-day", "yarım gün") + ")" : string.Empty;
         return (start == end ? start : $"{start} – {end}") + half;
     }
 

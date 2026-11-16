@@ -5,7 +5,7 @@ using Modulix.Web.Services;
 namespace Modulix.Web.Tests;
 
 /// <summary>
-/// ADR-0034 aşama 4, İK dilim 19a (blog ve galeri) 19b (duyurular) ve 19c (anketler): blog durumları, yayın durumu, hedef kitle "Herkes", anket durumları ve soru türleri sözlükten gelir; Türkçe kaynak metin (koddaki yedek)
+/// ADR-0034 aşama 4, İK dilim 19a (blog ve galeri) 19b (duyurular) 19c (anketler) ve 19d (izinler): blog durumları, yayın durumu, hedef kitle "Herkes", anket durumları, soru türleri, izin durumları ve gün biçimi sözlükten gelir; Türkçe kaynak metin (koddaki yedek)
 /// <c>tr.json</c> ile aynıdır. Diller arası anahtar eşitliğini ve kullanılan anahtarların varlığını mimari testler denetler.
 /// </summary>
 public class HrTextTests
@@ -52,6 +52,13 @@ public class HrTextTests
         {
             Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.question-type", key)]);
         }
+
+        foreach (var (key, label) in HrAccess.LeaveStatuses)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.leave-status", key)]);
+        }
+
+        Assert.Equal("{0} gün", tr["hr.leave.days"]);
     }
 
     [Fact]
@@ -68,5 +75,8 @@ public class HrTextTests
         Assert.Equal("Herkes", HrLabels.Everyone);
         Assert.Equal(HrAccess.SurveyStatuses, HrLabels.SurveyStatuses);
         Assert.Equal("Çoklu seçim", HrLabels.QuestionType("multiChoice"));
+        Assert.Equal("İptal edildi", HrLabels.LeaveStatus("cancelled"));
+        Assert.Equal("1,5 gün", HrLabels.Days(1.5m));
+        Assert.Equal("—", HrLabels.Days(null));
     }
 }

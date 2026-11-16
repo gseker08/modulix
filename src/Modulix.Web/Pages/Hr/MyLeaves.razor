@@ -3,12 +3,12 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>İzinlerim · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.my-leaves") · Modulix</PageTitle>
 
 @* Self servis (ADR-0042 dilim 2): kullanıcının bağlı olduğu çalışan kartı bulunur; bu yılın izin hakkı, talepleri ve yeni talep. Kullanıcı hesabı
    bir çalışan kartına bağlı değilse İK'ya yönlendirilir. Görünürlük sunucudadır (veri kapsamı "kendi": yalnızca kendi kayıtları). *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.LeavesRead">
-    <PageHeader Title="İzinlerim" Icon="calendar" Subtitle="İzin hakkınızı görün, izin talebi açın ve taleplerinizi izleyin." />
+    <PageHeader Title="@Texts.Get("nav.app.hr.my-leaves")" Icon="calendar" Subtitle="@Texts.Get("hr.my-leaves.intro")" />
 
     @if (message is not null)
     {
@@ -21,7 +21,7 @@
     }
     else if (employee is null)
     {
-        <div class="alert alert-info" role="status">Kullanıcı hesabınız bir çalışan kartına bağlı değil. İzin talebi açabilmek için İK'dan çalışan kartınıza hesabınızı bağlamasını isteyin.</div>
+        <div class="alert alert-info" role="status">@Texts.Get("hr.my-leaves.no-employee")</div>
     }
     else
     {
@@ -35,52 +35,52 @@
         }
 
         <div class="stat-grid">
-            <div class="stat-card"><span>@Year yılı hakkı</span><strong>@HrLabels.Days(Entitled)</strong></div>
-            <div class="stat-card"><span>Kullanılan</span><strong>@HrLabels.Days(balance is null ? null : HrLabels.Decimal(balance, "usedDays"))</strong></div>
-            <div class="stat-card"><span>Onay bekleyen</span><strong>@HrLabels.Days(PendingAnnual)</strong></div>
-            <div class="stat-card"><span>Kalan</span><strong>@HrLabels.Days(balance is null ? null : HrLabels.Decimal(balance, "remainingDays"))</strong></div>
+            <div class="stat-card"><span>@Texts.Get("hr.my-leaves.year-entitlement", Year)</span><strong>@HrLabels.Days(Entitled)</strong></div>
+            <div class="stat-card"><span>@Texts.Get("hr.leave.used")</span><strong>@HrLabels.Days(balance is null ? null : HrLabels.Decimal(balance, "usedDays"))</strong></div>
+            <div class="stat-card"><span>@Texts.Get("hr.leave.pending")</span><strong>@HrLabels.Days(PendingAnnual)</strong></div>
+            <div class="stat-card"><span>@Texts.Get("hr.leave.remaining")</span><strong>@HrLabels.Days(balance is null ? null : HrLabels.Decimal(balance, "remainingDays"))</strong></div>
         </div>
         @if (balance is null)
         {
-            <p class="text-muted mt-2">@Year yılı için yıllık izin hakkınız henüz tanımlanmamış; yıllık izin dışındaki türlerde talep açabilirsiniz.</p>
+            <p class="text-muted mt-2">@Texts.Get("hr.my-leaves.no-balance", Year)</p>
         }
 
         <div class="list-toolbar mt-3">
-            <h2 class="h5 mb-0 me-auto">Taleplerim</h2>
+            <h2 class="h5 mb-0 me-auto">@Texts.Get("hr.my-leaves.requests")</h2>
             @if (Session.Can(HrAccess.LeavesRequest) && !creating)
             {
-                <button type="button" class="btn btn-primary" @onclick="Create"><AppIcon Name="plus" Size="16" /> Yeni izin talebi</button>
+                <button type="button" class="btn btn-primary" @onclick="Create"><AppIcon Name="plus" Size="16" /> @Texts.Get("hr.leave-form.new")</button>
             }
         </div>
 
         @if (requests is null || requests.Items.Count == 0)
         {
-            <EmptyState Icon="calendar" Title="Henüz izin talebiniz yok." Text="@(Session.Can(HrAccess.LeavesRequest) ? "Yeni izin talebi ile ilk talebinizi açabilirsiniz." : null)" />
+            <EmptyState Icon="calendar" Title="@Texts.Get("hr.my-leaves.empty")" Text="@(Session.Can(HrAccess.LeavesRequest) ? Texts.Get("hr.my-leaves.empty-hint") : null)" />
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">İzin taleplerim</caption>
+                <caption class="visually-hidden">@Texts.Get("hr.my-leaves.caption")</caption>
                 <thead>
                     <tr>
-                        <th scope="col"><SortHeader Label="Tarih" ColumnIcon="calendar" Asc="startDate" Desc="-startDate" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
-                        <th scope="col"><SortHeader Label="Tür" ColumnIcon="tag" Asc="leaveTypeKey" Desc="-leaveTypeKey" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
-                        <th scope="col"><SortHeader Label="Süre" ColumnIcon="clock" Asc="days" Desc="-days" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
-                        <th scope="col"><SortHeader Label="Durum" ColumnIcon="check-circle" Asc="status" Desc="-status" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
-                        <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("hr.leave.col.date")" ColumnIcon="calendar" Asc="startDate" Desc="-startDate" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("common.field.kind")" ColumnIcon="tag" Asc="leaveTypeKey" Desc="-leaveTypeKey" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("hr.leave.col.days")" ColumnIcon="clock" Asc="days" Desc="-days" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("common.field.status")" ColumnIcon="check-circle" Asc="status" Desc="-status" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var request in requests.Items)
                     {
                         <tr>
-                            <td data-label="Tarih" class="primary">@HrLabels.Range(request)</td>
-                            <td data-label="Tür">@Lookups.Label(HrAccess.LeaveTypeList, WarehouseLabels.Text(request, "leaveTypeKey"))</td>
-                            <td data-label="Süre">@HrLabels.Days(HrLabels.Decimal(request, "days"))</td>
-                            <td data-label="Durum"><span class="badge @HrLabels.LeaveStatusBadge(WarehouseLabels.Text(request, "status"))">@HrLabels.LeaveStatus(WarehouseLabels.Text(request, "status"))</span></td>
+                            <td data-label="@Texts.Get("hr.leave.col.date")" class="primary">@HrLabels.Range(request)</td>
+                            <td data-label="@Texts.Get("common.field.kind")">@Lookups.Label(HrAccess.LeaveTypeList, WarehouseLabels.Text(request, "leaveTypeKey"))</td>
+                            <td data-label="@Texts.Get("hr.leave.col.days")">@HrLabels.Days(HrLabels.Decimal(request, "days"))</td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge @HrLabels.LeaveStatusBadge(WarehouseLabels.Text(request, "status"))">@HrLabels.LeaveStatus(WarehouseLabels.Text(request, "status"))</span></td>
                             <td class="row-menu-cell">
                                 <RowMenu Label="@($"{HrLabels.Range(request)} eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(request)"><AppIcon Name="eye" Size="16" /> <span>Aç</span></button>
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(request)"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></button>
                                 </RowMenu>
                             </td>
                         </tr>

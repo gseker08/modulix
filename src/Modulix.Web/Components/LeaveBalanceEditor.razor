@@ -9,7 +9,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Balance is null ? "Yeni izin hakkı" : "İzin hakkı")</h2>
+            <h2>@(Balance is null ? Texts.Get("hr.balance-form.new") : Texts.Get("hr.balance-form.title"))</h2>
             @if (Balance is not null)
             {
                 <p>@WarehouseLabels.Text(Balance, "employeeName") · @form.Year</p>
@@ -17,8 +17,8 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">@Texts.Get("common.save")</button>
         </div>
     </div>
 
@@ -32,19 +32,19 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Hak özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("hr.balance-form.summary")">
             <div class="summary-card">
-                <h3 class="summary-heading">@form.Year yılı</h3>
+                <h3 class="summary-heading">@Texts.Get("hr.balance-form.year", form.Year)</h3>
                 <dl class="summary-facts">
-                    <div><dt>Toplam hak</dt><dd>@HrLabels.Days(form.EntitledDays + (form.CarriedOverDays ?? 0m))</dd></div>
-                    <div><dt>Kullanılan</dt><dd>@HrLabels.Days(form.UsedDays)</dd></div>
-                    <div><dt>Kalan</dt><dd>@HrLabels.Days((form.EntitledDays ?? 0m) + (form.CarriedOverDays ?? 0m) - form.UsedDays)</dd></div>
+                    <div><dt>@Texts.Get("hr.balance-form.total")</dt><dd>@HrLabels.Days(form.EntitledDays + (form.CarriedOverDays ?? 0m))</dd></div>
+                    <div><dt>@Texts.Get("hr.leave.used")</dt><dd>@HrLabels.Days(form.UsedDays)</dd></div>
+                    <div><dt>@Texts.Get("hr.leave.remaining")</dt><dd>@HrLabels.Days((form.EntitledDays ?? 0m) + (form.CarriedOverDays ?? 0m) - form.UsedDays)</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="İzin hakkı bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("hr.balance-form.sections")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
@@ -57,7 +57,7 @@
                             else
                             {
                                 <label class="@f.LabelClass()" for="balance-employee">@f.Label</label>
-                                <LookupPicker Id="balance-employee" LookupKey="@HrAccess.LeaveBalanceEmployeeLookup" @bind-Value="form.EmployeeId" Required="true" Placeholder="Çalışanı seçin…" Invalid="@(errors?.ContainsKey("employeeId") == true)" />
+                                <LookupPicker Id="balance-employee" LookupKey="@HrAccess.LeaveBalanceEmployeeLookup" @bind-Value="form.EmployeeId" Required="true" Placeholder="@Texts.Get("hr.leave-form.choose-employee")" Invalid="@(errors?.ContainsKey("employeeId") == true)" />
                             }
                             <FieldError Field="employeeId" Errors="errors" />
                             break;
@@ -70,7 +70,7 @@
                             <label class="@f.LabelClass()" for="balance-entitled">@f.Label</label>
                             <input id="balance-entitled" class="form-control" type="number" min="0" max="366" step="0.5" required aria-required="true" @bind="form.EntitledDays" />
                             <FieldError Field="entitledDays" Errors="errors" />
-                            <small class="text-muted">Yasal hak ediş (kıdeme göre gün) otomatik hesaplanmaz; firmanın politikasına göre girin.</small>
+                            <small class="text-muted">@Texts.Get("hr.balance-form.entitled-help")</small>
                             break;
                         case "carriedOverDays":
                             <label class="@f.LabelClass()" for="balance-carried">@f.Label</label>
@@ -87,8 +87,8 @@
             </LayoutForm>
 
             <div class="form-actions">
-                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">@Texts.Get("common.save")</button>
             </div>
         </div>
     </div>
@@ -122,7 +122,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     protected override void OnParametersSet()
