@@ -1,8 +1,13 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Hosting;
 using Modulix.Shared.Crm;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// Lead raporu hesabı (tanımlar <see cref="LeadReportDto"/> üzerinde). Saf hesap: girdi, boru hattından kullanıcının kapsamıyla

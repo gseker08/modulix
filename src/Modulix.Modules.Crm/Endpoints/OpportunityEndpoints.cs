@@ -1,19 +1,20 @@
 using System.Globalization;
-using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json;
+using System.Text;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
 using Modulix.Core.Contracts.Records;
-using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Contracts.Settings;
-using Modulix.Modules.Crm;
+using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Crm.Opportunities;
 using Modulix.Modules.Crm.Reporting;
 using Modulix.Shared.Crm;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// Fırsat uç noktaları (/api/crm/opportunities). CRUD diğer CRM kaynaklarıyla aynı kalıptadır; durum ve kapanış değişiklikleri
@@ -29,11 +30,11 @@ internal static class OpportunityEndpoints
 
     public static void Map(RouteGroupBuilder crm)
     {
-        CrmEndpoints.MapResource<OpportunityDto, SaveOpportunityRequest>(crm, "opportunities", CrmModule.Entities.Opportunity,
+        ResourceEndpoints.MapResource<OpportunityDto, SaveOpportunityRequest>(crm, "/api/crm", "opportunities", CrmModule.Entities.Opportunity,
             CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.OpportunitiesWrite);
-        CrmEndpoints.MapResource<OpportunityContactDto, SaveOpportunityContactRequest>(crm, "opportunity-contacts", CrmModule.Entities.OpportunityContact,
+        ResourceEndpoints.MapResource<OpportunityContactDto, SaveOpportunityContactRequest>(crm, "/api/crm", "opportunity-contacts", CrmModule.Entities.OpportunityContact,
             CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.OpportunitiesWrite);
-        CrmEndpoints.MapResource<OpportunityCompetitorDto, SaveOpportunityCompetitorRequest>(crm, "opportunity-competitors", CrmModule.Entities.OpportunityCompetitor,
+        ResourceEndpoints.MapResource<OpportunityCompetitorDto, SaveOpportunityCompetitorRequest>(crm, "/api/crm", "opportunity-competitors", CrmModule.Entities.OpportunityCompetitor,
             CrmModule.Permissions.OpportunitiesRead, CrmModule.Permissions.OpportunitiesWrite);
 
         var opportunities = crm.MapGroup("/opportunities");
@@ -81,8 +82,8 @@ internal static class OpportunityEndpoints
     private static IResult Action(RecordResult<OpportunityActionResult> result) =>
         result.IsSuccess
             ? Results.Ok(new OpportunityActionResultDto(
-                CrmEndpoints.ToDto<OpportunityDto>(result.Value!.Opportunity), result.Value.OpenActivities, result.Value.FollowUpActivityId, result.Value.FollowUpWarning))
-            : RecordEndpoints.ToProblem(result.Error!);
+                ResourceEndpoints.ToDto<OpportunityDto>(result.Value!.Opportunity), result.Value.OpenActivities, result.Value.FollowUpActivityId, result.Value.FollowUpWarning))
+            : RecordProblems.ToProblem(result.Error!);
 
     private static async Task<IResult> HistoryAsync(Guid id, IOpportunityWorkflow workflow, CancellationToken ct)
     {
@@ -90,7 +91,7 @@ internal static class OpportunityEndpoints
         return result.IsSuccess
             ? Results.Ok(result.Value!.Select(h => new OpportunityHistoryDto(
                 h.Id, h.Kind, h.At, h.ChangedBy, h.Cycle, h.FromStage, h.ToStage, h.FromStatus, h.ToStatus, h.FromCloseDate, h.ToCloseDate, h.Reason, h.Details)).ToList())
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
     }
 
     // ---- Ayarlar ve rapor
@@ -106,7 +107,7 @@ internal static class OpportunityEndpoints
         var result = await report.BuildAsync(new OpportunityReportQuery(from ?? new DateOnly(today.Year, today.Month, 1), to ?? today, ownerId), ct);
         return result.IsSuccess
             ? Results.Ok(JsonSerializer.Deserialize<OpportunityReportDto>(JsonSerializer.Serialize(result.Value, Json), Json))
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
     }
 
     // ---- Dışa aktarma
@@ -114,14 +115,14 @@ internal static class OpportunityEndpoints
     private static async Task<IResult> ExportAsync(
         HttpRequest http, string? search, IRecordPipeline pipeline, IRecordExportAudit exportAudit, CancellationToken ct)
     {
-        var filters = RecordEndpoints.FiltersFrom(http) ?? new Dictionary<string, string>();
+        var filters = RecordRequests.FiltersFrom(http) ?? new Dictionary<string, string>();
         var items = new List<RecordData>();
         for (var page = 1; items.Count < MaxRows; page++)
         {
             var result = await pipeline.QueryAsync(new RecordQuery(CrmModule.Entities.Opportunity, page, RecordQuery.MaxPageSize, search, filters), ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             items.AddRange(result.Value!.Items);
@@ -151,7 +152,7 @@ internal static class OpportunityEndpoints
     }
 }
 
-/// <summary>Fırsat politikasını tenant ayarlarından okur (modül ayar altyapısına erişemez).</summary>
+/// <summary>Fırsat politikasını tenant ayarlarından okur (<see cref="Modulix.Core.Contracts.Settings.ITenantSettingReader"/>); modülün kendi <c>ConfigureServices</c>'inde kaydolur (ADR-0046).</summary>
 internal sealed class OpportunityPolicyProvider(IServiceProvider services) : IOpportunityPolicyProvider
 {
     public async Task<OpportunityPolicy> GetAsync(CancellationToken cancellationToken)

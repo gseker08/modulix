@@ -1,11 +1,13 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Access;
-using Modulix.Modules.Crm;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Crm.Pricing;
 using Modulix.Shared.Crm;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// Fiyatlandırma uç noktaları (ADR-0018): fiyat listesi, satır, vergi, kur, paket bileşeni ve indirim politikası CRUD'u ortak kayıt
@@ -18,17 +20,17 @@ internal static class PricingEndpoints
 
     public static void Map(RouteGroupBuilder crm)
     {
-        CrmEndpoints.MapResource<TaxRateDto, SaveTaxRateRequest>(crm, "tax-rates", CrmModule.Entities.TaxRate,
+        ResourceEndpoints.MapResource<TaxRateDto, SaveTaxRateRequest>(crm, "/api/crm", "tax-rates", CrmModule.Entities.TaxRate,
             CrmModule.Permissions.PricesRead, CrmModule.Permissions.PricesWrite);
-        CrmEndpoints.MapResource<ExchangeRateDto, SaveExchangeRateRequest>(crm, "exchange-rates", CrmModule.Entities.ExchangeRate,
+        ResourceEndpoints.MapResource<ExchangeRateDto, SaveExchangeRateRequest>(crm, "/api/crm", "exchange-rates", CrmModule.Entities.ExchangeRate,
             CrmModule.Permissions.PricesRead, CrmModule.Permissions.PricesWrite);
-        CrmEndpoints.MapResource<PriceListDto, SavePriceListRequest>(crm, "price-lists", CrmModule.Entities.PriceList,
+        ResourceEndpoints.MapResource<PriceListDto, SavePriceListRequest>(crm, "/api/crm", "price-lists", CrmModule.Entities.PriceList,
             CrmModule.Permissions.PricesRead, CrmModule.Permissions.PricesWrite);
-        CrmEndpoints.MapResource<PriceListItemDto, SavePriceListItemRequest>(crm, "price-list-items", CrmModule.Entities.PriceListItem,
+        ResourceEndpoints.MapResource<PriceListItemDto, SavePriceListItemRequest>(crm, "/api/crm", "price-list-items", CrmModule.Entities.PriceListItem,
             CrmModule.Permissions.PricesRead, CrmModule.Permissions.PricesWrite);
-        CrmEndpoints.MapResource<ProductComponentDto, SaveProductComponentRequest>(crm, "product-components", CrmModule.Entities.ProductComponent,
+        ResourceEndpoints.MapResource<ProductComponentDto, SaveProductComponentRequest>(crm, "/api/crm", "product-components", CrmModule.Entities.ProductComponent,
             CrmModule.Permissions.ProductsRead, CrmModule.Permissions.ProductsWrite);
-        CrmEndpoints.MapResource<DiscountPolicyDto, SaveDiscountPolicyRequest>(crm, "discount-policies", CrmModule.Entities.DiscountPolicy,
+        ResourceEndpoints.MapResource<DiscountPolicyDto, SaveDiscountPolicyRequest>(crm, "/api/crm", "discount-policies", CrmModule.Entities.DiscountPolicy,
             CrmModule.Permissions.PricesRead, CrmModule.Permissions.PricesWrite);
 
         crm.MapPost("/pricing/calculate", CalculateAsync).RequirePermission(CrmModule.Permissions.PricesRead);

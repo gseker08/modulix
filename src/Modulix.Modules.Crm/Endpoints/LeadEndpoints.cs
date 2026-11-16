@@ -1,16 +1,18 @@
 using System.Globalization;
-using System.Text;
 using System.Text.Json.Nodes;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
+using System.Text;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Records;
-using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Contracts.Settings;
-using Modulix.Modules.Crm;
+using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Crm.Leads;
 using Modulix.Shared.Crm;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// Lead uç noktaları (/api/crm/leads). CRUD diğer CRM kaynaklarıyla aynı kalıptadır; durum/sorumlu/dönüşüm değişiklikleri ayrı
@@ -24,7 +26,7 @@ internal static class LeadEndpoints
 
     public static void Map(RouteGroupBuilder crm)
     {
-        CrmEndpoints.MapResource<LeadDto, SaveLeadRequest>(crm, "leads", CrmModule.Entities.Lead,
+        ResourceEndpoints.MapResource<LeadDto, SaveLeadRequest>(crm, "/api/crm", "leads", CrmModule.Entities.Lead,
             CrmModule.Permissions.LeadsRead, CrmModule.Permissions.LeadsUpdate,
             createPermission: CrmModule.Permissions.LeadsCreate, deletePermission: CrmModule.Permissions.LeadsDelete);
 
@@ -66,14 +68,14 @@ internal static class LeadEndpoints
         Lead(await workflow.ReopenAsync(id, request.Version, request.Reason ?? string.Empty, ct));
 
     private static IResult Lead(RecordResult<RecordData> result) =>
-        result.IsSuccess ? Results.Ok(CrmEndpoints.ToDto<LeadDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<LeadDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
 
     private static async Task<IResult> ConversionPreviewAsync(Guid id, ILeadConversion conversion, CancellationToken ct)
     {
         var result = await conversion.PreviewAsync(id, ct);
         if (!result.IsSuccess)
         {
-            return RecordEndpoints.ToProblem(result.Error!);
+            return RecordProblems.ToProblem(result.Error!);
         }
 
         var p = result.Value!;
@@ -90,9 +92,9 @@ internal static class LeadEndpoints
             request.Currency, request.ExpectedCloseDate, request.Stage), ct);
         return result.IsSuccess
             ? Results.Ok(new ConvertLeadResultDto(
-                CrmEndpoints.ToDto<LeadDto>(result.Value!.Lead), result.Value.CompanyId, result.Value.ContactId, result.Value.OpportunityId,
+                ResourceEndpoints.ToDto<LeadDto>(result.Value!.Lead), result.Value.CompanyId, result.Value.ContactId, result.Value.OpportunityId,
                 result.Value.CompanyCreated, result.Value.ContactCreated))
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
     }
 
     // ---- Ayarlar
@@ -116,7 +118,7 @@ internal static class LeadEndpoints
         var lead = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Lead, id), ct);
         if (!lead.IsSuccess)
         {
-            return RecordEndpoints.ToProblem(lead.Error!);
+            return RecordProblems.ToProblem(lead.Error!);
         }
 
         string? Text(string name) => lead.Value!.Values[name]?.GetValue<string>();
@@ -208,7 +210,7 @@ internal static class LeadEndpoints
         var failure = cohort.Error ?? open.Error ?? convertedInPeriod.Error;
         if (failure is not null)
         {
-            return RecordEndpoints.ToProblem(failure);
+            return RecordProblems.ToProblem(failure);
         }
 
         return Results.Ok(LeadReport.Build(
@@ -246,14 +248,14 @@ internal static class LeadEndpoints
     private static async Task<IResult> ExportAsync(
         HttpRequest http, string? search, IRecordPipeline pipeline, IRecordExportAudit exportAudit, CancellationToken ct)
     {
-        var filters = RecordEndpoints.FiltersFrom(http) ?? new Dictionary<string, string>();
+        var filters = RecordRequests.FiltersFrom(http) ?? new Dictionary<string, string>();
         var items = new List<RecordData>();
         for (var page = 1; items.Count < MaxRows; page++)
         {
             var result = await pipeline.QueryAsync(new RecordQuery(CrmModule.Entities.Lead, page, RecordQuery.MaxPageSize, search, filters), ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             items.AddRange(result.Value!.Items);

@@ -162,6 +162,9 @@ public class CrmRecordStoreValidationTests
         public Task<IReadOnlySet<Guid>?> GetOwnersAsync(string entityKey, CancellationToken cancellationToken) => Task.FromResult<IReadOnlySet<Guid>?>(null);
 
         public Task<bool> CanAsync(string entityKey, RecordOperation operation, CancellationToken cancellationToken) => Task.FromResult(true);
+
+        public Task<IReadOnlySet<string>> GetHiddenFieldsAsync(string entityKey, IReadOnlySet<string> hiddenWithoutTenant, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlySet<string>>(new HashSet<string>());
     }
 
     private sealed class NoMembers : ITenantMembers

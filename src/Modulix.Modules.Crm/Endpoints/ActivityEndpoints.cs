@@ -1,12 +1,14 @@
 using System.Globalization;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Records;
-using Modulix.Modules.Crm;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Crm.Activities;
 using Modulix.Shared.Crm;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// Aktivite uç noktaları (/api/crm/activities). CRUD diğer CRM kaynaklarıyla aynı kalıptadır; durum, tamamlanma ve sorumlu
@@ -20,9 +22,9 @@ internal static class ActivityEndpoints
 
     public static void Map(RouteGroupBuilder crm)
     {
-        CrmEndpoints.MapResource<ActivityLinkDto, SaveActivityLinkRequest>(crm, "activity-links", CrmModule.Entities.ActivityLink,
+        ResourceEndpoints.MapResource<ActivityLinkDto, SaveActivityLinkRequest>(crm, "/api/crm", "activity-links", CrmModule.Entities.ActivityLink,
             CrmModule.Permissions.ActivitiesRead, CrmModule.Permissions.ActivitiesWrite);
-        CrmEndpoints.MapResource<ActivityParticipantDto, SaveActivityParticipantRequest>(crm, "activity-participants",
+        ResourceEndpoints.MapResource<ActivityParticipantDto, SaveActivityParticipantRequest>(crm, "/api/crm", "activity-participants",
             CrmModule.Entities.ActivityParticipant, CrmModule.Permissions.ActivitiesRead, CrmModule.Permissions.ActivitiesWrite);
 
         var activities = crm.MapGroup("/activities");
@@ -41,7 +43,7 @@ internal static class ActivityEndpoints
     }
 
     private static IResult Activity(RecordResult<RecordData> result) =>
-        result.IsSuccess ? Results.Ok(CrmEndpoints.ToDto<ActivityDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<ActivityDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
 
     private static async Task<IResult> StartAsync(Guid id, ActivityVersionRequest request, IActivityWorkflow workflow, CancellationToken ct) =>
         Activity(await workflow.StartAsync(id, request.Version, ct));
@@ -75,9 +77,9 @@ internal static class ActivityEndpoints
             request.NextStep is { } step ? new NextStep(step.Subject, step.Type, step.DueAt, step.OwnerId) : null), ct);
         return result.IsSuccess
             ? Results.Ok(new CompleteActivityResultDto(
-                CrmEndpoints.ToDto<ActivityDto>(result.Value!.Activity),
-                result.Value.NextStep is { } next ? CrmEndpoints.ToDto<ActivityDto>(next) : null))
-            : RecordEndpoints.ToProblem(result.Error!);
+                ResourceEndpoints.ToDto<ActivityDto>(result.Value!.Activity),
+                result.Value.NextStep is { } next ? ResourceEndpoints.ToDto<ActivityDto>(next) : null))
+            : RecordProblems.ToProblem(result.Error!);
     }
 
     // ---- Bağlı kayıtlar
@@ -93,7 +95,7 @@ internal static class ActivityEndpoints
         var activity = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Activity, id), ct);
         if (!activity.IsSuccess)
         {
-            return RecordEndpoints.ToProblem(activity.Error!);
+            return RecordProblems.ToProblem(activity.Error!);
         }
 
         if (activity.Value!.Values["masked"]?.GetValue<bool>() == true)

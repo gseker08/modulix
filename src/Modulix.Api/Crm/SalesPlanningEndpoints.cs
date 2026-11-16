@@ -26,7 +26,7 @@ internal static class SalesPlanningEndpoints
 
     public static void Map(RouteGroupBuilder crm)
     {
-        CrmEndpoints.MapResource<SalesTargetDto, SaveSalesTargetRequest>(crm, "sales-targets", CrmModule.Entities.SalesTarget,
+        ResourceEndpoints.MapResource<SalesTargetDto, SaveSalesTargetRequest>(crm, "/api/crm", "sales-targets", CrmModule.Entities.SalesTarget,
             CrmModule.Permissions.SalesTargetsRead, CrmModule.Permissions.SalesTargetsManage);
 
         var sales = crm.MapGroup("/sales");

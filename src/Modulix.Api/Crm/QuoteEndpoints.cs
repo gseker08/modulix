@@ -25,14 +25,14 @@ internal static class QuoteEndpoints
 {
     public static void Map(RouteGroupBuilder crm)
     {
-        CrmEndpoints.MapResource<QuoteDto, SaveQuoteRequest>(crm, "quotes", CrmModule.Entities.Quote,
+        ResourceEndpoints.MapResource<QuoteDto, SaveQuoteRequest>(crm, "/api/crm", "quotes", CrmModule.Entities.Quote,
             CrmModule.Permissions.QuotesRead, CrmModule.Permissions.QuotesWrite);
-        CrmEndpoints.MapResource<QuoteLineDto, SaveQuoteLineRequest>(crm, "quote-lines", CrmModule.Entities.QuoteLine,
+        ResourceEndpoints.MapResource<QuoteLineDto, SaveQuoteLineRequest>(crm, "/api/crm", "quote-lines", CrmModule.Entities.QuoteLine,
             CrmModule.Permissions.QuotesRead, CrmModule.Permissions.QuotesWrite);
 
-        CrmEndpoints.MapResource<QuoteApprovalRuleDto, SaveQuoteApprovalRuleRequest>(crm, "quote-approval-rules", CrmModule.Entities.QuoteApprovalRule,
+        ResourceEndpoints.MapResource<QuoteApprovalRuleDto, SaveQuoteApprovalRuleRequest>(crm, "/api/crm", "quote-approval-rules", CrmModule.Entities.QuoteApprovalRule,
             CrmModule.Permissions.QuoteRulesManage, CrmModule.Permissions.QuoteRulesManage);
-        CrmEndpoints.MapResource<QuoteApprovalDelegationDto, SaveQuoteApprovalDelegationRequest>(crm, "quote-approval-delegations", CrmModule.Entities.QuoteApprovalDelegation,
+        ResourceEndpoints.MapResource<QuoteApprovalDelegationDto, SaveQuoteApprovalDelegationRequest>(crm, "/api/crm", "quote-approval-delegations", CrmModule.Entities.QuoteApprovalDelegation,
             CrmModule.Permissions.QuoteRulesManage, CrmModule.Permissions.QuoteRulesManage);
 
         var quotes = crm.MapGroup("/quotes");
@@ -46,7 +46,7 @@ internal static class QuoteEndpoints
         crm.MapPost("/opportunities/{id:guid}/primary-quote", async (Guid id, SetPrimaryQuoteRequest r, IQuoteOpportunitySync sync, CancellationToken ct) =>
         {
             var result = await sync.SetPrimaryAsync(id, r.Version, r.QuoteId, ct);
-            return result.IsSuccess ? Results.Ok(CrmEndpoints.ToDto<OpportunityDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<OpportunityDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
         }).RequirePermission(CrmModule.Permissions.OpportunitiesRead);
 
         quotes.MapGet("/report", ReportAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
@@ -104,11 +104,11 @@ internal static class QuoteEndpoints
     private static async Task<IResult> Run(Task<RecordResult<RecordData>> action) => Ok(await action);
 
     private static IResult Ok(RecordResult<RecordData> result) =>
-        result.IsSuccess ? Results.Ok(CrmEndpoints.ToDto<QuoteDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<QuoteDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
 
     private static IResult Created(RecordResult<RecordData> result) =>
         result.IsSuccess
-            ? Results.Created($"/api/crm/quotes/{result.Value!.Id}", CrmEndpoints.ToDto<QuoteDto>(result.Value))
+            ? Results.Created($"/api/crm/quotes/{result.Value!.Id}", ResourceEndpoints.ToDto<QuoteDto>(result.Value))
             : RecordEndpoints.ToProblem(result.Error!);
 
     private static async Task<IResult> HistoryAsync(Guid id, IQuoteWorkflow workflow, CancellationToken ct)
