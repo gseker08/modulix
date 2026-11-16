@@ -4,12 +4,12 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Anket yönetimi · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.survey-admin") · Modulix</PageTitle>
 
 @* Anket yönetimi (ADR-0042 dilim 7): anket hazırlama (sekmeli form), sorular (yalnızca taslakta), yanıta açma ve kapatma (sunucudan gelen eylemler) ve
    özet sonuçlar. Yanıtlayanlar çalışanların "Anketler" ekranından yanıtlar. *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.SurveysManage">
-    <PageHeader Title="Anket yönetimi" Icon="clipboard-list" Subtitle="@(page is null ? "Anket hazırlayın, yanıta açın ve sonuçları izleyin." : $"{page.TotalCount} anket")" />
+    <PageHeader Title="@Texts.Get("nav.app.hr.survey-admin")" Icon="clipboard-list" Subtitle="@(page is null ? Texts.Get("hr.survey-admin.intro") : Texts.Get("hr.survey-admin.count", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -23,17 +23,17 @@
         {
             <LeaveActionsBar Record="selected" BaseUrl="/api/hr/surveys" Changed="ChangedAsync" />
 
-            <section aria-label="Sorular">
+            <section aria-label="@Texts.Get("hr.survey-answer.questions")">
                 <div class="list-toolbar mt-3">
-                    <h3 class="h6 mb-0 me-auto">Sorular</h3>
+                    <h3 class="h6 mb-0 me-auto">@Texts.Get("hr.survey-answer.questions")</h3>
                     @if (IsDraft && question is null && !addingQuestion)
                     {
-                        <button type="button" class="btn btn-tonal" @onclick="() => addingQuestion = true"><AppIcon Name="plus" Size="16" /> Soru ekle</button>
+                        <button type="button" class="btn btn-tonal" @onclick="() => addingQuestion = true"><AppIcon Name="plus" Size="16" /> @Texts.Get("hr.survey-admin.add-question")</button>
                     }
                 </div>
                 @if (!IsDraft)
                 {
-                    <p class="text-muted">Yanıta açılmış anketin soruları değiştirilmez.</p>
+                    <p class="text-muted">@Texts.Get("hr.survey-admin.questions-locked")</p>
                 }
                 @if (addingQuestion || question is not null)
                 {
@@ -46,34 +46,34 @@
                 }
                 else if (questions.Count == 0)
                 {
-                    <EmptyState Compact="true" Title="Henüz soru yok." Text="Yanıta açmadan önce en az bir soru ekleyin." />
+                    <EmptyState Compact="true" Title="@Texts.Get("hr.survey-admin.no-questions")" Text="@Texts.Get("hr.survey-admin.no-questions-hint")" />
                 }
                 else
                 {
                     <table class="table record-table">
-                        <caption class="visually-hidden">Anket soruları</caption>
+                        <caption class="visually-hidden">@Texts.Get("hr.survey-admin.questions-caption")</caption>
                         <thead>
                             <tr>
-                                <th scope="col"><AppIcon Name="hash" Size="14" /> Sıra</th>
-                                <th scope="col"><AppIcon Name="message-square" Size="14" /> Soru</th>
-                                <th scope="col"><AppIcon Name="list" Size="14" /> Tür</th>
-                                <th scope="col"><AppIcon Name="tag" Size="14" /> Zorunlu</th>
-                                <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                                <th scope="col"><AppIcon Name="hash" Size="14" /> @Texts.Get("hr.survey-admin.col.sequence")</th>
+                                <th scope="col"><AppIcon Name="message-square" Size="14" /> @Texts.Get("hr.question-form.title")</th>
+                                <th scope="col"><AppIcon Name="list" Size="14" /> @Texts.Get("common.field.kind")</th>
+                                <th scope="col"><AppIcon Name="tag" Size="14" /> @Texts.Get("hr.survey-admin.col.required")</th>
+                                <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var q in questions)
                             {
                                 <tr>
-                                    <td data-label="Sıra">@WarehouseLabels.Number(q, "sequence")</td>
-                                    <td data-label="Soru" class="primary">@WarehouseLabels.Text(q, "text")</td>
-                                    <td data-label="Tür">@HrLabels.QuestionType(WarehouseLabels.Text(q, "questionType"))</td>
-                                    <td data-label="Zorunlu">@(WarehouseLabels.Flag(q, "isRequired") ? "Evet" : "Hayır")</td>
+                                    <td data-label="@Texts.Get("hr.survey-admin.col.sequence")">@WarehouseLabels.Number(q, "sequence")</td>
+                                    <td data-label="@Texts.Get("hr.question-form.title")" class="primary">@WarehouseLabels.Text(q, "text")</td>
+                                    <td data-label="@Texts.Get("common.field.kind")">@HrLabels.QuestionType(WarehouseLabels.Text(q, "questionType"))</td>
+                                    <td data-label="@Texts.Get("hr.survey-admin.col.required")">@(WarehouseLabels.Flag(q, "isRequired") ? Texts.Get("common.yes") : Texts.Get("common.no"))</td>
                                     <td class="row-menu-cell">
                                         @if (IsDraft)
                                         {
-                                            <RowMenu Label="@($"{WarehouseLabels.Text(q, "text")} eylemleri")">
-                                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => { question = q; addingQuestion = false; }"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                            <RowMenu Label="@Texts.Get("hr.content.row-actions", WarehouseLabels.Text(q, "text"))">
+                                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => { question = q; addingQuestion = false; }"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                                 <RowMenuDelete OnConfirm="() => DeleteQuestionAsync(q)" />
                                             </RowMenu>
                                         }
@@ -92,16 +92,16 @@
         }
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Anket görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("hr.survey-admin.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Anket ara" placeholder="Başlık ya da açıklamada ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("hr.survey-admin.search-label")" placeholder="@Texts.Get("hr.gallery-admin.search-placeholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (!editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => OpenAsync(null)"><AppIcon Name="plus" Size="16" /> Yeni anket</button>
+            <button type="button" class="btn btn-primary" @onclick="() => OpenAsync(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("hr.survey-form.new")</button>
         }
     </div>
 
@@ -114,20 +114,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan anket yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("hr.survey-admin.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) anket listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("hr.survey-admin.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Anketler</caption>
+            <caption class="visually-hidden">@Texts.Get("nav.app.hr.surveys")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -139,8 +139,8 @@
                             @Cell(column, survey)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{WarehouseLabels.Text(survey, "title")} eylemleri")">
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenAsync(survey)"><AppIcon Name="pencil" Size="16" /> <span>Aç</span></button>
+                            <RowMenu Label="@Texts.Get("hr.content.row-actions", WarehouseLabels.Text(survey, "title"))">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenAsync(survey)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.open")</span></button>
                                 @if (WarehouseLabels.Number(survey, "responseCount") == 0)
                                 {
                                     <RowMenuDelete OnConfirm="() => DeleteAsync(survey)" />
@@ -161,15 +161,15 @@
     private const string AllViews = "all";
 
     // Sıralama anahtarları kayıt deposunun beyanıdır (SurveyRecordStore.SortKeys).
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("title", "Başlık", "clipboard-list", "title", "-title", Locked: true),
-        new("audience", "Hedef", "users"),
-        new("identity", "Kimlik", "eye"),
-        new("questionCount", "Soru", "message-square"),
-        new("responseCount", "Yanıt", "check"),
-        new("closesOn", "Kapanış", "calendar", "closesOn", "-closesOn"),
-        new("status", "Durum", "tag", "status", "-status"),
+        new("title", Texts.Get("hr.content.col.title"), "clipboard-list", "title", "-title", Locked: true),
+        new("audience", Texts.Get("hr.announcement-admin.col.audience"), "users"),
+        new("identity", Texts.Get("hr.survey-admin.col.identity"), "eye"),
+        new("questionCount", Texts.Get("hr.question-form.title"), "message-square"),
+        new("responseCount", Texts.Get("hr.survey-admin.col.responses"), "check"),
+        new("closesOn", Texts.Get("hr.survey-admin.col.closes"), "calendar", "closesOn", "-closesOn"),
+        new("status", Texts.Get("common.field.status"), "tag", "status", "-status"),
     ];
 
     private readonly GridViewState grid = new("hr.survey-admin", "-createdAt");
@@ -192,10 +192,10 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new("status=draft", "Taslak", Icon: "pencil"),
-        new("status=open", "Yanıta açık", Icon: "clipboard-list"),
-        new("status=closed", "Kapalı", Icon: "history"),
-        new("all", "Tüm anketler", Icon: "list"),
+        new("status=draft", HrLabels.SurveyStatus("draft"), Icon: "pencil"),
+        new("status=open", HrLabels.SurveyStatus("open"), Icon: "clipboard-list"),
+        new("status=closed", HrLabels.SurveyStatus("closed"), Icon: "history"),
+        new("all", Texts.Get("hr.survey-admin.view.all"), Icon: "list"),
         .. views.Options,
     ];
 
@@ -294,7 +294,7 @@
     {
         "title" => @<text>@WarehouseLabels.Text(record, "title")</text>,
         "audience" => @<text>@HrLabels.Audience(record, Lookups)</text>,
-        "identity" => @<text>@(WarehouseLabels.Flag(record, "isAnonymous") ? "Gizli" : "Açık")</text>,
+        "identity" => @<text>@Texts.Get(WarehouseLabels.Flag(record, "isAnonymous") ? "hr.survey-admin.identity.hidden" : "hr.survey-admin.identity.visible")</text>,
         "questionCount" => @<text>@WarehouseLabels.Number(record, "questionCount")</text>,
         "responseCount" => @<text>@WarehouseLabels.Number(record, "responseCount")</text>,
         "closesOn" => @<text>@(WarehouseLabels.Text(record, "closesOn") is { Length: > 0 } c ? HrLabels.Date(c) : "—")</text>,

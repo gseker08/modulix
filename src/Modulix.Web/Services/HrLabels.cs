@@ -153,7 +153,13 @@ public static class HrLabels
 
     public static string TaskType(string? key) => HrAccess.ChecklistTaskTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
-    public static string SurveyStatus(string? key) => HrAccess.SurveyStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Anket durumları; metin sözlükten (<c>hr.survey-status.&lt;değer&gt;</c>), yoksa Türkçe kaynak (ADR-0034, İK dilim 19c).</summary>
+    public static IReadOnlyList<(string Key, string Label)> SurveyStatuses => WarehouseLabels.Translate("hr.survey-status", HrAccess.SurveyStatuses);
+
+    /// <summary>Soru türleri; metin sözlükten (<c>hr.question-type.&lt;değer küçük harf&gt;</c>), yoksa Türkçe kaynak.</summary>
+    public static IReadOnlyList<(string Key, string Label)> QuestionTypes => WarehouseLabels.Translate("hr.question-type", HrAccess.QuestionTypes);
+
+    public static string SurveyStatus(string? key) => SurveyStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     public static string SurveyStatusBadge(string? key) => key switch
     {
@@ -162,5 +168,5 @@ public static class HrLabels
         _ => "status-inactive",
     };
 
-    public static string QuestionType(string? key) => HrAccess.QuestionTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    public static string QuestionType(string? key) => QuestionTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 }
