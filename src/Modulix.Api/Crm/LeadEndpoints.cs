@@ -5,7 +5,6 @@ using Modulix.Api.Access;
 using Modulix.Api.Records;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
-using Modulix.Core.Records;
 using Modulix.Core.Contracts.Settings;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Leads;
@@ -245,8 +244,7 @@ internal static class LeadEndpoints
     // ---- Dışa aktarma
 
     private static async Task<IResult> ExportAsync(
-        HttpRequest http, string? search, IRecordPipeline pipeline, ITenantContextAccessor tenant, IAuditWriter audit, IUnitOfWork unitOfWork,
-        CancellationToken ct)
+        HttpRequest http, string? search, IRecordPipeline pipeline, IRecordExportAudit exportAudit, CancellationToken ct)
     {
         var filters = RecordEndpoints.FiltersFrom(http) ?? new Dictionary<string, string>();
         var items = new List<RecordData>();
@@ -266,13 +264,7 @@ internal static class LeadEndpoints
         }
 
         // Kişisel veri çıkışı denetim kaydına yazılır (kim, kaç kayıt, hangi süzgeç).
-        if (tenant.Current is { } current)
-        {
-            audit.Add(new AuditEntry(current.TenantId, current.UserId, CrmModule.Entities.Lead, Guid.Empty, AuditAction.Exported,
-                new JsonObject { ["count"] = items.Count, ["filters"] = string.Join('&', filters.Select(f => $"{f.Key}={f.Value}")) },
-                ExecutionSource.Api, null));
-            await unitOfWork.SaveChangesAsync(ct);
-        }
+        await exportAudit.RecordAsync(CrmModule.Entities.Lead, items.Count, filters, null, ct);
 
         string[] columns =
         [
@@ -283,27 +275,9 @@ internal static class LeadEndpoints
         csv.AppendLine(string.Join(',', columns));
         foreach (var item in items)
         {
-            csv.AppendLine(string.Join(',', columns.Select(c => Csv(item.Values[c]?.ToString()))));
+            csv.AppendLine(string.Join(',', columns.Select(c => CsvText.Escape(item.Values[c]?.ToString()))));
         }
 
         return Results.File(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray(), "text/csv; charset=utf-8", "leadler.csv");
-    }
-
-    // CSV enjeksiyonuna karşı formül başlatan karakterlerle başlayan hücrelerin başına kesme konur.
-    internal static string Csv(string? value)
-    {
-        if (string.IsNullOrEmpty(value))
-        {
-            return string.Empty;
-        }
-
-        if (value[0] is '=' or '+' or '-' or '@' or '\t' or '\r')
-        {
-            value = "'" + value;
-        }
-
-        return value.Contains(',') || value.Contains('"') || value.Contains('\n')
-            ? "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
-            : value;
     }
 }

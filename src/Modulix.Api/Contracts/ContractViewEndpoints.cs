@@ -1,14 +1,12 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using Modulix.Api.Access;
-using Modulix.Api.Crm;
 using Modulix.Api.Records;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Lookups;
-using Modulix.Core.Records;
 using Modulix.Modules.Contracts;
 using Modulix.Modules.Contracts.Lifecycle;
 using Modulix.Shared.Contracts;
@@ -60,8 +58,7 @@ internal static class ContractViewEndpoints
     /// etkisizleştirilir. Çıkış denetim kaydına yazılır (kim, kaç kayıt, hangi süzgeç).
     /// </summary>
     private static async Task<IResult> ExportAsync(
-        HttpRequest http, string? search, IRecordPipeline pipeline, ICurrentAccess access, ILookupSearch lookups, ITenantContextAccessor tenant, IAuditWriter audit,
-        IUnitOfWork unitOfWork, CancellationToken ct)
+        HttpRequest http, string? search, IRecordPipeline pipeline, ICurrentAccess access, ILookupSearch lookups, IRecordExportAudit exportAudit, CancellationToken ct)
     {
         var filters = RecordEndpoints.FiltersFrom(http) ?? new Dictionary<string, string>();
         var items = new List<RecordData>();
@@ -96,19 +93,13 @@ internal static class ContractViewEndpoints
             }
         }
 
-        if (tenant.Current is { } current)
-        {
-            audit.Add(new AuditEntry(current.TenantId, current.UserId, ContractsModule.Entities.Contract, Guid.Empty, AuditAction.Exported,
-                new JsonObject { ["count"] = items.Count, ["truncated"] = truncated, ["money"] = money, ["filters"] = string.Join('&', filters.Select(f => $"{f.Key}={f.Value}")) },
-                ExecutionSource.Api, null));
-            await unitOfWork.SaveChangesAsync(ct);
-        }
+        await exportAudit.RecordAsync(ContractsModule.Entities.Contract, items.Count, filters, new JsonObject { ["truncated"] = truncated, ["money"] = money }, ct);
 
         var csv = new StringBuilder();
         csv.AppendLine(string.Join(',', columns));
         foreach (var item in items)
         {
-            csv.AppendLine(string.Join(',', columns.Select(c => LeadEndpoints.Csv(c == "customer"
+            csv.AppendLine(string.Join(',', columns.Select(c => CsvText.Escape(c == "customer"
                 ? (Guid.TryParse(item.Values["partyId"]?.ToString(), out var id) && names.TryGetValue(id, out var name) ? name : "—")
                 : item.Values[c]?.ToString()))));
         }
