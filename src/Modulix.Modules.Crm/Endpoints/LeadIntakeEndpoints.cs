@@ -1,28 +1,23 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.EntityFrameworkCore;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
-using Modulix.Core.Contracts.Events;
-using Modulix.Core.Contracts.Records;
-using Modulix.Core.Contracts.Tenancy;
-using Modulix.Core.Modules;
-using Modulix.Core.Platform;
-using Modulix.Core.Events;
-using Modulix.Infrastructure.Persistence;
-using Modulix.Infrastructure.Platform;
-using Modulix.Modules.Crm;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Crm.Leads;
 using Modulix.Shared.Crm;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// Herkese açık Lead toplama ucu: <c>POST /api/public/lead-forms/{tenant}/{formKey}</c> ve CORS ön kontrolü (<c>OPTIONS</c>).
 /// <list type="bullet">
-///   <item><b>Tenant</b> URL'deki firma kısa adından sunucuda çözülür; gövdede/başlıkta tenant kimliği aranmaz. İstek, oturumdan ve
+///   <item><b>Tenant</b> URL'deki firma kısa adından (ya da kimliğinden, N biçimi) sunucuda <see cref="IPublicTenantScopes"/> ile çözülür; gövdede/başlıkta tenant kimliği aranmaz. İstek, oturumdan ve
 ///   çerezden bağımsız, "crm.lead-intake" sistem kimliğiyle (dar izinler) kendi tenant kapsamında çalışır.</item>
 ///   <item><b>Form kimliği gizli değildir</b> (sayfada görünür); tek başına yalnızca izinli kaynaktan ve yalnızca izinli alanlarla Lead
 ///   oluşturma imkânı verir. Sunucudan sunucuya çağrılar <c>X-Lead-Form-Secret</c> başlığını kullanır; sır tarayıcıya konmaz.</item>
@@ -37,32 +32,42 @@ internal static class LeadIntakeEndpoints
     public const string SecretHeader = "X-Lead-Form-Secret";
     public const int MaxBodyBytes = 32 * 1024;
 
-    /// <summary>IP + form başına dakikadaki gönderim sınırı (<c>LeadIntake:RateLimitPerMinute</c>, varsayılan 20).</summary>
-    public static void AddLeadIntakeRateLimit(this IServiceCollection services, IConfiguration configuration) =>
+    /// <summary>Formun sistem kimliği: izinler yalnızca "crm.lead-intake" aboneliğinin bildirdikleridir; kayıt boru hattı bunu uygular.</summary>
+    private const string Identity = "crm.lead-intake";
+
+    /// <summary>
+    /// IP + form başına dakikadaki gönderim sınırı (<c>LeadIntake:RateLimitPerMinute</c>, en az 1, varsayılan 20). Modülün <c>ConfigureServices</c>'inde
+    /// kaydolur; sınır istek anında okunur.
+    /// </summary>
+    public static void AddLeadIntakeRateLimit(this IServiceCollection services) =>
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            var permits = Math.Max(1, configuration.GetValue("LeadIntake:RateLimitPerMinute", 20));
-            options.AddPolicy(RateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
-                $"{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["tenant"]}|{context.Request.RouteValues["formKey"]}",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(RateLimitPolicy, context =>
+            {
+                var permits = Math.Max(1, context.RequestServices.GetRequiredService<IConfiguration>().GetValue("LeadIntake:RateLimitPerMinute", 20));
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    $"{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["tenant"]}|{context.Request.RouteValues["formKey"]}",
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
+            });
         });
 
-    public static IEndpointRouteBuilder MapLeadIntakeEndpoints(this IEndpointRouteBuilder app)
+    /// <summary><paramref name="routes"/> host tarafından oturumsuz <c>/api/public</c> grubu olarak gelir (ADR-0046); yol <c>/api/public/lead-forms/{tenant}/{formKey}</c>.</summary>
+    public static void MapPublic(IEndpointRouteBuilder routes)
     {
-        var group = app.MapGroup("/api/public/lead-forms/{tenant}/{formKey}")
-            .AllowAnonymous()
+        var group = routes.MapGroup("/lead-forms/{tenant}/{formKey}")
             .RequireRateLimiting(RateLimitPolicy)
             .WithTags("Müşteri adayı formu (herkese açık)");
         group.MapPost("", SubmitAsync);
         group.MapMethods("", ["OPTIONS"], PreflightAsync);
+    }
 
-        // Form yönetimi (oturumlu): izin crm.lead-forms.manage.
-        var admin = app.MapGroup("/api/crm").RequireAuthorization().RequireModule(CrmModule.ModuleKey).WithTags("CRM");
-        ResourceEndpoints.MapResource<LeadFormDto, SaveLeadFormRequest>(admin, "/api/crm", "lead-forms", CrmModule.Entities.LeadForm,
+    /// <summary>Form yönetimi (oturumlu, <c>/api/crm</c> grubunda): izin crm.lead-forms.manage.</summary>
+    public static void MapAdmin(IEndpointRouteBuilder crm)
+    {
+        ResourceEndpoints.MapResource<LeadFormDto, SaveLeadFormRequest>(crm, "/api/crm", "lead-forms", CrmModule.Entities.LeadForm,
             CrmModule.Permissions.LeadFormsManage, CrmModule.Permissions.LeadFormsManage);
-        admin.MapPost("/lead-forms/{id:guid}/secret", RotateSecretAsync).RequirePermission(CrmModule.Permissions.LeadFormsManage);
-        return app;
+        crm.MapPost("/lead-forms/{id:guid}/secret", RotateSecretAsync).RequirePermission(CrmModule.Permissions.LeadFormsManage);
     }
 
     private static async Task<IResult> RotateSecretAsync(Guid id, LeadVersionRequest request, ILeadFormAdmin admin, CancellationToken ct)
@@ -70,11 +75,11 @@ internal static class LeadIntakeEndpoints
         var result = await admin.RotateSecretAsync(id, request.Version, ct);
         return result.IsSuccess
             ? Results.Ok(new LeadFormSecretDto(ResourceEndpoints.ToDto<LeadFormDto>(result.Value!.Form), result.Value.Secret))
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
     }
 
     private static async Task<IResult> SubmitAsync(
-        string tenant, string formKey, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, string formKey, HttpContext http, IPublicTenantScopes scopes, CancellationToken ct)
     {
         // Gövde sınırı (Kestrel); salt okunur olduğunda (test sunucusu) uygulanamaz.
         if (http.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } sizeLimit)
@@ -108,29 +113,13 @@ internal static class LeadIntakeEndpoints
             return Problem(StatusCodes.Status400BadRequest, "Geçersiz istek gövdesi.");
         }
 
-        var slug = tenant.Trim().ToLowerInvariant();
-        var found = await platform.Tenants.AsNoTracking()
-            .Where(t => t.Slug == slug && TenantStatusRules.Operational.Contains(t.Status))
-            .Select(t => t.Id)
-            .FirstOrDefaultAsync(ct);
-        if (found == Guid.Empty)
+        // Bilinmeyen ya da erişime kapalı firma ve kapalı ya da salt okunur modül (ADR-0028) aynı yanıtı alır: form kabul edilmez.
+        if (await scopes.OpenAsync(tenant, Identity, write: true, http.TraceIdentifier, ct) is not { } opened)
         {
             return Problem(StatusCodes.Status404NotFound, "Form bulunamadı.");
         }
 
-        await using var scope = scopes.Create(new TenantContext(found, Guid.Empty, Guid.Empty));
-
-        // Lisans (ADR-0028): modül kapalıysa ya da salt okunursa form kabul edilmez.
-        if (!await scope.ServiceProvider.GetRequiredService<IModuleLicense>().AllowsAsync(found, CrmModule.ModuleKey, write: true, ct))
-        {
-            return Problem(StatusCodes.Status404NotFound, "Form bulunamadı.");
-        }
-
-        // Sistem kimliği: izinler yalnızca "crm.lead-intake" aboneliğinin bildirdikleridir; kayıt boru hattı bunu uygular.
-        var cause = new EventEnvelope(
-            Guid.NewGuid(), found, DomainEventTypes.RecordDeleted, 1, CrmModule.Entities.LeadForm, Guid.Empty, null, Guid.Empty,
-            ExecutionSource.Import, http.TraceIdentifier, null, 0, new JsonObject(), time.GetUtcNow());
-        scope.ServiceProvider.GetRequiredService<EventHandlingScope>().Begin(cause, "crm.lead-intake");
+        await using var scope = opened;
         var intake = scope.ServiceProvider.GetRequiredService<ILeadIntake>();
 
         var origin = http.Request.Headers.Origin.ToString();
@@ -153,19 +142,13 @@ internal static class LeadIntakeEndpoints
     }
 
     private static async Task<IResult> PreflightAsync(
-        string tenant, string formKey, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, string formKey, HttpContext http, IPublicTenantScopes scopes, CancellationToken ct)
     {
+        // Ön kontrol yazmaz; modül kapalıysa kapsam açılmaz ve CORS başlığı verilmez (gönderim de kabul edilmez).
         var origin = http.Request.Headers.Origin.ToString();
-        var slug = tenant.Trim().ToLowerInvariant();
-        var found = await platform.Tenants.AsNoTracking()
-            .Where(t => t.Slug == slug && TenantStatusRules.Operational.Contains(t.Status)).Select(t => t.Id).FirstOrDefaultAsync(ct);
-        if (found != Guid.Empty && origin.Length > 0)
+        if (origin.Length > 0 && await scopes.OpenAsync(tenant, Identity, write: false, http.TraceIdentifier, ct) is { } opened)
         {
-            await using var scope = scopes.Create(new TenantContext(found, Guid.Empty, Guid.Empty));
-            var cause = new EventEnvelope(
-                Guid.NewGuid(), found, DomainEventTypes.RecordDeleted, 1, CrmModule.Entities.LeadForm, Guid.Empty, null, Guid.Empty,
-                ExecutionSource.Import, http.TraceIdentifier, null, 0, new JsonObject(), time.GetUtcNow());
-            scope.ServiceProvider.GetRequiredService<EventHandlingScope>().Begin(cause, "crm.lead-intake");
+            await using var scope = opened;
             if (await scope.ServiceProvider.GetRequiredService<ILeadIntake>().AllowedOriginAsync(formKey, origin, ct) is { Length: > 0 } allowed)
             {
                 AddCors(http, allowed);
