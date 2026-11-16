@@ -387,8 +387,6 @@
 
   "common.actions": "Eylemler",
   "common.cancel": "İptal",
-  "common.columns.moveDown": "{0} sütununu aşağı taşı",
-  "common.columns.moveUp": "{0} sütununu yukarı taşı",
   "common.edit": "Düzenle",
   "common.field.city": "Şehir",
   "common.field.email": "E-posta",
