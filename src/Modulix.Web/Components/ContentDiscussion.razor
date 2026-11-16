@@ -5,12 +5,12 @@
 @inject SessionState Session
 @inject ToastService Toasts
 
-<section class="mt-3" aria-label="Beğeni ve yorumlar">
+<section class="mt-3" aria-label="@Texts.Get("hr.discussion.label")">
     <div class="list-toolbar mb-2">
         <button type="button" class="btn btn-tonal" aria-pressed="@(likedByMe ? "true" : "false")" disabled="@liking" aria-busy="@(liking ? "true" : null)" @onclick="ToggleLikeAsync">
-            <AppIcon Name="star" Size="16" /> @(likedByMe ? "Beğendiniz" : "Beğen") · @likeCount
+            <AppIcon Name="star" Size="16" /> @(likedByMe ? Texts.Get("hr.discussion.liked") : Texts.Get("hr.discussion.like")) · @likeCount
         </button>
-        <span class="text-muted me-auto">@CommentCount yorum</span>
+        <span class="text-muted me-auto">@Texts.Get("hr.discussion.count", CommentCount)</span>
     </div>
 
     @if (message is not null)
@@ -24,11 +24,11 @@
     }
     else if (comments.Count == 0)
     {
-        <EmptyState Compact="true" Icon="message-square" Title="Henüz yorum yok." Text="İlk yorumu siz yazın." />
+        <EmptyState Compact="true" Icon="message-square" Title="@Texts.Get("hr.discussion.empty")" Text="@Texts.Get("hr.discussion.empty-hint")" />
     }
     else
     {
-        <ul class="list-unstyled" aria-label="Yorumlar">
+        <ul class="list-unstyled" aria-label="@Texts.Get("hr.discussion.comments")">
             @foreach (var comment in comments)
             {
                 var hidden = WarehouseLabels.Flag(comment, "isHidden");
@@ -39,7 +39,7 @@
                         <small class="text-muted">@(DateTimeOffset.TryParse(WarehouseLabels.Text(comment, "createdAt"), out var at) ? at.LocalDateTime.ToString("dd.MM.yyyy HH:mm") : "")</small>
                         @if (hidden)
                         {
-                            <span class="badge status-inactive">Gizlendi</span>
+                            <span class="badge status-inactive">@Texts.Get("hr.discussion.hidden")</span>
                         }
                     </div>
                     @if (WarehouseLabels.Text(comment, "body") is { Length: > 0 } body)
@@ -48,16 +48,16 @@
                     }
                     else
                     {
-                        <p class="text-muted mb-1">Bu yorum gizlendi.</p>
+                        <p class="text-muted mb-1">@Texts.Get("hr.discussion.hidden-text")</p>
                     }
                     @if (CanModerate || mine)
                     {
                         <div class="list-toolbar">
                             @if (CanModerate)
                             {
-                                <button type="button" class="btn btn-ghost" @onclick='() => ActAsync(comment, hidden ? "show" : "hide")'>@(hidden ? "Göster" : "Gizle")</button>
+                                <button type="button" class="btn btn-ghost" @onclick='() => ActAsync(comment, hidden ? "show" : "hide")'>@(hidden ? Texts.Get("hr.discussion.show") : Texts.Get("hr.discussion.hide"))</button>
                             }
-                            <button type="button" class="btn btn-outline-danger" @onclick='() => ActAsync(comment, "delete")'>Sil</button>
+                            <button type="button" class="btn btn-outline-danger" @onclick='() => ActAsync(comment, "delete")'>@Texts.Get("common.delete")</button>
                         </div>
                     }
                 </li>
@@ -66,11 +66,11 @@
     }
 
     <form class="mt-2" novalidate @onsubmit="CommentAsync" @onsubmit:preventDefault>
-        <label class="form-label" for="@($"comment-{Content.Id}")">Yorumunuz</label>
+        <label class="form-label" for="@($"comment-{Content.Id}")">@Texts.Get("hr.discussion.your-comment")</label>
         <textarea id="@($"comment-{Content.Id}")" class="form-control@(errors?.ContainsKey("body") == true ? " is-invalid" : "")" rows="2" maxlength="2000" @bind="draft"></textarea>
         <FieldError Field="body" Errors="errors" />
         <div class="list-toolbar mt-2">
-            <button type="submit" class="btn btn-tonal ms-auto" disabled="@(busy || string.IsNullOrWhiteSpace(draft))" aria-busy="@(busy ? "true" : null)">Yorum yap</button>
+            <button type="submit" class="btn btn-tonal ms-auto" disabled="@(busy || string.IsNullOrWhiteSpace(draft))" aria-busy="@(busy ? "true" : null)">@Texts.Get("hr.discussion.post")</button>
         </div>
     </form>
 </section>
@@ -145,7 +145,7 @@
         {
             draft = null;
             commentDelta++;
-            Toasts.Success("Yorumunuz eklendi.");
+            Toasts.Success(Texts.Get("hr.discussion.posted"));
             await LoadAsync();
             return;
         }
@@ -173,7 +173,7 @@
             "show" => 1,
             _ => 0,
         };
-        Toasts.Success(action switch { "delete" => "Yorum silindi.", "hide" => "Yorum gizlendi.", _ => "Yorum yeniden gösteriliyor." });
+        Toasts.Success(Texts.Get(action switch { "delete" => "hr.discussion.deleted", "hide" => "hr.discussion.hidden-done", _ => "hr.discussion.shown" }));
         await LoadAsync();
     }
 }
