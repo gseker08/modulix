@@ -17,6 +17,12 @@ public interface IRecordAccess
     Task<bool> CanAsync(string entityKey, RecordOperation operation, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Kayıt türünde kullanıcıdan gizlenen hassas alanlar (Y8b; boru hattının uyguladığı kuralla aynı). Uç nokta toplu bir değeri (ör. tutar toplamı)
+    /// gizli alandan türetiyorsa bununla karar verir. Aktif tenant yoksa bütün alanlar gizli sayılır: <paramref name="hiddenWithoutTenant"/> döner.
+    /// </summary>
+    Task<IReadOnlySet<string>> GetHiddenFieldsAsync(string entityKey, IReadOnlySet<string> hiddenWithoutTenant, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Kullanıcının tüm rolleri "kapsam dışı ortak kayıtları gizle" diyor mu (ADR-0026 K8)? Evetse kapsam dışı ortak firma ve
     /// kişiler asgari kimlikle bile görünmez. Yönetici, rolü olmayan kişi ve olay işleyicisi için hayırdır.
     /// </summary>

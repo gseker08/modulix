@@ -1,11 +1,13 @@
 using System.Text.Json.Nodes;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Records;
-using Modulix.Modules.Crm;
+using Modulix.Core.Hosting;
 using Modulix.Shared.Crm;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// Birleştirme uçları (ADR-0013): <c>POST /api/crm/{companies|contacts}/{targetId}/merge[/preview]</c> ve
@@ -27,7 +29,7 @@ internal static class MergeEndpoints
         group.MapPost("/{targetId:guid}/merge/preview", async (Guid targetId, MergeRecordsRequest body, IRecordPipeline pipeline, CancellationToken ct) =>
         {
             var result = await pipeline.PreviewMergeAsync(entityKey, ToRequest(targetId, body), ct);
-            return result.IsSuccess ? Results.Ok(ToDto(result.Value!, targetId)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToDto(result.Value!, targetId)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(mergePermission);
 
         group.MapPost("/{targetId:guid}/merge", async (Guid targetId, MergeRecordsRequest body, IRecordPipeline pipeline, CancellationToken ct) =>
@@ -39,7 +41,7 @@ internal static class MergeEndpoints
                     result.Value.Target.Version,
                     result.Value.SourceId,
                     [.. result.Value.Impacts.Select(i => new MergeImpactDto(i.Label, i.Count))]))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(mergePermission);
 
         // Eski bir kimliğin gittiği kayıt: hedefi göremeyen çağıran için 404 (eski kimliğin varlığı da belli edilmez).
@@ -48,7 +50,7 @@ internal static class MergeEndpoints
             var result = await pipeline.ResolveMergedAsync(new RecordRef(entityKey, id), ct);
             return result.IsSuccess
                 ? Results.Ok(new MergedRecordDto(result.Value!.SourceId, result.Value.TargetId, result.Value.MergedAt))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(readPermission);
     }
 

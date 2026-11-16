@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Automation;
@@ -6,6 +7,8 @@ using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Reporting;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Hosting;
+using Modulix.Modules.Crm.Endpoints;
 using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Leads;
 using Modulix.Modules.Crm.Opportunities;
@@ -25,7 +28,7 @@ namespace Modulix.Modules.Crm;
 ///   <item>Uç noktalar ve ekranlar modülü değil, yalnızca bu sınıftaki anahtarları ve izinleri bilir.</item>
 /// </list>
 /// </summary>
-public sealed class CrmModule : IModule
+public sealed class CrmModule : IModule, IModuleEndpoints
 {
     public const string ModuleKey = "crm";
 
@@ -1145,8 +1148,12 @@ public sealed class CrmModule : IModule
         public const string ForecastBestCaseMinProbability = "crm.forecast.best-case-min-probability";
     }
 
+    /// <summary>CRM uç noktaları (<c>/api/crm</c>) modüldedir (ADR-0046); teklif ve satış planlama uçları henüz host'tadır.</summary>
+    public void MapEndpoints(IEndpointRouteBuilder routes) => CrmEndpoints.MapEndpoints(routes);
+
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<Modulix.Modules.Crm.Opportunities.IOpportunityPolicyProvider, OpportunityPolicyProvider>();
         services.AddScoped<LeadScoreJob>();
         services.AddScoped<LeadScoreJobAnchor>();
         services.AddScoped<LeadScoreReader>();
