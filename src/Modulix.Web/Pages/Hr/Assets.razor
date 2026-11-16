@@ -4,12 +4,12 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Demirbaşlar · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.assets") · Modulix</PageTitle>
 
 @* Demirbaşlar (ADR-0042 dilim 4): envanter, durum ve şu anki zimmetli çalışan; kart açılınca zimmet geçmişi, zimmetleme, iade ve tutanak.
    "Kendi" kapsamındaki kullanıcı yalnızca üzerindeki demirbaşları görür (sunucuda). *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.AssetsRead">
-    <PageHeader Title="Demirbaşlar" Icon="package" Subtitle="@(page is null ? "Demirbaşları, zimmetleri ve iadeleri yönetin." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.hr.assets")" Icon="package" Subtitle="@(page is null ? Texts.Get("hr.assets.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -26,36 +26,36 @@
                 <AssetAssignmentEditor AssetId="selected.Id" AssetLabel="@($"{WarehouseLabels.Text(selected, "assetTag")} · {WarehouseLabels.Text(selected, "name")}")"
                                        Lookups="Lookups" Saved="AssignedAsync" Cancelled="() => assigning = false" />
             }
-            <AssetAssignmentList @ref="history" Title="Zimmet geçmişi" EmptyText="Bu demirbaş hiç zimmetlenmedi." Query="@($"assetId={selected.Id}")" ShowAsset="false" Changed="AssignmentChangedAsync">
+            <AssetAssignmentList @ref="history" Title="@Texts.Get("hr.assets.history")" EmptyText="@Texts.Get("hr.assets.history-empty")" Query="@($"assetId={selected.Id}")" ShowAsset="false" Changed="AssignmentChangedAsync">
                 <AddButton>
                     @if (Session.Can(HrAccess.AssetsManage) && WarehouseLabels.Text(selected, "status") == "inStock" && !assigning)
                     {
-                        <button type="button" class="btn btn-tonal" @onclick="() => assigning = true"><AppIcon Name="user-check" Size="16" /> Zimmetle</button>
+                        <button type="button" class="btn btn-tonal" @onclick="() => assigning = true"><AppIcon Name="user-check" Size="16" /> @Texts.Get("hr.assignment-form.title")</button>
                     }
                 </AddButton>
             </AssetAssignmentList>
         }
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Demirbaş görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("hr.assets.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Demirbaş ara" placeholder="Envanter no, ad, seri no, marka veya model ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("hr.assets.search")" placeholder="@Texts.Get("hr.assets.search-placeholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="@(string.IsNullOrEmpty(categoryKey) ? 0 : 1)" />
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(HrAccess.AssetsManage) && !editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni demirbaş</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("hr.asset-form.new")</button>
         }
     </div>
 
     @if (filtersOpen || !string.IsNullOrEmpty(categoryKey))
     {
         <div class="filters">
-            <select class="form-select" aria-label="Kategori" @bind="categoryKey" @bind:after="() => LoadAsync(1)">
-                <option value="">Tüm kategoriler</option>
+            <select class="form-select" aria-label="@Texts.Get("hr.assets.col.category")" @bind="categoryKey" @bind:after="() => LoadAsync(1)">
+                <option value="">@Texts.Get("hr.assets.all-categories")</option>
                 @foreach (var category in Lookups.ValuesOf(HrAccess.AssetCategoryList))
                 {
                     <option value="@category.Key">@category.Label</option>
@@ -73,20 +73,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan demirbaş yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("hr.assets.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) demirbaş listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("hr.assets.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Demirbaşlar</caption>
+            <caption class="visually-hidden">@Texts.Get("nav.app.hr.assets")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -98,8 +98,8 @@
                             @Cell(column, asset)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{WarehouseLabels.Text(asset, "assetTag")} eylemleri")">
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(asset)"><AppIcon Name="@(Session.Can(HrAccess.AssetsManage) ? "pencil" : "eye")" Size="16" /> <span>@(Session.Can(HrAccess.AssetsManage) ? "Düzenle ve zimmetle" : "Aç")</span></button>
+                            <RowMenu Label="@Texts.Get("hr.content.row-actions", WarehouseLabels.Text(asset, "assetTag"))">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(asset)"><AppIcon Name="@(Session.Can(HrAccess.AssetsManage) ? "pencil" : "eye")" Size="16" /> <span>@(Session.Can(HrAccess.AssetsManage) ? Texts.Get("hr.assets.edit-assign") : Texts.Get("common.open"))</span></button>
                             </RowMenu>
                         </td>
                     </tr>
@@ -116,15 +116,15 @@
     private const string AllViews = "all";
 
     // Sıralama anahtarları kayıt deposunun beyanıdır (AssetRecordStore.SortKeys).
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("assetTag", "Envanter no", "hash", "assetTag", "-assetTag", Locked: true),
-        new("name", "Ad", "package", "name", "-name"),
-        new("category", "Kategori", "tag", "categoryKey", "-categoryKey"),
-        new("serial", "Seri no", "type", DefaultVisible: false),
-        new("holder", "Zimmetli", "user"),
-        new("purchaseDate", "Alış tarihi", "calendar", "purchaseDate", "-purchaseDate", DefaultVisible: false),
-        new("status", "Durum", "check-circle", "status", "-status"),
+        new("assetTag", Texts.Get("hr.assets.col.tag"), "hash", "assetTag", "-assetTag", Locked: true),
+        new("name", Texts.Get("hr.assets.col.name"), "package", "name", "-name"),
+        new("category", Texts.Get("hr.assets.col.category"), "tag", "categoryKey", "-categoryKey"),
+        new("serial", Texts.Get("hr.assets.col.serial"), "type", DefaultVisible: false),
+        new("holder", Texts.Get("hr.assets.col.holder"), "user"),
+        new("purchaseDate", Texts.Get("hr.assets.col.purchase-date"), "calendar", "purchaseDate", "-purchaseDate", DefaultVisible: false),
+        new("status", Texts.Get("common.field.status"), "check-circle", "status", "-status"),
     ];
 
     private readonly GridViewState grid = new("hr.assets", "assetTag");
@@ -158,11 +158,11 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm demirbaşlar", Icon: "list"),
-        new("inStock", "Depoda", Icon: "package"),
-        new("assigned", "Zimmetli", Icon: "user-check"),
-        new("maintenance", "Bakımda", Icon: "wrench"),
-        new("retired,lost", "Hurda ve kayıp", Icon: "x"),
+        new(AllViews, Texts.Get("hr.assets.view.all"), Icon: "list"),
+        new("inStock", HrLabels.AssetStatus("inStock"), Icon: "package"),
+        new("assigned", HrLabels.AssetStatus("assigned"), Icon: "user-check"),
+        new("maintenance", HrLabels.AssetStatus("maintenance"), Icon: "wrench"),
+        new("retired,lost", Texts.Get("hr.assets.view.retired-lost"), Icon: "x"),
         .. views.Options,
     ];
 

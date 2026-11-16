@@ -2,16 +2,16 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Zimmetlerim · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.my-assets") · Modulix</PageTitle>
 
 @* Self servis (ADR-0042 dilim 4): kullanıcının üzerindeki demirbaşlar ve geçmiş zimmetleri; teslim aldığını onaylar, tutanağı indirir. Görünürlük
    sunucudadır (veri kapsamı "kendi": yalnızca kendi zimmetleri). *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.AssetsRead">
-    <PageHeader Title="Zimmetlerim" Icon="package" Subtitle="Üzerinizdeki demirbaşları görün, teslim aldığınızı onaylayın ve tutanağı indirin." />
+    <PageHeader Title="@Texts.Get("nav.app.hr.my-assets")" Icon="package" Subtitle="@Texts.Get("hr.my-assets.intro")" />
 
     @if (Session.User is { } user)
     {
-        <AssetAssignmentList Title="Üzerimdeki demirbaşlar" EmptyText="Üzerinizde zimmetli demirbaş yok." Query="@($"employeeUserId={user.UserId}&status=active")" ShowEmployee="false" />
-        <AssetAssignmentList Title="Geçmiş zimmetlerim" EmptyText="Kapanmış zimmetiniz yok." Query="@($"employeeUserId={user.UserId}&status=returned,lost")" ShowEmployee="false" />
+        <AssetAssignmentList Title="@Texts.Get("hr.my-assets.active")" EmptyText="@Texts.Get("hr.my-assets.active-empty")" Query="@($"employeeUserId={user.UserId}&status=active")" ShowEmployee="false" />
+        <AssetAssignmentList Title="@Texts.Get("hr.my-assets.past")" EmptyText="@Texts.Get("hr.my-assets.past-empty")" Query="@($"employeeUserId={user.UserId}&status=returned,lost")" ShowEmployee="false" />
     }
 </AuthGate>
