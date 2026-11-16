@@ -12,8 +12,8 @@ using Modulix.Infrastructure.Persistence;
 namespace Modulix.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ModulixDbContext))]
-    [Migration("20261116160134_DropHrHolidays")]
-    partial class DropHrHolidays
+    [Migration("20261116164226_RetireHrHolidaysEntity")]
+    partial class RetireHrHolidaysEntity
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
