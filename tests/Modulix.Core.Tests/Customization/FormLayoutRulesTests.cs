@@ -40,6 +40,49 @@ public class FormLayoutRulesTests
         Assert.Empty(FormLayoutRules.ExtraRequired(layout));
     }
 
+    private static readonly Dictionary<string, string> English = new()
+    {
+        ["meta.form.crm.deal"] = "Opportunity",
+        ["meta.form.crm.deal.tab.genel"] = "General information",
+        ["meta.form.crm.deal.section.temel"] = "Basic information",
+        ["meta.form.crm.deal.section.ek"] = "Additional information",
+        ["meta.form.crm.deal.field.title"] = "Title",
+        ["meta.form.crm.deal.field.amount"] = "Amount",
+    };
+
+    [Fact]
+    public void Localized_layout_translates_default_names_but_keeps_the_firms_names_and_custom_fields()
+    {
+        // Firma "ek" bölümünü yeniden adlandırmış, kendi "finans" sekmesini açmış; "temel" bölümü varsayılan adında.
+        var stored = new FormLayoutInput(
+            [new("genel", "Genel bilgiler"), new("finans", "Finans")],
+            [new("temel", "Temel bilgiler", "target", "genel"), new("ek", "Bizim ekler", null, "finans")],
+            [new("amount", "temel", 6, Required: false, Visible: true)]);
+        var layout = FormLayoutRules.Localize(FormLayoutRules.Resolve(Form, [Custom("plaka")], stored, version: 2), Form, English);
+
+        Assert.Equal("Opportunity", layout.DisplayName);
+        Assert.Equal(["General information", "Finans"], layout.Tabs.Select(t => t.Label));
+        Assert.Equal(["Basic information", "Bizim ekler"], layout.Sections.Select(s => s.Label));
+        Assert.Equal("Amount", layout.Fields.Single(f => f.Key == "amount").Label);
+        Assert.Equal("Notlar", layout.Fields.Single(f => f.Key == "notes").Label);
+        Assert.Equal("PLAKA", layout.Fields.Single(f => f.Key == "custom.plaka").Label);
+    }
+
+    [Fact]
+    public void Saving_a_default_name_shown_in_another_language_stores_the_turkish_source_and_keeps_a_renamed_one()
+    {
+        var input = new FormLayoutInput(
+            [new("genel", "General information"), new("finans", "Finance")],
+            [new("temel", "Basic information", "target", "genel"), new("ek", "Our extras", null, "finans")],
+            [new("amount", "temel", 6, Required: false, Visible: true)]);
+
+        var stored = FormLayoutRules.Delocalize(input, Form, English);
+
+        Assert.Equal(["Genel bilgiler", "Finance"], stored.Tabs.Select(t => t.Label));
+        Assert.Equal(["Temel bilgiler", "Our extras"], stored.Sections.Select(s => s.Label));
+        Assert.Equal(input.Fields, stored.Fields);
+    }
+
     [Fact]
     public void Stored_layout_moves_fields_adds_requirements_and_keeps_fixed_fields_visible()
     {

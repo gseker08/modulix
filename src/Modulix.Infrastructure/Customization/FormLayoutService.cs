@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -23,7 +24,9 @@ internal sealed class FormLayoutService(
     ModuleCatalog catalog,
     IModuleEntitlements entitlements,
     ICustomFieldProvider customFields,
-    IAuditWriter audit) : IFormLayoutService, IFormLayoutProvider
+    IAuditWriter audit,
+    IRequestLanguage language,
+    ITextCatalog texts) : IFormLayoutService, IFormLayoutProvider
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -56,11 +59,12 @@ internal sealed class FormLayoutService(
         var tenant = RequireTenant();
         var enabled = await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken);
         var rows = await db.FormLayouts.AsNoTracking().ToListAsync(cancellationToken);
+        var bundle = await TextsAsync(cancellationToken);
         var result = new List<FormLayoutInfo>();
         foreach (var (moduleKey, form) in catalog.Forms.Where(f => catalog.IsEnabled(f.ModuleKey, enabled)))
         {
             var custom = await customFields.GetFieldsAsync(tenant, form.EntityKey, cancellationToken);
-            result.Add(Resolve(form, custom, rows.FirstOrDefault(r => r.EntityKey == form.EntityKey)));
+            result.Add(FormLayoutRules.Localize(Resolve(form, custom, rows.FirstOrDefault(r => r.EntityKey == form.EntityKey)), form, bundle));
         }
 
         return result;
@@ -75,7 +79,8 @@ internal sealed class FormLayoutService(
         }
 
         var row = await db.FormLayouts.AsNoTracking().SingleOrDefaultAsync(l => l.EntityKey == entityKey, cancellationToken);
-        return Resolve(form, await customFields.GetFieldsAsync(tenant, entityKey, cancellationToken), row);
+        return FormLayoutRules.Localize(
+            Resolve(form, await customFields.GetFieldsAsync(tenant, entityKey, cancellationToken), row), form, await TextsAsync(cancellationToken));
     }
 
     public Task<RecordResult<FormLayoutInfo>> SaveAsync(string entityKey, FormLayoutInput input, long version, CancellationToken cancellationToken) =>
@@ -93,8 +98,11 @@ internal sealed class FormLayoutService(
         }
 
         var custom = await customFields.GetFieldsAsync(tenant, entityKey, cancellationToken);
+        var bundle = await TextsAsync(cancellationToken);
         if (input is not null)
         {
+            // Okurun dilinde gösterilen varsayılan sekme/bölüm adları Türkçe kaynağa döner (değiştirilmiş ad firmanın verisidir).
+            input = FormLayoutRules.Delocalize(input, form, bundle);
             var errors = FormLayoutRules.Validate(form, custom, input);
             if (errors.Count > 0)
             {
@@ -112,7 +120,7 @@ internal sealed class FormLayoutService(
         var created = row is null;
         if (created && input is null)
         {
-            return RecordResult<FormLayoutInfo>.Ok(before);
+            return RecordResult<FormLayoutInfo>.Ok(FormLayoutRules.Localize(before, form, bundle));
         }
 
         if (row is null)
@@ -144,8 +152,13 @@ internal sealed class FormLayoutService(
         }
 
         requiredCache.Remove((tenant.TenantId, entityKey));
-        return RecordResult<FormLayoutInfo>.Ok(after);
+        return RecordResult<FormLayoutInfo>.Ok(FormLayoutRules.Localize(after, form, bundle));
     }
+
+    private IReadOnlyDictionary<string, string>? bundle;
+
+    private async ValueTask<IReadOnlyDictionary<string, string>> TextsAsync(CancellationToken cancellationToken) =>
+        bundle ??= texts.Bundle(await language.GetAsync(cancellationToken));
 
     private static FormLayoutInfo Resolve(FormDefinition form, IReadOnlyList<CustomFieldInfo> custom, TenantFormLayout? row) =>
         FormLayoutRules.Resolve(form, custom, row?.LayoutJson is null ? null : Parse(row.LayoutJson), row?.Version ?? 0);
