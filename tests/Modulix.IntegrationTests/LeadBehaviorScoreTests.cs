@@ -120,7 +120,12 @@ public sealed class LeadBehaviorScoreTests(ModulixApiFactory factory) : IClassFi
 
         // 50 → 80: eşik aşıldı, sorumluya takip açılır.
         await PostActivityAsync(client, new SaveActivityRequest("Sunum", ActivityType.Meeting, done, done, LeadId: lead.Id));
-        await DeliverAndRunAsync(tenant.Id);
+        // Olay kuyruğu paralel testlerle ortaktır: puan olayı ve onun açtığı kural çalışması birkaç turda işlenebilir.
+        for (var i = 0; i < 5 && (await FollowUpsAsync(tenant.Id)).Count == 0; i++)
+        {
+            await DeliverAndRunAsync(tenant.Id);
+        }
+
         Assert.Equal(80, (await GetLeadAsync(client, lead.Id)).Score);
         var followUp = Assert.Single(await FollowUpsAsync(tenant.Id));
         Assert.Equal("Sıcak müşteri adayı: Eşik adayı", followUp.Subject);

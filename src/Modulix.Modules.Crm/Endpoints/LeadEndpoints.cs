@@ -36,6 +36,7 @@ internal static class LeadEndpoints
         leads.MapGet("/export", ExportAsync).RequirePermission(CrmModule.Permissions.LeadsExport);
         leads.MapGet("/duplicates", DuplicatesAsync).RequirePermission(CrmModule.Permissions.LeadsRead);
         leads.MapGet("/{id:guid}/duplicates", LeadDuplicatesAsync).RequirePermission(CrmModule.Permissions.LeadsRead);
+        leads.MapGet("/{id:guid}/score", ScoreAsync).RequirePermission(CrmModule.Permissions.LeadsRead);
 
         leads.MapPost("/{id:guid}/assign", AssignAsync).RequirePermission(CrmModule.Permissions.LeadsAssign);
         leads.MapPost("/{id:guid}/start-contacting", StartContactingAsync).RequirePermission(CrmModule.Permissions.LeadsQualify);
@@ -123,6 +124,21 @@ internal static class LeadEndpoints
 
         string? Text(string name) => lead.Value!.Values[name]?.GetValue<string>();
         return await MatchesAsync(Text("email"), Text("phone"), Text("companyName"), Text("website"), id, pipeline, ct);
+    }
+
+    /// <summary>
+    /// Puan açıklaması (ADR-0050 dilim 4): adayı görebilen, puanı veren kuralları da görür. Aday önce kayıt boru hattından okunur (izin ve
+    /// kayıt kapsamı; görünmeyen aday 404), açıklama sonra iç okuyucuyla hesaplanır. Kural yönetim izni gerekmez.
+    /// </summary>
+    private static async Task<IResult> ScoreAsync(Guid id, IRecordPipeline pipeline, Records.LeadScoreReader reader, CancellationToken ct)
+    {
+        var lead = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Lead, id), ct);
+        if (!lead.IsSuccess)
+        {
+            return RecordProblems.ToProblem(lead.Error!);
+        }
+
+        return await reader.ExplainAsync(id, ct) is { } explanation ? Results.Ok(explanation) : Results.NotFound();
     }
 
     /// <summary>

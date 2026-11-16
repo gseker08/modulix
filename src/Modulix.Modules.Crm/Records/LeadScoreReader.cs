@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Leads;
+using LeadScoreExplanationDto = Modulix.Shared.Crm.LeadScoreExplanationDto;
+using LeadScoreReasonDto = Modulix.Shared.Crm.LeadScoreReasonDto;
 
 namespace Modulix.Modules.Crm.Records;
 
@@ -57,9 +59,34 @@ internal sealed class LeadScoreReader(IModuleData data, TimeProvider time)
             return false;
         }
 
+        (List<LeadScoreRule> rules, LeadBehavior? behavior) = await InputsAsync(lead, cancellationToken);
+        return LeadScoring.Calculate(lead, rules, behavior) != lead.Score;
+    }
+
+    /// <summary>
+    /// Puan açıklaması (dilim 4): kayıttaki puan, bugünkü kurallarla hesaplanan puan ve katkı veren kurallar. Aday bulunamazsa null. Görünürlük
+    /// çağıranın sorunudur: uç nokta önce adayı kayıt boru hattından okur (izin ve kapsam), sonra bunu çağırır.
+    /// </summary>
+    public async Task<LeadScoreExplanationDto?> ExplainAsync(Guid leadId, CancellationToken cancellationToken)
+    {
+        Lead? lead = await data.Set<Lead>().AsNoTracking().SingleOrDefaultAsync(l => l.Id == leadId, cancellationToken);
+        if (lead is null)
+        {
+            return null;
+        }
+
+        (List<LeadScoreRule> rules, LeadBehavior? behavior) = await InputsAsync(lead, cancellationToken);
+        List<LeadScoreReasonDto> reasons =
+            [.. LeadScoring.Explain(lead, rules, behavior).Select(r => new LeadScoreReasonDto(r.Id, r.Name, r.Field, r.Operator, r.Value, r.Points))];
+        return new LeadScoreExplanationDto(lead.Score, LeadScoring.Calculate(lead, rules, behavior), reasons);
+    }
+
+    /// <summary>Etkin kurallar ve (bir kural kullanıyorsa) adayın davranış sayaçları; aday kaydedilirken yapılan hesabın girdileri.</summary>
+    private async Task<(List<LeadScoreRule> Rules, LeadBehavior? Behavior)> InputsAsync(Lead lead, CancellationToken cancellationToken)
+    {
         List<LeadScoreRule> rules = await data.Set<LeadScoreRule>().AsNoTracking().Where(r => r.IsActive).ToListAsync(cancellationToken);
         LeadBehavior? behavior = LeadScoring.NeedsBehavior(rules) ? await new LeadBehaviorReader(data, time.GetUtcNow()).ForLeadAsync(lead, cancellationToken) : null;
-        return LeadScoring.Calculate(lead, rules, behavior) != lead.Score;
+        return (rules, behavior);
     }
 
     /// <summary>Aktivitenin bugün bağlı olduğu aday (silinmişse ya da adaya bağlı değilse null).</summary>

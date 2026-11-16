@@ -88,6 +88,26 @@ public class LeadScoringTests
     }
 
     [Fact]
+    public void Explanation_lists_only_matching_active_rules_largest_contribution_first()
+    {
+        var lead = new Lead { Country = "TR", Email = "a@b.c" };
+        var rules = new[]
+        {
+            Rule("email", LeadScoreOperator.IsSet, null, 10),
+            Rule("country", LeadScoreOperator.EqualsTo, "TR", 40),
+            Rule("phone", LeadScoreOperator.IsEmpty, null, -20),
+            Rule("country", LeadScoreOperator.EqualsTo, "DE", 30),
+            Rule("email", LeadScoreOperator.IsSet, null, 90, active: false),
+        };
+
+        var explained = LeadScoring.Explain(lead, rules);
+
+        Assert.Equal([40, -20, 10], explained.Select(r => r.Points));
+        Assert.Equal(LeadScoring.Calculate(lead, rules), explained.Sum(r => r.Points));
+        Assert.Empty(LeadScoring.Explain(new Lead { Phone = "1" }, rules.Where(r => r.Field != "email")));
+    }
+
+    [Fact]
     public void Inactive_days_with_negative_points_decay_the_score()
     {
         var lead = new Lead { Country = "TR" };

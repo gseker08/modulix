@@ -107,6 +107,61 @@ public class LeadScoringTests(ModulixApiFactory factory) : IClassFixture<Modulix
     }
 
     [Fact]
+    public async Task The_score_explanation_lists_the_contributing_rules_and_the_pending_score()
+    {
+        var (_, admin) = await SetUpAsync();
+        using var client = await LoginAsync(admin);
+        await CreateRuleAsync(client, "Türkiye", "country", LeadScoreCatalog.EqualsTo, "TR", 50);
+        await CreateRuleAsync(client, "Telefonsuz", "phone", LeadScoreCatalog.IsEmpty, null, -10);
+        await CreateRuleAsync(client, "Almanya", "country", LeadScoreCatalog.EqualsTo, "DE", 30);
+        var lead = await CreateLeadAsync(client, new SaveLeadRequest("Açıklanan", LastName: "A", Country: "TR"));
+
+        var explanation = (await client.GetFromJsonAsync<LeadScoreExplanationDto>($"{LeadsUrl}/{lead.Id}/score"))!;
+        Assert.Equal(40, explanation.Score);
+        Assert.Equal(40, explanation.Calculated);
+        Assert.Equal(["Türkiye", "Telefonsuz"], explanation.Reasons.Select(r => r.Name));
+        Assert.Equal([50, -10], explanation.Reasons.Select(r => r.Points));
+        Assert.Equal("country", explanation.Reasons[0].Field);
+        Assert.Equal("TR", explanation.Reasons[0].Value);
+
+        // Yeni kural kaydedilmiş puanı hemen değiştirmez: açıklama işin yazacağı puanı gösterir.
+        await CreateRuleAsync(client, "Unvanlı", "jobTitle", LeadScoreCatalog.IsEmpty, null, 5);
+        explanation = (await client.GetFromJsonAsync<LeadScoreExplanationDto>($"{LeadsUrl}/{lead.Id}/score"))!;
+        Assert.Equal(40, explanation.Score);
+        Assert.Equal(45, explanation.Calculated);
+        Assert.Equal(3, explanation.Reasons.Count);
+    }
+
+    [Fact]
+    public async Task The_score_explanation_follows_lead_visibility_across_tenants_scopes_and_permissions()
+    {
+        var (tenant, admin) = await SetUpAsync();
+        var (_, other) = await SetUpAsync();
+        using var adminClient = await LoginAsync(admin);
+        using var otherClient = await LoginAsync(other);
+        await CreateRuleAsync(adminClient, "Türkiye", "country", LeadScoreCatalog.EqualsTo, "TR", 50);
+        var lead = await CreateLeadAsync(adminClient, new SaveLeadRequest("Gizli", LastName: "G", Country: "TR"));
+
+        // Başka tenant'ın adayı yok sayılır.
+        Assert.Equal(HttpStatusCode.NotFound, (await otherClient.GetAsync($"{LeadsUrl}/{lead.Id}/score")).StatusCode);
+
+        // Yalnızca kendi kayıtlarını gören temsilci başkasının adayının açıklamasını göremez; kendi adayınınkini kural izni olmadan görür.
+        var rep = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [LeadsRead, LeadsCreate], Scope.Own, rep);
+        using var repClient = await LoginAsync(rep);
+        Assert.Equal(HttpStatusCode.NotFound, (await repClient.GetAsync($"{LeadsUrl}/{lead.Id}/score")).StatusCode);
+        var own = await CreateLeadAsync(repClient, new SaveLeadRequest("Benim", LastName: "B", Country: "TR"));
+        var explanation = (await repClient.GetFromJsonAsync<LeadScoreExplanationDto>($"{LeadsUrl}/{own.Id}/score"))!;
+        Assert.Equal("Türkiye", Assert.Single(explanation.Reasons).Name);
+
+        // Aday okuma izni olmayan hiç göremez.
+        var outsider = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [ActivitiesRead], Scope.All, outsider);
+        using var outsiderClient = await LoginAsync(outsider);
+        Assert.Equal(HttpStatusCode.Forbidden, (await outsiderClient.GetAsync($"{LeadsUrl}/{own.Id}/score")).StatusCode);
+    }
+
+    [Fact]
     public async Task Managing_rules_needs_its_own_permission_but_every_lead_is_still_scored()
     {
         var (tenant, admin) = await SetUpAsync();
