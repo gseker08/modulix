@@ -387,8 +387,6 @@
 
   "common.actions": "Actions",
   "common.cancel": "Cancel",
-  "common.columns.moveDown": "Move column {0} down",
-  "common.columns.moveUp": "Move column {0} up",
   "common.edit": "Edit",
   "common.field.city": "City",
   "common.field.email": "Email",
