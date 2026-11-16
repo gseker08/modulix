@@ -251,6 +251,9 @@ public sealed class CoreModule : IModule
         /// <summary>Zamanlanmış rapor (ADR-0035, dilim 4); kaydın kimliği zamanlamanın kimliğidir.</summary>
         public const string ReportSchedule = "core.report-schedule";
 
+        /// <summary>Denetim kaydı arşivi dönemi (ADR-0052 dilim 3); kaydın kimliği arşiv satırının kimliğidir. Yalnızca indirme yazılır.</summary>
+        public const string AuditArchive = "core.audit-archive";
+
         /// <summary>Tenant'ın faaliyet seçimi (ADR-0029); kaydın kimliği tenant'ın kimliğidir, seçimin tamamı bir kayıt olarak yazılır.</summary>
         public const string ActivitySelection = "core.activity-selection";
 
@@ -695,6 +698,10 @@ public sealed class CoreModule : IModule
                 ["visibility"] = new Dictionary<string, string> { ["Private"] = "Özel", ["Users"] = "Seçilen kullanıcılar", ["Tenant"] = "Firma" },
             },
         },
+        new(AuditedEntityKeys.AuditArchive, "Denetim kaydı arşivi", null, new Dictionary<string, string>
+        {
+            ["period"] = "Dönem", ["rows"] = "Satır sayısı", ["bytes"] = "Boyut (bayt)", ["sha256"] = "SHA-256 özeti",
+        }, "period"),
         new(AuditedEntityKeys.ReportSchedule, "Zamanlanmış rapor", null, new Dictionary<string, string>
         {
             ["report"] = "Rapor", ["frequency"] = "Sıklık", ["hour"] = "Saat", ["dayOfWeek"] = "Haftanın günü", ["dayOfMonth"] = "Ayın günü",

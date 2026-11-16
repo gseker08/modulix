@@ -233,6 +233,7 @@ public static class PersistenceSetup
 
         // Denetim kaydı okuma (Y5).
         services.AddScoped<IAuditLog, AuditLog>();
+        services.AddScoped<IAuditArchives, AuditArchives>();
         services.AddScoped<ITenantSettings, TenantSettings>();
         // Modüllerin ayar okuma sözleşmesi (ADR-0046); aynı kapsamdaki ITenantSettings örneğini verir.
         services.AddScoped<ITenantSettingReader>(provider => provider.GetRequiredService<ITenantSettings>());
