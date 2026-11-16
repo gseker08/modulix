@@ -78,6 +78,10 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
         // Oluşturulma anı aralığı (ana sayfa dönem karşılaştırması): alt sınır dahil, üst sınır hariç.
         ["createdSince"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(a => a.CreatedAt >= time) : null,
         ["createdBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(a => a.CreatedAt < time) : null,
+        // Müşteri zaman çizelgesinin sayfalama imleci (sınır hariç); "gerçekleşme anı" sort=-occurred ile aynı ifadedir.
+        ["occurredBefore"] = (q, v, _) => FilterValue.Time(v) is { } time
+            ? q.Where(a => (a.CompletedAt ?? a.StartAt ?? a.DueAt ?? a.CreatedAt) < time)
+            : null,
         // Gecikmiş: açık durumda ve son tarihi verilen andan önce. Tamamlanmış/iptal kayıt hiçbir zaman gecikmiş sayılmaz.
         ["overdue"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(a => OpenStates.Contains(a.Status) && a.DueAt != null && a.DueAt < time) : null,
         ["open"] = (q, v, _) => FilterValue.Bool(v) is { } open
@@ -132,6 +136,18 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
             .ThenBy(a => (a.DueAt ?? a.StartAt) == null)
             .ThenBy(a => a.DueAt ?? a.StartAt)
             .ThenByDescending(a => a.CompletedAt);
+
+    /// <summary>
+    /// <c>sort=-occurred</c>: müşteri zaman çizelgesinin sırası. Gerçekleşme anı kapanış, yoksa başlangıç, yoksa son tarih, o da yoksa oluşturulma
+    /// anıdır; en yeni üstte.
+    /// </summary>
+    internal const string OccurredDescending = "-occurred";
+
+    protected override IReadOnlyCollection<string>? SortKeys { get; } = [OccurredDescending];
+
+    protected override IOrderedQueryable<Activity> Order(IQueryable<Activity> source, string? sort) => sort == OccurredDescending
+        ? source.OrderByDescending(a => a.CompletedAt ?? a.StartAt ?? a.DueAt ?? a.CreatedAt)
+        : Order(source);
 
     // ---- Veri kapsamı: sorumlu ya da katılımcı.
 
