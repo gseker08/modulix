@@ -369,9 +369,3 @@ public static class FirstResponseRules
         && !isAutomatic
         && deliveryStatus is DeliveryStatus.Queued or DeliveryStatus.Sent or DeliveryStatus.Recorded;
 }
-
-public static class TicketNumbers
-{
-    /// <summary>Yeni talep numarası: TK-yyyyMMdd-XXXXXX (karışmayan harf/rakam alfabesi).</summary>
-    public static string New(DateTimeOffset createdAt) => Modulix.Core.Contracts.Numbering.RandomDocumentNumber.New("TK", createdAt);
-}
