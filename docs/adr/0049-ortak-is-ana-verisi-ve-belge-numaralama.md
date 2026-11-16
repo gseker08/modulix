@@ -29,9 +29,17 @@ Bu üç kavram Core'a alınır; modüller sözleşme üzerinden kullanır. Dilim
 - **Geçiş (tohum):** numarasını kendisi üreten kayıt türü ortak seriye geçerken `seedLastValue` ile o ana dek verilmiş en büyük sırayı bildirir; yalnızca sayaç açılırken sorulur. Migration'da veri taşıma gerekmez.
 - **İlk kullanıcı:** sefer (`logistics.trip`, `SF-yıl-sıra`). Numara biçimi değişmedi; `Trips.Number` benzersizlik dizini ikinci güvence olarak duruyor.
 
-### Dilim 2: seriyi firma yapılandırır (öneri)
+### Dilim 2: seriyi firma yapılandırır
 
-Önek, basamak sayısı ve sıfırlama firma ayarından değiştirilebilir (dinamik tasarım ilkesi); şirket başına ayrı seri (ADR-0008, `ICompanyScoped` belgeler için). Yönetim ekranı: seriler, son verilen numara, sonraki numarayı ileri alma (denetim kaydıyla).
+Önek, basamak sayısı ve sıfırlama firma ayarından değiştirilebilir (dinamik tasarım ilkesi); şirket başına ayrı seri (ADR-0008, `ICompanyScoped` belgeler için). Yönetim ekranı: seriler, son verilen numara, sonraki numarayı ileri alma (denetim kaydıyla). Üç adımda gelir.
+
+#### Dilim 2a: yapılandırma ve sayacı ileri alma, API (teslim edildi)
+
+- **Tablo:** `core.NumberSeriesSettings` (tenant verisi, RLS altında, `ICompanyShared`; `UNIQUE(TenantId, SeriesKey)`). Önek, basamak ve sıfırlama boş olabilir: boş alan modülün beyanını kullanır, varsayılana eşit değer boş saklanır. Numaralama servisi her numarada bu satırı okur.
+- **Çakışmazlık:** sayaç seri ve dönem başına tutulduğu için önek ya da basamak değişikliği sayacı sıfırlamaz; sıfırlama değişince dönem değişir (yıllık seride yıl, sıfırlanmayan seride 0). Önek yalnızca büyük harf ve rakam olduğu için iki biçim aynı metni üretemez.
+- **İleri alma:** yalnızca ileri ve yalnızca bu dönemin sayacı açıldıktan sonra. Sayaç yokken ileri almak, modülün geçişte eski numaralardan devam etmek için kullandığı tohumu atlayıp çakışan numara verebilirdi. Güncelleme tek ifadede `LastValue < hedef` koşuluyla yapılır; aynı anda verilen numarayla yarışmaz.
+- **İzin ve denetim:** `core.numbering.manage` (migration'da `core.settings.manage` taşıyan rollere verildi); yapılandırma ve ileri alma `core.number-series` denetim kaydına yazılır. Ayar satırının sürümü iki işlemi de sıraya sokar (409).
+- **Dilim 2b:** Yönetim ekranı (Yönetim > Belge numaraları). **Dilim 2c:** şirket başına seri.
 
 ### Dilim 3: mevcut üreticilerin geçişi (ürün kararı ister)
 

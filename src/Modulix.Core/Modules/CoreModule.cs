@@ -28,6 +28,9 @@ public sealed class CoreModule : IModule
         /// <summary>Firmanın resmî tatil listesini yazar (ADR-0049 dilim 6a); okumak için izin gerekmez.</summary>
         public const string ManageHolidays = "core.holidays.manage";
 
+        /// <summary>Belge serilerini yapılandırır ve sayacı ileri alır (ADR-0049 dilim 2a).</summary>
+        public const string ManageNumbering = "core.numbering.manage";
+
         public const string ReadAudit = "core.audit.read";
 
         /// <summary>Özelleştirme (Y9): özel alanlar, listeler ve sektör profili.</summary>
@@ -113,6 +116,7 @@ public sealed class CoreModule : IModule
         new(Permissions.ManageRoles, "Rolleri ve izinlerini yönetir", "Roller"),
         new(Permissions.ManageSettings, "Kuruluş ve modül ayarlarını değiştirir", "Kuruluş ayarları"),
         new(Permissions.ManageHolidays, "Firmanın resmî tatil listesini düzenler", "Resmî tatiller"),
+        new(Permissions.ManageNumbering, "Belge numarası serilerini yapılandırır ve sayacı ileri alır", "Belge numaraları"),
         new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
         new(Permissions.ManageCustomization, "Özel alanları ve listeleri düzenler", "Özelleştirme"),
         new(Permissions.ManageCompanies, "İşletici şirketleri ve kullanıcıların şirket görevlerini yönetir", "Şirketler"),
@@ -231,6 +235,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>Onay süreci tanımı (ADR-0027 Dilim 4a); kaydın kimliği tanımın kimliğidir.</summary>
         public const string ApprovalDefinition = "core.approval-definition";
+
+        /// <summary>Belge serisi yapılandırması (ADR-0049 dilim 2a); kaydın kimliği firmanın seri ayarı satırıdır. Sayacı ileri alma da yazılır.</summary>
+        public const string NumberSeries = "core.number-series";
 
         /// <summary>Onay talebi (ADR-0027 Dilim 4a); kaydın kimliği talebin kimliğidir. Karar, not ve atama değişikliği yazılır.</summary>
         public const string ApprovalRequest = "core.approval-request";
@@ -651,6 +658,16 @@ public sealed class CoreModule : IModule
             ["name"] = "Ad", ["description"] = "Açıklama", ["currency"] = "Para birimi", ["isActive"] = "Açık", ["revision"] = "Sürüm", ["steps"] = "Adımlar",
             ["target"] = "Kayıt türü", ["gatedCommands"] = "Onaysız yapılamaz", ["dueInWorkingHours"] = "Süre iş saatiyle",
         }, "name"),
+        new(AuditedEntityKeys.NumberSeries, "Belge serisi", null, new Dictionary<string, string>
+        {
+            ["series"] = "Seri", ["prefix"] = "Önek", ["digits"] = "Basamak", ["reset"] = "Sıfırlama", ["nextNumber"] = "Sıradaki numara",
+        }, "series")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["reset"] = new Dictionary<string, string> { ["Never"] = "Sıfırlanmaz", ["Yearly"] = "Her yıl" },
+            },
+        },
         new(AuditedEntityKeys.ApprovalRequest, "Onay talebi", null, new Dictionary<string, string>
         {
             ["title"] = "Başlık", ["process"] = "Süreç", ["amount"] = "Tutar", ["currency"] = "Para birimi", ["status"] = "Durum",

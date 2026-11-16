@@ -24,6 +24,7 @@ using Modulix.Api.Organization;
 using Modulix.Api.Platform;
 using Modulix.Api.Records;
 using Modulix.Api.Settings;
+using Modulix.Api.Numbering;
 using Modulix.Api.Customs;
 using Modulix.Api.Sectors;
 using Modulix.Api.Tenancy;
@@ -301,6 +302,7 @@ app.MapPlatformTeamEndpoints();
 app.MapAuditEndpoints();
 app.MapImportEndpoints();
 app.MapSettingsEndpoints();
+app.MapNumberingEndpoints();
 app.MapTextEndpoints();
 
 // Bilinmeyen API adresi 404 döner; diğer adresler arayüzün sayfalarıdır.
