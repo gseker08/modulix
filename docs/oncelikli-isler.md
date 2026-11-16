@@ -59,7 +59,7 @@ Kaynaklar: ADR-0046 ve ADR-0049 durum satırları, `core-mimari-degerlendirme-20
 | C3 | Büyük modüllerin uç noktaları modüle (Sözleşme, CRM; CRM birden çok PR) | ADR-0046 dilim 6, H3 | Sürüyor: Sözleşme yapıldı (16 Kasım); sırada CRM (birden çok PR) |
 | C4 | Customs'ın Antrepo'ya taşınması ve Core hazır listelerindeki sektör sözlüğü | ADR-0046 dilim 7, H1, H2 | C3'ten bağımsız başlanabilir |
 | C5 | Seriyi firma yapılandırır (önek, basamak, sıfırlama; yönetim ekranı) | ADR-0049 dilim 2 | Açık kararlar listesinde değil |
-| C6 | Modül bağımlılık beyanı (`IModule` + lisans atamada denetim) | H7 | Sürüyor: ADR-0051 kabul edildi, dilim 1 (beyan, katalog doğrulaması, mimari test) yapıldı (16 Kasım); sırada dilim 2 (hak yazılırken denetim) |
+| C6 | Modül bağımlılık beyanı (`IModule` + lisans atamada denetim) | H7 | Sürüyor: ADR-0051 kabul edildi, dilim 1 (beyan, katalog doğrulaması, mimari test) ve dilim 2 (hak yazılırken zorunlu bağımlılık denetimi) yapıldı (16 Kasım); sırada dilim 3 (isteğe bağlı uyarı, platform ve firma ekranı) |
 | C7 | Kapanış: `Program.cs`'te modüle özel satır kalmadığını denetleyen mimari test | ADR-0046 dilim 8 | En son |
 
 Core'da karar bekleyenler: ADR-0049 dilim 3 (numara biçimi) ve 5 (kur kaynağı), entegrasyon katmanı (E1), belge çıktısı (E2), portal kimliği (E4),

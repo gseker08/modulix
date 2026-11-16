@@ -1,6 +1,6 @@
 # ADR-0051: Modül bağımlılık beyanı
 
-- **Durum:** Kabul edildi, 16 Kasım 2026 (açık sorular aynı gün karara bağlandı, aşağıda). Dilim 1 (beyan, katalog doğrulaması, ilk beyanlar, mimari test) teslim edildi; dilim 2 ve 3 sırada.
+- **Durum:** Kabul edildi, 16 Kasım 2026 (açık sorular aynı gün karara bağlandı, aşağıda). Dilim 1 (beyan, katalog doğrulaması, ilk beyanlar, mimari test) ve dilim 2 (zorunlu bağımlılığın hak yazılırken denetimi) teslim edildi; isteğe bağlı bağımlılık uyarıları ve arayüz dilim 3'te.
 - **Kaynak:** [Core mimari değerlendirmesi](../core-mimari-degerlendirme-2026-11.md) H7; [öncelik listesi](../oncelikli-isler.md) C6.
 - **İlgili:** ADR-0028 (lisans ve tenant yönetimi), ADR-0044 (modül sözleşme projeleri).
 
@@ -79,6 +79,17 @@ eksik isteğe bağlı bağımlılıkları döndürür. Hak yazan her yol onu ça
 Zorunlu bağımlılık kendiliğinden açılmaz: modül hakkı ticari bir karardır (kaynak, bitiş, gerekçe taşır), platform yöneticisi bilerek
 açar. Reddetme 400 ve alan hatasıyla döner; denetim kaydı değişmez (başarısız işlem yazılmaz).
 
+Dilim 2'de netleşenler:
+
+- **Yalnızca değişikliğin yarattığı ihlal reddedilir.** Önceden var olan ihlal (karar 4) ilgisiz bir hak değişikliğini engellemez; ör.
+  CRM'siz açık Pazarlama'sı olan firmada Destek yine açılır.
+- **Plan uygulaması toplu denetlenir.** Plan atama ve plan güncelleme, firmada oluşacak sonuç kümesini yazmadan önce denetler; modüller
+  tek tek açılıp kapanırken ara durumlar denetlenmez (`SetModuleAsync(..., checkDependencies: false)`). Plan güncellemesi geçerli
+  abonelerden birini bozacaksa plan kaydedilmez.
+- **Denetim platform katmanındadır**, `IModuleEntitlements.SetEnabledAsync` düzeyinde değil: demo verisi ve testler hakkı doğrudan yazar.
+- **İsteğe bağlı bağımlılık uyarısı dilim 3'e kaydı.** Uyarı yanıt sözleşmelerini ve platform ekranını birlikte değiştirir; kural
+  (`ModuleDependencyRules.Missing`) isteğe bağlı eksikleri şimdiden döndürür.
+
 ### 4. Değişmeyenler
 
 - **Çalışma zamanı:** ADR-0044'teki `Unavailable` kalıbı aynen kalır. Beyan çalışma zamanında modülü kapatmaz, istek reddetmez.
@@ -120,8 +131,8 @@ açar. Reddetme 400 ve alan hatasıyla döner; denetim kaydı değişmez (başar
 | Dilim | İçerik | Test |
 |---|---|---|
 | 1 | `IModule.Dependencies`, katalog doğrulaması, ilk beyanlar, başvuru-beyan eşleşme testi | Birim (doğrulama), mimari |
-| 2 | `ModuleDependencyRules` ve altı hak yolunda denetim; platform yanıtlarında uyarı | Mutlu yol, ret, tenant izolasyonu, yetki (platform rolü) |
-| 3 | Platform arayüzü: modül satırında bağımlılık bilgisi, ret iletisi, "bağımlılığı eksik firmalar" raporu; firma Modüller ekranında bilgi | Entegrasyon + arayüz görsel kontrolü |
+| 2 | `ModuleDependencyRules` ve altı hak yolunda zorunlu bağımlılık denetimi | Mutlu yol, ret, tenant izolasyonu, yetki (platform rolü) |
+| 3 | İsteğe bağlı bağımlılık uyarısı (yanıt + ekran); platform arayüzü: modül satırında bağımlılık bilgisi, ret iletisi, "bağımlılığı eksik firmalar" raporu; firma Modüller ekranında bilgi | Entegrasyon + arayüz görsel kontrolü |
 
 ## Sonuçlar
 
