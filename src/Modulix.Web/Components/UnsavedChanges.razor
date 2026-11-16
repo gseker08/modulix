@@ -6,7 +6,7 @@
 <NavigationLock ConfirmExternalNavigation="@IsDirty()" OnBeforeInternalNavigation="ConfirmLeaveAsync" />
 @if (IsDirty())
 {
-    <span class="form-dirty-state" role="status">Kaydedilmemiş değişiklik</span>
+    <span class="form-dirty-state" role="status">@Texts.Get("form.unsaved")</span>
 }
 
 @code {
@@ -15,7 +15,7 @@
 
     private async Task ConfirmLeaveAsync(LocationChangingContext context)
     {
-        if (IsDirty() && !await Js.InvokeAsync<bool>("confirm", "Kaydedilmemiş değişiklikler var. Sayfadan ayrılmak istiyor musunuz?"))
+        if (IsDirty() && !await Js.InvokeAsync<bool>("confirm", Texts.Get("crm.quoteDetail.leaveConfirm")))
         {
             context.PreventNavigation();
         }
