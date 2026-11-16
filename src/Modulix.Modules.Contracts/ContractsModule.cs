@@ -17,6 +17,14 @@ public sealed class ContractsModule : IModule
 {
     public const string ModuleKey = "contracts";
 
+    /// <summary>Sözleşme numarası ortak belge serisinden verilir (ADR-0049 dilim 3a): <c>SZ-yıl-sıra</c>. Önceki kayıtlar rastgele sonekli numarasını korur.</summary>
+    public const string ContractNumberSeries = "contracts.contract";
+
+    IReadOnlyList<Modulix.Core.Contracts.Numbering.NumberSeriesDefinition> IModule.NumberSeries { get; } =
+    [
+        new(ContractNumberSeries, "Sözleşme", "SZ"),
+    ];
+
     public static class Permissions
     {
         public const string ContractsRead = "contracts.contracts.read";

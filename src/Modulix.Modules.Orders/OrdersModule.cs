@@ -18,6 +18,23 @@ public sealed class OrdersModule : IModule
 {
     public const string ModuleKey = "orders";
 
+    /// <summary>
+    /// Sipariş, teslimat ve operasyon işi numaraları ortak belge serisinden verilir (ADR-0049 dilim 3a): <c>önek-yıl-sıra</c>. Önceki kayıtlar rastgele
+    /// sonekli numarasını korur. Operasyon işinin öneki <c>IS</c>'tir (eski <c>OP</c> fırsat numarasıyla karışıyordu).
+    /// </summary>
+    public const string OrderNumberSeries = "orders.order";
+
+    public const string DeliveryNumberSeries = "orders.delivery";
+
+    public const string JobNumberSeries = "orders.job";
+
+    IReadOnlyList<Modulix.Core.Contracts.Numbering.NumberSeriesDefinition> IModule.NumberSeries { get; } =
+    [
+        new(OrderNumberSeries, "Sipariş", "SP"),
+        new(DeliveryNumberSeries, "Teslimat", "TS"),
+        new(JobNumberSeries, "Operasyon işi", "IS"),
+    ];
+
     public static class Permissions
     {
         public const string OrdersRead = "orders.orders.read";

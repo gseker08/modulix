@@ -117,16 +117,4 @@ public class OrderRulesTests
         Assert.Equal(allowed, result.Allowed);
         Assert.Equal(allowed, result.Message is null);
     }
-
-    [Fact]
-    public void Order_numbers_have_the_expected_shape_and_differ()
-    {
-        var at = new DateTimeOffset(2026, 11, 1, 10, 0, 0, TimeSpan.Zero);
-
-        var first = OrderRules.NewNumber(at);
-        var second = OrderRules.NewNumber(at);
-
-        Assert.Matches(@"^SP-20261101-[A-HJ-NP-Z2-9]{6}$", first);
-        Assert.NotEqual(first, second);
-    }
 }

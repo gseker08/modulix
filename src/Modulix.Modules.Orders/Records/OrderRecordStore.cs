@@ -141,7 +141,6 @@ internal sealed class OrderRecordStore(OrdersStoreContext context) : OrdersRecor
             throw new RecordValidationException([new RecordFieldError("title", "Sipariş yalnızca kabul edilmiş tekliften oluşturulur.")]);
         }
 
-        entity.Number = OrderRules.NewNumber(DateTimeOffset.UtcNow);
         entity.CreatedBy = Context.CurrentUserId;
         return Task.FromResult(values);
     }
@@ -188,6 +187,8 @@ internal sealed class OrderRecordStore(OrdersStoreContext context) : OrdersRecor
 
     protected override async Task CreatedAsync(SalesOrder entity, CancellationToken cancellationToken)
     {
+        // Numara doğrulamadan sonra, kayıt eklenmeden hemen önce alınır (ADR-0049 dilim 3a): reddedilen istek sıra harcamaz.
+        entity.Number = await Context.Numbers.NextAsync(OrdersModule.OrderNumberSeries, cancellationToken: cancellationToken);
         OrderHistory.Add(Context, entity, Context.Gate.EventKind ?? OrderEventKinds.CreatedFromQuote, Context.Gate.Reason, null, StatusSummary(entity));
         if (Context.Gate.Effect is { } effect)
         {
