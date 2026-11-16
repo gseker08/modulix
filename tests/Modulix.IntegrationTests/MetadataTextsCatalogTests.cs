@@ -6,8 +6,9 @@ using Modulix.Core.Modules;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0034 dilim 18c: bütün modüllerin denetim kayıt türleri (tür, alan ve kodda tanımlı seçenek adları) üç sözlükte karşılığını taşır,
-/// Türkçe sözlük kaynak metinle aynıdır ve sözlükte karşılığı olmayan <c>meta.*</c> anahtarı kalmaz. Veritabanı gerekmez; katalog
+/// ADR-0034 dilim 18c: bütün modüllerin metadata adları üç sözlükte karşılığını taşır, Türkçe sözlük kaynak metinle aynıdır ve sözlükte
+/// hiçbir modülün tanımlamadığı <c>meta.*</c> anahtarı kalmaz. Kapsam: denetim kayıt türleri (tür, alan ve kodda tanımlı seçenek adları;
+/// 18c-1), modül adları, izinlerin açıklaması ve satır adı, hazır roller ("Salt okur" dahil; 18c-2). Veritabanı gerekmez; katalog
 /// uygulamanın kaydettiği modüllerden kurulur.
 /// </summary>
 public class MetadataTextsCatalogTests
@@ -16,10 +17,29 @@ public class MetadataTextsCatalogTests
         (IModule[])typeof(Program).Assembly.GetType("ModulixModules", throwOnError: true)!.GetMethod("Create")!.Invoke(null, null)!);
 
     private static IEnumerable<(string Key, string Source)> Names() =>
+        AuditedNames().Concat(AccessNames());
+
+    private static IEnumerable<(string Key, string Source)> AuditedNames() =>
         Catalog.AuditedEntities.SelectMany(entity =>
             new[] { (MetadataTexts.EntityKey(entity.EntityKey), entity.DisplayName) }
                 .Concat(entity.Fields.Select(f => (MetadataTexts.FieldKey(entity.EntityKey, f.Key), f.Value)))
                 .Concat(entity.Options.SelectMany(o => o.Value.Select(v => (MetadataTexts.OptionKey(entity.EntityKey, o.Key, v.Key), v.Value)))));
+
+    private static IEnumerable<(string Key, string Source)> AccessNames()
+    {
+        var templates = Catalog.TemplatesFor(Catalog.Modules.Select(m => m.Key).ToHashSet(StringComparer.Ordinal));
+        return Catalog.Modules.SelectMany(module =>
+                new[] { (MetadataTexts.ModuleKey(module.Key), module.DisplayName) }
+                    .Concat(module.Permissions.Select(p => (MetadataTexts.PermissionKey(p.Key), p.DisplayName)))
+                    .Concat(module.Permissions
+                        .Where(p => p.ResourceName is not null)
+                        .Select(p => (MetadataTexts.PermissionResourceKey(p.Key), p.ResourceName!))))
+            .Concat(templates.SelectMany(t => new[]
+            {
+                (MetadataTexts.RoleTemplateKey(t.Key), t.Name),
+                (MetadataTexts.RoleTemplateDescriptionKey(t.Key), t.Description),
+            }));
+    }
 
     [Fact]
     public void Every_audited_name_is_in_all_three_dictionaries_with_the_turkish_text_unchanged()

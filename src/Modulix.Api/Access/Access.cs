@@ -120,19 +120,21 @@ public static class AccessEndpoints
     private static async Task<IResult> ListRolesAsync(IRoleService roles, CancellationToken ct) =>
         Results.Ok((await roles.ListAsync(ct)).Select(ToDto).ToList());
 
-    private static async Task<IResult> ListAssignablePermissionsAsync(ModuleCatalog catalog, ICurrentAccess access, CancellationToken ct) =>
-        Results.Ok(await AssignablePermissionsAsync(catalog, access, ct));
+    private static async Task<IResult> ListAssignablePermissionsAsync(
+        ModuleCatalog catalog, ICurrentAccess access, IRequestLanguage language, ITextCatalog texts, CancellationToken ct) =>
+        Results.Ok(await AssignablePermissionsAsync(catalog, access, language, texts, ct));
 
     /// <summary>Rollere atanabilecek izinler: yalnızca tenant için açık modüllerinkiler.</summary>
-    internal static async Task<List<PermissionDto>> AssignablePermissionsAsync(ModuleCatalog catalog, ICurrentAccess access, CancellationToken ct)
+    internal static async Task<List<PermissionDto>> AssignablePermissionsAsync(
+        ModuleCatalog catalog, ICurrentAccess access, IRequestLanguage language, ITextCatalog texts, CancellationToken ct)
     {
+        var bundle = await MetadataLabels.BundleAsync(language, texts, ct);
         var permissions = new List<PermissionDto>();
         foreach (var module in catalog.Modules)
         {
             if (await access.IsModuleEnabledAsync(module.Key, ct))
             {
-                permissions.AddRange(module.Permissions.Select(p =>
-                    new PermissionDto(p.Key, p.DisplayName, module.Key, module.DisplayName, p.ResourceName ?? AccessKeys.ResourceOf(p.Key))));
+                permissions.AddRange(module.Permissions.Select(p => MetadataLabels.Permission(p, module, bundle)));
             }
         }
 
@@ -140,18 +142,24 @@ public static class AccessEndpoints
     }
 
     /// <summary>Kapsamı ayarlanabilen kayıt türleri ve platform tavanları (ADR-0030 K9); rol ekranı seçenekleri buna göre kapatır.</summary>
-    private static async Task<IResult> ListScopeTypesAsync(IRoleService roles, CancellationToken ct) =>
-        Results.Ok((await roles.GetScopeTypesAsync(ct))
-            .Select(t => new RoleScopeTypeDto(t.EntityKey, t.ModuleKey, t.Label, (Shared.Access.RecordScope?)t.MaxScope))
+    private static async Task<IResult> ListScopeTypesAsync(
+        IRoleService roles, IRequestLanguage language, ITextCatalog texts, CancellationToken ct)
+    {
+        var bundle = await MetadataLabels.BundleAsync(language, texts, ct);
+        return Results.Ok((await roles.GetScopeTypesAsync(ct))
+            .Select(t => new RoleScopeTypeDto(t.EntityKey, t.ModuleKey, MetadataLabels.Entity(t.EntityKey, t.Label, bundle), (Shared.Access.RecordScope?)t.MaxScope))
             .ToList());
+    }
 
     /// <summary>Hazır roller (ADR-0005): açık modüllerin şablonları ve "Salt okur".</summary>
     private static async Task<IResult> ListTemplatesAsync(
-        ModuleCatalog catalog, IModuleEntitlements entitlements, ITenantContextAccessor tenant, CancellationToken ct)
+        ModuleCatalog catalog, IModuleEntitlements entitlements, ITenantContextAccessor tenant, IRequestLanguage language, ITextCatalog texts,
+        CancellationToken ct)
     {
         var enabled = await entitlements.GetEnabledAsync(tenant.Current!.TenantId, ct);
+        var bundle = await MetadataLabels.BundleAsync(language, texts, ct);
         return Results.Ok(catalog.TemplatesFor(enabled)
-            .Select(t => new RoleTemplateDto(t.Key, t.Name, t.Description, t.Permissions, (Shared.Access.RecordScope)t.Scope))
+            .Select(t => MetadataLabels.Template(t, bundle) with { Scope = (Shared.Access.RecordScope)t.Scope })
             .ToList());
     }
 

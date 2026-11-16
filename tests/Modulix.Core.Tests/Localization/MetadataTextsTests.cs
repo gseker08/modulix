@@ -42,6 +42,33 @@ public class MetadataTextsTests
     }
 
     [Fact]
+    public void Role_template_name_and_description_are_translated_while_key_and_permissions_stay()
+    {
+        var template = new RoleTemplate("crm.sales-rep", "Satış temsilcisi", "Kendi firmalarını yönetir.", ["crm.companies.read"]);
+        var bundle = new Dictionary<string, string> { ["meta.role-template.crm.sales-rep"] = "Sales representative" };
+
+        var localized = MetadataTexts.Localize(template, bundle);
+
+        Assert.Equal("Sales representative", localized.Name);
+        Assert.Equal("Kendi firmalarını yönetir.", localized.Description);
+        Assert.Equal(template.Key, localized.Key);
+        Assert.Equal(template.Permissions, localized.Permissions);
+    }
+
+    [Fact]
+    public void Core_module_permissions_and_name_have_all_three_languages_and_the_turkish_text_equals_the_source()
+    {
+        var tr = TextCatalog.Load("tr");
+        var en = TextCatalog.Load("en");
+        var az = TextCatalog.Load("az");
+        IModule core = new CoreModule();
+        var names = new[] { (MetadataTexts.ModuleKey(core.Key), core.DisplayName) }
+            .Concat(core.Permissions.Select(p => (MetadataTexts.PermissionKey(p.Key), p.DisplayName)));
+
+        Assert.Empty(names.Where(n => !tr.TryGetValue(n.Item1, out var text) || text != n.Item2 || !en.ContainsKey(n.Item1) || !az.ContainsKey(n.Item1)));
+    }
+
+    [Fact]
     public void An_empty_dictionary_leaves_the_entity_as_written() =>
         Assert.Equal("Firma (CRM)", MetadataTexts.Localize(Entity, new Dictionary<string, string>()).DisplayName);
 
