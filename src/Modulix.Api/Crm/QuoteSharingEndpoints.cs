@@ -2,19 +2,12 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.EntityFrameworkCore;
 using Modulix.Api.Access;
 using Modulix.Api.Records;
-using Modulix.Api.Users;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
-using Modulix.Core.Events;
-using Modulix.Core.Modules;
-using Modulix.Core.Platform;
 using Modulix.Core.Contracts.Settings;
-using Modulix.Infrastructure.Persistence;
-using Modulix.Infrastructure.Platform;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Quotes;
 using Modulix.Shared.Crm;
@@ -40,6 +33,9 @@ internal static class QuoteSharingEndpoints
     public const int MaxBodyBytes = 8 * 1024;
 
     /// <summary>IP + tenant başına dakikadaki istek sınırı (<c>QuotePublic:RateLimitPerMinute</c>, varsayılan 60; karar için 1/6'sı).</summary>
+    /// <summary>Müşteri sayfasının sistem kimliği: izinler yalnızca "crm.quote-customer" aboneliğinin bildirdikleridir (teklifi okuma, karar kaydı).</summary>
+    private const string CustomerIdentity = "crm.quote-customer";
+
     public static void AddQuotePublicRateLimit(this IServiceCollection services, IConfiguration configuration) =>
         services.AddRateLimiter(options =>
         {
@@ -176,14 +172,14 @@ internal static class QuoteSharingEndpoints
     // ---- herkese açık uçlar
 
     private static async Task<IResult> ViewAsync(
-        string tenant, PublicQuoteTokenRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, PublicQuoteTokenRequest request, HttpContext http, IPublicTenantScopes scopes, CancellationToken ct)
     {
         if (Guard(http) is { } rejected)
         {
             return rejected;
         }
 
-        if (await OpenAsync(tenant, http, platform, scopes, time, ct) is not { } opened)
+        if (await scopes.OpenAsync(tenant, CustomerIdentity, write: false, http.TraceIdentifier, ct) is not { } opened)
         {
             return Unknown();
         }
@@ -195,14 +191,14 @@ internal static class QuoteSharingEndpoints
     }
 
     private static async Task<IResult> PdfAsync(
-        string tenant, PublicQuoteTokenRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, PublicQuoteTokenRequest request, HttpContext http, IPublicTenantScopes scopes, CancellationToken ct)
     {
         if (Guard(http) is { } rejected)
         {
             return rejected;
         }
 
-        if (await OpenAsync(tenant, http, platform, scopes, time, ct) is not { } opened)
+        if (await scopes.OpenAsync(tenant, CustomerIdentity, write: false, http.TraceIdentifier, ct) is not { } opened)
         {
             return Unknown();
         }
@@ -216,7 +212,7 @@ internal static class QuoteSharingEndpoints
     }
 
     private static async Task<IResult> DecisionAsync(
-        string tenant, PublicQuoteDecisionRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, PublicQuoteDecisionRequest request, HttpContext http, IPublicTenantScopes scopes, CancellationToken ct)
     {
         if (Guard(http) is { } rejected)
         {
@@ -229,7 +225,7 @@ internal static class QuoteSharingEndpoints
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["decision"] = ["Karar 'accept' ya da 'reject' olmalıdır."] }, statusCode: StatusCodes.Status400BadRequest);
         }
 
-        if (await OpenAsync(tenant, http, platform, scopes, time, ct, write: true) is not { } opened)
+        if (await scopes.OpenAsync(tenant, CustomerIdentity, write: true, http.TraceIdentifier, ct) is not { } opened)
         {
             return Unknown();
         }
@@ -255,36 +251,6 @@ internal static class QuoteSharingEndpoints
         }
 
         return http.Request.ContentLength > MaxBodyBytes ? Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "Gövde çok büyük.") : null;
-    }
-
-    private static async Task<AsyncServiceScope?> OpenAsync(
-        string tenant, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct, bool write = false)
-    {
-        var slug = tenant.Trim().ToLowerInvariant();
-        var found = await platform.Tenants.AsNoTracking()
-            .Where(t => t.Slug == slug && TenantStatusRules.Operational.Contains(t.Status))
-            .Select(t => t.Id)
-            .FirstOrDefaultAsync(ct);
-        if (found == Guid.Empty)
-        {
-            return null;
-        }
-
-        var scope = scopes.Create(new TenantContext(found, Guid.Empty, Guid.Empty));
-
-        // Lisans (ADR-0028): modül kapalıysa bağlantı çalışmaz; salt okunursa görüntüleme sürer, karar yazılamaz.
-        if (!await scope.ServiceProvider.GetRequiredService<IModuleLicense>().AllowsAsync(found, CrmModule.ModuleKey, write, ct))
-        {
-            await scope.DisposeAsync();
-            return null;
-        }
-
-        // Sistem kimliği: izinler yalnızca "crm.quote-customer" aboneliğinin bildirdikleridir (teklifi okuma, karar kaydı).
-        var cause = new EventEnvelope(
-            Guid.NewGuid(), found, DomainEventTypes.RecordDeleted, 1, CrmModule.Entities.Quote, Guid.Empty, null, Guid.Empty,
-            ExecutionSource.Import, http.TraceIdentifier, null, 0, new JsonObject(), time.GetUtcNow());
-        scope.ServiceProvider.GetRequiredService<EventHandlingScope>().Begin(cause, "crm.quote-customer");
-        return scope;
     }
 
     private static IResult Unknown() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Bağlantı geçersiz.");
@@ -340,7 +306,7 @@ internal static class QuoteSharingEndpoints
 /// Teklif belgesini üretir: belge verisi (modül) → PDF (<see cref="QuotePdf"/>) → sabitleme (modül). Satıcı bilgisi tenant ayarlarından gelir
 /// (modül ayar altyapısına erişemez).
 /// </summary>
-internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvider services, ITenantContextAccessor tenant, ModulixDbContext platform)
+internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvider services, ICurrentTenantInfo tenant)
 {
     public async Task<RecordResult<QuoteDocumentInfo>> EnsureAsync(Guid quoteId, CancellationToken cancellationToken)
     {
@@ -365,11 +331,8 @@ internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvid
         return await sharing.StoreDocumentAsync(quoteId, snapshot.Value!, pdf, QuotePdf.TemplateVersion, cancellationToken);
     }
 
-    public async Task<string> TenantSlugAsync(CancellationToken cancellationToken)
-    {
-        var id = tenant.Current?.TenantId ?? Guid.Empty;
-        return await platform.Tenants.AsNoTracking().Where(t => t.Id == id).Select(t => t.Slug).FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
-    }
+    public async Task<string> TenantSlugAsync(CancellationToken cancellationToken) =>
+        (await tenant.GetAsync(cancellationToken))?.Slug ?? string.Empty;
 
     public async Task<string> SellerNameAsync(CancellationToken cancellationToken)
     {
@@ -380,11 +343,10 @@ internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvid
     private async Task<QuoteSellerInfo> SellerAsync(CancellationToken cancellationToken)
     {
         var settings = services.GetRequiredService<ITenantSettingReader>();
-        var name = (await settings.GetValueAsync(CoreModule.SettingKeys.DisplayName, cancellationToken)).Trim();
+        var name = (await settings.GetValueAsync(ProfileSettingKeys.DisplayName, cancellationToken)).Trim();
         if (name.Length == 0)
         {
-            var id = tenant.Current?.TenantId ?? Guid.Empty;
-            name = await platform.Tenants.AsNoTracking().Where(t => t.Id == id).Select(t => t.Name).FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+            name = (await tenant.GetAsync(cancellationToken))?.Name ?? string.Empty;
         }
 
         var details = (await settings.GetValueAsync(CrmModule.SettingKeys.QuoteSellerDetails, cancellationToken)).Trim();

@@ -239,6 +239,7 @@ public static class PersistenceSetup
         // Modüllerin ayar okuma sözleşmesi (ADR-0046); aynı kapsamdaki ITenantSettings örneğini verir.
         services.AddScoped<ITenantSettingReader>(provider => provider.GetRequiredService<ITenantSettings>());
         services.AddScoped<ITenantClock, TenantClock>();
+        services.AddScoped<ICurrentTenantInfo, Modulix.Infrastructure.Platform.CurrentTenantInfo>();
         services.AddScoped<ITenantLogo, TenantLogoStore>();
         services.AddScoped<TenantDisplayNames>();
         return services;

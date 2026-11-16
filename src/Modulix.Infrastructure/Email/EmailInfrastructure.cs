@@ -465,6 +465,7 @@ public static class EmailSetup
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IEmailTransport, SmtpEmailTransport>();
         services.AddScoped<IEmailQueue, EfEmailQueue>();
+        services.AddScoped<IEmailDeliveries, EmailDeliveries>();
         services.AddScoped<EmailDispatcher>();
         return services;
     }

@@ -1,11 +1,7 @@
 using System.Globalization;
 using System.Net;
-using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
-using Modulix.Core.Contracts.Tenancy;
-using Modulix.Infrastructure.Email;
-using Modulix.Infrastructure.Persistence;
 using Modulix.Modules.Crm.Quotes;
 
 namespace Modulix.Api.Crm;
@@ -19,7 +15,7 @@ public sealed record QuoteLinkDelivery(string Status, string? Error, DateTimeOff
 /// alıcıya ulaştığını söylemez. Gönderen/SMTP yapılandırılmamışsa e-posta kuyrukta <c>Pending</c> bekler; hiçbir şey sahte "gönderildi" olmaz.
 /// Geliştirmede SMTP yerel Mailpit'tir, gerçek müşteriye e-posta gitmez.
 /// </summary>
-internal sealed class QuoteDelivery(IEmailQueue emails, ModulixDbContext platform, ITenantContextAccessor tenant, IRecipientLanguage languages)
+internal sealed class QuoteDelivery(IEmailQueue emails, IEmailDeliveries deliveries, IRecipientLanguage languages)
 {
     public const string ReferencePrefix = "crm.quote-link:";
 
@@ -40,26 +36,22 @@ internal sealed class QuoteDelivery(IEmailQueue emails, ModulixDbContext platfor
     /// <summary>Bağlantıların e-posta durumu; e-postası olmayan bağlantı sonuçta yoktur (gönderilmedi).</summary>
     public async Task<IReadOnlyDictionary<Guid, QuoteLinkDelivery>> GetAsync(IEnumerable<Guid> linkIds, CancellationToken cancellationToken)
     {
-        var tenantId = tenant.Current?.TenantId;
         var references = linkIds.ToDictionary(Reference, id => id);
-        if (tenantId is null || references.Count == 0)
+        if (references.Count == 0)
         {
             return new Dictionary<Guid, QuoteLinkDelivery>();
         }
 
-        var keys = references.Keys.ToList();
-        var rows = await platform.EmailMessages.AsNoTracking()
-            .Where(e => e.TenantId == tenantId && e.Reference != null && keys.Contains(e.Reference))
-            .Select(e => new { e.Reference, e.Status, e.AttemptCount, e.LastError, e.SentAt })
-            .ToListAsync(cancellationToken);
-        return rows.ToDictionary(r => references[r.Reference!], r => Map(r.Status, r.AttemptCount, r.LastError, r.SentAt));
+        // Kuyruk aktif tenant'ın e-postalarıyla süzülür (IEmailDeliveries); başka tenant'ın aynı anahtarlı e-postası görünmez.
+        var states = await deliveries.GetAsync(references.Keys, cancellationToken);
+        return states.ToDictionary(p => references[p.Key], p => Map(p.Value.Status, p.Value.Attempts, p.Value.LastError, p.Value.SentAt));
     }
 
     /// <summary>Kuyruk durumunu teklif gönderim durumuna eşler (saf).</summary>
-    public static QuoteLinkDelivery Map(EmailStatus status, int attempts, string? error, DateTimeOffset? sentAt) => status switch
+    public static QuoteLinkDelivery Map(EmailDeliveryStatus status, int attempts, string? error, DateTimeOffset? sentAt) => status switch
     {
-        EmailStatus.Sent => new QuoteLinkDelivery(QuoteDeliveryStatus.Succeeded, null, sentAt),
-        EmailStatus.Failed => new QuoteLinkDelivery(QuoteDeliveryStatus.Failed, Shorten(error), null),
+        EmailDeliveryStatus.Sent => new QuoteLinkDelivery(QuoteDeliveryStatus.Succeeded, null, sentAt),
+        EmailDeliveryStatus.Failed => new QuoteLinkDelivery(QuoteDeliveryStatus.Failed, Shorten(error), null),
         // Deneme başlamış ama bitmemişse (tekrar deneme bekliyor) işleniyor; hata kısa gösterilir.
         _ when attempts > 0 => new QuoteLinkDelivery(QuoteDeliveryStatus.Processing, Shorten(error), null),
         _ => new QuoteLinkDelivery(QuoteDeliveryStatus.Pending, null, null),
