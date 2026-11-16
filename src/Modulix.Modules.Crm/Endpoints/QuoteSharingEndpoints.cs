@@ -1,25 +1,23 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.EntityFrameworkCore;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
-using Modulix.Api.Users;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
-using Modulix.Core.Contracts.Tenancy;
-using Modulix.Core.Events;
-using Modulix.Core.Modules;
-using Modulix.Core.Platform;
 using Modulix.Core.Contracts.Settings;
-using Modulix.Infrastructure.Persistence;
-using Modulix.Infrastructure.Platform;
-using Modulix.Modules.Crm;
+using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Crm.Quotes;
 using Modulix.Shared.Crm;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// Teklif belgesi (PDF), paylaşım bağlantısı ve müşteri sayfası uç noktaları (ADR-0019, dilim 3).
@@ -40,26 +38,35 @@ internal static class QuoteSharingEndpoints
     public const int MaxBodyBytes = 8 * 1024;
 
     /// <summary>IP + tenant başına dakikadaki istek sınırı (<c>QuotePublic:RateLimitPerMinute</c>, varsayılan 60; karar için 1/6'sı).</summary>
-    public static void AddQuotePublicRateLimit(this IServiceCollection services, IConfiguration configuration) =>
+    /// <summary>Müşteri sayfasının sistem kimliği: izinler yalnızca "crm.quote-customer" aboneliğinin bildirdikleridir (teklifi okuma, karar kaydı).</summary>
+    private const string CustomerIdentity = "crm.quote-customer";
+
+    /// <summary>
+    /// Müşteri sayfasının hız sınırları (IP + tenant başına dakikada <c>QuotePublic:RateLimitPerMinute</c>, en az 2, varsayılan 60; karar bunun altıda biri,
+    /// en az 2). Modülün <c>ConfigureServices</c>'inde kaydolur; sınır istek anında okunur.
+    /// </summary>
+    public static void AddQuotePublicRateLimit(this IServiceCollection services) =>
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            var permits = Math.Max(2, configuration.GetValue("QuotePublic:RateLimitPerMinute", 60));
             options.AddPolicy(ViewPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
                 $"view|{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["tenant"]}",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = Permits(context), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             options.AddPolicy(DecisionPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
                 $"decision|{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["tenant"]}",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(2, permits / 6), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(2, Permits(context) / 6), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
         });
 
-    public static IEndpointRouteBuilder MapQuotePublicEndpoints(this IEndpointRouteBuilder app)
+    private static int Permits(HttpContext context) =>
+        Math.Max(2, context.RequestServices.GetRequiredService<IConfiguration>().GetValue("QuotePublic:RateLimitPerMinute", 60));
+
+    /// <summary><paramref name="routes"/> host tarafından oturumsuz <c>/api/public</c> grubu olarak gelir (ADR-0046); yollar <c>/api/public/quotes/{tenant}/…</c>.</summary>
+    public static void MapPublic(IEndpointRouteBuilder routes)
     {
-        var group = app.MapGroup("/api/public/quotes/{tenant}").AllowAnonymous().WithTags("Teklif müşteri sayfası (herkese açık)");
+        var group = routes.MapGroup("/quotes/{tenant}").WithTags("Teklif müşteri sayfası (herkese açık)");
         group.MapPost("/view", ViewAsync).RequireRateLimiting(ViewPolicy);
         group.MapPost("/pdf", PdfAsync).RequireRateLimiting(ViewPolicy);
         group.MapPost("/decision", DecisionAsync).RequireRateLimiting(DecisionPolicy);
-        return app;
     }
 
     public static void MapInternal(RouteGroupBuilder quotes)
@@ -67,7 +74,7 @@ internal static class QuoteSharingEndpoints
         quotes.MapGet("/{id:guid}/documents", async (Guid id, IQuoteSharing sharing, CancellationToken ct) =>
         {
             var result = await sharing.ListDocumentsAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(result.Value!.Select(ToDto).ToList()) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(result.Value!.Select(ToDto).ToList()) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(CrmModule.Permissions.QuotesRead);
 
         quotes.MapGet("/{id:guid}/documents/{documentId:guid}/file", async (Guid id, Guid documentId, IQuoteSharing sharing, HttpContext http, CancellationToken ct) =>
@@ -75,7 +82,7 @@ internal static class QuoteSharingEndpoints
             var result = await sharing.GetDocumentAsync(id, documentId, ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             http.Response.Headers.CacheControl = "private, no-store";
@@ -86,7 +93,7 @@ internal static class QuoteSharingEndpoints
         quotes.MapPost("/{id:guid}/documents", async (Guid id, QuoteDocumentService documents, CancellationToken ct) =>
         {
             var result = await documents.EnsureAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(CrmModule.Permissions.QuotesRead);
 
         // Listeleme e-posta durumunu kuyruktan okur ve teklifin gönderim durumunu buna eşitler (arka plan işleyicisi tenant bağlamına yazmaz).
@@ -95,7 +102,7 @@ internal static class QuoteSharingEndpoints
             var result = await sharing.ListLinksAsync(id, ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             var states = await SyncDeliveryAsync(id, result.Value!, delivery, sharing, ct);
@@ -109,20 +116,20 @@ internal static class QuoteSharingEndpoints
             if (request.SendEmail && string.IsNullOrWhiteSpace(request.RecipientEmail))
             {
                 var message = "E-posta göndermek için alıcı e-postası girin.";
-                return RecordEndpoints.ToProblem(new RecordError(RecordErrorCode.ValidationFailed, message, [new RecordFieldError("recipientEmail", message)]));
+                return RecordProblems.ToProblem(new RecordError(RecordErrorCode.ValidationFailed, message, [new RecordFieldError("recipientEmail", message)]));
             }
 
             // Belge henüz yoksa (ör. sunum sırasında üretilemediyse) bağlantıdan önce üretilir.
             var document = await documents.EnsureAsync(id, ct);
             if (!document.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(document.Error!);
+                return RecordProblems.ToProblem(document.Error!);
             }
 
             var result = await sharing.CreateLinkAsync(id, new QuoteShareRequest(request.DocumentId ?? document.Value!.Id, request.ValidDays, request.RecipientName, request.RecipientEmail), ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             var slug = await documents.TenantSlugAsync(ct);
@@ -159,7 +166,7 @@ internal static class QuoteSharingEndpoints
         quotes.MapPost("/{id:guid}/share-links/{linkId:guid}/revoke", async (Guid id, Guid linkId, RevokeQuoteShareLinkRequest request, IQuoteSharing sharing, CancellationToken ct) =>
         {
             var result = await sharing.RevokeLinkAsync(id, linkId, request.Reason, ct);
-            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(CrmModule.Permissions.QuotesRead);
 
         quotes.MapGet("/{id:guid}/decisions", async (Guid id, IQuoteSharing sharing, CancellationToken ct) =>
@@ -169,21 +176,21 @@ internal static class QuoteSharingEndpoints
                 ? Results.Ok(result.Value!.Select(d => new QuoteDecisionDto(
                     d.Id, d.ShareLinkId, d.DocumentId, d.DocumentSha256, d.Decision, d.SignerName, d.SignerEmail, d.SignerTitle, d.Reason, d.TermsStatement,
                     d.ClientAddressMasked, d.At)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(CrmModule.Permissions.QuotesRead);
     }
 
     // ---- herkese açık uçlar
 
     private static async Task<IResult> ViewAsync(
-        string tenant, PublicQuoteTokenRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, PublicQuoteTokenRequest request, HttpContext http, IPublicTenantScopes scopes, CancellationToken ct)
     {
         if (Guard(http) is { } rejected)
         {
             return rejected;
         }
 
-        if (await OpenAsync(tenant, http, platform, scopes, time, ct) is not { } opened)
+        if (await scopes.OpenAsync(tenant, CustomerIdentity, write: false, http.TraceIdentifier, ct) is not { } opened)
         {
             return Unknown();
         }
@@ -195,14 +202,14 @@ internal static class QuoteSharingEndpoints
     }
 
     private static async Task<IResult> PdfAsync(
-        string tenant, PublicQuoteTokenRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, PublicQuoteTokenRequest request, HttpContext http, IPublicTenantScopes scopes, CancellationToken ct)
     {
         if (Guard(http) is { } rejected)
         {
             return rejected;
         }
 
-        if (await OpenAsync(tenant, http, platform, scopes, time, ct) is not { } opened)
+        if (await scopes.OpenAsync(tenant, CustomerIdentity, write: false, http.TraceIdentifier, ct) is not { } opened)
         {
             return Unknown();
         }
@@ -216,7 +223,7 @@ internal static class QuoteSharingEndpoints
     }
 
     private static async Task<IResult> DecisionAsync(
-        string tenant, PublicQuoteDecisionRequest request, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct)
+        string tenant, PublicQuoteDecisionRequest request, HttpContext http, IPublicTenantScopes scopes, CancellationToken ct)
     {
         if (Guard(http) is { } rejected)
         {
@@ -229,7 +236,7 @@ internal static class QuoteSharingEndpoints
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["decision"] = ["Karar 'accept' ya da 'reject' olmalıdır."] }, statusCode: StatusCodes.Status400BadRequest);
         }
 
-        if (await OpenAsync(tenant, http, platform, scopes, time, ct, write: true) is not { } opened)
+        if (await scopes.OpenAsync(tenant, CustomerIdentity, write: true, http.TraceIdentifier, ct) is not { } opened)
         {
             return Unknown();
         }
@@ -255,36 +262,6 @@ internal static class QuoteSharingEndpoints
         }
 
         return http.Request.ContentLength > MaxBodyBytes ? Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "Gövde çok büyük.") : null;
-    }
-
-    private static async Task<AsyncServiceScope?> OpenAsync(
-        string tenant, HttpContext http, ModulixDbContext platform, ITenantScopeFactory scopes, TimeProvider time, CancellationToken ct, bool write = false)
-    {
-        var slug = tenant.Trim().ToLowerInvariant();
-        var found = await platform.Tenants.AsNoTracking()
-            .Where(t => t.Slug == slug && TenantStatusRules.Operational.Contains(t.Status))
-            .Select(t => t.Id)
-            .FirstOrDefaultAsync(ct);
-        if (found == Guid.Empty)
-        {
-            return null;
-        }
-
-        var scope = scopes.Create(new TenantContext(found, Guid.Empty, Guid.Empty));
-
-        // Lisans (ADR-0028): modül kapalıysa bağlantı çalışmaz; salt okunursa görüntüleme sürer, karar yazılamaz.
-        if (!await scope.ServiceProvider.GetRequiredService<IModuleLicense>().AllowsAsync(found, CrmModule.ModuleKey, write, ct))
-        {
-            await scope.DisposeAsync();
-            return null;
-        }
-
-        // Sistem kimliği: izinler yalnızca "crm.quote-customer" aboneliğinin bildirdikleridir (teklifi okuma, karar kaydı).
-        var cause = new EventEnvelope(
-            Guid.NewGuid(), found, DomainEventTypes.RecordDeleted, 1, CrmModule.Entities.Quote, Guid.Empty, null, Guid.Empty,
-            ExecutionSource.Import, http.TraceIdentifier, null, 0, new JsonObject(), time.GetUtcNow());
-        scope.ServiceProvider.GetRequiredService<EventHandlingScope>().Begin(cause, "crm.quote-customer");
-        return scope;
     }
 
     private static IResult Unknown() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Bağlantı geçersiz.");
@@ -337,10 +314,10 @@ internal static class QuoteSharingEndpoints
 }
 
 /// <summary>
-/// Teklif belgesini üretir: belge verisi (modül) → PDF (<see cref="QuotePdf"/>) → sabitleme (modül). Satıcı bilgisi tenant ayarlarından gelir
-/// (modül ayar altyapısına erişemez).
+/// Teklif belgesini üretir: belge verisi → PDF (<see cref="QuotePdf"/>) → sabitleme. Satıcı bilgisi tenant ayarlarından (<see cref="ITenantSettingReader"/>),
+/// firma adı ve kısa adı <see cref="ICurrentTenantInfo"/>'dan gelir (ADR-0046).
 /// </summary>
-internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvider services, ITenantContextAccessor tenant, ModulixDbContext platform)
+internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvider services, ICurrentTenantInfo tenant)
 {
     public async Task<RecordResult<QuoteDocumentInfo>> EnsureAsync(Guid quoteId, CancellationToken cancellationToken)
     {
@@ -365,11 +342,8 @@ internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvid
         return await sharing.StoreDocumentAsync(quoteId, snapshot.Value!, pdf, QuotePdf.TemplateVersion, cancellationToken);
     }
 
-    public async Task<string> TenantSlugAsync(CancellationToken cancellationToken)
-    {
-        var id = tenant.Current?.TenantId ?? Guid.Empty;
-        return await platform.Tenants.AsNoTracking().Where(t => t.Id == id).Select(t => t.Slug).FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
-    }
+    public async Task<string> TenantSlugAsync(CancellationToken cancellationToken) =>
+        (await tenant.GetAsync(cancellationToken))?.Slug ?? string.Empty;
 
     public async Task<string> SellerNameAsync(CancellationToken cancellationToken)
     {
@@ -380,11 +354,10 @@ internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvid
     private async Task<QuoteSellerInfo> SellerAsync(CancellationToken cancellationToken)
     {
         var settings = services.GetRequiredService<ITenantSettingReader>();
-        var name = (await settings.GetValueAsync(CoreModule.SettingKeys.DisplayName, cancellationToken)).Trim();
+        var name = (await settings.GetValueAsync(ProfileSettingKeys.DisplayName, cancellationToken)).Trim();
         if (name.Length == 0)
         {
-            var id = tenant.Current?.TenantId ?? Guid.Empty;
-            name = await platform.Tenants.AsNoTracking().Where(t => t.Id == id).Select(t => t.Name).FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+            name = (await tenant.GetAsync(cancellationToken))?.Name ?? string.Empty;
         }
 
         var details = (await settings.GetValueAsync(CrmModule.SettingKeys.QuoteSellerDetails, cancellationToken)).Trim();

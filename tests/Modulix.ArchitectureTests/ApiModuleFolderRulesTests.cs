@@ -33,14 +33,6 @@ public partial class ApiModuleFolderRulesTests
     /// </summary>
     private static readonly Dictionary<string, string[]> PendingCleanup = new()
     {
-        ["Crm"] =
-        [
-            "Modulix.Api.Users",
-            "Modulix.Core.Events",
-            "Modulix.Core.Modules",
-            "Modulix.Core.Platform",
-            "Modulix.Infrastructure",
-        ],
         ["Customs"] =
         [
             "Modulix.Api.Imports",

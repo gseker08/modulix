@@ -8,6 +8,11 @@
     <ProjectReference Include="..\Modulix.Modules.Marketing.Contracts\Modulix.Modules.Marketing.Contracts.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Teklif PDF'i (uç noktasıyla birlikte modüle taşındı, ADR-0046); sürüm Modulix.Api ile aynı tutulur. -->
+    <PackageReference Include="QuestPDF" Version="2026.9.1" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

@@ -39,6 +39,30 @@ public interface IEmailQueue
     void Enqueue(EmailMessage message);
 }
 
+public enum EmailDeliveryStatus
+{
+    /// <summary>Gönderilmeyi bekliyor (ilk deneme ya da tekrar deneme zamanı gelmedi).</summary>
+    Pending = 1,
+
+    /// <summary>Sağlayıcı (SMTP sunucusu) kabul etti; alıcıya ulaştığı anlamına gelmez.</summary>
+    Sent = 2,
+
+    /// <summary>Kalıcı hata ya da deneme hakkı bitti.</summary>
+    Failed = 3,
+}
+
+/// <summary>Kuyruktaki bir e-postanın gönderim durumu.</summary>
+public sealed record EmailDeliveryState(EmailDeliveryStatus Status, int Attempts, string? LastError, DateTimeOffset? SentAt);
+
+/// <summary>
+/// Gönderim durumu sorgusu (ADR-0046): modül, kuyruğa yazdığı e-postaların durumunu <see cref="EmailMessage.Reference"/> anahtarıyla sorar; kuyruk
+/// tablosunu doğrudan görmez. Yalnızca aktif tenant'ın e-postaları döner; aktif tenant yoksa ya da anahtarın e-postası yoksa sonuçta yer almaz.
+/// </summary>
+public interface IEmailDeliveries
+{
+    Task<IReadOnlyDictionary<string, EmailDeliveryState>> GetAsync(IReadOnlyCollection<string> references, CancellationToken cancellationToken);
+}
+
 /// <summary>Bildirimin alıcısı: aktif tenant'ın etkin üyesi.</summary>
 public sealed record NotificationRecipient(Guid UserId, string DisplayName, string Email);
 

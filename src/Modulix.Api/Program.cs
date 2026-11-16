@@ -10,7 +10,6 @@ using Modulix.Api.Automation;
 using Modulix.Api.Reports;
 using Modulix.Api.Auth;
 using Modulix.Api.Communication;
-using Modulix.Api.Crm;
 using Modulix.Api.Customization;
 using Modulix.Api.Files;
 using Modulix.Api.Views;
@@ -85,7 +84,6 @@ builder.Services.AddSingleton(sp => new SectorProfileCatalog(SectorProfiles.Crea
 builder.Services.AddSingleton(sp => new SubProfileStarterCatalog(SubProfileStarters.Create(), sp.GetRequiredService<ModuleCatalog>()));
 
 builder.Services.AddModulixRecords();
-builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modulix.Api.Crm.QuotePolicyProvider>();
 builder.Services.Configure<Modulix.Api.Communication.CommunicationCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Communication.CommunicationCleanupOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Imports.ImportErrorReports>();
 builder.Services.Configure<Modulix.Api.Imports.ImportReportCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Imports.ImportReportCleanupOptions.SectionName));
@@ -108,8 +106,6 @@ builder.Services.Configure<Modulix.Infrastructure.Audit.AuditArchiveOptions>(bui
 builder.Services.Configure<Modulix.Core.Files.FileStorageOptions>(builder.Configuration.GetSection(Modulix.Core.Files.FileStorageOptions.SectionName));
 builder.Services.AddHostedService<Modulix.Api.Automation.AutomationWorker>();
 builder.Services.AddHostedService<ApprovalEscalationWorker>();
-builder.Services.AddScoped<Modulix.Api.Crm.QuoteDocumentService>();
-builder.Services.AddScoped<Modulix.Api.Crm.QuoteDelivery>();
 
 // E-posta: kuyruk + arka plan gönderici. Ayarlar "Email" bölümünde; SMTP şifresi user-secrets veya ortam değişkeninde.
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
@@ -120,7 +116,6 @@ builder.Services.AddHostedService<EmailDispatchWorker>();
 builder.Services.Configure<EventOptions>(builder.Configuration.GetSection(EventOptions.SectionName));
 builder.Services.AddModulixEvents();
 builder.Services.AddModulixHardening(builder.Configuration);
-builder.Services.AddQuotePublicRateLimit(builder.Configuration);
 builder.Services.AddScoped<IPublicTenantScopes, Modulix.Api.PublicTenantScopes>();
 builder.Services.AddCommunicationPublicRateLimit(builder.Configuration);
 builder.Services.AddHostedService<EventDispatchWorker>();
@@ -275,8 +270,6 @@ app.MapRegimeCheckEndpoints();
 app.MapModuleEndpoints();
 app.MapRuleEndpoints();
 app.MapRecordEndpoints();
-app.MapCrmEndpoints();
-app.MapQuotePublicEndpoints();
 app.MapCommunicationPublicEndpoints();
 app.MapPlatformEndpoints();
 app.MapPlatformEventEndpoints();

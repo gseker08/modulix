@@ -4,7 +4,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// Müşteri teklif belgesi (PDF). Girdisi yalnızca sabitlenmiş belge verisidir (<see cref="QuoteDocumentSnapshot"/>): canlı katalog,

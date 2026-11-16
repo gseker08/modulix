@@ -291,7 +291,7 @@ public sealed class CoreModule : IModule
     /// <summary>Çekirdeğin firma ayarları (Y6): firma profili ve bölgesel ayarlar.</summary>
     public static class SettingKeys
     {
-        public const string DisplayName = "core.profile.display-name";
+        public const string DisplayName = Modulix.Core.Contracts.Settings.ProfileSettingKeys.DisplayName;
         public const string LegalName = "core.profile.legal-name";
         public const string TaxOffice = "core.profile.tax-office";
         public const string TaxNumber = "core.profile.tax-number";
