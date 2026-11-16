@@ -765,20 +765,26 @@ public sealed class CoreModule : IModule
             ["kind"] = "Tür", ["name"] = "Ünvan", ["taxOffice"] = "Vergi dairesi", ["taxNumber"] = "Vergi no", ["phone"] = "Telefon",
             ["email"] = "E-posta", ["website"] = "Web sitesi", ["city"] = "Şehir", ["address"] = "Adres",
             ["relationshipRoles"] = "İlişki rolleri", ["customerSectors"] = "Müşteri sektörü", ["serviceNeeds"] = "Hizmet ihtiyacı",
+            ["preferredLanguage"] = "Yazışma dili",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
                 ["kind"] = new Dictionary<string, string> { ["Organization"] = "Tüzel kişi", ["Individual"] = "Gerçek kişi" },
+                ["preferredLanguage"] = new Dictionary<string, string> { ["tr"] = "Türkçe", ["en"] = "English", ["az"] = "Azərbaycanca" },
             },
         },
         new(SharedEntities.Person, "Kişi (ortak kayıt)", null, new Dictionary<string, string>
         {
             ["firstName"] = "Ad", ["lastName"] = "Soyad", ["email"] = "E-posta", ["phone"] = "Telefon", ["title"] = "Unvan",
-            ["partyId"] = "Firma",
+            ["partyId"] = "Firma", ["preferredLanguage"] = "Yazışma dili",
         })
         {
             TitleFields = ["firstName", "lastName"],
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["preferredLanguage"] = new Dictionary<string, string> { ["tr"] = "Türkçe", ["en"] = "English", ["az"] = "Azərbaycanca" },
+            },
             References = new Dictionary<string, string> { ["partyId"] = SharedEntities.Party },
         },
         new(SharedEntities.PartyRelationship, "Firma ilişkisi (ortak kayıt)", null, new Dictionary<string, string>
