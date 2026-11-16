@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Marketing;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Marketing;

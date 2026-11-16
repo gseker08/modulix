@@ -1,10 +1,11 @@
-using Modulix.Api.Access;
-using Modulix.Api.Records;
-using Modulix.Modules.Marketing;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Marketing.Audiences;
 using Modulix.Shared.Marketing;
 
-namespace Modulix.Api.Marketing;
+namespace Modulix.Modules.Marketing.Endpoints;
 
 /// <summary>
 /// Kampanya uç noktaları (/api/marketing/campaigns...; ADR-0025, dilim 4). Kampanya, hedef kitle girdisi ve dondurulmuş kitle kayıt boru hattından geçer.
@@ -32,7 +33,7 @@ internal static class CampaignEndpoints
         campaigns.MapPost("/{id:guid}/audience/preview", async (Guid id, ICampaignAudience audience, CancellationToken ct) =>
         {
             var result = await audience.PreviewAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(MarketingModule.Permissions.CampaignsRead);
 
         campaigns.MapPost("/{id:guid}/audience/snapshot", async (Guid id, ICampaignAudience audience, CancellationToken ct) =>
@@ -40,19 +41,19 @@ internal static class CampaignEndpoints
             var result = await audience.SnapshotAsync(id, ct);
             return result.IsSuccess
                 ? Results.Created($"{Prefix}/audience-snapshots/{result.Value!.Id}", ResourceEndpoints.ToDto<AudienceSnapshotDto>(result.Value))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(MarketingModule.Permissions.CampaignsAudience);
 
         campaigns.MapPost("/{id:guid}/archive", async (Guid id, SegmentActionRequest r, ICampaignAudience audience, CancellationToken ct) =>
         {
             var result = await audience.ArchiveAsync(id, r.Version, ct);
-            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<CampaignDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<CampaignDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(MarketingModule.Permissions.CampaignsAudience);
 
         campaigns.MapPost("/{id:guid}/restore", async (Guid id, SegmentActionRequest r, ICampaignAudience audience, CancellationToken ct) =>
         {
             var result = await audience.RestoreAsync(id, r.Version, ct);
-            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<CampaignDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<CampaignDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(MarketingModule.Permissions.CampaignsAudience);
 
         group.MapGet("/audience-snapshots/{id:guid}/recipients", async (Guid id, string? status, string? code, int? page, int? pageSize, ICampaignAudience audience, CancellationToken ct) =>
@@ -62,7 +63,7 @@ internal static class CampaignEndpoints
                 ? Results.Ok(new AudienceRecipientsPageDto(
                     [.. result.Value!.Items.Select(r => new AudienceRecipientDto(r.TargetId, r.Label, r.PersonId, r.Status, r.Code))],
                     result.Value.Page, result.Value.PageSize, result.Value.TotalCount))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(MarketingModule.Permissions.CampaignsRead);
     }
 

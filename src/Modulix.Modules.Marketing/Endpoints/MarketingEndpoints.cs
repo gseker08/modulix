@@ -1,27 +1,28 @@
-using Modulix.Api.Access;
-using Modulix.Api.Records;
-using Modulix.Modules.Marketing.Contracts;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Modulix.Core.Contracts.Records;
-using Modulix.Modules.Marketing;
+using Modulix.Core.Hosting;
+using Modulix.Modules.Marketing.Contracts;
 using Modulix.Modules.Marketing.Segments;
 using Modulix.Shared.Marketing;
 
-namespace Modulix.Api.Marketing;
+namespace Modulix.Modules.Marketing.Endpoints;
 
 /// <summary>
 /// Pazarlama uç noktaları (/api/marketing; ADR-0025). Liste, detay, oluşturma ve düzenleme kayıt boru hattından geçer. Durum, yayın sürümü ve hesaplama özeti
 /// yalnızca eylem uç noktalarıyla (yayımla, yenile, arşivle, geri al) değişir; genel PUT bunları yok sayar. Sürüm yalnızca yayımla ile oluşur.
-/// Alanı görme yetkisi olmayan kişi o alanla önizleme yapamaz, sayı alamaz. Tenant her istekte oturumdan çözülür.
+/// Alanı görme yetkisi olmayan kişi o alanla önizleme yapamaz, sayı alamaz. Tenant her istekte oturumdan çözülür. Uç noktalar modüldedir (ADR-0046);
+/// grup host tarafından açılır.
 /// </summary>
-public static class MarketingEndpoints
+internal static class MarketingEndpoints
 {
     private const string Prefix = "/api/marketing";
 
-    public static IEndpointRouteBuilder MapMarketingEndpoints(this IEndpointRouteBuilder app)
+    /// <summary><paramref name="routes"/> host tarafından <c>/api/marketing</c> grubu olarak, oturum ve modül kontrolüyle sarılmış gelir (ADR-0046).</summary>
+    public static void MapEndpoints(IEndpointRouteBuilder routes)
     {
-        var group = app.MapGroup(Prefix)
-            .RequireAuthorization()
-            .RequireModule(MarketingModule.ModuleKey)
+        var group = routes.MapGroup(string.Empty)
             .WithTags("Pazarlama");
 
         ResourceEndpoints.MapResource<SegmentDto, SaveSegmentRequest>(group, Prefix, "segments", MarketingModule.Entities.Segment,
@@ -74,10 +75,8 @@ public static class MarketingEndpoints
             var result = await service.CopyAsync(id, r.Code ?? string.Empty, r.Name ?? string.Empty, ct);
             return result.IsSuccess
                 ? Results.Created($"{Prefix}/segments/{result.Value!.Id}", ResourceEndpoints.ToDto<SegmentDto>(result.Value))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(MarketingModule.Permissions.SegmentsWrite);
-
-        return app;
     }
 
     private static bool TryTarget(string? value, out SegmentTarget target)
@@ -94,11 +93,11 @@ public static class MarketingEndpoints
             statusCode: StatusCodes.Status422UnprocessableEntity);
 
     private static IResult Record(RecordResult<RecordData> result) =>
-        result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<SegmentDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<SegmentDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
 
     private static IResult Evaluation(RecordResult<SegmentEvaluation> result) =>
         result.IsSuccess
             ? Results.Ok(new SegmentEvaluationDto(
                 result.Value!.Count, [.. result.Value.Rows.Select(r => new SegmentRowDto(r.Id, r.Label))], result.Value.RowsHidden, result.Value.DurationMs))
-            : RecordEndpoints.ToProblem(result.Error!);
+            : RecordProblems.ToProblem(result.Error!);
 }
