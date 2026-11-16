@@ -64,7 +64,8 @@ public sealed record PlatformTenantDto(
     int? AdministratorCount,
     IReadOnlyList<string> EnabledModules,
     string? ProfileKey = null,
-    DateTimeOffset? ProfileAppliedAt = null);
+    DateTimeOffset? ProfileAppliedAt = null,
+    IReadOnlyList<MissingDependencyDto>? MissingDependencies = null);
 
 public sealed record PlatformTenantPageResponse(IReadOnlyList<PlatformTenantDto> Items, int Page, int PageSize, int TotalCount);
 
@@ -96,8 +97,22 @@ public sealed record InviteTenantAdministratorRequest(string Email, string Displ
 
 public sealed record InviteTenantAdministratorResponse(TenantAdministratorDto Administrator, bool ExistingAccount);
 
-/// <summary>Firma açma formu için modül ve hazır rolleri.</summary>
-public sealed record PlatformModuleDto(string Key, string DisplayName, IReadOnlyList<RoleTemplateDto> Templates);
+/// <summary>
+/// Modülün beyan ettiği bağımlılık (ADR-0051). <see cref="Required"/>: sağlayan modül açık olmadan bu modül açılamaz; değilse
+/// modül çalışır, <see cref="Reason"/>'daki özellik eksik kalır.
+/// </summary>
+public sealed record ModuleDependencyDto(string ModuleKey, string DisplayName, bool Required, string Reason);
+
+/// <summary>Firmada karşılanmayan bağımlılık (ADR-0051): <see cref="ModuleKey"/> açık, <see cref="DependencyKey"/> kapalı.</summary>
+public sealed record MissingDependencyDto(string ModuleKey, string DependencyKey, bool Required, string Reason);
+
+/// <summary>Bağımlılığı eksik firma: açık bir modülünün zorunlu bağımlılığı kapalı (<c>GET /api/platform/dependency-gaps</c>).</summary>
+public sealed record PlatformDependencyGapDto(
+    Guid TenantId, string TenantName, string TenantSlug, TenantState TenantStatus, IReadOnlyList<MissingDependencyDto> Missing);
+
+/// <summary>Firma açma formu ve modül hakları için modül, hazır rolleri ve bağımlılıkları.</summary>
+public sealed record PlatformModuleDto(
+    string Key, string DisplayName, IReadOnlyList<RoleTemplateDto> Templates, IReadOnlyList<ModuleDependencyDto>? Dependencies = null);
 
 /// <summary>
 /// <see cref="ReadOnlyTemplate"/>: her firmada seçilebilen "Salt okur" rolü; izinleri açılan modüllere göre oluşur
@@ -139,7 +154,8 @@ public sealed record CatalogModuleDto(
     bool IsAlwaysEnabled,
     int? EnabledTenantCount,
     IReadOnlyList<PermissionDto> Permissions,
-    IReadOnlyList<RoleTemplateDto> Templates);
+    IReadOnlyList<RoleTemplateDto> Templates,
+    IReadOnlyList<ModuleDependencyDto>? Dependencies = null);
 
 public static class TenantStateText
 {

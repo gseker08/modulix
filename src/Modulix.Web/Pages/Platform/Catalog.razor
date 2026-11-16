@@ -33,6 +33,11 @@
                     </span>
                 </div>
 
+                @foreach (var dependency in module.Dependencies ?? [])
+                {
+                    <p class="text-muted">@Texts.Get(dependency.Required ? "platform.dependency.required" : "platform.dependency.optional", dependency.DisplayName, dependency.Reason)</p>
+                }
+
                 <table class="table record-table">
                     <thead><tr><th>@Texts.Get("platform.catalog.resource")</th><th>@Texts.Get("platform.catalog.permission")</th><th>@Texts.Get("platform.plans.key")</th></tr></thead>
                     <tbody>

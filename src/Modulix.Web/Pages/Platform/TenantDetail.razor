@@ -46,11 +46,23 @@
             <section class="detail-section">
                 <div class="section-header"><h2>@Texts.Get("platform.modules")</h2></div>
                 <p class="text-muted">@Texts.Get("platform.tenantDetail.modulesIntro")</p>
+                @* Karşılanmayan bağımlılıklar (ADR-0051): zorunlu eksik uyarı, isteğe bağlı eksik bilgi. Hak kendiliğinden değişmez. *@
+                @foreach (var missing in tenant.MissingDependencies ?? [])
+                {
+                    <div class="alert @(missing.Required ? "alert-warning" : "alert-info")" role="status">
+                        @Texts.Get(missing.Required ? "platform.dependency.missingRequired" : "platform.dependency.missingOptional", ModuleNames([missing.ModuleKey]), ModuleNames([missing.DependencyKey]), missing.Reason)
+                    </div>
+                }
+
                 @foreach (var module in modules.Modules)
                 {
                     <ModuleToggle TenantId="tenant.Id" TenantName="@tenant.Name" ModuleKey="@module.Key" ModuleName="@module.DisplayName"
                                   Enabled="tenant.EnabledModules.Contains(module.Key)" ShowLabel="true"
                                   Changed="error => ModuleChangedAsync(module, error)" />
+                    @foreach (var dependency in module.Dependencies ?? [])
+                    {
+                        <div class="form-text">@Texts.Get(dependency.Required ? "platform.dependency.required" : "platform.dependency.optional", dependency.DisplayName, dependency.Reason)</div>
+                    }
                 }
 
                 <h3>@Texts.Get("platform.tenantDetail.terms")</h3>

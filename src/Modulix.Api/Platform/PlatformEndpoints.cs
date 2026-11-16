@@ -4,6 +4,7 @@ using Modulix.Api.Localization;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
 using Modulix.Core.Contracts.Localization;
+using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
 using Modulix.Core.Modules;
@@ -105,6 +106,10 @@ public static class PlatformEndpoints
         platform.MapGet("/overview", GetOverviewAsync);
         platform.MapGet("/expirations", ListExpirationsAsync);
         platform.MapGet("/catalog", GetCatalogAsync);
+        // Bağımlılığı eksik firmalar (ADR-0051): yalnızca rapor, hak değiştirmez.
+        platform.MapGet("/dependency-gaps", async (IPlatformAdministration admin, CancellationToken ct) =>
+            (await admin.ListDependencyGapsAsync(ct)).Select(g => new PlatformDependencyGapDto(
+                g.TenantId, g.TenantName, g.TenantSlug, (TenantState)g.TenantStatus, [.. g.Missing.Select(ToDto)])).ToList());
 
         // Sektör profilleri (Y9c): platform yöneticisi profilin kapalı modüllerini de açar.
         platform.MapGet("/profiles", (SectorProfileCatalog profiles) => SectorProfileEndpoints.ToDto(profiles));
@@ -193,7 +198,8 @@ public static class PlatformEndpoints
             .Select(m => new PlatformModuleDto(
                 m.Key,
                 MetadataLabels.Module(m, bundle),
-                m.RoleTemplates.Select(t => MetadataLabels.Template(t, bundle)).ToList()))
+                m.RoleTemplates.Select(t => MetadataLabels.Template(t, bundle)).ToList(),
+                Dependencies(m, catalog, bundle)))
             .ToList();
 
         var readOnly = catalog.TemplatesFor(catalog.Modules.Select(m => m.Key).ToHashSet(StringComparer.Ordinal))
@@ -214,9 +220,18 @@ public static class PlatformEndpoints
                 ModuleCatalog.IsAlwaysEnabled(m.Key),
                 usage.TryGetValue(m.Key, out var count) ? count : null,
                 m.Permissions.Select(p => MetadataLabels.Permission(p, m, bundle)).ToList(),
-                m.RoleTemplates.Select(t => MetadataLabels.Template(t, bundle)).ToList()))
+                m.RoleTemplates.Select(t => MetadataLabels.Template(t, bundle)).ToList(),
+                Dependencies(m, catalog, bundle)))
             .ToList();
     }
+
+    // Kurulu olmayan (katalogda bulunmayan) sağlayıcı gösterilmez; kural da onu saymaz (ModuleDependencyRules).
+    private static List<ModuleDependencyDto> Dependencies(IModule module, ModuleCatalog catalog, IReadOnlyDictionary<string, string> bundle) =>
+        [.. module.Dependencies
+            .Select(d => (Dependency: d, Provider: catalog.Find(d.ModuleKey)))
+            .Where(d => d.Provider is not null)
+            .Select(d => new ModuleDependencyDto(
+                d.Dependency.ModuleKey, MetadataLabels.Module(d.Provider!, bundle), d.Dependency.Kind == ModuleDependencyKind.Required, d.Dependency.Reason))];
 
     private static async Task<IResult> ListTenantsAsync(
         string? search, TenantState? status, string? sort, int? page, int? pageSize, IPlatformAdministration admin, CancellationToken ct)
@@ -330,7 +345,11 @@ public static class PlatformEndpoints
         tenant.AdministratorCount,
         tenant.EnabledModules,
         tenant.ProfileKey,
-        tenant.ProfileAppliedAt);
+        tenant.ProfileAppliedAt,
+        [.. (tenant.MissingDependencies ?? []).Select(ToDto)]);
+
+    private static MissingDependencyDto ToDto(MissingDependency missing) =>
+        new(missing.ModuleKey, missing.DependencyKey, missing.Kind == ModuleDependencyKind.Required, missing.Reason);
 
     private static PlatformTenantDetailResponse ToDto(PlatformTenantDetail detail) => new(
         ToDto(detail.Tenant),

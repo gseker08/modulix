@@ -712,6 +712,26 @@ internal sealed class PlatformAdministration(
             .Select(m => new ModuleUsage(m.Key, counts.GetValueOrDefault(m.Key)))];
     }
 
+    // Platform tablolarından okunur; kural tek yerdedir (ModuleDependencyRules). Kapalı ve askıdaki firmalar raporlanmaz.
+    public async Task<IReadOnlyList<PlatformDependencyGap>> ListDependencyGapsAsync(CancellationToken cancellationToken)
+    {
+        var rows = await (
+            from entitlement in db.ModuleEntitlements.AsNoTracking()
+            join tenant in db.Tenants.AsNoTracking() on entitlement.TenantId equals tenant.Id
+            where entitlement.IsEnabled && TenantStatusRules.Operational.Contains(tenant.Status)
+            select new { tenant.Id, tenant.Name, tenant.Slug, tenant.Status, entitlement.ModuleKey })
+            .ToListAsync(cancellationToken);
+
+        return [.. rows
+            .GroupBy(r => new { r.Id, r.Name, r.Slug, r.Status })
+            .Select(g => new PlatformDependencyGap(
+                g.Key.Id, g.Key.Name, g.Key.Slug, g.Key.Status,
+                ModuleDependencyRules.Missing(catalog, g.Select(r => r.ModuleKey), ModuleDependencyKind.Required)))
+            .Where(g => g.Missing.Count > 0)
+            .OrderBy(g => g.TenantName, StringComparer.CurrentCulture)
+            .ThenBy(g => g.TenantId)];
+    }
+
     public async Task<PlatformOverview> GetOverviewAsync(CancellationToken cancellationToken)
     {
         var counts = await db.Tenants.AsNoTracking()
@@ -811,7 +831,8 @@ internal sealed class PlatformAdministration(
             administratorCount,
             [.. catalog.Modules.Select(m => m.Key).Where(modules.Contains)],
             tenant.ProfileKey,
-            tenant.ProfileAppliedAt);
+            tenant.ProfileAppliedAt,
+            ModuleDependencyRules.Missing(catalog, modules));
     }
 
     /// <summary>

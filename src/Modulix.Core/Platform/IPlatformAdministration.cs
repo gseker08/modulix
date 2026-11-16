@@ -19,7 +19,8 @@ public sealed record PlatformTenant(
     int? AdministratorCount,
     IReadOnlyList<string> EnabledModules,
     string? ProfileKey = null,
-    DateTimeOffset? ProfileAppliedAt = null);
+    DateTimeOffset? ProfileAppliedAt = null,
+    IReadOnlyList<MissingDependency>? MissingDependencies = null);
 
 /// <summary>Firma listesi sorgusu. Arama ad ve kısa adda yapılır; sayfa 1'den başlar.</summary>
 public sealed record PlatformTenantQuery(string? Search, TenantStatus? Status, int Page, int PageSize, string? Sort = null)
@@ -105,6 +106,10 @@ public sealed record TenantCreationResult(PlatformTenantDetail Tenant, bool Exis
 
 /// <summary>Bir modülün kaç firmada açık olduğu (yalnızca açık firmalar sayılır).</summary>
 public sealed record ModuleUsage(string ModuleKey, int EnabledTenantCount);
+
+/// <summary>Açık bir modülünün zorunlu bağımlılığı kapalı olan firma (ADR-0051); yalnızca erişime açık firmalar raporlanır.</summary>
+public sealed record PlatformDependencyGap(
+    Guid TenantId, string TenantName, string TenantSlug, TenantStatus TenantStatus, IReadOnlyList<MissingDependency> Missing);
 
 /// <summary>Bir kayıt türündeki tavan (ADR-0030): firmanın rolleri bu türde <see cref="MaxScope"/>'tan geniş kapsam alamaz.</summary>
 public sealed record PlatformScopeLimit(string EntityKey, RecordScope MaxScope, bool AppliesToAdministrators);
@@ -260,4 +265,10 @@ public interface IPlatformAdministration
 
     /// <summary>Katalogdaki modüllerin (çekirdek hariç) kaç açık firmada açık olduğu, katalog sırasıyla.</summary>
     Task<IReadOnlyList<ModuleUsage>> GetModuleUsageAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Bağımlılığı eksik firmalar (ADR-0051): açık modülünün zorunlu bağımlılığı kapalı olan erişime açık firmalar, ada göre.
+    /// Yalnızca rapordur; hiçbir hak değişmez. İsteğe bağlı eksikler burada listelenmez (firma detayında görünür).
+    /// </summary>
+    Task<IReadOnlyList<PlatformDependencyGap>> ListDependencyGapsAsync(CancellationToken cancellationToken);
 }

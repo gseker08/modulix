@@ -1,6 +1,6 @@
 # ADR-0051: Modül bağımlılık beyanı
 
-- **Durum:** Kabul edildi, 16 Kasım 2026 (açık sorular aynı gün karara bağlandı, aşağıda). Dilim 1 (beyan, katalog doğrulaması, ilk beyanlar, mimari test) ve dilim 2 (zorunlu bağımlılığın hak yazılırken denetimi) teslim edildi; isteğe bağlı bağımlılık uyarıları ve arayüz dilim 3'te.
+- **Durum:** Kabul edildi, 16 Kasım 2026 (açık sorular aynı gün karara bağlandı, aşağıda). Dilim 1 (beyan, katalog doğrulaması, ilk beyanlar, mimari test) ve dilim 2 (zorunlu bağımlılığın hak yazılırken denetimi) teslim edildi. Dilim 3a (platform: bağımlılık bilgisi, eksik bağımlılık uyarısı, rapor) teslim edildi; firma tarafındaki bilgi dilim 3b'de.
 - **Kaynak:** [Core mimari değerlendirmesi](../core-mimari-degerlendirme-2026-11.md) H7; [öncelik listesi](../oncelikli-isler.md) C6.
 - **İlgili:** ADR-0028 (lisans ve tenant yönetimi), ADR-0044 (modül sözleşme projeleri).
 
@@ -133,6 +133,20 @@ Dilim 2'de netleşenler:
 | 1 | `IModule.Dependencies`, katalog doğrulaması, ilk beyanlar, başvuru-beyan eşleşme testi | Birim (doğrulama), mimari |
 | 2 | `ModuleDependencyRules` ve altı hak yolunda zorunlu bağımlılık denetimi | Mutlu yol, ret, tenant izolasyonu, yetki (platform rolü) |
 | 3 | İsteğe bağlı bağımlılık uyarısı (yanıt + ekran); platform arayüzü: modül satırında bağımlılık bilgisi, ret iletisi, "bağımlılığı eksik firmalar" raporu; firma Modüller ekranında bilgi | Entegrasyon + arayüz görsel kontrolü |
+
+Dilim 3 ikiye bölündü:
+
+- **3a (platform, teslim edildi).** `GET /api/platform/modules` ve `/catalog` modülün bağımlılıklarını döndürür; firma yanıtı
+  `missingDependencies` taşır (zorunlu ve isteğe bağlı eksikler, gerekçesiyle); `GET /api/platform/dependency-gaps` zorunlu bağımlılığı
+  eksik, erişime açık firmaları listeler. Ekran: firma detayında modülün altında bağımlılık satırı ve eksikler için uyarı/bilgi kutusu,
+  katalogda bağımlılık satırı, platform ana sayfasında "Bağımlılığı eksik firmalar".
+- **3b (firma tarafı, bekliyor).** Firma yöneticisinin gördüğü bilgi. Bugün firma tarafında modülleri listeleyen bir ekran yok; yeri
+  3b'de kararlaştırılır.
+
+Karar 3'teki tablodan sapma: isteğe bağlı eksik için uyarı, hak yazan altı işlemin yanıtında değil firma yanıtında
+(`missingDependencies`) döner. Modül açma/kapama ve plan atama gövdesiz 204 döndürür; ekran işlemden sonra firmayı zaten yeniden okur.
+Böylece yanıt sözleşmeleri değişmez ve uyarı işlemden sonra da görünür kalır. Rapor yalnızca zorunlu eksikleri listeler: isteğe bağlı
+eksik (ör. CRM'siz Sipariş) geçerli bir ticari durumdur. Gerekçe metni (`Reason`) kodda Türkçe yazılıdır ve çevrilmeden gösterilir.
 
 ## Sonuçlar
 
