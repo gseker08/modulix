@@ -3,45 +3,45 @@
 @inject ApiClient Api
 @inject NavigationManager Navigation
 
-<PageTitle>Memnuniyet anketi · Modulix</PageTitle>
+<PageTitle>@Texts.Get("support.public-survey.title") · Modulix</PageTitle>
 
 @* Oturumsuz memnuniyet anketi (ADR-0024 dilim 4). Belirteç adresin # parçasındadır (#t=...): sunucuya, günlüklere ve Referer başlığına gitmez; API çağrılarında gövdede taşınır.
    Anket tek kullanımlık ve süreli; talebin konusu ve numarası dışında bir şey gösterilmez. *@
 
 @if (loading)
 {
-    <p class="text-muted" role="status">Anket yükleniyor…</p>
+    <LoadingState />
 }
 else if (invalid)
 {
     <div class="alert alert-warning" role="alert">
-        <h1 class="h5">Bağlantı geçersiz</h1>
-        <p class="mb-0">Bu anket bağlantısı geçersiz ya da kaldırılmış. Lütfen size ulaşan ekiple iletişime geçin.</p>
+        <h1 class="h5">@Texts.Get("crm.public-quote.invalid")</h1>
+        <p class="mb-0">@Texts.Get("support.public-survey.invalid-text")</p>
     </div>
 }
 else if (view is not null)
 {
     <article class="public-quote" aria-labelledby="survey-heading">
-        <h1 id="survey-heading" class="h4">Deneyiminizi puanlayın</h1>
+        <h1 id="survey-heading" class="h4">@Texts.Get("support.public-survey.heading")</h1>
         <p class="text-muted"><strong>@view.TicketNumber</strong> · @view.Subject</p>
 
         @if (view.State == "answered")
         {
             <div class="alert alert-success" role="status">
-                <strong>Teşekkür ederiz.</strong> Yanıtınız kaydedildi@(view.Rating is { } r ? $" (puan: {r}/5)" : null). Bu anket yeniden yanıtlanamaz.
+                <strong>@Texts.Get("support.public-survey.thanks")</strong> @(view.Rating is { } r ? Texts.Get("support.public-survey.saved-rating", r) : Texts.Get("support.public-survey.saved"))
             </div>
         }
         else if (!view.CanAnswer)
         {
-            <div class="alert alert-warning" role="status">@(view.Message ?? "Bu anket artık yanıtlanamıyor.")</div>
+            <div class="alert alert-warning" role="status">@(view.Message ?? Texts.Get("support.public-survey.closed"))</div>
         }
         else
         {
             <Notice Text="@problem" Failed="true" />
             <form novalidate @onsubmit="AnswerAsync" @onsubmit:preventDefault>
                 <fieldset disabled="@busy">
-                    <legend class="form-label">Talebinizin çözümünden ne kadar memnun kaldınız?</legend>
-                    <div role="radiogroup" aria-label="Puan (1: hiç memnun değilim, 5: çok memnunum)">
+                    <legend class="form-label">@Texts.Get("support.public-survey.question")</legend>
+                    <div role="radiogroup" aria-label="@Texts.Get("support.public-survey.scale")">
                         @for (var value = 1; value <= 5; value++)
                         {
                             var current = value;
@@ -51,13 +51,13 @@ else if (view is not null)
                             </div>
                         }
                     </div>
-                    @if (ratingMissing) { <div class="invalid-feedback d-block" role="alert">Lütfen bir puan seçin.</div> }
-                    <label class="form-label mt-3" for="survey-comment">Eklemek istediğiniz bir şey var mı? (isteğe bağlı)</label>
+                    @if (ratingMissing) { <div class="invalid-feedback d-block" role="alert">@Texts.Get("support.public-survey.rating-required")</div> }
+                    <label class="form-label mt-3" for="survey-comment">@Texts.Get("support.public-survey.comment")</label>
                     <textarea id="survey-comment" class="form-control" rows="3" maxlength="1000" @bind="comment"></textarea>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">Gönder</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("support.public-survey.submit")</button></div>
             </form>
-            <p class="small text-muted mt-2">Bu bağlantı size özeldir ve @CrmLabels.Time(view.ExpiresAt) tarihine kadar geçerlidir.</p>
+            <p class="small text-muted mt-2">@Texts.Get("support.public-survey.valid-until", CrmLabels.Time(view.ExpiresAt))</p>
         }
     </article>
 }
@@ -77,6 +77,8 @@ else if (view is not null)
 
     protected override async Task OnInitializedAsync()
     {
+        // Sayfa önce tarayıcının diliyle açılır; anket gelince müşterinin diline geçer (ADR-0034 §6).
+        await PublicTexts.ApplyAsync(Api, null);
         token = Modulix.Web.Pages.Crm.PublicQuote.TokenFromFragment(Navigation.Uri);
         if (token.Length == 0)
         {
@@ -86,6 +88,11 @@ else if (view is not null)
         }
 
         var result = await Api.PostAsync<PublicSurveyView>($"/api/public/support-survey/{Uri.EscapeDataString(Tenant)}/view", new PublicSurveyTokenRequest(token));
+        if (result.Value is { } loaded)
+        {
+            await PublicTexts.ApplyAsync(Api, loaded.Language);
+        }
+
         loading = false;
         view = result.Value;
         invalid = view is null;
@@ -108,8 +115,8 @@ else if (view is not null)
             return;
         }
 
-        problem = result.Error ?? "Yanıtınız kaydedilemedi.";
+        problem = result.Error ?? Texts.Get("support.public-survey.save-failed");
     }
 
-    private static string Hint(int value) => value switch { 1 => "(hiç memnun değilim)", 5 => "(çok memnunum)", _ => string.Empty };
+    private static string Hint(int value) => value switch { 1 => Texts.Get("support.public-survey.hint-low"), 5 => Texts.Get("support.public-survey.hint-high"), _ => string.Empty };
 }
