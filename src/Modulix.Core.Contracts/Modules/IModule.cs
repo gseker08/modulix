@@ -144,6 +144,13 @@ public interface IModule
     /// </summary>
     IReadOnlyList<ModuleJobDefinition> Jobs => [];
 
+    /// <summary>
+    /// Modülün başka modüllere bağımlılıkları (ADR-0051): zorunlu olan olmadan modül açılamaz, isteğe bağlı olan olmadan belirtilen özellik
+    /// eksik kalır. Başka modülün sözleşme projesine başvuran modül bunu beyan eder; <c>core</c> beyan edilmez. Beyan açılışta doğrulanır.
+    /// Çalışma zamanını değiştirmez: sağlayan modül kapalıysa çağıran bugünkü gibi "yok" sonucu alır (ADR-0044).
+    /// </summary>
+    IReadOnlyList<ModuleDependency> Dependencies => [];
+
     /// <summary>Modülün kendi servislerini kaydeder. Modül başka modülün servisine erişmez.</summary>
     void ConfigureServices(IServiceCollection services)
     {

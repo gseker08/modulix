@@ -128,6 +128,12 @@ public sealed class ContractsModule : IModule, IModuleEndpoints, IModulePublicEn
 
     public string DisplayName => "Sözleşmeler";
 
+    /// <summary>CRM olmadan sözleşme elle açılır; tekliften taslak ve takip aktivitesi CRM'den gelir (ADR-0051).</summary>
+    public IReadOnlyList<ModuleDependency> Dependencies { get; } =
+    [
+        new ModuleDependency("crm", ModuleDependencyKind.Optional, "Kabul edilmiş tekliften sözleşme taslağı ve takip aktivitesi"),
+    ];
+
     IReadOnlyList<PermissionDefinition> IModule.Permissions { get; } =
     [
         new(Permissions.ContractsRead, "Sözleşmeleri, taraflarını ve kalemlerini görüntüler", "Sözleşmeler"),

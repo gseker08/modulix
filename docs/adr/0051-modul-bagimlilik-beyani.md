@@ -1,6 +1,6 @@
 # ADR-0051: Modül bağımlılık beyanı
 
-- **Durum:** Öneri (16 Kasım 2026). Kod yazılmadı; aşağıdaki açık sorular karara bağlanınca dilim 1 başlar.
+- **Durum:** Kabul edildi, 16 Kasım 2026 (açık sorular aynı gün karara bağlandı, aşağıda). Dilim 1 (beyan, katalog doğrulaması, ilk beyanlar, mimari test) teslim edildi; dilim 2 ve 3 sırada.
 - **Kaynak:** [Core mimari değerlendirmesi](../core-mimari-degerlendirme-2026-11.md) H7; [öncelik listesi](../oncelikli-isler.md) C6.
 - **İlgili:** ADR-0028 (lisans ve tenant yönetimi), ADR-0044 (modül sözleşme projeleri).
 
@@ -51,8 +51,10 @@ public enum ModuleDependencyKind
 `Reason` arayüzde gösterilen Türkçe cümledir (ör. "Kabul edilmiş tekliften sipariş oluşturma"). Beyan kodda sabittir; firma ya da platform
 yöneticisi değiştiremez (bağımlılık kodun özelliğidir, yapılandırma değildir).
 
-Açılışta `ModuleCatalog` doğrular: bilinmeyen modül anahtarı, modülün kendisi, `core` (her zaman açıktır, beyan edilmez), aynı modüle iki
-beyan ve `Required` bağımlılıklarda döngü açılışı durdurur.
+Açılışta `ModuleCatalog` doğrular: biçimi bozuk modül anahtarı, modülün kendisi, `core` (her zaman açıktır, beyan edilmez), boş gerekçe,
+aynı modüle iki beyan ve `Required` bağımlılıklarda döngü açılışı durdurur. Sağlayan modülün katalogda bulunmaması açılış hatası değildir
+(dilim 1'de görüldü: entegrasyon testleri kataloğu modüllerin alt kümesiyle kurar, ör. CRM'siz Pazarlama); beyanın gerçek bir modülü
+gösterdiğini mimari test denetler.
 
 ### 2. Beyan ile proje başvurusu eşleşir
 
@@ -87,14 +89,14 @@ açar. Reddetme 400 ve alan hatasıyla döner; denetim kaydı değişmez (başar
   değişikliğinde denetim devreye girer.
 - **Otomasyon:** `AutomationActionDefinition.RequiredModules` aksiyon düzeyinde kalır; modül düzeyindeki beyanın yerine geçmez.
 
-### 5. İlk beyanlar (öneri)
+### 5. İlk beyanlar
 
 | Modül | Bağımlılık | Tür | Gerekçe |
 |---|---|---|---|
 | Sipariş | CRM | İsteğe bağlı | Tekliften sipariş, takip aktivitesi; sipariş elle de açılır |
 | Sözleşme | CRM | İsteğe bağlı | Tekliften sözleşme taslağı, takip aktivitesi |
 | Lojistik | Filo | İsteğe bağlı | Seferde araç ve dorse seçimi |
-| Pazarlama | CRM | Zorunlu (açık soru 1) | Alıcı ve segment alanlarını yalnızca CRM sağlar |
+| Pazarlama | CRM | Zorunlu | Alıcı ve segment alanlarını yalnızca CRM sağlar |
 
 ## Seçenekler
 
@@ -104,14 +106,14 @@ açar. Reddetme 400 ve alan hatasıyla döner; denetim kaydı değişmez (başar
 3. **Zorunlu bağımlılığı kendiliğinden açmak.** Lisans kaydını (kaynak, bitiş, gerekçe) kimin adına yazacağı belirsiz. Reddedildi.
 4. **Bu ADR:** kodda beyan, açılışta doğrulama, hak yazılırken denetim.
 
-## Açık sorular
+## Açık soruların kararı (16 Kasım 2026)
 
-1. **Pazarlama → CRM zorunlu mu?** Öneri: zorunlu. Alternatif: isteğe bağlı bırakıp Pazarlama'yı CRM'siz "alıcısız" açılabilir tutmak;
-   bugün başka alıcı kaynağı olmadığı için satılabilir bir birleşim değil.
-2. **Kapama reddi mi, zincirleme kapama mı?** Öneri: ret (bağımlıları listeler); platform yöneticisi önce bağımlı modülü kapatır.
-3. **Firma yöneticisi görsün mü?** Öneri: dilim 3'te firma Modüller ekranında yalnızca bilgi olarak ("CRM açık olmadığı için tekliften
-   sipariş kullanılamaz"). Hak değişikliği yine yalnızca platformdadır.
-4. **Mevcut ihlaller:** yalnızca rapor (öneri) mi, yoksa platform yöneticisine düzeltme görevi mi?
+1. **Pazarlama → CRM zorunludur.** Bugün başka alıcı kaynağı yok; ikinci bir alıcı kaynağı gelirse beyan isteğe bağlıya çevrilir.
+2. **Bağımlısı olan modülü kapatma reddedilir**, zincirleme kapama yapılmaz. Yanıt bağımlı modülleri listeler; platform yöneticisi önce
+   onları kapatır.
+3. **Firma yöneticisi bağımlılığı yalnızca bilgi olarak görür** (dilim 3, firma Modüller ekranı: "CRM açık olmadığı için tekliften sipariş
+   kullanılamaz"). Hak değişikliği yalnızca platformdadır.
+4. **Mevcut ihlaller yalnızca raporlanır**; kendiliğinden düzeltme ya da görev açma yoktur.
 
 ## Dilimler
 
