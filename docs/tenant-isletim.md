@@ -43,7 +43,7 @@ komutu içindir.
 ## Gizli ve yetki yapılandırması
 
 - `modulix_app`: yalnızca `SELECT/INSERT/UPDATE/DELETE/EXECUTE`; DDL yok, güvenlik politikasını kapatamaz.
-  `core.AuditLog` üzerinde `UPDATE/DELETE` ayrıca reddedilir (append-only; baseline migration'ı).
+  `core.AuditLog` üzerinde `UPDATE/DELETE` ayrıca reddedilir (append-only; baseline migration'ı). Tablo aylık bölümlüdür (ADR-0052); bölüm boşaltma `ALTER` ister, uygulama rolünde yoktur.
 - `modulix_migrator`: `db_owner`. Sunucu düzeyinde `dbcreator` gerekmez.
 - Şifreler `.env` + user-secrets/ortam değişkeninde; kodda, logda veya PR'da yer almaz. Üretimde secret yöneticisi
   (ör. Key Vault) referansı tercih edilir; yerel ve üretim yapılandırması ayrıdır.
