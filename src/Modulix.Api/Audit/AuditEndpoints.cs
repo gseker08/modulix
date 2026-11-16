@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Modulix.Api.Access;
 using Modulix.Core.Audit;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Modules;
 using Modulix.Core.Records;
@@ -54,10 +55,26 @@ public static class AuditEndpoints
     internal static AuditPageResponse ToResponse(AuditLogPage page) =>
         new(page.Items.Select(ToDto).ToList(), page.Page, page.PageSize, page.TotalCount);
 
-    private static async Task<AuditFiltersResponse> GetFiltersAsync(IAuditLog log, ModuleCatalog catalog, CancellationToken ct) =>
-        new(
+    private static async Task<AuditFiltersResponse> GetFiltersAsync(
+        IAuditLog log, ModuleCatalog catalog, IRequestLanguage language, ITextCatalog texts, CancellationToken ct)
+    {
+        var bundle = texts.Bundle(await language.GetAsync(ct));
+        return new(
             (await log.ListActorsAsync(ct)).Select(a => new AuditActorDto(a.UserId, a.Name)).ToList(),
-            catalog.AuditedEntities.Select(e => new AuditEntityTypeDto(e.EntityKey, e.DisplayName)).ToList());
+            catalog.AuditedEntities
+                .Select(e => new AuditEntityTypeDto(e.EntityKey, MetadataTexts.Text(bundle, MetadataTexts.EntityKey(e.EntityKey), e.DisplayName)))
+                .ToList());
+    }
+
+    // CSV'nin sabit metinleri okurun dilinde (ADR-0034, dilim 18c); işlem ve kaynak adları denetim ekranıyla aynı anahtarlardan gelir.
+    private static string ActionText(IReadOnlyDictionary<string, string> bundle, AuditOperation action) =>
+        MetadataTexts.Text(bundle, "admin.audit-action." + action.ToString().ToLowerInvariant(), AuditText.Of(action));
+
+    private static string SourceText(IReadOnlyDictionary<string, string> bundle, AuditSource source, string? subscription)
+    {
+        var text = MetadataTexts.Text(bundle, "admin.audit-source." + source.ToString().ToLowerInvariant(), AuditText.Of(source));
+        return subscription is null ? text : $"{text} · {subscription}";
+    }
 
     /// <summary>
     /// CSV: noktalı virgülle ayrılmış, UTF-8 BOM'lu (Türkçe Excel doğrudan açar); her değişen alan bir satır. Formül gibi
@@ -65,9 +82,12 @@ public static class AuditEndpoints
     /// </summary>
     private static async Task<IResult> ExportAsync(
         Guid? userId, string? entityKey, AuditOperation? action, AuditSource? source, DateOnly? from, DateOnly? to,
-        IAuditLog log, ITenantSettings settings, CancellationToken ct)
+        IAuditLog log, ITenantSettings settings, IRequestLanguage language, ITextCatalog texts, CancellationToken ct)
     {
         var zone = await ZoneAsync(settings, ct);
+        var bundle = texts.Bundle(await language.GetAsync(ct));
+        string Text(string key, string source) => MetadataTexts.Text(bundle, key, source);
+        var hiddenText = Text("common.history.hidden", AuditText.Hidden);
         IReadOnlyList<AuditLogItem> items;
         try
         {
@@ -79,7 +99,19 @@ public static class AuditEndpoints
         }
 
         var csv = new StringBuilder();
-        AppendRow(csv, ["Tarih", "Kullanıcı", "E-posta", "Kayıt türü", "Kayıt", "İşlem", "Kaynak", "Alan", "Eski değer", "Yeni değer"]);
+        AppendRow(csv,
+        [
+            Text("audit.csv.date", "Tarih"),
+            Text("audit.csv.user", "Kullanıcı"),
+            Text("audit.csv.email", "E-posta"),
+            Text("audit.csv.entity", "Kayıt türü"),
+            Text("audit.csv.record", "Kayıt"),
+            Text("audit.csv.action", "İşlem"),
+            Text("audit.csv.source", "Kaynak"),
+            Text("audit.csv.field", "Alan"),
+            Text("audit.csv.old", "Eski değer"),
+            Text("audit.csv.new", "Yeni değer"),
+        ]);
         foreach (var item in items)
         {
             string?[] common =
@@ -88,9 +120,9 @@ public static class AuditEndpoints
                 item.UserName,
                 item.UserEmail,
                 item.EntityName,
-                item.ValuesHidden ? AuditText.Hidden : item.RecordTitle,
-                AuditText.Of((AuditOperation)item.Action),
-                AuditText.Of((AuditSource)item.Source, item.Subscription),
+                item.ValuesHidden ? hiddenText : item.RecordTitle,
+                ActionText(bundle, (AuditOperation)item.Action),
+                SourceText(bundle, (AuditSource)item.Source, item.Subscription),
             ];
 
             if (item.Changes.Count == 0)
@@ -101,7 +133,7 @@ public static class AuditEndpoints
             foreach (var change in item.Changes)
             {
                 AppendRow(csv, item.ValuesHidden
-                    ? [.. common, change.Label, AuditText.Hidden, AuditText.Hidden]
+                    ? [.. common, change.Label, hiddenText, hiddenText]
                     : [.. common, change.Label, change.Old, change.New]);
             }
         }
