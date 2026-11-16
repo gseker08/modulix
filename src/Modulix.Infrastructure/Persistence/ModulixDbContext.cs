@@ -231,6 +231,8 @@ public class ModulixDbContext(
 
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
+    public DbSet<Modulix.Infrastructure.Audit.AuditArchiveEntry> AuditArchives => Set<Modulix.Infrastructure.Audit.AuditArchiveEntry>();
+
     /// <summary>Sorgu filtresinde kullanılır; EF her sorguda yeniden okur. Aktif tenant yoksa hiçbir satır dönmez.</summary>
     private Guid? CurrentTenantId => tenantAccessor?.Current?.TenantId;
 

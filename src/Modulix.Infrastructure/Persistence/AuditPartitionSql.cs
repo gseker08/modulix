@@ -29,6 +29,9 @@ public static class AuditPartitionSql
     public static string Boundary(DateOnly month) =>
         string.Create(CultureInfo.InvariantCulture, $"'{month:yyyy-MM}-01T00:00:00.0000000+00:00'");
 
+    /// <summary>Ay sınırının SQL değişmezi; değerin UTC ayı kullanılır.</summary>
+    public static string Boundary(DateTimeOffset month) => Boundary(DateOnly.FromDateTime(month.UtcDateTime));
+
     /// <summary>Var olan bir dizini bölüm şemasına taşır (aynı ad ve sütunlarla yeniden kurar).</summary>
     public static string AlignIndex(string name, string columns) =>
         $"CREATE NONCLUSTERED INDEX [{name}] ON [core].[AuditLog] ({columns}) WITH (DROP_EXISTING = ON) ON [{SchemeName}]([OccurredAt]);";

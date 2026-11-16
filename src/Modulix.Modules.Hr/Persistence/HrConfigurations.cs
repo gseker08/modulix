@@ -97,16 +97,6 @@ internal sealed class LeaveRequestConfiguration : IEntityTypeConfiguration<Leave
     }
 }
 
-internal sealed class HolidayConfiguration : IEntityTypeConfiguration<Holiday>
-{
-    public void Configure(EntityTypeBuilder<Holiday> builder)
-    {
-        HrTables.ConfigureCommon(builder, "Holidays");
-        builder.Property(h => h.Name).HasMaxLength(Holiday.NameMaxLength).IsRequired();
-        builder.HasIndex(h => new { h.TenantId, h.Date }).IsUnique().HasDatabaseName("UX_Holidays_Date");
-    }
-}
-
 internal sealed class ExpenseClaimConfiguration : IEntityTypeConfiguration<ExpenseClaim>
 {
     public void Configure(EntityTypeBuilder<ExpenseClaim> builder)

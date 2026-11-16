@@ -193,9 +193,13 @@ public class AuditLogTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         var occurredAt = await db.AuditLog.Where(a => a.RecordId == company).Select(a => a.OccurredAt).FirstAsync();
         var partition = await db.Database.SqlQuery<int>(
             $"SELECT $PARTITION.AuditLogMonthly({occurredAt}) AS Value").SingleAsync();
-        var monthsSinceFirst = ((occurredAt.UtcDateTime.Year - AuditPartitionSql.FirstBoundary.Year) * 12)
-            + occurredAt.UtcDateTime.Month - AuditPartitionSql.FirstBoundary.Month;
-        Assert.Equal(monthsSinceFirst + 2, partition);
+        // Arşiv komutu eski boş sınırları birleştirdiği için bölüm numarası sabit değildir; komşu aylar ayrı bölümdedir.
+        var monthStart = new DateTimeOffset(occurredAt.UtcDateTime.Year, occurredAt.UtcDateTime.Month, 1, 0, 0, 0, TimeSpan.Zero);
+        var previousMonth = monthStart.AddTicks(-1);
+        var nextMonth = monthStart.AddMonths(1);
+        Assert.Equal(partition, await db.Database.SqlQuery<int>($"SELECT $PARTITION.AuditLogMonthly({monthStart}) AS Value").SingleAsync());
+        Assert.Equal(partition - 1, await db.Database.SqlQuery<int>($"SELECT $PARTITION.AuditLogMonthly({previousMonth}) AS Value").SingleAsync());
+        Assert.Equal(partition + 1, await db.Database.SqlQuery<int>($"SELECT $PARTITION.AuditLogMonthly({nextMonth}) AS Value").SingleAsync());
 
         await Assert.ThrowsAsync<SqlException>(() =>
 #pragma warning disable EF1003 // Bölüm numarası sorgudan gelen tamsayıdır; TRUNCATE parametre almaz.

@@ -3897,6 +3897,49 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("GridViews", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Infrastructure.Audit.AuditArchiveEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ArchivedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("PeriodEnd")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("PeriodStart")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("RowCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "PeriodStart")
+                        .IsUnique();
+
+                    b.ToTable("AuditArchives", "core");
+                });
+
             modelBuilder.Entity("Modulix.Infrastructure.Email.QueuedEmail", b =>
                 {
                     b.Property<Guid>("Id")
@@ -10715,49 +10758,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_ExpenseLines_Claim");
 
                     b.ToTable("ExpenseLines", "hr");
-                });
-
-            modelBuilder.Entity("Modulix.Modules.Hr.Domain.Holiday", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("CustomFields")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateOnly>("Date")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("HalfDay")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasAlternateKey("TenantId", "Id");
-
-                    b.HasIndex("TenantId", "Date")
-                        .IsUnique()
-                        .HasDatabaseName("UX_Holidays_Date");
-
-                    b.ToTable("Holidays", "hr");
                 });
 
             modelBuilder.Entity("Modulix.Modules.Hr.Domain.LeaveBalance", b =>
