@@ -18,6 +18,16 @@ public static class CrmAutomationTemplates
 
     public const string LeadPurchaseDate = "crm.lead-purchase-date-reminder";
 
+    public const string LeadScoreThreshold = "crm.lead-score-threshold-follow-up";
+
+    /// <summary>Puan eşiği şablonunun varsayılan eşiği; firma kuralı kullanırken değiştirir.</summary>
+    public const int DefaultScoreThreshold = 70;
+
+    // Koşul değeri metindir (sabit, alan başlatma sırasından bağımsız).
+    private const string Threshold = "70";
+
+    private static readonly string LeadScoreField = $"{CrmModule.Entities.Lead}.score";
+
     // Metin değişkenleri (Dilim 4d): kayıt türünün beyan edilmiş, okuma izni gerektirmeyen alanları.
     private static readonly string LeadSubject = $"{CrmModule.Entities.Lead}.subject";
     private static readonly string LeadPurchaseDateField = $"{CrmModule.Entities.Lead}.targetPurchaseDate";
@@ -70,6 +80,24 @@ public static class CrmAutomationTemplates
                     $"Satın alma tarihi yaklaşıyor: {Var(LeadSubject)}",
                     $"Adayın hedef satın alma tarihi {Var(LeadPurchaseDateField)}; 7 gün kaldı.",
                     1)])),
+        // ADR-0050 dilim 3: puan eşiği yalnızca aşıldığı anda (eski < eşik ≤ yeni) tetikler; eşiğin üstünde dalgalanma yeni takip açmaz.
+        new(
+            LeadScoreThreshold,
+            "Puanı eşiği aşan müşteri adayı için takip",
+            $"Açık bir müşteri adayının puanı {DefaultScoreThreshold} ve üstüne çıktığında kaydın sorumlusuna bugüne takip aktivitesi açar.",
+            CrmModule.Entities.Lead,
+            new AutomationDefinition(
+                new FieldChangedTrigger([LeadScoreField]),
+                new ConditionGroup(ConditionLogic.And,
+                [
+                    new ConditionLeaf(LeadScoreField, AutomationOperator.Gte, [Threshold]),
+                    new ConditionLeaf(LeadScoreField, AutomationOperator.Lt, [Threshold]) { Source = AutomationValueSource.Old },
+                    new ConditionLeaf($"{CrmModule.Entities.Lead}.status", AutomationOperator.In, [.. LeadStatus.Open]),
+                ]),
+                [FollowUp(
+                    $"Sıcak müşteri adayı: {Var(LeadSubject)}",
+                    $"Adayın puanı {Var(LeadScoreField)} oldu ve {DefaultScoreThreshold} eşiğini aştı.",
+                    0)])),
     ];
 
     private static AutomationActionStep FollowUp(string subject, string description, int dueInDays) =>

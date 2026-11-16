@@ -172,7 +172,8 @@ public static class TicketAction
 
 /// <summary>Tenant ayarlarından gelen talep politikası; sağlayıcı yoksa varsayılan.</summary>
 public sealed record TicketPolicySettings(
-    int ReopenWindowDays = 7, bool RequireRootCauseForComplaint = true, int AutoCloseDays = 0, bool SurveyEnabled = false, int SurveyValidDays = SurveyRules.DefaultValidDays)
+    int ReopenWindowDays = 7, bool RequireRootCauseForComplaint = true, int AutoCloseDays = 0, bool SurveyEnabled = false, int SurveyValidDays = SurveyRules.DefaultValidDays,
+    bool AcknowledgementEnabled = false)
 {
     public static TicketPolicySettings Default { get; } = new();
 }

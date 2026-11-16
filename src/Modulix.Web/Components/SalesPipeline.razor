@@ -3,7 +3,7 @@
    tonuyla gösterilir. Tıklama yalnızca izin varsa etkindir ve aşamayı doğrudan değiştirmez: çağıran, iş kurallarını çalıştıran
    işlem panelini açar. *@
 
-<ol class="pipeline" aria-label="Satış aşamaları">
+<ol class="pipeline" aria-label="@Texts.Get("crm.pipeline.label")">
     @for (var i = 0; i < Stages.Count; i++)
     {
         var step = Stages[i];
@@ -11,7 +11,7 @@
         <li class="pipeline-step is-@state cat-@(step.Category ?? CrmLists.StageCategories.Open)" aria-current="@(state == "current" ? "step" : null)">
             @if (CanChoose(step, state))
             {
-                <button type="button" class="pipeline-label" @onclick="() => OnChoose.InvokeAsync(step)" title="@step.Label aşamasına geçir">
+                <button type="button" class="pipeline-label" @onclick="() => OnChoose.InvokeAsync(step)" title="@Texts.Get("crm.pipeline.move-to", step.Label)">
                     @Content(i, step, state)
                 </button>
             }
@@ -109,7 +109,7 @@
         {
             builder.OpenElement(10, "span");
             builder.AddAttribute(11, "class", "visually-hidden");
-            builder.AddContent(12, " (tamamlandı)");
+            builder.AddContent(12, " " + Texts.Get("crm.pipeline.done"));
             builder.CloseElement();
         }
     };

@@ -8,7 +8,7 @@ namespace Modulix.IntegrationTests;
 /// <summary>
 /// ADR-0034 dilim 18c: bütün modüllerin metadata adları üç sözlükte karşılığını taşır, Türkçe sözlük kaynak metinle aynıdır ve sözlükte
 /// hiçbir modülün tanımlamadığı <c>meta.*</c> anahtarı kalmaz. Kapsam: denetim kayıt türleri (tür, alan ve kodda tanımlı seçenek adları;
-/// 18c-1), modül adları, izinlerin açıklaması ve satır adı, hazır roller ("Salt okur" dahil; 18c-2), form düzeni ve firma ayarı adları (18c-3).
+/// 18c-1), modül adları, izinlerin açıklaması ve satır adı, hazır roller ("Salt okur" dahil; 18c-2), form düzeni ve firma ayarı adları (18c-3), seçim listeleri, özel alan türleri, lookup ve kayıt devri adları (18c-4).
 /// Veritabanı gerekmez; katalog uygulamanın kaydettiği modüllerden kurulur.
 /// </summary>
 public class MetadataTextsCatalogTests
@@ -17,7 +17,19 @@ public class MetadataTextsCatalogTests
         (IModule[])typeof(Program).Assembly.GetType("ModulixModules", throwOnError: true)!.GetMethod("Create")!.Invoke(null, null)!);
 
     private static IEnumerable<(string Key, string Source)> Names() =>
-        AuditedNames().Concat(AccessNames()).Concat(FormNames()).Concat(SettingNames());
+        AuditedNames().Concat(AccessNames()).Concat(FormNames()).Concat(SettingNames()).Concat(CustomizationNames());
+
+    private static IEnumerable<(string Key, string Source)> CustomizationNames() =>
+        Catalog.ChoiceLists.SelectMany(l =>
+                new[] { (MetadataTexts.ChoiceListKey(l.List.Key), l.List.DisplayName) }
+                    .Concat(l.List.Categories.Select(c => (MetadataTexts.ChoiceCategoryKey(l.List.Key, c.Key), c.DisplayName)))
+                    .Concat(l.List.Values.Select(v => (MetadataTexts.ChoiceValueKey(l.List.Key, v.Key), v.Label))))
+            .Concat(Catalog.CustomizableEntities.Select(e => (MetadataTexts.CustomizableKey(e.Entity.EntityKey), e.Entity.DisplayName)))
+            .Concat(Catalog.Lookups.SelectMany(k =>
+                new[] { (MetadataTexts.LookupKey(k.Lookup.Key), k.Lookup.Title) }
+                    .Concat(k.Lookup.SearchDescription.Length > 0 ? [(MetadataTexts.LookupDescriptionKey(k.Lookup.Key), k.Lookup.SearchDescription)] : [])
+                    .Concat(k.Lookup.DependsOnHint is { } hint ? [(MetadataTexts.LookupHintKey(k.Lookup.Key), hint)] : [])))
+            .Concat(Catalog.Modules.SelectMany(m => m.OwnedRecords).Select(o => (MetadataTexts.OwnedRecordKey(o.EntityKey), o.Label)));
 
     private static IEnumerable<(string Key, string Source)> FormNames() =>
         Catalog.Forms.SelectMany(f =>

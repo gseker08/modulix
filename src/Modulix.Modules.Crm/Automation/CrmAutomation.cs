@@ -101,6 +101,11 @@ public static class CrmAutomation
             new(CrmModule.Entities.Lead, "ownerId", "Sorumlu", AutomationFieldType.Lookup) { LookupKey = CrmLookupDefinitions.LeadOwner },
             new(CrmModule.Entities.Lead, "estimatedBudget", "Tahmini bütçe", AutomationFieldType.Money) { CurrencyField = "currency" },
             Date(CrmModule.Entities.Lead, "targetPurchaseDate", "Hedef satın alma tarihi", "Satın alma tarihi yaklaşan müşteri adayları için (tarihe kala tetikleyicisi)."),
+            // Puan (ADR-0050 dilim 3): eşik "puan değişti" tetikleyicisi ve eski/yeni değer koşuluyla ifade edilir (ör. eski < 70, yeni ≥ 70).
+            new(CrmModule.Entities.Lead, "score", "Puan", AutomationFieldType.Number)
+            {
+                Hint = "0-100. Eşiği aşanı yakalamak için \"puan değişti\" tetikleyicisinde yeni puan ≥ eşik ve eski puan < eşik koşulunu kullanın.",
+            },
 
             // Fırsat
             new(CrmModule.Entities.Opportunity, "title", "Başlık", AutomationFieldType.Text),

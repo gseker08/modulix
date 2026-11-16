@@ -86,7 +86,6 @@ builder.Services.AddSingleton(sp => new SubProfileStarterCatalog(SubProfileStart
 
 builder.Services.AddModulixRecords();
 builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modulix.Api.Crm.QuotePolicyProvider>();
-builder.Services.AddScoped<Modulix.Modules.Crm.Reporting.ISalesReportingPolicyProvider, Modulix.Api.Crm.SalesReportingPolicyProvider>();
 builder.Services.Configure<Modulix.Api.Communication.CommunicationCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Communication.CommunicationCleanupOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Imports.ImportErrorReports>();
 builder.Services.Configure<Modulix.Api.Imports.ImportReportCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Imports.ImportReportCleanupOptions.SectionName));
@@ -121,7 +120,6 @@ builder.Services.AddHostedService<EmailDispatchWorker>();
 builder.Services.Configure<EventOptions>(builder.Configuration.GetSection(EventOptions.SectionName));
 builder.Services.AddModulixEvents();
 builder.Services.AddModulixHardening(builder.Configuration);
-builder.Services.AddLeadIntakeRateLimit(builder.Configuration);
 builder.Services.AddQuotePublicRateLimit(builder.Configuration);
 builder.Services.AddScoped<IPublicTenantScopes, Modulix.Api.PublicTenantScopes>();
 builder.Services.AddCommunicationPublicRateLimit(builder.Configuration);
@@ -278,7 +276,6 @@ app.MapModuleEndpoints();
 app.MapRuleEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
-app.MapLeadIntakeEndpoints();
 app.MapQuotePublicEndpoints();
 app.MapCommunicationPublicEndpoints();
 app.MapPlatformEndpoints();

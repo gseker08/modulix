@@ -106,3 +106,18 @@ public static class AuditText
     public static string Of(AuditSource source, string? subscription) =>
         subscription is null ? Of(source) : $"{Of(source)} · {subscription}";
 }
+
+/// <summary>
+/// Arşivlenmiş denetim kaydı dönemi (ADR-0052 dilim 3): eski aylar ekranda aranmaz, <c>/api/audit/archives/{id}/download</c> ile gzip'li
+/// JSON Lines dosyası olarak indirilir. <see cref="PeriodStart"/> ilk bölümde boştur; <see cref="PeriodEnd"/> hariçtir.
+/// <see cref="Period"/> okunabilir dönemdir (ör. "2026-01").
+/// </summary>
+public sealed record AuditArchiveDto(
+    Guid Id,
+    DateTimeOffset? PeriodStart,
+    DateTimeOffset PeriodEnd,
+    string Period,
+    long RowCount,
+    long SizeBytes,
+    string Sha256,
+    DateTimeOffset ArchivedAt);

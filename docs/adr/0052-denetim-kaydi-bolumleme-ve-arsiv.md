@@ -1,6 +1,6 @@
 # ADR-0052: Denetim kaydının aylık bölümlenmesi ve arşivi
 
-- **Durum:** Kabul edildi, 16 Kasım 2026. Kullanıcı "tarihe göre bölümleme ve arşiv" seçeneğini seçti (mimari değerlendirme A9). Sıcak saklama süresi için kullanıcı süre vermedi; varsayılan 24 ay, yapılandırmayla değişir. Dilim 1 (bölümleme) PR #445 ile main'de; dilim 2 (arşiv komutu) ayrı PR'da.
+- **Durum:** Kabul edildi, 16 Kasım 2026. Kullanıcı "tarihe göre bölümleme ve arşiv" seçeneğini seçti (mimari değerlendirme A9). Sıcak saklama süresi için kullanıcı süre vermedi; varsayılan 24 ay, yapılandırmayla değişir. Dilim 1 (bölümleme) PR #445, dilim 2 (arşiv komutu) PR #454 ile main'de; dilim 3 (arşiv indirme) ayrı PR'da.
 - **Karar:** `core.AuditLog` `OccurredAt` sütununa göre **aylık** bölümlenir. Sıcak saklama süresinden (varsayılan 24 ay) eski aylar tenant başına sıkıştırılmış dosya olarak nesne deposuna arşivlenir, sonra o ayın bölümü bir kerede boşaltılır (`TRUNCATE ... WITH (PARTITIONS)`). Satır satır silme yapılmaz. Arşivleme işletmenin çalıştırdığı bir komuttur (`audit-archive`); uygulama süreci denetim kaydını yine değiştiremez ve silemez.
 
 > Numara notu: 16 Kasım 2026'da `main`'de en yüksek numara 0051'di. Birleştirmeden önce numara yeniden kontrol edilmeli.
@@ -52,7 +52,8 @@ Tablo bugün küçüktür. Bölümleme için kümelenmiş dizin yeniden kurulur;
 
 ### Erişim ve tenant verisi (dilim 3)
 
-- Denetim kaydı ekranı sıcak dönemi gösterir. Daha eski aylar için firma yöneticisi arşiv dosyasını indirir (`audit.read` izni ve denetim kaydı yazılır). Arşiv içinde arama yoktur.
+- Denetim kaydı ekranı sıcak dönemi gösterir. Ekranın **Arşiv** sekmesi arşivlenmiş dönemleri listeler (dönem, satır sayısı, boyut, arşivlenme zamanı, SHA-256); firma yöneticisi dönem dosyasını olduğu gibi indirir (`GET /api/audit/archives/{id}/download`). İkisi de `core.audit.read` ister. Arşiv içinde arama yoktur.
+- İndirme denetim kaydına yazılır (`core.audit-archive`, `Exported`: dönem, satır sayısı, boyut, özet). Başka tenant'ın dönemi ve depoda bulunmayan dosya 404'tür; o zaman denetim kaydı yazılmaz. Dosya bulunmazsa hata günlüğe de yazılır.
 - `tenant-export` ve `tenant-delete` arşivi zaten kapsar (dilim 2'de görüldü): arşiv dosyaları tenant'ın depo kökündedir ve iki komut kökün tamamını kopyalar ya da siler. `core.AuditArchives` satırları da `TenantId` ile dışa aktarılır ve silinir.
 
 ### Arşivin saklanması (dilim 4)

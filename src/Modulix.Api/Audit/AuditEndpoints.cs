@@ -31,6 +31,8 @@ public static class AuditEndpoints
         audit.MapGet("/", ListAsync);
         audit.MapGet("/filters", GetFiltersAsync);
         audit.MapGet("/export", ExportAsync);
+        audit.MapGet("/archives", ListArchivesAsync);
+        audit.MapGet("/archives/{id:guid}/download", DownloadArchiveAsync);
 
         return app;
     }
@@ -143,6 +145,28 @@ public static class AuditEndpoints
             .ToArray();
         var name = FormattableString.Invariant($"denetim-kaydi-{RegionalTime.ToLocal(DateTimeOffset.UtcNow, zone):yyyy-MM-dd}.csv");
         return Results.File(bytes, "text/csv; charset=utf-8", name);
+    }
+
+    // Arşiv (ADR-0052 dilim 3): sıcak saklama süresinden eski aylar ekranda aranmaz, dönem dosyası indirilir.
+    private static async Task<IReadOnlyList<AuditArchiveDto>> ListArchivesAsync(IAuditArchives archives, CancellationToken ct) =>
+        (await archives.ListAsync(ct))
+            .Select(a => new AuditArchiveDto(a.Id, a.PeriodStart, a.PeriodEnd, a.PeriodText, a.RowCount, a.SizeBytes, a.Sha256, a.ArchivedAt))
+            .ToList();
+
+    /// <summary>
+    /// Dönem dosyası (gzip'li JSON Lines) olduğu gibi verilir; indirme denetim kaydına yazılır. Başka tenant'ın dönemi ve depoda bulunmayan
+    /// dosya 404'tür (denetim kaydı yazılmaz).
+    /// </summary>
+    private static async Task<IResult> DownloadArchiveAsync(Guid id, IAuditArchives archives, CancellationToken ct)
+    {
+        if (await archives.OpenAsync(id, ct) is not { } download)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Arşiv dosyası bulunamadı.");
+        }
+
+        var archive = download.Archive;
+        var period = archive.FirstMonth is { } first && first != archive.LastMonth ? $"{first}_{archive.LastMonth}" : archive.LastMonth;
+        return Results.File(download.Content, "application/gzip", $"denetim-arsivi-{period}.jsonl.gz");
     }
 
     private static AuditQuery Query(

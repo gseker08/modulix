@@ -8,7 +8,7 @@
    Aktif ekranın detay sayfasında son öğe liste ekranına bağlantı olur. *@
 @if (trail is not null)
 {
-    <nav class="page-breadcrumb" aria-label="Konum">
+    <nav class="page-breadcrumb" aria-label="@Texts.Get("breadcrumb.label")">
         <ol>
             <li><a href="@trail.RootHref">@trail.Root</a></li>
             @if (trail.Section is not null)

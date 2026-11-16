@@ -47,6 +47,7 @@ public static class LeadScoreCatalog
         new("contacts", "Gerçekleşen temas sayısı", CountOperators),
         new("meetings", "Yapılan toplantı sayısı", CountOperators),
         new("repeatInquiries", "Tekrar başvuru sayısı", CountOperators),
+        new("inactiveDays", "Hareketsiz gün sayısı", CountOperators),
     ];
 
     public static ScoreFieldOption? Find(string? key) => Fields.FirstOrDefault(f => f.Key == key);

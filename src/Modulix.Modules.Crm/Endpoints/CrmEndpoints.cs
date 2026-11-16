@@ -19,8 +19,8 @@ namespace Modulix.Modules.Crm.Endpoints;
 internal static class CrmEndpoints
 {
     /// <summary>
-    /// <paramref name="routes"/> host tarafından <c>/api/crm</c> grubu olarak, oturum ve modül kontrolüyle sarılmış gelir (ADR-0046). Teklif ve satış
-    /// planlama uçları henüz host'tadır (<c>Modulix.Api/Crm</c>; ADR-0046 dilim 6'nın sonraki adımları).
+    /// <paramref name="routes"/> host tarafından <c>/api/crm</c> grubu olarak, oturum ve modül kontrolüyle sarılmış gelir (ADR-0046). Teklif
+    /// uçları henüz host'tadır (<c>Modulix.Api/Crm</c>; ADR-0046 dilim 6'nın sonraki adımları).
     /// </summary>
     public static void MapEndpoints(IEndpointRouteBuilder routes)
     {
@@ -58,5 +58,7 @@ internal static class CrmEndpoints
             CrmModule.Permissions.ActivitiesRead, CrmModule.Permissions.ActivitiesWrite);
         ActivityEndpoints.Map(crm);
         LeadEndpoints.Map(crm);
+        LeadIntakeEndpoints.MapAdmin(crm);
+        SalesPlanningEndpoints.Map(crm);
     }
 }

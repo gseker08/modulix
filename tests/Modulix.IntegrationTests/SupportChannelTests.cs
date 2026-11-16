@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
+using Modulix.Infrastructure.Email;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Shared.Auth;
@@ -640,6 +641,125 @@ public class SupportChannelTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         await BulkAsync(lead, new BulkTicketsRequest("assign", [.. Enumerable.Range(0, 51).Select(_ => Guid.NewGuid())], OwnerId: s.Agent.Id), HttpStatusCode.UnprocessableEntity);
         using var anonymous = Anonymous();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync("/api/support/tickets/bulk", new BulkTicketsRequest("close", [a.Id]))).StatusCode);
+    }
+
+    // ---- Otomatik alındı yanıtı (ADR-0024 §4.12)
+
+    private async Task<List<QueuedEmail>> AcknowledgementMailsAsync(Guid ticketId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        return await db.EmailMessages.AsNoTracking().Where(e => e.Reference == $"support.ack:{ticketId}").ToListAsync();
+    }
+
+    [Fact]
+    public async Task A_new_ticket_is_acknowledged_by_email_when_enabled_and_the_acknowledgement_is_not_a_first_response()
+    {
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        using var lead = await LoginAsync(s.Lead);
+        var address = $"alindi-{Guid.NewGuid():N}@musteri.example.test";
+
+        // Ayar kapalıyken (varsayılan) ne mesaj ne e-posta yazılır.
+        var quiet = await TicketAsync(lead, s, "Sessiz", address);
+        Assert.Empty(await MessagesAsync(lead, quiet.Id));
+        Assert.Empty(await AcknowledgementMailsAsync(quiet.Id));
+
+        // Doğrulama: ayar yalnızca evet/hayır alır.
+        var current = (await manager.GetFromJsonAsync<SettingsResponse>("/api/settings"))!;
+        var version = current.Settings.FirstOrDefault(x => x.Key == "support.acknowledgement.enabled")?.Version ?? 0;
+        var invalid = await manager.PutAsJsonAsync("/api/settings",
+            new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { ["support.acknowledgement.enabled"] = new("belki", version) }));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+
+        await SetSettingAsync(manager, "support.acknowledgement.enabled", "true");
+        var ticket = await TicketAsync(lead, s, "Faturam hatalı", address);
+
+        var message = Assert.Single(await MessagesAsync(lead, ticket.Id));
+        Assert.Equal(("Public", "Outbound", true, "Queued", (Guid?)null), (message.Visibility, message.Direction, message.IsAutomatic, message.DeliveryStatus, message.AuthorId));
+        Assert.Contains(ticket.Number, message.Body);
+
+        var mail = Assert.Single(await AcknowledgementMailsAsync(ticket.Id));
+        Assert.Equal((s.Tenant.Id, address, $"[{ticket.Number}] Faturam hatalı"), (mail.TenantId, mail.ToAddress, mail.Subject));
+        Assert.Contains(ticket.Number, mail.TextBody);
+
+        // Otomatik yanıt ilk insan yanıtı değildir; personelin yanıtı öyledir.
+        Assert.Null((await GetAsync(lead, ticket.Id)).FirstResponseAt);
+        await MessageAsync(lead, ticket.Id, "reply", "İnceliyoruz.");
+        Assert.NotNull((await GetAsync(lead, ticket.Id)).FirstResponseAt);
+
+        // Başvuran e-postası yoksa yanıtlarla aynı alıcı kullanılır (müşterinin e-postası).
+        var fallback = await TicketAsync(lead, s, "Telefonla açıldı");
+        Assert.Equal("kanal@musteri.example.test", Assert.Single(await AcknowledgementMailsAsync(fallback.Id)).ToAddress);
+
+        // Tekrar sayılan istek (aynı clientKey) ikinci kez alındı göndermez.
+        var key = Guid.NewGuid().ToString("N");
+        var first = await TicketAsync(lead, s, "Çift tık", address, key);
+        var repeat = await lead.PostAsJsonAsync("/api/support/tickets", new SaveTicketRequest(Subject: "Çift tık", PartyId: s.PartyId, ReporterEmail: address, ClientKey: key));
+        Assert.NotEqual(HttpStatusCode.Created, repeat.StatusCode);
+        Assert.Single(await AcknowledgementMailsAsync(first.Id));
+    }
+
+    [Fact]
+    public async Task Inbound_tickets_are_acknowledged_and_the_reply_to_the_acknowledgement_joins_the_ticket_while_automatic_mail_gets_none()
+    {
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        using var integration = await LoginAsync(s.Integration);
+        using var lead = await LoginAsync(s.Lead);
+        await SetSettingAsync(manager, "support.acknowledgement.enabled", "true");
+        var from = $"gelen-{Guid.NewGuid():N}@musteri.example.test";
+
+        var created = await IngestAsync(integration, Email($"<{Guid.NewGuid():N}@mx.test>", from, "Kargom gelmedi"));
+        var ticketId = created.TicketId!.Value;
+        var mail = Assert.Single(await AcknowledgementMailsAsync(ticketId));
+        Assert.Equal((from, $"[{created.TicketNumber}] Kargom gelmedi"), (mail.ToAddress, mail.Subject));
+
+        // Müşteri alındı e-postasını yanıtlar: konu etiketi talebe eşlenir, yeni talep ve yeni alındı yazılmaz.
+        var reply = await IngestAsync(integration, Email($"<{Guid.NewGuid():N}@mx.test>", from, $"Re: {mail.Subject}", "Ek bilgi: sipariş no 42."));
+        Assert.Equal(ticketId, reply.TicketId);
+        Assert.Single(await AcknowledgementMailsAsync(ticketId));
+        var messages = await MessagesAsync(lead, ticketId);
+        Assert.Single(messages, m => m.IsAutomatic);
+        Assert.Equal(2, messages.Count(m => m.Direction == "Inbound"));
+
+        // Otomatik gelen e-posta talep açmaz; alındı da gitmez (döngü olmaz).
+        var robot = $"robot-{Guid.NewGuid():N}@musteri.example.test";
+        var ignored = await IngestAsync(integration, Email($"<{Guid.NewGuid():N}@mx.test>", robot, "Ofis dışındayım", autoSubmitted: "auto-replied"));
+        Assert.Null(ignored.TicketId);
+        using var scope = factory.Services.CreateScope();
+        Assert.False(await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().EmailMessages.AnyAsync(e => e.ToAddress == robot));
+    }
+
+    [Fact]
+    public async Task Acknowledgements_follow_each_tenants_own_setting_and_only_settings_managers_can_switch_them_on()
+    {
+        var s = await SetUpAsync();
+        var other = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        using var lead = await LoginAsync(s.Lead);
+        using var viewer = await LoginAsync(s.Viewer);
+        using var otherLead = await LoginAsync(other.Lead);
+        var address = $"kiraci-{Guid.NewGuid():N}@musteri.example.test";
+
+        // Yetki: ayar yönetme izni olmayan kullanıcı alındı yanıtını açamaz.
+        var forbidden = await lead.PutAsJsonAsync("/api/settings",
+            new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { ["support.acknowledgement.enabled"] = new("true", 0) }));
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.Empty(await AcknowledgementMailsAsync((await TicketAsync(lead, s, "Henüz kapalı", address)).Id));
+
+        await SetSettingAsync(manager, "support.acknowledgement.enabled", "true");
+        var ticket = await TicketAsync(lead, s, "Açık", address);
+        Assert.Single(await AcknowledgementMailsAsync(ticket.Id));
+
+        // Tenant izolasyonu: öteki firmanın ayarı kapalıdır, onun talebine alındı gitmez; bu firmanın mesajını da göremez.
+        var foreign = await TicketAsync(otherLead, other, "Öteki firma", address);
+        Assert.Empty(await AcknowledgementMailsAsync(foreign.Id));
+        Assert.Empty(await MessagesAsync(otherLead, foreign.Id));
+        Assert.Equal(HttpStatusCode.NotFound, (await otherLead.GetAsync($"/api/support/tickets/{ticket.Id}/messages")).StatusCode);
+
+        // Otomatik yanıt müşteriye görünen mesajdır: iç not izni olmayan kullanıcı da görür.
+        Assert.True(Assert.Single(await MessagesAsync(viewer, ticket.Id)).IsAutomatic);
     }
 
     private sealed record RecordPage(int TotalCount);

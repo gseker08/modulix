@@ -105,6 +105,7 @@ public sealed class SupportModule : IModule, IModuleEndpoints, IModulePublicEndp
         public const string AutoCloseDays = "support.auto-close-days";
         public const string SurveyEnabled = "support.survey.enabled";
         public const string SurveyValidDays = "support.survey.valid-days";
+        public const string AcknowledgementEnabled = "support.acknowledgement.enabled";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -192,7 +193,12 @@ public sealed class SupportModule : IModule, IModuleEndpoints, IModulePublicEndp
             PatternMessage = "1-90 arası tam sayı girin.",
             MaxLength = 2,
         },
-        new(SettingKeys.RequireRootCause, "Destek: şikâyet çözümünde kök neden zorunlu", "Destek", SettingType.Choice, "true")
+        new(SettingKeys.AcknowledgementEnabled, "Destek: talep açılınca otomatik alındı yanıtı gönder", "Destek", SettingType.Choice, "false")
+        {
+            Description = "Evet seçilirse talep açıldığında, başvuranın e-postası varsa talep numarasını bildiren otomatik yanıt e-posta kuyruğuna yazılır. Otomatik yanıt ilk yanıt sayılmaz ve SLA sayacını durdurmaz. Varsayılan hayırdır.",
+            Options = [new SettingOption("true", "Evet"), new SettingOption("false", "Hayır")],
+        },
+        new(SettingKeys.RequireRootCause,"Destek: şikâyet çözümünde kök neden zorunlu", "Destek", SettingType.Choice, "true")
         {
             Description = "Evet seçilirse şikâyet türündeki talep, kök neden ve düzeltici aksiyon yazılmadan çözülemez.",
             Options = [new SettingOption("true", "Evet"), new SettingOption("false", "Hayır")],
@@ -456,6 +462,7 @@ public sealed class SupportModule : IModule, IModuleEndpoints, IModulePublicEndp
         services.AddScoped<ISupportReports, SupportReports>();
         services.AddScoped<ITicketInbound, TicketInbound>();
         services.AddScoped<SurveyIssuer>();
+        services.AddScoped<AcknowledgementSender>();
         services.AddScoped<ITicketSurveys, TicketSurveys>();
         services.AddScoped<ISurveyPortal, SurveyPortal>();
         services.AddScoped<ITicketBulk, TicketBulk>();

@@ -162,6 +162,7 @@ public static class PersistenceSetup
         services.AddScoped<IReportCenter, ReportCenter>();
         services.AddScoped<ReportAccessStamp>();
         services.AddScoped<IReportExports, ReportExports>();
+        services.AddScoped<Modulix.Core.Contracts.Reporting.IReportTableExports, ReportTableExports>();
         services.AddScoped<IReportSchedules, ReportSchedules>();
         services.AddScoped<CustomFieldService>();
         services.AddScoped<ICustomFieldService>(sp => sp.GetRequiredService<CustomFieldService>());
@@ -233,6 +234,7 @@ public static class PersistenceSetup
 
         // Denetim kaydı okuma (Y5).
         services.AddScoped<IAuditLog, AuditLog>();
+        services.AddScoped<IAuditArchives, AuditArchives>();
         services.AddScoped<ITenantSettings, TenantSettings>();
         // Modüllerin ayar okuma sözleşmesi (ADR-0046); aynı kapsamdaki ITenantSettings örneğini verir.
         services.AddScoped<ITenantSettingReader>(provider => provider.GetRequiredService<ITenantSettings>());
