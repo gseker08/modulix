@@ -6,14 +6,14 @@
 @inject CrmLookups Lookups
 @inject NavigationManager Nav
 
-<PageTitle>CRM panosu · Modulix</PageTitle>
+<PageTitle>@Texts.Get("crm.dashboard.title") · Modulix</PageTitle>
 
 @* İki sekme (ViewTabs): Hedef merkezi ve Benim günüm (MyDayPanel). Hedef merkezi: veri Satış görünümüyle aynı uçtan gelir, yeni hesap yoktur. Kapsam ve tutar izni sunucuda uygulanır; tutar izni yoksa adetler gösterilir. *@
 @* Satış raporu izni olmayan temsilci yalnızca Benim günüm'ü görür (sekme çubuğu çizilmez). *@
 <AuthGate Module="@CrmAccess.ModuleKey" AnyPermission="SalesAccess.MyDayAny">
     <div class="page-header">
         <div>
-            <h1>CRM panosu</h1>
+            <h1>@Texts.Get("crm.dashboard.title")</h1>
             <p class="page-subtitle">@(view == DayView ? Greeting : Subtitle)</p>
         </div>
         <div class="header-actions">
@@ -21,23 +21,23 @@
             {
                 @if (Session.Can(CrmAccess.ActivitiesRead))
                 {
-                    <a class="btn btn-outline-secondary" href="crm/aktiviteler"><AppIcon Name="calendar" Size="16" /> Takvim</a>
+                    <a class="btn btn-outline-secondary" href="crm/aktiviteler"><AppIcon Name="calendar" Size="16" /> @Texts.Get("crm.dashboard.calendar")</a>
                 }
                 @if (Session.Can(CrmAccess.ActivitiesWrite))
                 {
-                    <button type="button" class="btn btn-primary" @onclick="() => myDay?.NewActivity()"><AppIcon Name="plus" Size="16" /> Yeni aktivite</button>
+                    <button type="button" class="btn btn-primary" @onclick="() => myDay?.NewActivity()"><AppIcon Name="plus" Size="16" /> @Texts.Get("crm.activities.new")</button>
                 }
             }
             else
             {
-            <div class="segmented" role="group" aria-label="Dönem türü">
+            <div class="segmented" role="group" aria-label="@Texts.Get("crm.sales.periodKind")">
                 @foreach (var (key, label) in SalesLabels.PeriodKinds)
                 {
                     <button type="button" class="chip @(kind == key ? "active" : null)" aria-pressed="@(kind == key ? "true" : "false")" disabled="@loading" @onclick="() => ChooseKindAsync(key)">@label</button>
                 }
             </div>
-            <select class="form-select dash-filter" aria-label="Sorumlu" @bind="owner" @bind:after="LoadAsync">
-                <option value="">Tüm ekip</option>
+            <select class="form-select dash-filter" aria-label="@Texts.Get("common.field.owner")" @bind="owner" @bind:after="LoadAsync">
+                <option value="">@Texts.Get("crm.dashboard.all-team")</option>
                 @foreach (var member in Lookups.Members)
                 {
                     <option value="@member.UserId">@member.DisplayName</option>
@@ -45,7 +45,7 @@
             </select>
             @if (Session.Can(CrmAccess.OpportunitiesWrite))
             {
-                <a class="btn btn-primary" href="crm/firsatlar?yeni=true"><AppIcon Name="plus" Size="16" /> Yeni fırsat</a>
+                <a class="btn btn-primary" href="crm/firsatlar?yeni=true"><AppIcon Name="plus" Size="16" /> @Texts.Get("crm.opportunities.new")</a>
             }
             }
         </div>
@@ -53,7 +53,7 @@
 
     @if (CanReports)
     {
-        <ViewTabs Items="Views" Value="@view" ValueChanged="ChooseViewAsync" Label="Pano görünümleri" />
+        <ViewTabs Items="Views" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("crm.dashboard.views")" />
     }
 
     @if (view == DayView)
@@ -71,10 +71,10 @@
     @if (error is not null)
     {
         <div class="alert @(forbidden ? "alert-warning" : "alert-danger")" role="alert">
-            @(forbidden ? "Bu panoyu açma yetkiniz yok. " : null)@error
+            @(forbidden ? Texts.Get("crm.dashboard.forbidden") + " " : null)@error
             @if (!forbidden)
             {
-                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">Tekrar dene</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" disabled="@loading" @onclick="LoadAsync">@Texts.Get("crm.sales.retry")</button>
             }
         </div>
     }
@@ -86,18 +86,18 @@
         var progress = (amounts ? r.AmountTarget : r.CountTarget)?.Progress;
         var tempo = SalesLabels.PeriodElapsedPercent(r.PeriodStart, r.PeriodEnd, r.Today);
 
-        <section class="dash-hero @(progress is null ? "dash-hero-solo" : null)" aria-label="Dönem öngörüsü">
+        <section class="dash-hero @(progress is null ? "dash-hero-solo" : null)" aria-label="@Texts.Get("crm.dashboard.outlook")">
             <div>
-                <p class="dash-hero-kicker">@(amounts ? "Dönem öngörüsü · gerçekleşen + ağırlıklı tahmin" : "Kazanılan fırsat")</p>
+                <p class="dash-hero-kicker">@(amounts ? Texts.Get("crm.dashboard.outlook-kicker") : Texts.Get("crm.dashboard.won"))</p>
                 <div class="dash-hero-headline">
                     <span class="dash-hero-value">@(amounts ? SalesLabels.Compact(r.Outlook, r.Currency) : SalesLabels.Count(r.WonCount))</span>
                     @if (progress is not null)
                     {
-                        <span class="dash-hero-note">Hedef @Figure(progress.Target, r) · @SalesLabels.Percent(Math.Round(Share(amounts ? r.Outlook : progress.Realized, progress)))</span>
+                        <span class="dash-hero-note">@Texts.Get("crm.dashboard.target-line", Figure(progress.Target, r), SalesLabels.Percent(Math.Round(Share(amounts ? r.Outlook : progress.Realized, progress))))</span>
                     }
                     else if (Session.Can(SalesAccess.TargetsRead))
                     {
-                        <span class="dash-hero-note">Bu dönem için hedef yok. <a href="crm/satis-hedefleri">Hedef tanımla</a></span>
+                        <span class="dash-hero-note">@Texts.Get("crm.dashboard.no-target") <a href="crm/satis-hedefleri">@Texts.Get("crm.dashboard.define-target")</a></span>
                     }
                 </div>
                 @if (progress is not null)
@@ -107,12 +107,12 @@
                 <div class="dash-hero-legend">
                     @if (amounts)
                     {
-                        <span><i class="fill-realized"></i>Gerçekleşen @SalesLabels.Compact(r.Realized.Amount, r.Currency)</span>
-                        <span><i class="fill-weighted"></i>Ağırlıklı tahmin @SalesLabels.Compact(r.WeightedOpen.Amount, r.Currency)</span>
+                        <span><i class="fill-realized"></i>@Texts.Get("crm.sales-card.realized") @SalesLabels.Compact(r.Realized.Amount, r.Currency)</span>
+                        <span><i class="fill-weighted"></i>@Texts.Get("crm.sales-card.weightedopen") @SalesLabels.Compact(r.WeightedOpen.Amount, r.Currency)</span>
                     }
                     @if (progress is not null && tempo is { } elapsed)
                     {
-                        <span><i class="fill-tempo"></i>Bugünkü tempo @SalesLabels.Percent(Math.Round(elapsed))</span>
+                        <span><i class="fill-tempo"></i>@Texts.Get("crm.dashboard.today-tempo") @SalesLabels.Percent(Math.Round(elapsed))</span>
                     }
                 </div>
             </div>
@@ -120,67 +120,67 @@
             {
                 <dl class="dash-hero-stats">
                     <div>
-                        <dd>@(progress.TargetMet ? "Karşılandı" : Figure(progress.Remaining, r))</dd>
-                        <dt>Kalan hedef</dt>
+                        <dd>@(progress.TargetMet ? Texts.Get("crm.dashboard.target-met") : Figure(progress.Remaining, r))</dd>
+                        <dt>@Texts.Get("crm.dashboard.remaining")</dt>
                     </div>
                     <div>
                         <dd>@(progress.Coverage is { } coverage ? $"{coverage.ToString("0.0", Regional.Numbers)}×" : "—")</dd>
-                        <dt>Pipeline kapsama</dt>
+                        <dt>@Texts.Get("crm.salesTarget.coverage")</dt>
                     </div>
                     @if (tempo is { } pace)
                     {
                         var gap = Math.Round(Share(progress.Realized, progress) - pace);
                         <div>
-                            <dd>@(gap > 0 ? "+" : null)@gap.ToString("0", Regional.Numbers) puan</dd>
-                            <dt>Tempoya göre @(gap < 0 ? "geride" : "önde")</dt>
+                            <dd>@(gap > 0 ? "+" : null)@Texts.Get("crm.dashboard.points", gap.ToString("0", Regional.Numbers))</dd>
+                            <dt>@Texts.Get(gap < 0 ? "crm.dashboard.behind-tempo" : "crm.dashboard.ahead-tempo")</dt>
                         </div>
                     }
                 </dl>
             }
         </section>
 
-        <div class="dash-kpis" role="group" aria-label="Satış özeti">
-            <DashKpi Label="Gerçekleşen" Icon="check-circle" Tone="success" Value="@(amounts ? SalesLabels.Compact(r.Realized.Amount, r.Currency) : SalesLabels.Count(r.WonCount))"
-                     Detail="@($"{r.Realized.Count} kazanılan fırsat")" Delta="@RealizedDelta(r).Text" DeltaTrend="@RealizedDelta(r).Trend" Partial="@(amounts && r.Realized.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.Realized)"
+        <div class="dash-kpis" role="group" aria-label="@Texts.Get("crm.dashboard.summary")">
+            <DashKpi Label="@Texts.Get("crm.sales-card.realized")" Icon="check-circle" Tone="success" Value="@(amounts ? SalesLabels.Compact(r.Realized.Amount, r.Currency) : SalesLabels.Count(r.WonCount))"
+                     Detail="@Texts.Get("crm.dashboard.won-count", r.Realized.Count)" Delta="@RealizedDelta(r).Text" DeltaTrend="@RealizedDelta(r).Trend" Partial="@(amounts && r.Realized.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.Realized)"
                      Trend="@(r.Trend.Select(t => amounts ? t.Realized : t.WonCount).ToList())" />
-            <DashKpi Label="Açık pipeline" Icon="layers" Value="@(amounts ? SalesLabels.Compact(r.OpenPipeline.Amount, r.Currency) : SalesLabels.Count(r.OpenPipeline.Count))"
-                     Detail="@($"{r.OpenPipeline.Count} açık fırsat")" Partial="@(amounts && r.OpenPipeline.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.OpenPipeline)" />
-            <DashKpi Label="Kazanma oranı" Icon="target" Tone="teal" Value="@(r.WinRatePercent is { } rate ? SalesLabels.Percent(Math.Round(rate)) : "Veri yok")"
-                     Detail="@(r.WinRatePercent is null ? "Bu dönemde sonuçlanan fırsat yok" : $"{r.WonCount} kazanılan · {r.LostCount} kayıp")"
+            <DashKpi Label="@Texts.Get("crm.sales-card.openpipeline")" Icon="layers" Value="@(amounts ? SalesLabels.Compact(r.OpenPipeline.Amount, r.Currency) : SalesLabels.Count(r.OpenPipeline.Count))"
+                     Detail="@Texts.Get("crm.dashboard.open-count", r.OpenPipeline.Count)" Partial="@(amounts && r.OpenPipeline.IsPartial)" PartialHint="@SalesLabels.PartialHint(r.OpenPipeline)" />
+            <DashKpi Label="@Texts.Get("crm.opportunityReport.winRate")" Icon="target" Tone="teal" Value="@(r.WinRatePercent is { } rate ? SalesLabels.Percent(Math.Round(rate)) : Texts.Get("crm.sales.noData"))"
+                     Detail="@(r.WinRatePercent is null ? Texts.Get("crm.dashboard.no-closed") : Texts.Get("crm.dashboard.won-lost", r.WonCount, r.LostCount))"
                      Delta="@WinRateDelta(r).Text" DeltaTrend="@WinRateDelta(r).Trend" />
-            <DashKpi Label="Gecikmiş fırsat" Icon="alert-circle" Tone="warning" Value="@SalesLabels.Count(r.OverdueOpenCount)" Detail="Beklenen kapanışı geçmiş" />
+            <DashKpi Label="@Texts.Get("crm.dashboard.overdue")" Icon="alert-circle" Tone="warning" Value="@SalesLabels.Count(r.OverdueOpenCount)" Detail="@Texts.Get("crm.dashboard.overdue-detail")" />
         </div>
 
         @if (r.PreviousToDate is { } previous && (RealizedDelta(r).Text is not null || WinRateDelta(r).Text is not null))
         {
-            <p class="small text-muted">Değişimler önceki dönemin aynı noktasına göredir: @previous.Label, @SalesLabels.Period(previous.Start, previous.LastDay).</p>
+            <p class="small text-muted">@Texts.Get("crm.dashboard.delta-note", previous.Label, SalesLabels.Period(previous.Start, previous.LastDay))</p>
         }
 
         <div class="dash-grid">
             <section class="dash-card" aria-labelledby="dash-trend">
-                <div class="dash-card-head"><h2 id="dash-trend">Son @r.Trend.Count dönemin gerçekleşeni</h2></div>
+                <div class="dash-card-head"><h2 id="dash-trend">@Texts.Get("crm.dashboard.trend", r.Trend.Count)</h2></div>
                 @if (r.Trend.All(t => t.Realized == 0 && t.WonCount == 0))
                 {
-                    <EmptyState Compact="true" Title="Bu dönemlerde kazanılan fırsat yok." />
+                    <EmptyState Compact="true" Title="@Texts.Get("crm.dashboard.trend-empty")" />
                 }
                 else
                 {
-                    <ColumnChart Title="@($"Dönemlere göre gerçekleşen {(amounts ? $"tutar ({r.Currency})" : "adet")}")"
+                    <ColumnChart Title="@(amounts ? Texts.Get("crm.dashboard.trend-chart-amount", r.Currency) : Texts.Get("crm.dashboard.trend-chart-count"))"
                                  Items="@(r.Trend.Select(t => new ColumnChart.Item(SalesLabels.ShortPeriod(t.Label), t.Label, amounts ? t.Realized : t.WonCount, amounts ? SalesLabels.Short(t.Realized) : SalesLabels.Count(t.WonCount))).ToList())" />
                 }
             </section>
 
             <section class="dash-card" aria-labelledby="dash-stage">
                 <div class="dash-card-head">
-                    <h2 id="dash-stage">Pipeline aşamaları</h2>
+                    <h2 id="dash-stage">@Texts.Get("crm.dashboard.stages")</h2>
                     @if (Session.Can(CrmAccess.OpportunitiesRead))
                     {
-                        <a href="crm/firsatlar">Fırsatlara git</a>
+                        <a href="crm/firsatlar">@Texts.Get("crm.dashboard.go-opportunities")</a>
                     }
                 </div>
                 @if (r.ByStage.Count == 0)
                 {
-                    <EmptyState Compact="true" Title="Açık fırsat yok." />
+                    <EmptyState Compact="true" Title="@Texts.Get("crm.sales.noOpen")" />
                 }
                 else
                 {
@@ -201,22 +201,22 @@
                     }
                     @if (stages.Where(s => s.AverageDaysInStage is not null).MaxBy(s => s.AverageDaysInStage) is { } slowest)
                     {
-                        <p class="small text-muted mb-0 mt-3"><AppIcon Name="clock" Size="14" /> En uzun bekleyen aşama: @Lookups.Label(CrmLists.OpportunityStage, slowest.Stage) (ort. @Days(slowest.AverageDaysInStage!.Value) gün)</p>
+                        <p class="small text-muted mb-0 mt-3"><AppIcon Name="clock" Size="14" /> @Texts.Get("crm.dashboard.slowest", Lookups.Label(CrmLists.OpportunityStage, slowest.Stage), Days(slowest.AverageDaysInStage!.Value))</p>
                     }
                 }
             </section>
 
             <section class="dash-card" aria-labelledby="dash-risk">
                 <div class="dash-card-head">
-                    <h2 id="dash-risk">Dikkat isteyenler</h2>
+                    <h2 id="dash-risk">@Texts.Get("crm.dashboard.attention")</h2>
                     @if (r.OverdueOpenCount > AttentionLimit)
                     {
-                        <a href="crm/satis-gorunumu">@r.OverdueOpenCount fırsatın tümü</a>
+                        <a href="crm/satis-gorunumu">@Texts.Get("crm.dashboard.all-overdue", r.OverdueOpenCount)</a>
                     }
                 </div>
                 @if (r.Overdue.Count == 0)
                 {
-                    <EmptyState Compact="true" Title="Beklenen kapanışı geçmiş açık fırsat yok." />
+                    <EmptyState Compact="true" Title="@Texts.Get("crm.dashboard.attention-empty")" />
                 }
                 else
                 {
@@ -231,7 +231,7 @@
                                 }
                                 <div class="dash-list-main">
                                     <a href="crm/firsatlar/@risk.Id" title="@risk.Title">@risk.Title</a>
-                                    <small>@LateText(risk, r.Today)@(string.IsNullOrEmpty(owner) ? " · Atanmadı" : $" · {owner}")</small>
+                                    <small>@LateText(risk, r.Today)@(" · " + (string.IsNullOrEmpty(owner) ? Texts.Get("crm.leads.unassigned") : owner))</small>
                                 </div>
                                 @if (risk.Amount is { } value)
                                 {
@@ -247,7 +247,7 @@
         @if (r.Warnings.Count > 0)
         {
             <details class="detail-section">
-                <summary><strong>Verilerle ilgili uyarılar (@r.Warnings.Count)</strong></summary>
+                <summary><strong>@Texts.Get("crm.sales.warnings") (@r.Warnings.Count)</strong></summary>
                 <ul class="small text-muted mt-2 mb-0">
                     @foreach (var warning in r.Warnings)
                     {
@@ -265,10 +265,10 @@
     private const string GoalView = "hedef";
     private const string DayView = "gunum";
 
-    private static readonly IReadOnlyList<ViewOption> Views =
+    private static IReadOnlyList<ViewOption> Views =>
     [
-        new(GoalView, "Hedef merkezi", Icon: "target"),
-        new(DayView, "Benim günüm", Icon: "calendar"),
+        new(GoalView, Texts.Get("crm.dashboard.view.goal"), Icon: "target"),
+        new(DayView, Texts.Get("crm.dashboard.view.day"), Icon: "calendar"),
     ];
 
     /// <summary>Açılacak sekme: <c>?gorunum=gunum</c> Benim günüm'ü açar; yoksa Hedef merkezi.</summary>
@@ -319,17 +319,17 @@
         get
         {
             var hour = Regional.Now.Hour;
-            var hello = hour < 12 ? "Günaydın" : hour < 18 ? "İyi günler" : "İyi akşamlar";
+            var hello = Texts.Get(hour < 12 ? "crm.dashboard.morning" : hour < 18 ? "crm.dashboard.afternoon" : "crm.dashboard.evening");
             var name = Session.User?.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
             var parts = new List<string>();
             if (summary?.OpenToday is { } open)
             {
-                parts.Add(open == 0 ? "Bugün planlı işiniz yok" : $"Bugün {open} işiniz var");
+                parts.Add(open == 0 ? Texts.Get("crm.dashboard.today-none") : Texts.Get("crm.dashboard.today-count", open));
             }
 
             if (summary?.OverdueOpportunities is { } late && late > 0)
             {
-                parts.Add($"{late} fırsatınızın kapanış tarihi geçti");
+                parts.Add(Texts.Get("crm.dashboard.late-count", late));
             }
 
             return $"{hello}{(name is null ? null : " " + name)}." + (parts.Count > 0 ? " " + string.Join(", ", parts) + "." : null);
@@ -342,13 +342,13 @@
         {
             if (report is not { } r)
             {
-                return "Hedef, pipeline ve dikkat isteyen fırsatlar";
+                return Texts.Get("crm.dashboard.subtitle");
             }
 
             var total = r.PeriodEnd.DayNumber - r.PeriodStart.DayNumber + 1;
             var passed = r.Today.DayNumber - r.PeriodStart.DayNumber + 1;
             return passed >= 1 && passed <= total
-                ? $"{CrmLabels.Date(r.Today)} · {r.PeriodLabel} · {passed} / {total} gün geçti"
+                ? Texts.Get("crm.dashboard.period-progress", CrmLabels.Date(r.Today), r.PeriodLabel, passed, total)
                 : $"{r.PeriodLabel} · {SalesLabels.Period(r.PeriodStart, r.PeriodEnd)}";
         }
     }
@@ -390,10 +390,12 @@
     private static string Figure(decimal value, SalesOverviewDto r) => r.AmountsVisible ? SalesLabels.Compact(value, r.Currency) : value.ToString("N0", Regional.Numbers);
 
     private static string MeterLabel(SalesOverviewDto r, TargetProgressDto progress, decimal? tempo) =>
-        $"Hedefin {SalesLabels.Percent(Math.Round(Share(progress.Realized, progress)))} gerçekleşti" + (tempo is { } value ? $", dönemin {SalesLabels.Percent(Math.Round(value))} geçti" : null);
+        tempo is { } value
+            ? Texts.Get("crm.dashboard.meter-tempo", SalesLabels.Percent(Math.Round(Share(progress.Realized, progress))), SalesLabels.Percent(Math.Round(value)))
+            : Texts.Get("crm.dashboard.meter", SalesLabels.Percent(Math.Round(Share(progress.Realized, progress))));
 
     private static string LateText(OverviewRiskDto risk, DateOnly today) =>
-        risk.ExpectedCloseDate is { } due ? $"{today.DayNumber - due.DayNumber} gün gecikti" : "Gecikti";
+        risk.ExpectedCloseDate is { } due ? Texts.Get("crm.dashboard.days-late", today.DayNumber - due.DayNumber) : Texts.Get("crm.pending.overdue");
 
     // Gerçekleşen: tutar izni varsa yüzde değişim, yoksa kazanılan adet farkı. Önceki dönemde hiç yoksa oran yazılmaz.
     private static (string? Text, int Trend) RealizedDelta(SalesOverviewDto r)
@@ -406,7 +408,7 @@
         if (!r.AmountsVisible)
         {
             var gap = r.WonCount - previous.WonCount;
-            return ($"{(gap > 0 ? "+" : null)}{gap} adet", Math.Sign(gap));
+            return ((gap > 0 ? "+" : null) + Texts.Get("crm.sales.countUnit", gap), Math.Sign(gap));
         }
 
         if (previous.Realized.Amount <= 0)
@@ -427,13 +429,13 @@
         }
 
         var gap = Math.Round(now - before);
-        return ($"{(gap > 0 ? "+" : gap < 0 ? "−" : null)}{Math.Abs(gap).ToString("0", Regional.Numbers)} puan", Math.Sign(gap));
+        return ((gap > 0 ? "+" : gap < 0 ? "−" : null) + Texts.Get("crm.dashboard.points", Math.Abs(gap).ToString("0", Regional.Numbers)), Math.Sign(gap));
     }
 
     private static string Days(decimal days) => days.ToString("0.#", Regional.Numbers);
 
     private string StageTitle(StageSliceDto stage) =>
-        Lookups.Label(CrmLists.OpportunityStage, stage.Stage) + (stage.AverageDaysInStage is { } days ? $" · ort. {Days(days)} gündür bu aşamada" : null);
+        Lookups.Label(CrmLists.OpportunityStage, stage.Stage) + (stage.AverageDaysInStage is { } days ? " · " + Texts.Get("crm.dashboard.stage-days", Days(days)) : null);
 
     // Aşamalar firmanın tanımladığı sırayla çizilir; listede olmayan (eski) aşama sona gelir.
     private List<StageSliceDto> OrderedStages(SalesOverviewDto r)
