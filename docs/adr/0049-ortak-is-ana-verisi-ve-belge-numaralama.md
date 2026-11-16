@@ -81,7 +81,7 @@ Tek Core takvimi (mesai saatleri + tatil günleri, tenant başına; ileride şir
 - **Tatil listesi Core'da:** `core.Holidays` (tenant tablosu, RLS altında, `ICompanyShared`; `UNIQUE(TenantId, Date)`), kayıt türü `core.holiday` (kayıt boru hattı, denetim kaydı, içe aktarma). Okuma her üyeye açık, yazma `core.holidays.manage`.
 - **Sözleşme:** `Modulix.Core.Contracts.Calendar.IHolidayCalendar` (aralıktaki tatil günleri). Saf hesaplayıcı `WorkCalendar` (+ `CalendarSpec`, `CalendarSpecParser`) destek modülünden aynı ad alanına taşındı; SLA'ya özgü `SlaClock` destekte kaldı.
 - **İK geçişi:** izin gün sayısı `IHolidayCalendar`'dan okunur. `hr.holiday` kayıt türü, içe aktarma tanımı ve denetim tanımı kaldırıldı; ekran Yönetim'e taşındı (eski adres açılır).
-- **Veri:** migration `hr.Holidays` satırlarını kimlik, sürüm ve zamanlarıyla `core.Holidays`'e kopyalar (RLS kopya süresince kapatılır) ve `core.holidays.manage` iznini `hr.leaves.manage` taşıyan rollere ekler. `hr.Holidays` tablosu kesintisiz dağıtım için bir sürüm daha durur, sonraki migration'da kaldırılır. Dağıtım sırasında eski sürümün yazdığı tatil (kopyadan sonra) yeni listeye geçmez; dağıtım penceresinde tatil düzenlenmemelidir.
+- **Veri:** migration `hr.Holidays` satırlarını kimlik, sürüm ve zamanlarıyla `core.Holidays`'e kopyalar (RLS kopya süresince kapatılır) ve `core.holidays.manage` iznini `hr.leaves.manage` taşıyan rollere ekler. `hr.Holidays` tablosu kesintisiz dağıtım için bir sürüm daha durur, sonraki migration'da kaldırılır. Dağıtım sırasında eski sürümün yazdığı tatil (kopyadan sonra) yeni listeye geçmez; dağıtım penceresinde tatil düzenlenmemelidir. **Tablo kaldırıldı (16.11.2026, `DropHrHolidays`):** migration önce Core'da olmayan günleri bir kez daha kopyalar (eski sürümün sonradan yazdıkları da geçer), tabloyu RLS politikasından çıkarır ve düşürür; geri alma tabloyu Core'daki listeyle yeniden kurar. Bu migration, 6a'yı içermeyen bir sürümle aynı anda çalıştırılamaz (o sürüm tabloyu okur); önce 6a'lı sürüm her yerde yayında olmalıdır.
 
 #### Dilim 6b: destek SLA takvimi firmanın listesini uygular (teslim edildi)
 
@@ -100,7 +100,7 @@ Tek Core takvimi (mesai saatleri + tatil günleri, tenant başına; ileride şir
 - **Seçenek süreç başınadır:** `ApprovalDefinition.DueInWorkingHours` (varsayılan kapalı; mevcut süreçler takvim saatiyle sürer). Açıkken adımın süresi `ITenantWorkCalendar`'ın takviminde (mesai, çalışma günleri, tatil listesi) `WorkCalendar.AddWorkingTime` ile sayılır; bitiş anı (`DueAt`) adım açılırken bir kez hesaplanır, eskalasyon işi değişmeden bu anı kullanır.
 - **Anlık görüntü:** seçenek talep açılırken `ApprovalRequest.DueInWorkingHours`'a kopyalanır; süreç sonradan değişse de açık talep kendi ayarıyla sürer. Seçeneği değiştirmek süreç sürümünü (`Revision`) artırır. Tatil listesi adım açılırken bugünden 400 gün ileriye kadar okunur; bu yüzden iş saatiyle adım süresi en çok 2000 saattir (yaklaşık bir yıllık mesai). Sonradan eklenen tatil açılmış adımın bitişini değiştirmez.
 - **Kapsam dışı:** sözleşme onayı (`contracts`) kendi süresini kullanır; adım başına ayrı seçenek yoktur.
-- **Kalan:** lojistik teslim süresi, platformun hazır tatil kataloğu (açık karar 3), şube başına takvim, `hr.Holidays` tablosunun kaldırılması.
+- **Kalan:** lojistik teslim süresi, platformun hazır tatil kataloğu (açık karar 3), şube başına takvim. (`hr.Holidays` tablosu 16.11.2026'da kaldırıldı.)
 
 ## Açık kararlar
 
