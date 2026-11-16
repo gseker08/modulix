@@ -105,6 +105,7 @@ builder.Services.Configure<Modulix.Api.Reports.ReportJobsOptions>(builder.Config
 builder.Services.AddSingleton<Modulix.Api.Reports.ReportScheduleRunner>();
 builder.Services.AddHostedService<Modulix.Api.Reports.ReportScheduleWorker>();
 builder.Services.Configure<Modulix.Infrastructure.Automation.AutomationOptions>(builder.Configuration.GetSection(Modulix.Infrastructure.Automation.AutomationOptions.SectionName));
+builder.Services.Configure<Modulix.Infrastructure.Audit.AuditArchiveOptions>(builder.Configuration.GetSection(Modulix.Infrastructure.Audit.AuditArchiveOptions.SectionName));
 builder.Services.Configure<Modulix.Core.Files.FileStorageOptions>(builder.Configuration.GetSection(Modulix.Core.Files.FileStorageOptions.SectionName));
 builder.Services.AddHostedService<Modulix.Api.Automation.AutomationWorker>();
 builder.Services.AddHostedService<ApprovalEscalationWorker>();
@@ -175,6 +176,20 @@ if (args.Contains(PlatformAdministratorCommand.Name, StringComparer.OrdinalIgnor
 if (TenantDataCommand.Matches(args))
 {
     Console.WriteLine(await TenantDataCommand.RunAsync(app.Services, args));
+    return;
+}
+
+// "audit-archive" komutu: sıcak saklama süresinden eski denetim kaydı aylarını nesne deposuna arşivler ve bölümü boşaltır (ADR-0052).
+//   dotnet run --project src/Modulix.Api -- audit-archive
+if (AuditArchiveCommand.Matches(args))
+{
+    var (archiveOutput, archived) = await AuditArchiveCommand.RunAsync(app.Services);
+    Console.WriteLine(archiveOutput);
+    if (!archived)
+    {
+        Environment.ExitCode = 1;
+    }
+
     return;
 }
 

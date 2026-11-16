@@ -3897,6 +3897,49 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("GridViews", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Infrastructure.Audit.AuditArchiveEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ArchivedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("PeriodEnd")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("PeriodStart")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("RowCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "PeriodStart")
+                        .IsUnique();
+
+                    b.ToTable("AuditArchives", "core");
+                });
+
             modelBuilder.Entity("Modulix.Infrastructure.Email.QueuedEmail", b =>
                 {
                     b.Property<Guid>("Id")
