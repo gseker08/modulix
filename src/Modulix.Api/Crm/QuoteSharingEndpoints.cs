@@ -135,8 +135,8 @@ internal static class QuoteSharingEndpoints
                 {
                     var quote = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Quote, id), ct);
                     var dto = CrmEndpoints.ToDto<QuoteDto>(quote.Value!);
-                    delivery.Enqueue(result.Value.Link.Id, request.RecipientEmail!.Trim(), request.RecipientName, (await documents.SellerNameAsync(ct)),
-                        dto.QuoteNumber, dto.Title, dto.ValidUntil, $"{PublicUrl.Resolve(http)}/{path}");
+                    await delivery.EnqueueAsync(result.Value.Link.Id, request.RecipientEmail!.Trim(), request.RecipientName, (await documents.SellerNameAsync(ct)),
+                        dto.QuoteNumber, dto.Title, dto.ValidUntil, $"{PublicUrl.Resolve(http)}/{path}", ct);
                     state = (await delivery.GetAsync([result.Value.Link.Id], ct)).GetValueOrDefault(result.Value.Link.Id)
                         ?? new QuoteLinkDelivery(QuoteDeliveryStatus.Pending, null, null);
                 }

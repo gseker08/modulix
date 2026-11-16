@@ -3,6 +3,7 @@ using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
@@ -32,6 +33,7 @@ internal sealed class SlaScheduler(
     TicketWorkflowGate gate,
     TimeProvider time,
     IEmailQueue emailQueue,
+    IRecipientLanguage languages,
     INotificationRecipients? recipients = null,
     ISupportPolicyProvider? policy = null) : ISlaScheduler
 {
@@ -206,19 +208,22 @@ internal sealed class SlaScheduler(
             return "Alıcı yok (bildirim gönderilmedi).";
         }
 
-        var kind = rule.Percent >= 100 ? "hedef aşıldı" : $"hedefin %{rule.Percent}'ine ulaşıldı";
+        // Alıcının dilinde (ADR-0034 §6, dilim 18b); eskalasyon satırındaki sonuç metni (denetim izi) Türkçe kalır.
+        var t = await languages.ForUserAsync(recipient.UserId, cancellationToken);
+        var metric = t.Get(instance.Metric == SlaMetric.FirstResponse ? "email.sla.first-response" : "email.sla.resolution");
+        var kind = rule.Percent >= 100 ? t.Get("email.sla.breached") : t.Get("email.sla.threshold", rule.Percent);
         var link = recipients.Link($"destek/talepler/{ticket.Id}");
-        var number = WebUtility.HtmlEncode(ticket.Number);
-        var subject = WebUtility.HtmlEncode(ticket.Subject);
-        var html = $"<p>{number} numaralı talep için {WebUtility.HtmlEncode(MetricLabel(instance.Metric))} SLA'sında {WebUtility.HtmlEncode(kind)}.</p><p><strong>{subject}</strong></p>"
-            + (link is null ? string.Empty : $"<p><a href=\"{WebUtility.HtmlEncode(link)}\">Talebi aç</a></p>");
+        var sentence = t.Get("email.sla.body", ticket.Number, metric, kind);
+        var html = $"<p>{WebUtility.HtmlEncode(sentence)}</p><p><strong>{WebUtility.HtmlEncode(ticket.Subject)}</strong></p>"
+            + (link is null ? string.Empty : $"<p><a href=\"{WebUtility.HtmlEncode(link)}\">{WebUtility.HtmlEncode(t.Get("email.sla.action"))}</a></p>");
         try
         {
-            emailQueue.Enqueue(new EmailMessage(recipient.Email, $"[SLA] {ticket.Number}: {MetricLabel(instance.Metric)} {kind}", html)
+            emailQueue.Enqueue(new EmailMessage(recipient.Email, t.Get("email.sla.subject", ticket.Number, metric, kind), html)
             {
                 ToName = recipient.DisplayName,
-                TextBody = $"{ticket.Number} numaralı talep için {MetricLabel(instance.Metric)} SLA'sında {kind}.\n{ticket.Subject}" + (link is null ? string.Empty : $"\n{link}"),
+                TextBody = $"{sentence}\n{ticket.Subject}" + (link is null ? string.Empty : $"\n{link}"),
                 Reference = $"support.sla:{instance.Id}:{rule.Id}",
+                Language = t.Language,
             });
             return "E-posta kuyruğuna alındı.";
         }

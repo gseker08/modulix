@@ -9,8 +9,10 @@ using Modulix.Core.Authorization;
 using Modulix.Infrastructure.Email;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Shared.Account;
 using Modulix.Shared.Auth;
 using Modulix.Shared.Crm;
+using Modulix.Shared.Settings;
 using static Modulix.Modules.Crm.CrmModule.Permissions;
 using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
 
@@ -111,6 +113,47 @@ public class QuoteDeliveryTests(ModulixApiFactory factory) : IClassFixture<Modul
 
         using var anonymous = factory.CreateClient();
         Assert.Equal(HttpStatusCode.OK, (await anonymous.PostAsJsonAsync($"/api/public/quotes/{s.Slug}/view", new PublicQuoteTokenRequest(created.Token))).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_customer_email_uses_the_tenants_default_language_not_the_senders_and_not_another_tenants()
+    {
+        // ADR-0034 §6, dilim 18b: müşterinin hesabı yoktur; e-posta firmanın varsayılan dilindedir. Gönderenin kendi tercihi (az) ve başka
+        // firmanın varsayılanı karışmaz.
+        var english = await SetUpAsync();
+        var plain = await SetUpAsync();
+        using var admin = await LoginAsync(factory, english.Admin);
+        using var other = await LoginAsync(factory, plain.Admin);
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync("/api/account/language", new UpdateLanguageRequest("az"))).StatusCode);
+        var saved = await admin.PutAsJsonAsync("/api/settings", new SaveSettingsRequest(
+            new Dictionary<string, SettingWriteDto> { [SettingKeys.Language] = new("en", 0) }));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+
+        var toEnglish = $"musteri-{Guid.NewGuid():N}@test.modulix";
+        var toTurkish = $"musteri-{Guid.NewGuid():N}@test.modulix";
+        await SendLinkAsync(admin, (await PresentedQuoteAsync(admin, english.CompanyId)).Id, toEnglish);
+        await SendLinkAsync(other, (await PresentedQuoteAsync(other, plain.CompanyId)).Id, toTurkish);
+
+        var inEnglish = await QueuedAsync(toEnglish);
+        Assert.Equal("en", inEnglish.Language);
+        Assert.StartsWith("Quote ", inEnglish.Subject);
+        Assert.StartsWith("Hello Ayşe,", inEnglish.TextBody);
+        Assert.Contains("View the quote", inEnglish.HtmlBody);
+        Assert.Contains("View the quote: ", inEnglish.TextBody);
+
+        var inTurkish = await QueuedAsync(toTurkish);
+        Assert.Equal("tr", inTurkish.Language);
+        Assert.StartsWith("Teklif ", inTurkish.Subject);
+        Assert.StartsWith("Merhaba Ayşe,", inTurkish.TextBody);
+        // HTML gövdesinde Türkçe harfler sayısal varlık olarak kodlanır; düz metinde aranır.
+        Assert.Contains("Teklifi görüntüle: ", inTurkish.TextBody);
+    }
+
+    private static async Task SendLinkAsync(HttpClient client, Guid quoteId, string address)
+    {
+        var response = await client.PostAsJsonAsync($"/api/crm/quotes/{quoteId}/share-links",
+            new CreateQuoteShareLinkRequest(RecipientName: "Ayşe", RecipientEmail: address, SendEmail: true));
+        Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
     }
 
     // ---- yardımcılar
