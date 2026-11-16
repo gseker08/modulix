@@ -80,4 +80,5 @@ Yeni ve dokunulan her ekran (CRM ve sonraki bütün modüller) bu kurallara uyar
 
 - `.editorconfig`: file-scoped namespace, primary constructor, `var` yerine açık tip, Allman süslü parantez, 4 boşluk.
 - Nullable açık; null uyarıları derleme hatasıdır.
+- Razor'da en düşük desteklenen SDK (10.0.100) ile derlenmeyen iki yazım kullanılmaz: `@section.X` (yönerge sanılır; `@(section.X)` yazılır) ve `@code` içinde satır başında `< 0 =>` deseni (etiket sanılır; karşılaştırma ifadesi yazılır). `RazorCompatibilityRulesTests` denetler.
 - Çevredeki kodun yorum yoğunluğuna ve adlandırmasına uy. README'de belgelenen bir davranışı değiştirirsen README'yi de güncelle.

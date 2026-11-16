@@ -28,7 +28,7 @@ else
                     continue;
                 }
 
-                <FormSection Title="@section.Label" Icon="@section.Icon">
+                <FormSection Title="@(section.Label)" Icon="@(section.Icon)">
                     <div class="form-grid">
                         @foreach (var field in fields)
                         {
