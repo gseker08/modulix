@@ -4,20 +4,20 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
 
-<PageTitle>@(view?.Content is { } c ? $"Teklif {c.QuoteNumber}" : "Teklif") · Modulix</PageTitle>
+<PageTitle>@(view?.Content is { } c ? Texts.Get("crm.public-quote.title-number", c.QuoteNumber) : Texts.Get("crm.public-quote.title")) · Modulix</PageTitle>
 
 @* Oturumsuz müşteri sayfası (ADR-0019). Belirteç adresin # parçasındadır (#t=...): sunucuya, günlüklere ve Referer başlığına gitmez;
    API çağrılarında gövdede taşınır. Gösterilen her şey belgenin sabitlenmiş verisidir. *@
 
 @if (loading)
 {
-    <p class="text-muted" role="status">Teklif yükleniyor…</p>
+    <LoadingState />
 }
 else if (invalid)
 {
     <div class="alert alert-warning" role="alert">
-        <h1 class="h5">Bağlantı geçersiz</h1>
-        <p class="mb-0">@(problem ?? "Bu teklif bağlantısı geçersiz ya da kaldırılmış. Lütfen teklifi gönderen kişiyle iletişime geçin.")</p>
+        <h1 class="h5">@Texts.Get("crm.public-quote.invalid")</h1>
+        <p class="mb-0">@(problem ?? Texts.Get("crm.public-quote.invalid-text"))</p>
     </div>
 }
 else if (view is not null)
@@ -46,11 +46,11 @@ else if (view is not null)
                     }
                 </div>
                 <dl class="summary-list">
-                    <div><dt>Teklif no</dt><dd>@content.QuoteNumber · V@(content.RevisionNo)</dd></div>
-                    <div><dt>Tarih</dt><dd>@CrmLabels.Date(content.IssueDate)</dd></div>
+                    <div><dt>@Texts.Get("crm.public-quote.number")</dt><dd>@content.QuoteNumber · V@(content.RevisionNo)</dd></div>
+                    <div><dt>@Texts.Get("crm.public-quote.date")</dt><dd>@CrmLabels.Date(content.IssueDate)</dd></div>
                     @if (content.ValidUntil is { } until)
                     {
-                        <div><dt>Geçerlilik</dt><dd>@CrmLabels.Time(until)</dd></div>
+                        <div><dt>@Texts.Get("crm.public-quote.valid-until")</dt><dd>@CrmLabels.Time(until)</dd></div>
                     }
                 </dl>
             </header>
@@ -58,7 +58,7 @@ else if (view is not null)
             <h1 id="pq-title" class="h4">@content.Title</h1>
             <p class="text-muted">
                 @content.CustomerName@if (content.CustomerCity is not null) { <text> · @content.CustomerCity</text> }
-                @if (content.ContactName is { Length: > 0 }) { <text><br />İlgili: @content.ContactName</text> }
+                @if (content.ContactName is { Length: > 0 }) { <text><br />@Texts.Get("crm.public-quote.contact", content.ContactName)</text> }
             </p>
             @if (!string.IsNullOrWhiteSpace(content.Description))
             {
@@ -66,49 +66,49 @@ else if (view is not null)
             }
 
             <table class="table record-table">
-                <caption class="visually-hidden">Teklif kalemleri</caption>
+                <caption class="visually-hidden">@Texts.Get("crm.public-quote.lines")</caption>
                 <thead>
                     <tr>
-                        <th scope="col">Kalem</th><th scope="col" class="text-end">Miktar</th><th scope="col" class="text-end">Birim fiyat</th>
-                        <th scope="col" class="text-end">İndirim</th><th scope="col" class="text-end">KDV</th><th scope="col" class="text-end">Net tutar</th>
+                        <th scope="col">@Texts.Get("crm.public-quote.col.item")</th><th scope="col" class="text-end">@Texts.Get("crm.public-quote.col.quantity")</th><th scope="col" class="text-end">@Texts.Get("crm.public-quote.col.unit-price")</th>
+                        <th scope="col" class="text-end">@Texts.Get("crm.public-quote.col.discount")</th><th scope="col" class="text-end">@Texts.Get("crm.public-quote.col.vat")</th><th scope="col" class="text-end">@Texts.Get("crm.public-quote.col.net")</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var line in content.Lines)
                     {
                         <tr>
-                            <td data-label="Kalem" class="primary">
+                            <td data-label="@Texts.Get("crm.public-quote.col.item")" class="primary">
                                 @line.Name
                                 @if (line.Code is not null) { <small class="text-muted"> (@line.Code)</small> }
                                 @if (RoleNote(line) is { } note) { <div class="small text-muted">@note</div> }
                                 @if (!string.IsNullOrWhiteSpace(line.Description)) { <div class="small text-muted">@line.Description</div> }
                             </td>
-                            <td data-label="Miktar" class="text-end">@line.Quantity.ToString("0.####", Regional.Numbers)@(line.Unit is null ? null : $" {line.Unit}")</td>
-                            <td data-label="Birim fiyat" class="text-end">@line.UnitPrice.ToString("N2", Regional.Numbers)</td>
-                            <td data-label="İndirim" class="text-end">@Discount(line)</td>
-                            <td data-label="KDV" class="text-end">%@line.TaxRatePercent.ToString("0.##", Regional.Numbers)</td>
-                            <td data-label="Net tutar" class="text-end">@(line.Included ? line.Net.ToString("N2", Regional.Numbers) : "—")</td>
+                            <td data-label="@Texts.Get("crm.public-quote.col.quantity")" class="text-end">@line.Quantity.ToString("0.####", Regional.Numbers)@(line.Unit is null ? null : $" {line.Unit}")</td>
+                            <td data-label="@Texts.Get("crm.public-quote.col.unit-price")" class="text-end">@line.UnitPrice.ToString("N2", Regional.Numbers)</td>
+                            <td data-label="@Texts.Get("crm.public-quote.col.discount")" class="text-end">@Discount(line)</td>
+                            <td data-label="@Texts.Get("crm.public-quote.col.vat")" class="text-end">%@line.TaxRatePercent.ToString("0.##", Regional.Numbers)</td>
+                            <td data-label="@Texts.Get("crm.public-quote.col.net")" class="text-end">@(line.Included ? line.Net.ToString("N2", Regional.Numbers) : "—")</td>
                         </tr>
                     }
                 </tbody>
             </table>
 
             <dl class="summary-list public-totals">
-                <div><dt>Liste toplamı</dt><dd>@QuoteLabels.Money(content.ListTotal, content.Currency)</dd></div>
+                <div><dt>@Texts.Get("crm.public-quote.list-total")</dt><dd>@QuoteLabels.Money(content.ListTotal, content.Currency)</dd></div>
                 @if (content.DiscountTotal > 0)
                 {
-                    <div><dt>Toplam indirim</dt><dd>-@QuoteLabels.Money(content.DiscountTotal, content.Currency)</dd></div>
+                    <div><dt>@Texts.Get("crm.public-quote.discount-total")</dt><dd>-@QuoteLabels.Money(content.DiscountTotal, content.Currency)</dd></div>
                 }
-                <div><dt>Net toplam</dt><dd>@QuoteLabels.Money(content.NetTotal, content.Currency)</dd></div>
+                <div><dt>@Texts.Get("crm.public-quote.net-total")</dt><dd>@QuoteLabels.Money(content.NetTotal, content.Currency)</dd></div>
                 @foreach (var tax in content.TaxGroups)
                 {
-                    <div><dt>KDV %@tax.RatePercent.ToString("0.##", Regional.Numbers)</dt><dd>@QuoteLabels.Money(tax.Tax, content.Currency)</dd></div>
+                    <div><dt>@Texts.Get("crm.public-quote.vat-rate", tax.RatePercent.ToString("0.##", Regional.Numbers))</dt><dd>@QuoteLabels.Money(tax.Tax, content.Currency)</dd></div>
                 }
-                <div class="total"><dt>Genel toplam</dt><dd>@QuoteLabels.Money(content.GrossTotal, content.Currency)</dd></div>
+                <div class="total"><dt>@Texts.Get("crm.public-quote.gross-total")</dt><dd>@QuoteLabels.Money(content.GrossTotal, content.Currency)</dd></div>
             </dl>
             @if (content.OptionalNet > 0)
             {
-                <p class="small text-muted">Opsiyonel ve alternatif kalemler toplama dahil değildir (net @QuoteLabels.Money(content.OptionalNet, content.Currency)).</p>
+                <p class="small text-muted">@Texts.Get("crm.public-quote.optional-note", QuoteLabels.Money(content.OptionalNet, content.Currency))</p>
             }
 
             @foreach (var (label, text) in Terms(content))
@@ -120,30 +120,30 @@ else if (view is not null)
             }
 
             <p>
-                <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="DownloadAsync">PDF olarak indir</button>
-                <span class="small text-muted">Belge özeti (SHA-256): <code>@view.DocumentSha256[..16]…</code></span>
+                <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="DownloadAsync">@Texts.Get("crm.public-quote.download")</button>
+                <span class="small text-muted">@Texts.Get("crm.public-quote.digest") <code>@view.DocumentSha256[..16]…</code></span>
             </p>
         }
 
         @if (view.CanDecide)
         {
             <section aria-labelledby="pq-decision" class="public-decision">
-                <h2 id="pq-decision" class="h5">Kararınız</h2>
+                <h2 id="pq-decision" class="h5">@Texts.Get("crm.public-quote.decision")</h2>
                 <Notice Text="@message" Failed="true" />
 
                 <div class="form-grid">
                     <div>
-                        <label class="form-label" for="pq-name">Ad soyad *</label>
+                        <label class="form-label" for="pq-name">@Texts.Get("crm.public-quote.signer-name") *</label>
                         <input id="pq-name" class="form-control" autocomplete="name" maxlength="200" @bind="signerName" />
                         <FieldError Errors="@errors" Field="signerName" />
                     </div>
                     <div>
-                        <label class="form-label" for="pq-title-input">Ünvan</label>
+                        <label class="form-label" for="pq-title-input">@Texts.Get("crm.public-quote.signer-title")</label>
                         <input id="pq-title-input" class="form-control" autocomplete="organization-title" maxlength="200" @bind="signerTitle" />
                         <FieldError Errors="@errors" Field="signerTitle" />
                     </div>
                     <div>
-                        <label class="form-label" for="pq-email">E-posta</label>
+                        <label class="form-label" for="pq-email">@Texts.Get("common.field.email")</label>
                         <input id="pq-email" class="form-control" type="email" autocomplete="email" maxlength="254" @bind="signerEmail" />
                         <FieldError Errors="@errors" Field="signerEmail" />
                     </div>
@@ -152,8 +152,8 @@ else if (view is not null)
                 @if (mode is null)
                 {
                     <div class="form-actions">
-                        <button type="button" class="btn btn-primary" @onclick='() => mode = "accept"'>Teklifi kabul et</button>
-                        <button type="button" class="btn btn-outline-secondary" @onclick='() => mode = "reject"'>Teklifi reddet</button>
+                        <button type="button" class="btn btn-primary" @onclick='() => mode = "accept"'>@Texts.Get("crm.public-quote.accept")</button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick='() => mode = "reject"'>@Texts.Get("crm.public-quote.reject")</button>
                     </div>
                 }
                 else if (mode == "accept")
@@ -166,20 +166,20 @@ else if (view is not null)
                         <FieldError Errors="@errors" Field="confirmTerms" />
                         <FieldError Errors="@errors" Field="documentSha256" />
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">Kabulü onayla</button>
-                            <button type="button" class="btn btn-link" @onclick="() => mode = null">Vazgeç</button>
+                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.public-quote.confirm-accept")</button>
+                            <button type="button" class="btn btn-link" @onclick="() => mode = null">@Texts.Get("common.cancel")</button>
                         </div>
                     </form>
                 }
                 else
                 {
                     <form novalidate @onsubmit="() => DecideAsync(false)" @onsubmit:preventDefault>
-                        <label class="form-label" for="pq-reason">Ret gerekçesi *</label>
+                        <label class="form-label" for="pq-reason">@Texts.Get("crm.public-quote.reason") *</label>
                         <textarea id="pq-reason" class="form-control" rows="3" maxlength="500" @bind="reason"></textarea>
                         <FieldError Errors="@errors" Field="reason" />
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-outline-danger" disabled="@busy">Reddi onayla</button>
-                            <button type="button" class="btn btn-link" @onclick="() => mode = null">Vazgeç</button>
+                            <button type="submit" class="btn btn-outline-danger" disabled="@busy">@Texts.Get("crm.public-quote.confirm-reject")</button>
+                            <button type="button" class="btn btn-link" @onclick="() => mode = null">@Texts.Get("common.cancel")</button>
                         </div>
                     </form>
                 }
@@ -208,6 +208,8 @@ else if (view is not null)
 
     protected override async Task OnInitializedAsync()
     {
+        // Sayfa önce tarayıcının diliyle açılır; teklif gelince müşterinin diline geçer (ADR-0034 §6).
+        await PublicTexts.ApplyAsync(Api, null);
         token = TokenFromFragment(Navigation.Uri);
         if (token.Length == 0)
         {
@@ -222,14 +224,16 @@ else if (view is not null)
     private async Task LoadAsync()
     {
         var result = await Api.PostAsync<PublicQuoteView>($"/api/public/quotes/{Uri.EscapeDataString(Tenant)}/view", new PublicQuoteTokenRequest(token));
-        loading = false;
         if (result.Value is { } loaded)
         {
+            await PublicTexts.ApplyAsync(Api, loaded.Language);
             view = loaded;
+            loading = false;
             invalid = false;
             return;
         }
 
+        loading = false;
         invalid = true;
         problem = result.Status == System.Net.HttpStatusCode.NotFound ? null : result.Error;
     }
@@ -297,21 +301,21 @@ else if (view is not null)
 
     private static string StateTitle(string state) => state switch
     {
-        "accepted" => "Teklif kabul edildi",
-        "rejected" => "Teklif reddedildi",
-        "expired" => "Geçerlilik süresi doldu",
-        "superseded" => "Yeni revizyon hazırlandı",
-        "cancelled" => "Teklif iptal edildi",
-        "link-expired" => "Bağlantının süresi doldu",
-        "link-revoked" => "Bağlantı iptal edildi",
-        _ => "Teklif",
+        "accepted" => Texts.Get("crm.public-quote.state.accepted"),
+        "rejected" => Texts.Get("crm.public-quote.state.rejected"),
+        "expired" => Texts.Get("crm.public-quote.state.expired"),
+        "superseded" => Texts.Get("crm.public-quote.state.superseded"),
+        "cancelled" => Texts.Get("crm.public-quote.state.cancelled"),
+        "link-expired" => Texts.Get("crm.public-quote.state.link-expired"),
+        "link-revoked" => Texts.Get("crm.public-quote.state.link-revoked"),
+        _ => Texts.Get("crm.public-quote.title"),
     };
 
     private static string? RoleNote(PublicQuoteLine line) => line.Role switch
     {
-        "Optional" => line.IsSelected ? "Opsiyonel — seçili (toplama dahil)" : "Opsiyonel — toplama dahil değil",
-        "Alternative" => line.IsSelected ? "Alternatif — seçili (toplama dahil)" : "Alternatif — toplama dahil değil",
-        "PackageChild" => "Paket bileşeni",
+        "Optional" => Texts.Get(line.IsSelected ? "crm.public-quote.role.optional-selected" : "crm.public-quote.role.optional"),
+        "Alternative" => Texts.Get(line.IsSelected ? "crm.public-quote.role.alternative-selected" : "crm.public-quote.role.alternative"),
+        "PackageChild" => Texts.Get("crm.public-quote.role.package-child"),
         _ => null,
     };
 
@@ -324,9 +328,9 @@ else if (view is not null)
 
     private static IEnumerable<(string Label, string Text)> Terms(PublicQuoteContent content)
     {
-        if (!string.IsNullOrWhiteSpace(content.PaymentTerms)) { yield return ("Ödeme koşulları", content.PaymentTerms); }
-        if (!string.IsNullOrWhiteSpace(content.DeliveryTerms)) { yield return ("Teslimat koşulları", content.DeliveryTerms); }
-        if (!string.IsNullOrWhiteSpace(content.CommercialTerms)) { yield return ("Ticari koşullar", content.CommercialTerms); }
+        if (!string.IsNullOrWhiteSpace(content.PaymentTerms)) { yield return (Texts.Get("crm.public-quote.payment-terms"), content.PaymentTerms); }
+        if (!string.IsNullOrWhiteSpace(content.DeliveryTerms)) { yield return (Texts.Get("crm.public-quote.delivery-terms"), content.DeliveryTerms); }
+        if (!string.IsNullOrWhiteSpace(content.CommercialTerms)) { yield return (Texts.Get("crm.public-quote.commercial-terms"), content.CommercialTerms); }
     }
 
     private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();

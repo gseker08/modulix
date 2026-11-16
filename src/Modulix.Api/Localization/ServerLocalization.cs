@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Localization;
+using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Localization;
 using Modulix.Core.Modules;
@@ -94,5 +95,28 @@ public sealed class RecipientLanguage(ITenantContextAccessor tenant, ModulixDbCo
         var texts = new LocalizedTexts(LanguageOptions.Normalize(tenantDefault) ?? LanguageOptions.Default, catalog);
         externals[tenantId] = texts;
         return texts;
+    }
+
+    public async ValueTask<LocalizedTexts> ForContactAsync(Guid? personId, Guid? partyId, CancellationToken cancellationToken)
+    {
+        // Ortak kayıtlar tenant süzgecinden (sorgu süzgeci + RLS) geçer: başka tenant'ın kişisi bulunmaz, dil düşer.
+        if (personId is { } person
+            && await db.Set<Person>().AsNoTracking().Where(p => p.Id == person).Select(p => new { p.PreferredLanguage, p.PartyId }).FirstOrDefaultAsync(cancellationToken) is { } found)
+        {
+            if (CorrespondenceLanguages.Normalize(found.PreferredLanguage) is { } own)
+            {
+                return new LocalizedTexts(own, catalog);
+            }
+
+            partyId ??= found.PartyId;
+        }
+
+        if (partyId is { } party
+            && CorrespondenceLanguages.Normalize(await db.Set<Party>().AsNoTracking().Where(p => p.Id == party).Select(p => p.PreferredLanguage).FirstOrDefaultAsync(cancellationToken)) is { } company)
+        {
+            return new LocalizedTexts(company, catalog);
+        }
+
+        return await ForExternalAsync(cancellationToken);
     }
 }

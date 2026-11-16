@@ -112,7 +112,7 @@ public sealed record QuotePortalDecisionInfo(string Decision, string SignerName,
 /// </summary>
 public sealed record QuotePortalView(
     string State, bool CanDecide, string? Message, string QuoteNumber, int RevisionNo, string DocumentSha256, DateTimeOffset LinkExpiresAt,
-    QuoteDocumentSnapshot? Snapshot, string? AcceptanceStatement, QuotePortalDecisionInfo? Decision);
+    QuoteDocumentSnapshot? Snapshot, string? AcceptanceStatement, QuotePortalDecisionInfo? Decision, string Language = "tr");
 
 public interface IQuoteCustomerPortal
 {

@@ -309,7 +309,7 @@ internal static class QuoteSharingEndpoints
             : JsonSerializer.Deserialize<PublicQuoteContent>(JsonSerializer.Serialize(v.Snapshot, JsonSerializerOptions.Web), JsonSerializerOptions.Web);
         return new PublicQuoteView(
             v.State, v.CanDecide, v.Message, v.QuoteNumber, v.RevisionNo, v.DocumentSha256, v.LinkExpiresAt, content, v.AcceptanceStatement,
-            v.Decision is null ? null : new PublicQuoteDecisionInfo(v.Decision.Decision, v.Decision.SignerName, v.Decision.At));
+            v.Decision is null ? null : new PublicQuoteDecisionInfo(v.Decision.Decision, v.Decision.SignerName, v.Decision.At), v.Language);
     }
 }
 
