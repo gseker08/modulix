@@ -170,6 +170,42 @@ public class AuditLogTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         Assert.Equal(2, await db.AuditLog.CountAsync(a => a.RecordId == company));
     }
 
+    /// <summary>
+    /// ADR-0052: tablo aylık bölümlüdür ve bütün dizinleri bölüm şemasına hizalıdır (hizalanmamış bir dizin bölüm boşaltmayı engeller;
+    /// EF modelinde bölüm şeması olmadığı için yeni dizin bu testle yakalanır). Uygulama bölüm de boşaltamaz.
+    /// </summary>
+    [Fact]
+    public async Task Audit_log_is_partitioned_by_month_and_every_index_is_aligned()
+    {
+        var (tenant, _, company) = await TenantWithCompanyChangeAsync();
+        using var scope = factory.OpenScope(tenant.Id);
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+
+        var indexes = await db.Database.SqlQuery<IndexPlacement>($"""
+            SELECT i.name AS Name, ds.name AS DataSpace
+            FROM sys.indexes i JOIN sys.data_spaces ds ON ds.data_space_id = i.data_space_id
+            WHERE i.object_id = OBJECT_ID(N'core.AuditLog')
+            """).ToListAsync();
+        Assert.Contains(indexes, i => i.Name == "PK_AuditLog");
+        Assert.True(indexes.Count >= 4, string.Join(", ", indexes.Select(i => i.Name)));
+        Assert.All(indexes, i => Assert.Equal(AuditPartitionSql.SchemeName, i.DataSpace));
+
+        var occurredAt = await db.AuditLog.Where(a => a.RecordId == company).Select(a => a.OccurredAt).FirstAsync();
+        var partition = await db.Database.SqlQuery<int>(
+            $"SELECT $PARTITION.AuditLogMonthly({occurredAt}) AS Value").SingleAsync();
+        var monthsSinceFirst = ((occurredAt.UtcDateTime.Year - AuditPartitionSql.FirstBoundary.Year) * 12)
+            + occurredAt.UtcDateTime.Month - AuditPartitionSql.FirstBoundary.Month;
+        Assert.Equal(monthsSinceFirst + 2, partition);
+
+        await Assert.ThrowsAsync<SqlException>(() =>
+#pragma warning disable EF1003 // Bölüm numarası sorgudan gelen tamsayıdır; TRUNCATE parametre almaz.
+            db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE core.AuditLog WITH (PARTITIONS (" + partition.ToString(System.Globalization.CultureInfo.InvariantCulture) + "))"));
+#pragma warning restore EF1003
+        Assert.Equal(2, await db.AuditLog.CountAsync(a => a.RecordId == company));
+    }
+
+    private sealed record IndexPlacement(string Name, string DataSpace);
+
     [Fact]
     public async Task Platform_administrator_appears_with_a_fixed_name()
     {

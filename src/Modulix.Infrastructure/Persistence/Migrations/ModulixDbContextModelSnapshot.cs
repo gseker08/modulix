@@ -4152,6 +4152,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Modulix.Infrastructure.Records.AuditLogEntry", b =>
                 {
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
@@ -4171,9 +4174,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<DateTimeOffset>("OccurredAt")
-                        .HasColumnType("datetimeoffset");
-
                     b.Property<Guid>("RecordId")
                         .HasColumnType("uniqueidentifier");
 
@@ -4190,7 +4190,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.HasKey("Id");
+                    b.HasKey("OccurredAt", "Id");
 
                     b.HasIndex("TenantId", "OccurredAt");
 
