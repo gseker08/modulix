@@ -2,7 +2,7 @@
 @{
     var max = Slices.Count == 0 ? 0 : Slices.Max(s => s.Value);
 }
-<div class="bar-chart" role="img" aria-label="@Title">
+<div class="bar-chart" role="img" aria-label="@(Title ?? Texts.Get("chart.bar"))">
     @for (var i = 0; i < Slices.Count; i++)
     {
         // Değeri olan çubuk görünür kalsın diye en az %2; sıfır değer çubuksuz kalır.
@@ -18,7 +18,7 @@
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<ChartSlice> Slices { get; set; } = [];
 
-    [Parameter] public string Title { get; set; } = "Çubuk grafik";
+    [Parameter] public string? Title { get; set; }
 
     /// <summary>Değer etiketinin sayı biçimi; ondalıklı değerlerde (ortalama, tutar) "N2" verilir.</summary>
     [Parameter] public string ValueFormat { get; set; } = "N0";

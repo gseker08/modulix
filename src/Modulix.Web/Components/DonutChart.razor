@@ -5,7 +5,7 @@
     double offset = 0;
 }
 <div class="donut-chart">
-    <svg viewBox="0 0 42 42" role="img" aria-label="@Title">
+    <svg viewBox="0 0 42 42" role="img" aria-label="@(Title ?? Texts.Get("chart.donut"))">
         <circle class="donut-track" cx="21" cy="21" r="@radius" fill="none" stroke-width="5" />
         @if (total > 0)
         {
@@ -34,7 +34,7 @@
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<ChartSlice> Slices { get; set; } = [];
 
-    [Parameter] public string Title { get; set; } = "Dağılım grafiği";
+    [Parameter] public string? Title { get; set; }
 
     [Parameter] public string Caption { get; set; } = "toplam";
 

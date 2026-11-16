@@ -7,10 +7,10 @@
     {
         <span class="tag-chip">
             @tag
-            <button type="button" aria-label="Etiketi kaldır: @tag" @onclick="() => RemoveAsync(tag)">×</button>
+            <button type="button" aria-label="@Texts.Get("tags.remove", tag)" @onclick="() => RemoveAsync(tag)">×</button>
         </span>
     }
-    <input @ref="input" id="@Id" value="@draft" autocomplete="off" placeholder="@(Tags.Count == 0 ? Placeholder : "Ekle…")"
+    <input @ref="input" id="@Id" value="@draft" autocomplete="off" placeholder="@(Tags.Count == 0 ? Placeholder : Texts.Get("tags.add"))"
            aria-required="@(Required ? "true" : null)" @oninput="OnInputAsync" @onkeydown="OnKeyDownAsync" @onblur="CommitAsync" />
 </div>
 
