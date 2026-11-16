@@ -19,7 +19,7 @@ public static class HrLabels
     public static string EmploymentType(string? key) => HrAccess.EmploymentTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>"yyyy-AA-gg" tarihini gg.AA.yyyy gösterir; boşsa "—".</summary>
-    public const string Everyone = "Herkes";
+    public static string Everyone => Texts.GetOr("hr.audience.everyone", "Herkes");
 
     /// <summary>Kayıttaki kimlik listesi alanı (ör. hedef departmanlar); boşsa boş liste.</summary>
     public static IReadOnlyList<Guid> Ids(RecordResponse record, string field) =>

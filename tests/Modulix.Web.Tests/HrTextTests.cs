@@ -5,7 +5,7 @@ using Modulix.Web.Services;
 namespace Modulix.Web.Tests;
 
 /// <summary>
-/// ADR-0034 aşama 4, İK dilim 19a (blog ve galeri): blog durumları ve yayın durumu sözlükten gelir; Türkçe kaynak metin (koddaki yedek)
+/// ADR-0034 aşama 4, İK dilim 19a (blog ve galeri) ve 19b (duyurular): blog durumları, yayın durumu ve hedef kitle "Herkes" sözlükten gelir; Türkçe kaynak metin (koddaki yedek)
 /// <c>tr.json</c> ile aynıdır. Diller arası anahtar eşitliğini ve kullanılan anahtarların varlığını mimari testler denetler.
 /// </summary>
 public class HrTextTests
@@ -35,6 +35,7 @@ public class HrTextTests
         }
 
         Assert.Equal("Yayında", tr["hr.content.published"]);
+        Assert.Equal("Herkes", tr["hr.audience.everyone"]);
         Assert.Equal("Taslak", tr["hr.content.draft"]);
     }
 
@@ -49,5 +50,6 @@ public class HrTextTests
         Assert.Equal(("Taslak", "status-inactive"), HrLabels.BlogStatus(null));
         Assert.Equal(("Yayında", "status-customer"), HrLabels.Published(true));
         Assert.Equal(("Taslak", "status-inactive"), HrLabels.Published(false));
+        Assert.Equal("Herkes", HrLabels.Everyone);
     }
 }

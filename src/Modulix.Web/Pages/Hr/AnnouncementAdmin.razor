@@ -4,12 +4,12 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Duyuru yönetimi · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.announcement-admin") · Modulix</PageTitle>
 
 @* Duyuru yönetimi (ADR-0042 dilim 6): taslak, yayında ve süresi geçmiş bütün duyurular; yazma, yayınlama, sabitleme, hedef departman ve kimin
    okuduğu. Okurlar duyuruları "Duyurular" akışında görür. *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.AnnouncementsManage">
-    <PageHeader Title="Duyuru yönetimi" Icon="bell" Subtitle="@(page is null ? "Duyuru yazın, yayınlayın ve okunma durumunu izleyin." : $"{page.TotalCount} duyuru")" />
+    <PageHeader Title="@Texts.Get("nav.app.hr.announcement-admin")" Icon="bell" Subtitle="@(page is null ? Texts.Get("hr.announcement-admin.intro") : Texts.Get("hr.announcements.count", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -21,12 +21,12 @@
         <AnnouncementEditor @key="selected?.Id" Announcement="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="() => editing = false" />
         @if (selected is not null)
         {
-            <AttachmentPanel EntityKey="@HrAccess.AnnouncementEntityKey" RecordId="selected.Id" CanWrite="true" Title="Ekler" EmptyText="Bu duyurunun eki yok." />
-            <section aria-label="Okuyanlar">
-                <div class="list-toolbar mt-3"><h3 class="h6 mb-0 me-auto">Okuyanlar</h3></div>
+            <AttachmentPanel EntityKey="@HrAccess.AnnouncementEntityKey" RecordId="selected.Id" CanWrite="true" Title="@Texts.Get("hr.content.attachments")" EmptyText="@Texts.Get("hr.announcements.attachments-empty")" />
+            <section aria-label="@Texts.Get("hr.announcement-admin.readers")">
+                <div class="list-toolbar mt-3"><h3 class="h6 mb-0 me-auto">@Texts.Get("hr.announcement-admin.readers")</h3></div>
                 @if (reads is null || reads.Count == 0)
                 {
-                    <EmptyState Compact="true" Icon="eye" Title="Henüz kimse okumadı." />
+                    <EmptyState Compact="true" Icon="eye" Title="@Texts.Get("hr.announcement-admin.no-readers")" />
                 }
                 else
                 {
@@ -44,16 +44,16 @@
         }
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Duyuru görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("hr.announcement-admin.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Duyuru ara" placeholder="Başlık ya da metinde ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("hr.announcement-admin.search-label")" placeholder="@Texts.Get("hr.blog.search-placeholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (!editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => OpenAsync(null)"><AppIcon Name="plus" Size="16" /> Yeni duyuru</button>
+            <button type="button" class="btn btn-primary" @onclick="() => OpenAsync(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("hr.announcement-form.new")</button>
         }
     </div>
 
@@ -66,20 +66,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan duyuru yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("hr.announcement-admin.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) duyuru listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("hr.announcement-admin.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Duyurular</caption>
+            <caption class="visually-hidden">@Texts.Get("nav.app.hr.announcements")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -91,8 +91,8 @@
                             @Cell(column, announcement)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{WarehouseLabels.Text(announcement, "title")} eylemleri")">
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenAsync(announcement)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                            <RowMenu Label="@Texts.Get("hr.content.row-actions", WarehouseLabels.Text(announcement, "title"))">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenAsync(announcement)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 <RowMenuDelete OnConfirm="() => DeleteAsync(announcement)" />
                             </RowMenu>
                         </td>
@@ -110,13 +110,13 @@
     private const string AllViews = "all";
 
     // Sıralama anahtarları kayıt deposunun beyanıdır (AnnouncementRecordStore.SortKeys).
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("title", "Başlık", "bell", "title", "-title", Locked: true),
-        new("audience", "Hedef", "users"),
-        new("publishOn", "Yayın aralığı", "calendar", "publishOn", "-publishOn"),
-        new("readCount", "Okuyan", "eye"),
-        new("status", "Durum", "tag"),
+        new("title", Texts.Get("hr.content.col.title"), "bell", "title", "-title", Locked: true),
+        new("audience", Texts.Get("hr.announcement-admin.col.audience"), "users"),
+        new("publishOn", Texts.Get("hr.announcement-admin.col.period"), "calendar", "publishOn", "-publishOn"),
+        new("readCount", Texts.Get("hr.announcement-admin.col.readers"), "eye"),
+        new("status", Texts.Get("common.field.status"), "tag"),
     ];
 
     private readonly GridViewState grid = new("hr.announcement-admin", "-publishOn");
@@ -135,10 +135,10 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new("active=true", "Yayında", Icon: "bell"),
-        new("isPublished=false", "Taslak", Icon: "pencil"),
-        new("expired=true", "Süresi geçen", Icon: "history"),
-        new("all", "Tüm duyurular", Icon: "list"),
+        new("active=true", HrLabels.Published(true).Label, Icon: "bell"),
+        new("isPublished=false", HrLabels.Published(false).Label, Icon: "pencil"),
+        new("expired=true", Texts.Get("hr.announcement-admin.view.expired"), Icon: "history"),
+        new("all", Texts.Get("hr.announcement-admin.view.all"), Icon: "list"),
         .. views.Options,
     ];
 
@@ -235,11 +235,11 @@
 
     private RenderFragment CellContent(string key, RecordResponse record) => key switch
     {
-        "title" => @<text>@WarehouseLabels.Text(record, "title") @if (WarehouseLabels.Flag(record, "isPinned")) { <span class="badge stage-qualified">Sabitlenmiş</span> }</text>,
+        "title" => @<text>@WarehouseLabels.Text(record, "title") @if (WarehouseLabels.Flag(record, "isPinned")) { <span class="badge stage-qualified">@Texts.Get("home.announcements.pinned")</span> }</text>,
         "audience" => @<text>@HrLabels.Audience(record, Lookups)</text>,
-        "publishOn" => @<text>@HrLabels.Date(WarehouseLabels.Text(record, "publishOn")) – @(WarehouseLabels.Text(record, "expiresOn") is { Length: > 0 } e ? HrLabels.Date(e) : "süresiz")</text>,
+        "publishOn" => @<text>@HrLabels.Date(WarehouseLabels.Text(record, "publishOn")) – @(WarehouseLabels.Text(record, "expiresOn") is { Length: > 0 } e ? HrLabels.Date(e) : Texts.Get("hr.announcement-admin.open-ended"))</text>,
         "readCount" => @<text>@WarehouseLabels.Number(record, "readCount")</text>,
-        "status" => @<span class="badge @(WarehouseLabels.Flag(record, "isPublished") ? "status-customer" : "status-inactive")">@(WarehouseLabels.Flag(record, "isPublished") ? "Yayında" : "Taslak")</span>,
+        "status" => @<span class="badge @HrLabels.Published(WarehouseLabels.Flag(record, "isPublished")).Badge">@HrLabels.Published(WarehouseLabels.Flag(record, "isPublished")).Label</span>,
         _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.AnnouncementEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
             @<text>@CustomFieldText.Format(field, record.Values["custom"] as JsonObject)</text>,
         _ => @<text></text>,
