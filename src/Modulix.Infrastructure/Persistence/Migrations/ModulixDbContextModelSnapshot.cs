@@ -10717,49 +10717,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("ExpenseLines", "hr");
                 });
 
-            modelBuilder.Entity("Modulix.Modules.Hr.Domain.Holiday", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("CustomFields")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateOnly>("Date")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("HalfDay")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasAlternateKey("TenantId", "Id");
-
-                    b.HasIndex("TenantId", "Date")
-                        .IsUnique()
-                        .HasDatabaseName("UX_Holidays_Date");
-
-                    b.ToTable("Holidays", "hr");
-                });
-
             modelBuilder.Entity("Modulix.Modules.Hr.Domain.LeaveBalance", b =>
                 {
                     b.Property<Guid>("Id")
