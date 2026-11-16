@@ -104,11 +104,11 @@
                             <div class="designer-section-head">
                                 <span class="section-card-icon" aria-hidden="true"><AppIcon Name="@(section.Icon ?? "square-pen")" Size="16" /></span>
                                 <div class="designer-name">
-                                    <label class="visually-hidden" for="section-label-@section.Key">@Texts.Get("admin.formDesigner.sectionName")</label>
-                                    <input id="section-label-@section.Key" class="form-control form-control-sm" maxlength="60" value="@section.Label" @onchange="e => Rename(section, e.Value as string)" />
+                                    <label class="visually-hidden" for="section-label-@(section.Key)">@Texts.Get("admin.formDesigner.sectionName")</label>
+                                    <input id="section-label-@(section.Key)" class="form-control form-control-sm" maxlength="60" value="@(section.Label)" @onchange="e => Rename(section, e.Value as string)" />
                                 </div>
-                                <label class="visually-hidden" for="section-icon-@section.Key">@Texts.Get("admin.formDesigner.sectionIcon")</label>
-                                <select id="section-icon-@section.Key" class="form-select form-select-sm designer-icon" value="@(section.Icon ?? "")" @onchange="e => SetIcon(section, e.Value as string)">
+                                <label class="visually-hidden" for="section-icon-@(section.Key)">@Texts.Get("admin.formDesigner.sectionIcon")</label>
+                                <select id="section-icon-@(section.Key)" class="form-select form-select-sm designer-icon" value="@(section.Icon ?? "")" @onchange="e => SetIcon(section, e.Value as string)">
                                     <option value="">@Texts.Get("admin.formDesigner.noIcon")</option>
                                     @foreach (var icon in Icons)
                                     {
@@ -117,8 +117,8 @@
                                 </select>
                                 @if (tabs.Count > 1)
                                 {
-                                    <label class="visually-hidden" for="section-tab-@section.Key">@Texts.Get("admin.formDesigner.sectionTab")</label>
-                                    <select id="section-tab-@section.Key" class="form-select form-select-sm designer-move" value="@section.Tab" @onchange="e => MoveSectionToTab(section, e.Value as string)">
+                                    <label class="visually-hidden" for="section-tab-@(section.Key)">@Texts.Get("admin.formDesigner.sectionTab")</label>
+                                    <select id="section-tab-@(section.Key)" class="form-select form-select-sm designer-move" value="@(section.Tab)" @onchange="e => MoveSectionToTab(section, e.Value as string)">
                                         @foreach (var t in tabs)
                                         {
                                             <option value="@t.Key">@t.Label</option>
