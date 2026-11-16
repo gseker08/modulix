@@ -299,6 +299,7 @@ public static class AppCatalog
         new("admin.companies", Admin, "Şirketler", "landmark", "yonetim/sirketler", 50, Permission: CoreAccess.ManageCompanies),
         new("admin.settings", Admin, "Kuruluş ayarları", "wrench", "yonetim/ayarlar", 60, Permission: CoreAccess.ManageSettings, Tone: AppTone.Teal),
         new("admin.holidays", Admin, "Resmî tatiller", "sun", "yonetim/resmi-tatiller", 62, Permission: CoreAccess.ManageHolidays),
+        new("admin.numbering", Admin, "Belge numaraları", "hash", "yonetim/belge-numaralari", 63, Permission: CoreAccess.ManageNumbering), // ADR-0049 dilim 2b
         new("admin.ai-access", Admin, "Yapay zekâ erişimi", "zap", "yonetim/yapay-zeka", 65, Permission: CoreAccess.ManageSettings),
         new("admin.audit", Admin, "Denetim kaydı", "history", "yonetim/denetim", 70, Permission: CoreAccess.ReadAudit),
         new("admin.import-log", Admin, "İşlem günlüğü", "history", "yonetim/gunluk", 72, AnyPermission: [CoreAccess.ReadImports, CoreAccess.RunImports]),
