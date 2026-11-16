@@ -80,6 +80,9 @@ internal sealed class FileCleanup(
         }
 
         var known = (await db.StoredFiles.AsNoTracking().Select(f => f.StorageKey).ToListAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
+
+        // Denetim kaydı arşivinin dosyaları da bilinen içeriktir (ADR-0052); üst verisi core.AuditArchives'dedir.
+        known.UnionWith(await db.AuditArchives.AsNoTracking().Select(a => a.StorageKey).ToListAsync(cancellationToken));
         var removed = 0;
         foreach (var orphan in candidates.Where(b => !known.Contains(b.Key)))
         {

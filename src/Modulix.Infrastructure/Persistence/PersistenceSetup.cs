@@ -148,6 +148,7 @@ public static class PersistenceSetup
         services.AddScoped<IAutomationRunService, AutomationRunService>();
         services.AddSingleton<AutomationScanner>();
         services.AddScoped<AutomationRetention>();
+        services.AddScoped<Modulix.Infrastructure.Audit.AuditArchiver>();
         services.AddSingleton<AutomationRunner>();
         services.AddScoped<IImportLog, ImportLog>();
         services.AddScoped<ImportSchema>();

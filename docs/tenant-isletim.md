@@ -145,6 +145,16 @@ Yerelden S3'e geçişte mevcut içerik `{kök}/{tenantId}/…` dizininden aynı 
 
 **Sözleşme verisi (dilim 9):** kullanıcıların kaydettiği liste görünümleri ortak `core.GridViews` tablosundadır (ADR-0036; eski `contracts.ContractSavedViews` tablosu `ContractSavedViewsToGridViews` migration'ıyla taşınıp kaldırıldı), `TenantId` taşır; tenant dışa aktarma ve silme kapsamındadır. Sözleşme listesi CSV çıkışı (`contracts.contracts.export` izni) uygulama içinden yapılır ve her çıkış denetim kaydına (`Exported`: kim, kaç satır, hangi süzgeç) yazılır; tenant verisinin bütünüyle alınması için `tenant-export` kullanılır.
 
+**Denetim kaydı arşivi (`audit-archive`, ADR-0052):** `core.AuditLog` aylık bölümlüdür. Komut ayda bir zamanlanmış görev olarak çalıştırılır (ör. her ayın 2'si gece). Migrator bağlantısıyla çalışır ve şu işleri yapar:
+- Sıcak saklama süresinden (`AuditArchive:HotMonths`, varsayılan 24) eski her dolu bölüm için tenant başına gzip'li JSON Lines dosyasını nesne deposuna, kaydını `core.AuditArchives`'e yazar ve bölümü boşaltır.
+- Boş eski sınırları birleştirir, ileriye `AuditArchive:FutureMonths` (24) ay sınır açar.
+
+Sayı tutmayan dönem (örneğin tenant kaydı olmayan satır) boşaltılmaz; komut çıkış kodu 1 ile biter ve günlüğe hata yazar. Neden giderilip komut yeniden çalıştırılır; tekrar çalıştırmak güvenlidir. Aynı anda tek çalışma olur. Arşiv dosyaları uygulama düzeyinde şifrelenmez: nesne deposunda sunucu tarafı şifreleme ve sürümleme açık, kova kapalı olmalıdır. Arşiv dosyaları tenant'ın depo kökünde durduğu için `tenant-export` ve `tenant-delete` onları da kapsar. Komut hiç çalıştırılmazsa veri kaybolmaz; yalnızca tablo büyür.
+
+```bash
+dotnet run --project src/Modulix.Api -- audit-archive
+```
+
 **Dışa aktarma (`tenant-export`):** bir tenant'ın bütün satırlarını `TenantId` ile tablo başına bir JSON dosyasına yazar.
 Tablolar koddan değil veritabanı kataloğundan bulunur (`TenantId` kolonu taşıyan her tablo: tenant şemaları ve platform
 şemasındaki üyelik, modül hakkı, e-posta, outbox, teslim); yeni tablo kendiliğinden kapsama girer. `tenant.json` tenant kaydını,

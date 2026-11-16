@@ -19,6 +19,7 @@ dotnet run --project src/Modulix.Api             # API + arayüz; /health
 dotnet run --project src/Modulix.Api -- migrate  # bekleyen migration'lar (tek zincir); db-up.ps1 bunu çağırır
 dotnet run --project src/Modulix.Api -- tenant-export <slug> [--dir <dizin>]   # tenant verisini TenantId ile JSON olarak dışa aktarır
 dotnet run --project src/Modulix.Api -- tenant-delete <slug> --confirm <slug>  # tenant verisini siler (geri alınamaz; önce dışa aktar)
+dotnet run --project src/Modulix.Api -- audit-archive                        # 24 aydan eski denetim kaydı aylarını nesne deposuna arşivler, bölümü boşaltır (ADR-0052)
 ```
 
 - Yerel veritabanı: `docker compose up -d --wait sqlserver mailpit && docker compose run --rm db-init` (şifreler `.env`'de; Windows'ta `scripts/db-up.ps1`). Port 14333.
