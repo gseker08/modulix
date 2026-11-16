@@ -3,13 +3,13 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Organizasyon şeması · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.org-chart") · Modulix</PageTitle>
 
 @* Organizasyon şeması (ADR-0042 dilim 1): ayrılmamış çalışanların yönetici bağından çizilen ağaç. Yöneticisi olmayan (ya da yöneticisi
    ayrılmış) çalışan köktür. Döngü sunucuda engellenir; yine de ziyaret edilen düğüm ikinci kez çizilmez. Departman süzgeci ağacı daraltmaz,
    yalnızca o departmandaki (alt departmanlar dahil; departmanlar Core'dan, bölüm 22) kişileri vurgular (yönetim zinciri bozulmasın diye). *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.EmployeesRead">
-    <PageHeader Title="Organizasyon şeması" Icon="layers" Subtitle="@(employees is null ? "Yönetici bağlarına göre kurum yapısı." : $"{employees.Count} çalışan · {roots.Count} üst düzey")" />
+    <PageHeader Title="@Texts.Get("nav.app.hr.org-chart")" Icon="layers" Subtitle="@(employees is null ? Texts.Get("hr.org-chart.intro") : Texts.Get("hr.org-chart.count", employees.Count, roots.Count))" />
 
     @if (message is not null)
     {
@@ -18,7 +18,7 @@
 
     <div class="list-toolbar">
         <div class="w-auto">
-            <HrBusinessUnitSelect AriaLabel="Vurgulanacak departman" EmptyLabel="Departman vurgusu yok" Value="highlightUnit" ValueChanged="Highlight" Loaded="u => units = u" />
+            <HrBusinessUnitSelect AriaLabel="@Texts.Get("hr.org-chart.highlight")" EmptyLabel="@Texts.Get("hr.org-chart.no-highlight")" Value="highlightUnit" ValueChanged="Highlight" Loaded="u => units = u" />
         </div>
     </div>
 
@@ -28,15 +28,15 @@
     }
     else if (employees.Count == 0)
     {
-        <EmptyState Icon="layers" Title="Henüz çalışan kartı yok." Text="Şema, çalışan kartlarındaki yönetici bağlarından çizilir." />
+        <EmptyState Icon="layers" Title="@Texts.Get("hr.org-chart.empty")" Text="@Texts.Get("hr.org-chart.empty-hint")" />
     }
     else
     {
         @if (truncated)
         {
-            <div class="alert alert-info" role="status">Şema ilk @MaxEmployees çalışanla çizildi; tamamı için Çalışanlar listesini kullanın.</div>
+            <div class="alert alert-info" role="status">@Texts.Get("hr.org-chart.truncated", MaxEmployees)</div>
         }
-        <ul class="org-tree" role="tree" aria-label="Organizasyon şeması">
+        <ul class="org-tree" role="tree" aria-label="@Texts.Get("nav.app.hr.org-chart")">
             @foreach (var root in roots)
             {
                 @Node(root, 1)
@@ -115,7 +115,7 @@
                 <span class="avatar avatar-tone-@(Math.Abs(employee.Id.GetHashCode()) % 5)" aria-hidden="true">@HrLabels.Initials(employee)</span>
                 <span>
                     <strong>@HrLabels.Name(employee)</strong>
-                    <small>@(string.IsNullOrWhiteSpace(WarehouseLabels.Text(employee, "jobTitle")) ? "Unvan girilmedi" : WarehouseLabels.Text(employee, "jobTitle"))@(department.Length > 0 ? $" · {department}" : "")@(children.Count > 0 ? $" · {children.Count} kişi bağlı" : "")</small>
+                    <small>@(string.IsNullOrWhiteSpace(WarehouseLabels.Text(employee, "jobTitle")) ? HrLabels.NoJobTitle : WarehouseLabels.Text(employee, "jobTitle"))@(department.Length > 0 ? $" · {department}" : "")@(children.Count > 0 ? " · " + Texts.Get("hr.org-chart.reports", children.Count) : "")</small>
                 </span>
             </div>
             @if (children.Count > 0)
