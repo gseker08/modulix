@@ -1,12 +1,14 @@
 using System.Text.Json;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Records;
-using Modulix.Modules.Contracts;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Contracts.Lifecycle;
 using Modulix.Shared.Contracts;
 
-namespace Modulix.Api.Contracts;
+namespace Modulix.Modules.Contracts.Endpoints;
 
 /// <summary>
 /// Yenileme ve fesih uç noktaları (ADR-0022, dilim 8). İzinler serviste, kayıt bulunduktan sonra denetlenir (kapsam dışı 404, izinsiz 403). Yenileme taslağı, yenilememe kararı ve
@@ -29,7 +31,7 @@ internal static class ContractRenewalEndpoints
             var result = await service.CreateDraftAsync(id, new RenewalDraftInput(r.StartDate, r.TermMonths), ct);
             return result.IsSuccess
                 ? Results.Json(new RenewalDraftResultDto(result.Value!.ContractId, result.Value.Number, result.Value.AlreadyExisted), Json, statusCode: result.Value.AlreadyExisted ? StatusCodes.Status200OK : StatusCodes.Status201Created)
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
 
         contracts.MapPost("/{id:guid}/renewal/decline", async (Guid id, DeclineRenewalRequest r, IContractRenewals service, CancellationToken ct) =>
@@ -43,7 +45,7 @@ internal static class ContractRenewalEndpoints
             var result = await service.ChainAsync(id, ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value!.Select(i => new ChainItemDto(i.Id, i.Number, i.Title, i.StartDate, i.EndDate, i.EffectiveStatus, i.SignatureStatus, i.Relation)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
 
         group.MapGet("/renewals/calendar", async (int? days, IContractRenewals service, CancellationToken ct) =>
@@ -53,7 +55,7 @@ internal static class ContractRenewalEndpoints
                 ? Results.Ok(result.Value!.Select(i => new RenewalCalendarItemDto(
                     i.ContractId, i.Number, i.Title, i.PartyId, i.OwnerId, i.EndDate, i.NoticeDeadline, i.DaysToNotice, i.DaysToEnd, i.RenewalMode, i.EffectiveStatus, i.Decision,
                     i.ResultContractId, i.TerminationDate, i.LastReminder)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
 
         group.MapPost("/scheduler/run", async (IContractScheduler scheduler, CancellationToken ct) =>
@@ -69,7 +71,7 @@ internal static class ContractRenewalEndpoints
     {
         if (!result.IsSuccess)
         {
-            return RecordEndpoints.ToProblem(result.Error!);
+            return RecordProblems.ToProblem(result.Error!);
         }
 
         return Results.Ok(JsonSerializer.Deserialize<RenewalOverviewDto>(JsonSerializer.Serialize(result.Value!, Json), Json));

@@ -1,31 +1,32 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Settings;
-using Modulix.Modules.Contracts;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Contracts.Lifecycle;
 using Modulix.Shared.Contracts;
 
-namespace Modulix.Api.Contracts;
+namespace Modulix.Modules.Contracts.Endpoints;
 
 /// <summary>
 /// Sözleşme uç noktaları (/api/contracts/...; ADR-0022). Başlık, taraf ve kalem CRUD'u kayıt boru hattından geçer; durum, sürüm ve
 /// toplam alanları genel uçlardan yazılamaz. Durum geçişleri ayrı eylem uç noktalarıdır (<c>POST .../contracts/{id}/{eylem}</c>) ve tek
 /// kural kümesini (<see cref="IContractWorkflow"/>) kullanır. Eylem izinleri serviste, kayıt bulunduktan SONRA denetlenir: kapsam dışı kayıt
 /// 404, izinsiz eylem 403 alır. Eylemler kayıt sürümünü ister (eşzamanlı çakışmada yalnızca biri kazanır, diğeri 409 alır).
+/// Uç noktalar modüldedir (ADR-0046); grup host tarafından açılır.
 /// </summary>
-public static class ContractsEndpoints
+internal static class ContractsEndpoints
 {
     private const string Prefix = "/api/contracts";
     private static readonly JsonSerializerOptions Json = JsonSerializerOptions.Web;
 
-    public static IEndpointRouteBuilder MapContractsEndpoints(this IEndpointRouteBuilder app)
+    /// <summary><paramref name="routes"/> host tarafından <c>/api/contracts</c> grubu olarak, oturum ve modül kontrolüyle sarılmış gelir (ADR-0046).</summary>
+    public static void MapEndpoints(IEndpointRouteBuilder routes)
     {
-        var group = app.MapGroup(Prefix)
-            .RequireAuthorization()
-            .RequireModule(ContractsModule.ModuleKey)
+        var group = routes.MapGroup(string.Empty)
             .WithTags("Sözleşmeler");
 
         ResourceEndpoints.MapResource<ContractDto, SaveContractRequest>(group, Prefix, "contracts", ContractsModule.Entities.Contract,
@@ -41,7 +42,7 @@ public static class ContractsEndpoints
             var result = await workflow.HistoryAsync(id, ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value!.Select(h => new ContractHistoryDto(h.Id, h.Kind, h.At, h.ActorId, h.FromStatus, h.ToStatus, h.Reason)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
 
         contracts.MapGet("/{id:guid}/actions", async (Guid id, IContractWorkflow workflow, CancellationToken ct) =>
@@ -49,7 +50,7 @@ public static class ContractsEndpoints
             var result = await workflow.ActionsAsync(id, ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value!.Select(a => new ContractActionDto(a.Action, a.Allowed, a.Code, a.Message, a.RequiresReason)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
 
         // Eylem izinleri serviste denetlenir; uç nokta yalnızca okuma iznini ister ki kayıt yoksa 404 dönsün.
@@ -58,7 +59,7 @@ public static class ContractsEndpoints
             contracts.MapPost($"/{{id:guid}}/{action}", async (Guid id, ContractTransitionRequest r, IContractWorkflow w, CancellationToken ct) =>
             {
                 var result = await w.RunAsync(id, action, r.Version, r.Reason, ct);
-                return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<ContractDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+                return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<ContractDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
             }).RequirePermission(ContractsModule.Permissions.ContractsRead);
         }
 
@@ -69,7 +70,7 @@ public static class ContractsEndpoints
             var result = await service.PreviewAsync(quoteId, ct);
             return result.IsSuccess
                 ? Results.Ok(JsonSerializer.Deserialize<QuoteSourceDto>(JsonSerializer.Serialize(result.Value, Json), Json))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
         fromQuote.MapPost("/{quoteId:guid}", async (Guid quoteId, CreateContractFromQuoteRequest r, IContractFromQuote service, CancellationToken ct) =>
         {
@@ -77,31 +78,31 @@ public static class ContractsEndpoints
                 new ContractFromQuoteOptions(r.Type, r.StartDate, r.TermMonths, r.RenewalMode, r.RenewalPeriodMonths, r.NoticePeriodDays, r.LineKeys, r.OwnerId), ct);
             return result.IsSuccess
                 ? Results.Created($"{Prefix}/contracts/{result.Value!.Id}", ResourceEndpoints.ToDto<ContractDto>(result.Value))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
 
         // Belgeler (dilim 4): liste, önizleme, üretim ve indirme. İzinler serviste denetlenir (sözleşme görünürlüğü önce: kapsam dışı 404).
         contracts.MapGet("/{id:guid}/documents", async (Guid id, IContractDocuments documents, CancellationToken ct) =>
         {
             var result = await documents.ListAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(result.Value!.Select(ToDto).ToList()) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(result.Value!.Select(ToDto).ToList()) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
         contracts.MapPost("/{id:guid}/documents/preview", async (Guid id, PreviewContractDocumentRequest r, IContractDocuments documents, CancellationToken ct) =>
         {
             var result = await documents.PreviewAsync(id, r.TemplateId, r.UseDraft, ct);
-            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
         contracts.MapPost("/{id:guid}/documents", async (Guid id, GenerateContractDocumentRequest r, IContractDocuments documents, CancellationToken ct) =>
         {
             var result = await documents.GenerateAsync(id, r.TemplateId, ct);
-            return result.IsSuccess ? Results.Created($"{Prefix}/contracts/{id}/documents/{result.Value!.Id}", ToDto(result.Value)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Created($"{Prefix}/contracts/{id}/documents/{result.Value!.Id}", ToDto(result.Value)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
         contracts.MapGet("/{id:guid}/documents/{documentId:guid}/file", async (Guid id, Guid documentId, IContractDocuments documents, HttpContext http, CancellationToken ct) =>
         {
             var result = await documents.GetFileAsync(id, documentId, ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             http.Response.Headers.CacheControl = "no-store";
@@ -126,20 +127,20 @@ public static class ContractsEndpoints
         templates.MapGet("/{id:guid}/versions", async (Guid id, IContractTemplates service, CancellationToken ct) =>
         {
             var result = await service.VersionsAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(result.Value!.Select(ToDto).ToList()) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(result.Value!.Select(ToDto).ToList()) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
         templates.MapGet("/{id:guid}/versions/{versionNo}", async (Guid id, string versionNo, IContractTemplates service, CancellationToken ct) =>
         {
             if (!int.TryParse(versionNo, out var no)) { return Results.NotFound(); }
             var result = await service.VersionAsync(id, no, ct);
-            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
 
         // İç onay (dilim 5): sözleşmenin onay planı/ilerlemesi, onay iş listesi, kurallar ve vekâletler. Karar verme eylem uç noktalarıyla yapılır (approve, reject-approval, return-for-changes).
         contracts.MapGet("/{id:guid}/approval", async (Guid id, IContractApprovals approvals, CancellationToken ct) =>
         {
             var result = await approvals.GetAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
 
         group.MapGet("/approvals/inbox", async (bool? mine, IContractApprovals approvals, CancellationToken ct) =>
@@ -149,7 +150,7 @@ public static class ContractsEndpoints
                 ? Results.Ok(result.Value!.Select(i => new ContractApprovalInboxItemDto(
                     i.ContractId, i.Number, i.Title, i.Type, i.VersionNo, i.OwnerId, i.SubmittedBy, i.SubmittedAt, i.DueAt, i.IsOverdue, i.CurrentStep, i.StepCount,
                     i.WaitingFor, i.CanDecide, i.ActingAsDelegate, i.CannotDecideReason, i.Rules)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsApprove);
 
         ResourceEndpoints.MapResource<ContractApprovalRuleDto, SaveContractApprovalRuleRequest>(group, Prefix, "approval-rules", ContractsModule.Entities.ContractApprovalRule,
@@ -165,7 +166,7 @@ public static class ContractsEndpoints
         contracts.MapGet("/{id:guid}/versions", async (Guid id, IContractWorkflow workflow, CancellationToken ct) =>
         {
             var result = await workflow.VersionsAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(result.Value!.Select(ToDto).ToList()) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(result.Value!.Select(ToDto).ToList()) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
 
         contracts.MapGet("/{id:guid}/versions/{versionNo}", async (Guid id, string versionNo, IContractWorkflow workflow, CancellationToken ct) =>
@@ -173,7 +174,7 @@ public static class ContractsEndpoints
             // Sürüm numarası kısıtsız okunur ki oturumsuz istek rota eşleşmemesiyle 404 değil 401 alsın; geçersiz numara 404'tür.
             if (!int.TryParse(versionNo, out var no)) { return Results.NotFound(); }
             var result = await workflow.VersionAsync(id, no, ct);
-            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToDto(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
 
         // Karşılaştırma: ?with=0 güncel taslak.
@@ -186,14 +187,12 @@ public static class ContractsEndpoints
                     [.. result.Value!.Header.Select(f => new FieldChangeDto(f.Field, f.Before, f.After))],
                     [.. result.Value.Lines.Select(l => new LineChangeDto(l.StableKey, l.Change, l.Name, [.. l.Fields.Select(f => new FieldChangeDto(f.Field, f.Before, f.After))]))],
                     [.. result.Value.Parties.Select(p => new PartyChangeDto(p.Id, p.Change, p.Role, [.. p.Fields.Select(f => new FieldChangeDto(f.Field, f.Before, f.After))]))]))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
-
-        return app;
     }
 
     private static IResult TemplateResult(Modulix.Core.Contracts.Records.RecordResult<Modulix.Core.Contracts.Records.RecordData> result) =>
-        result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<ContractTemplateDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<ContractTemplateDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
 
     private static ContractApprovalDto ToDto(ContractApprovalView v) => new(
         v.Status, v.VersionNo,
@@ -228,7 +227,7 @@ public static class ContractsEndpoints
             v.Snapshot is null ? null : JsonSerializer.Deserialize<ContractSnapshotDto>(JsonSerializer.Serialize(v.Snapshot, Json), Json));
 }
 
-/// <summary>Sözleşme politikası: tenant ayarlarından okunur (modül Core'un ayar servisini görmez; host bu köprüyü sağlar).</summary>
+/// <summary>Sözleşme politikası: tenant ayarlarından okunur (<see cref="ITenantSettingReader"/>); modülün kendi <c>ConfigureServices</c>'inde kaydolur (ADR-0046).</summary>
 internal sealed class ContractPolicyProvider(IServiceProvider services) : IContractPolicyProvider
 {
     public async Task<ContractPolicySettings> GetAsync(CancellationToken cancellationToken)
@@ -240,7 +239,7 @@ internal sealed class ContractPolicyProvider(IServiceProvider services) : IContr
             Text(await settings.GetValueAsync(ContractsModule.SettingKeys.ProviderName, cancellationToken)),
             Text(await settings.GetValueAsync(ContractsModule.SettingKeys.ProviderDetails, cancellationToken)),
             Text(await settings.GetValueAsync(ContractsModule.SettingKeys.FooterNote, cancellationToken)),
-            Text(await settings.GetValueAsync(Modulix.Core.Modules.CoreModule.SettingKeys.TimeZone, cancellationToken)) ?? "Europe/Istanbul",
+            (await services.GetRequiredService<Modulix.Core.Contracts.Tenancy.ITenantClock>().GetAsync(cancellationToken)).Zone.Id,
             int.TryParse(await settings.GetValueAsync(ContractsModule.SettingKeys.ApprovalDueHours, cancellationToken), out var dueHours) ? Math.Clamp(dueHours, 0, 9999) : 72,
             Text(await settings.GetValueAsync(ContractsModule.SettingKeys.SignatureProvider, cancellationToken)) is { } provider && provider != "none" ? provider : null,
             int.TryParse(await settings.GetValueAsync(ContractsModule.SettingKeys.SignatureValidityDays, cancellationToken), out var validity) ? Math.Clamp(validity, 1, 90) : 14,

@@ -6,11 +6,10 @@
 
 @if (rows is { Count: > 0 } && rows.Any(Pending))
 {
-    <section class="settings-group" aria-label="Departman eşleme">
-        <h3>Departmanlar Core'a taşınıyor</h3>
+    <section class="settings-group" aria-label="@Texts.Get("hr.dept-map.label")">
+        <h3>@Texts.Get("hr.dept-map.title")</h3>
         <p class="text-muted">
-            Departmanlar artık Yönetim › Departmanlar ağacından seçilir. Aşağıdaki eski İK departmanları aynı adlı Core departmanına eşlenir;
-            kullanıcı hesabı bağlı çalışanlar kullanıcının departmanını alır.
+            @Texts.Get("hr.dept-map.intro")
         </p>
 
         @if (message is not null)
@@ -19,34 +18,34 @@
         }
 
         <table class="table record-table">
-            <caption class="visually-hidden">Departman eşleme önizlemesi</caption>
+            <caption class="visually-hidden">@Texts.Get("hr.dept-map.caption")</caption>
             <thead>
                 <tr>
-                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> Eski departman</span></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="building" Size="14" /> Core departmanı</span></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="users" Size="14" /> Çalışan</span></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="bell" Size="14" /> Duyuru</span></th>
-                    <th scope="col"><span class="th-label"><AppIcon Name="clipboard-list" Size="14" /> Anket</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="tag" Size="14" /> @Texts.Get("hr.dept-map.col.legacy")</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="building" Size="14" /> @Texts.Get("hr.dept-map.col.unit")</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="users" Size="14" /> @Texts.Get("hr.leave.col.employee")</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="bell" Size="14" /> @Texts.Get("hr.dept-map.col.announcements")</span></th>
+                    <th scope="col"><span class="th-label"><AppIcon Name="clipboard-list" Size="14" /> @Texts.Get("hr.dept-map.col.surveys")</span></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var row in rows.Where(Pending))
                 {
                     <tr>
-                        <td data-label="Eski departman" class="primary">@row.Label</td>
-                        <td data-label="Core departmanı">
+                        <td data-label="@Texts.Get("hr.dept-map.col.legacy")" class="primary">@row.Label</td>
+                        <td data-label="@Texts.Get("hr.dept-map.col.unit")">
                             @if (row.BusinessUnitName is { } unit)
                             {
                                 @unit
                             }
                             else
                             {
-                                <span class="badge stage-negotiation">Eşleşmedi</span>
+                                <span class="badge stage-negotiation">@Texts.Get("hr.dept-map.unmatched")</span>
                             }
                         </td>
-                        <td data-label="Çalışan">@row.EmployeeCount</td>
-                        <td data-label="Duyuru">@row.AnnouncementCount</td>
-                        <td data-label="Anket">@row.SurveyCount</td>
+                        <td data-label="@Texts.Get("hr.leave.col.employee")">@row.EmployeeCount</td>
+                        <td data-label="@Texts.Get("hr.dept-map.col.announcements")">@row.AnnouncementCount</td>
+                        <td data-label="@Texts.Get("hr.dept-map.col.surveys")">@row.SurveyCount</td>
                     </tr>
                 }
             </tbody>
@@ -54,7 +53,7 @@
 
         @if (rows.Any(r => Pending(r) && r.BusinessUnitId is null))
         {
-            <p class="text-muted">Eşleşmeyen değer için Yönetim › Departmanlar'da aynı adla departman açın (ya da birden çok departman aynı adı taşıyorsa adlardan birini değiştirin) ve sayfayı yenileyin.</p>
+            <p class="text-muted">@Texts.Get("hr.dept-map.unmatched-help")</p>
         }
 
         @if (rows.Any(r => Pending(r) && r.BusinessUnitId is not null))
@@ -65,7 +64,7 @@
                     {
                         <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                     }
-                    Eşleşenleri uygula
+                    @Texts.Get("hr.dept-map.apply")
                 </button>
             </div>
         }
@@ -102,7 +101,7 @@
             return;
         }
 
-        Toasts.Success($"{result.Value!.Updated} kayıt Core departmanına taşındı.");
+        Toasts.Success(Texts.Get("hr.dept-map.applied", result.Value!.Updated));
         await LoadAsync();
         await Applied.InvokeAsync();
     }

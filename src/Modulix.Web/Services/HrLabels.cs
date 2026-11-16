@@ -123,7 +123,10 @@ public static class HrLabels
     public static string Money(decimal? amount, string? currency) =>
         amount is { } value ? $"{value.ToString("#,##0.00", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))} {currency}".Trim() : "—";
 
-    public static string AssetStatus(string? key) => HrAccess.AssetStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Demirbaş durumları; metin sözlükten (<c>hr.asset-status.&lt;değer küçük harf&gt;</c>), yoksa Türkçe kaynak (ADR-0034, İK dilim 19g).</summary>
+    public static IReadOnlyList<(string Key, string Label)> AssetStatuses => WarehouseLabels.Translate("hr.asset-status", HrAccess.AssetStatuses);
+
+    public static string AssetStatus(string? key) => AssetStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Depoda başarı, zimmetli marka, bakımda dikkat, kayıp kayıp tonu, hurda nötr.</summary>
     public static string AssetStatusBadge(string? key) => key switch
@@ -135,7 +138,10 @@ public static class HrLabels
         _ => "status-inactive",
     };
 
-    public static string AssignmentStatus(string? key) => HrAccess.AssignmentStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Zimmet durumları; metin sözlükten (<c>hr.assignment-status.&lt;değer&gt;</c>), yoksa Türkçe kaynak.</summary>
+    public static IReadOnlyList<(string Key, string Label)> AssignmentStatuses => WarehouseLabels.Translate("hr.assignment-status", HrAccess.AssignmentStatuses);
+
+    public static string AssignmentStatus(string? key) => AssignmentStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     public static string AssignmentStatusBadge(string? key) => key switch
     {
@@ -145,9 +151,15 @@ public static class HrLabels
         _ => "status-inactive",
     };
 
-    public static string ChecklistKind(string? key) => HrAccess.ChecklistKinds.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Süreç türleri; metin sözlükten (<c>hr.checklist-kind.&lt;değer&gt;</c>), yoksa Türkçe kaynak.</summary>
+    public static IReadOnlyList<(string Key, string Label)> ChecklistKinds => WarehouseLabels.Translate("hr.checklist-kind", HrAccess.ChecklistKinds);
 
-    public static string ChecklistStatus(string? key) => HrAccess.ChecklistStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    public static string ChecklistKind(string? key) => ChecklistKinds.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    /// <summary>Süreç durumları; metin sözlükten (<c>hr.checklist-status.&lt;değer&gt;</c>), yoksa Türkçe kaynak.</summary>
+    public static IReadOnlyList<(string Key, string Label)> ChecklistStatuses => WarehouseLabels.Translate("hr.checklist-status", HrAccess.ChecklistStatuses);
+
+    public static string ChecklistStatus(string? key) => ChecklistStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     public static string ChecklistStatusBadge(string? key) => key switch
     {
@@ -156,7 +168,10 @@ public static class HrLabels
         _ => "status-inactive",
     };
 
-    public static string TaskStatus(string? key) => HrAccess.TaskStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Görev durumları; metin sözlükten (<c>hr.task-status.&lt;değer&gt;</c>), yoksa Türkçe kaynak.</summary>
+    public static IReadOnlyList<(string Key, string Label)> TaskStatuses => WarehouseLabels.Translate("hr.task-status", HrAccess.TaskStatuses);
+
+    public static string TaskStatus(string? key) => TaskStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     public static string TaskStatusBadge(string? key) => key switch
     {
@@ -165,9 +180,15 @@ public static class HrLabels
         _ => "status-inactive",
     };
 
-    public static string Responsible(string? key) => HrAccess.ChecklistResponsibles.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Görev sorumluları; metin sözlükten (<c>hr.responsible.&lt;değer&gt;</c>), yoksa Türkçe kaynak.</summary>
+    public static IReadOnlyList<(string Key, string Label)> Responsibles => WarehouseLabels.Translate("hr.responsible", HrAccess.ChecklistResponsibles);
 
-    public static string TaskType(string? key) => HrAccess.ChecklistTaskTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    public static string Responsible(string? key) => Responsibles.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    /// <summary>Görev türleri; metin sözlükten (<c>hr.task-type.&lt;değer küçük harf&gt;</c>), yoksa Türkçe kaynak.</summary>
+    public static IReadOnlyList<(string Key, string Label)> TaskTypes => WarehouseLabels.Translate("hr.task-type", HrAccess.ChecklistTaskTypes);
+
+    public static string TaskType(string? key) => TaskTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Anket durumları; metin sözlükten (<c>hr.survey-status.&lt;değer&gt;</c>), yoksa Türkçe kaynak (ADR-0034, İK dilim 19c).</summary>
     public static IReadOnlyList<(string Key, string Label)> SurveyStatuses => WarehouseLabels.Translate("hr.survey-status", HrAccess.SurveyStatuses);

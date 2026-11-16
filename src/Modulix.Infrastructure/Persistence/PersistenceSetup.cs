@@ -171,6 +171,7 @@ public static class PersistenceSetup
         services.AddScoped<LookupService>();
         services.AddScoped<ILookupSettings>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<ILookupSearch>(sp => sp.GetRequiredService<LookupService>());
+        services.AddScoped<Modulix.Core.Contracts.Records.ILookupLabels, LookupLabels>();
         services.AddScoped<ISectorProfileService, SectorProfileService>();
         services.AddScoped<ISubProfileService, SubProfileService>();
         services.TryAddSingleton<CustomizationLimits>(); // varsayılan: sınırsız (ADR-0041 K7); uygulama yapılandırmadan üzerine yazar
@@ -240,6 +241,9 @@ public static class PersistenceSetup
         return services;
     }
 
+    /// <summary>migrate komutunda tek SQL komutunun azami süresi.</summary>
+    public static readonly TimeSpan MigrationCommandTimeout = TimeSpan.FromMinutes(30);
+
     /// <summary>
     /// Bekleyen migration'ları migration kullanıcısıyla uygular ('migrate' komutu). Tek veritabanı bütün tenant'ları
     /// etkilediği için migration'lar geriye uyumlu ve kesintisiz yazılır (ADR-0020).
@@ -250,6 +254,9 @@ public static class PersistenceSetup
         ArgumentNullException.ThrowIfNull(modules);
 
         await using var context = CreateContext(migrationsConnectionString, modules);
+
+        // Varsayılan 30 sn büyük tabloda dizin yeniden kurmaya yetmez (ör. denetim kaydının bölümlenmesi, ADR-0052); migration işletmen komutudur.
+        context.Database.SetCommandTimeout(MigrationCommandTimeout);
         await context.Database.MigrateAsync(cancellationToken);
     }
 

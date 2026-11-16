@@ -1053,10 +1053,12 @@ public sealed class CrmModule : IModule
     /// <summary>
     /// Zamanlanmış iş (ADR-0046): host'taki tek zamanlayıcı 5 dakikada bir, CRM modülü yazılabilir olan her tenant için teklif süre dolumu turunu çalıştırır.
     /// Yapılandırma <c>Jobs:crm.quote-expiry</c>; eski <c>QuoteExpiry</c> bölümü okunmaya devam eder.
+    /// Müşteri adayı puanlarını kural değişikliğinden sonra yeniden hesaplayan iş (ADR-0050 dilim 1b) de 5 dakikada bir çalışır; yapılandırma <c>Jobs:crm.lead-scoring</c>.
     /// </summary>
     IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
     [
         ModuleJobDefinition.For<QuoteExpiryJob>(QuoteExpiryJob.JobKey, TimeSpan.FromSeconds(300), QuoteExpiryJob.Identity) with { LegacySection = "QuoteExpiry" },
+        ModuleJobDefinition.For<LeadScoreJob>(LeadScoreJob.JobKey, TimeSpan.FromMinutes(5), LeadScoreJob.Identity),
     ];
 
     IReadOnlyList<EventSubscription> IModule.EventSubscriptions { get; } =
@@ -1103,6 +1105,13 @@ public sealed class CrmModule : IModule
             [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated],
             [Entities.Activity],
             [Permissions.ActivitiesRead, Permissions.ActivitiesViewPrivate, Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite]),
+        // Toplu yeniden puanlama işinin (ADR-0050 dilim 1b) sistem kimliği: olay işlemez. Atama izni yalnızca sorumlusu boş adayları
+        // (atama havuzu) görmek içindir; iş sorumlu ya da durum yazmaz, boş değerli güncellemeyle puanı yeniden hesaplatır.
+        EventSubscription.For<LeadScoreJobAnchor>(
+            LeadScoreJob.Identity,
+            [DomainEventTypes.RecordDeleted],
+            [Entities.LeadScoreRule],
+            [Permissions.LeadsRead, Permissions.LeadsUpdate, Permissions.LeadsAssign]),
     ];
 
     /// <summary>Tenant ayar anahtarları.</summary>
@@ -1131,6 +1140,9 @@ public sealed class CrmModule : IModule
 
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<LeadScoreJob>();
+        services.AddScoped<LeadScoreJobAnchor>();
+        services.AddScoped<LeadScoreReader>();
         services.AddScoped<CrmStoreContext>();
         services.AddScoped<ISharedRecordVisibility, CrmSharedRecordVisibility>();
         services.AddScoped<IRecordStore, CompanyRecordStore>();

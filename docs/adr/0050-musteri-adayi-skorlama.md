@@ -1,6 +1,7 @@
 # ADR-0050: Müşteri adayı skorlama
 
-- **Durum:** Dilim 1 (kural modeli, kayıtta hesaplama, liste sütunu ve sıralama, kural ekranı) 15 Kasım 2026'da teslim edilir. Diğer dilimler öneridir.
+- **Durum:** Dilim 1 (kural modeli, kayıtta hesaplama, liste sütunu ve sıralama, kural ekranı) 15 Kasım 2026'da teslim edildi (PR #417).
+  Dilim 1b (toplu yeniden hesaplama) 16 Kasım 2026'da teslim edilir. Diğer dilimler öneridir.
 - **Kaynak:** [CRM eksik süreç epic listesi](../crm-eksik-surecler-epicleri.md) E1.
 
 ## Bağlam
@@ -56,10 +57,25 @@ alacağı firmanındır.
 
 Müşteri adayları listesine "Puan" sütunu eklenir (`sort=score`/`-score`, eşitlikte en yeni geliş önce) ve `minScore` süzgeci gelir.
 
+### Toplu yeniden hesaplama (dilim 1b)
+
+- Kural eklenince, değişince ya da silinince mevcut adayların puanı eskir. CRM modülünün zamanlanmış işi (ADR-0046) `crm.lead-scoring`
+  (varsayılan 5 dakikada bir, `Jobs:crm.lead-scoring`) her turda **açık** adayları etkin kurallarla yeniden hesaplar ve puanı tutmayanları
+  kayıt boru hattından boş değerli bir güncellemeyle günceller; puanı `AppliedAsync` her zamanki gibi hesaplar. Puan değişikliği denetim
+  kaydına (kullanıcısız, abonelik `crm.lead-scoring`) ve `RecordUpdated` olayına girer.
+- Ayrı bir "yeniden hesapla" işareti ya da kuyruk tablosu tutulmaz: puanı tutan aday dokunulmadan geçilir, aynı tur iki kez çalışsa ikinci
+  tur bir şey yazmaz. Kural yoksa yalnızca puanı sıfır olmayan adaylar taranır. Tarama maliyeti açık aday sayısıyla orantılıdır; ölçüm
+  gerektirirse kural değişikliğinde işaret koyan bir abonelik eklenir.
+- Bir turda en çok 200 aday güncellenir (tur tek işlemde kaydedilir); kalanlar sonraki turlara kalır. Güncellenemeyen aday turu durdurmaz,
+  özette sayılır.
+- Elenmiş ve dönüştürülmüş adayların puanı donar: kapanış anındaki puan tarihî bilgidir.
+- İşin sistem kimliği yalnızca `crm.leads.read`, `crm.leads.update` ve `crm.leads.assign` taşır. Atama izni yalnızca sorumlusu boş
+  adayları (atama havuzu) görmek içindir; iş sorumlu ya da durum yazmaz.
+- Kural ekranı ve silme onayı "birkaç dakika içinde yansır" der.
 ## Sonuçlar
 
-- Kural değişince mevcut adayların puanı, aday bir sonraki kaydedilişinde güncellenir. Toplu yeniden hesaplama dilim 1b'dir; o zamana kadar
-  kural ekranı bunu açıkça yazar.
+- Kural değişikliği açık adaylara birkaç dakika içinde yansır (dilim 1b). Yeniden puanlama `RecordUpdated` olayı ürettiği için aday
+  güncellemesine bağlı otomasyon kuralları (ADR-0027) bu güncellemeyle de çalışabilir.
 - Puan geçmişi, denetim kaydındaki alan değişikliğidir; ayrı tablo yoktur.
 - Migration: `crm.Leads.Score` (`int`, varsayılan 0, `IX_Leads_TenantId_Score`) ve `crm.LeadScoreRules` (RLS'ye eklenir). Geriye uyumludur;
   mevcut adaylar 0 puanla başlar.
@@ -69,7 +85,7 @@ Müşteri adayları listesine "Puan" sütunu eklenir (`sort=score`/`-score`, eş
 | Dilim | Kapsam | Durum |
 |---|---|---|
 | 1 | Kural modeli, kayıtta hesaplama, liste sütunu/sıralama/süzgeç, kural ekranı | Teslim |
-| 1b | Toplu yeniden hesaplama: kural değişince arka plan işçisi açık adayları sistem adına, kayıt boru hattından yeniden puanlar | Öneri |
+| 1b | Toplu yeniden hesaplama: kural değişince arka plan işçisi açık adayları sistem adına, kayıt boru hattından yeniden puanlar | Teslim |
 | 2 | Davranış puanı: iş olaylarına abone (tamamlanan aktivite, kampanya yanıtı, teklif görüntüleme) | Öneri; olay listesi ADR-0039'dan |
 | 3 | Zamanla azalma (hareketsiz gün sayısı) ve eşik olayı `crm.lead.score-changed`; atama/bildirim otomasyonla (ADR-0027) | Öneri |
 | 4 | Puan açıklaması: kartta hangi kuralın kaç puan verdiği | Öneri |
