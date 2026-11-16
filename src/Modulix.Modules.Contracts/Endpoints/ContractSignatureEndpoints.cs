@@ -1,25 +1,24 @@
 using System.Globalization;
-using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.EntityFrameworkCore;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
-using Modulix.Core.Events;
-using Modulix.Core.Modules;
-using Modulix.Core.Platform;
-using Modulix.Infrastructure.Persistence;
-using Modulix.Infrastructure.Platform;
-using Modulix.Modules.Contracts;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Contracts.Lifecycle;
 using Modulix.Shared.Contracts;
 
-namespace Modulix.Api.Contracts;
+namespace Modulix.Modules.Contracts.Endpoints;
 
 /// <summary>
 /// İmza uç noktaları (ADR-0022, dilim 6).
@@ -38,16 +37,21 @@ internal static class ContractSignatureEndpoints
 {
     public const string WebhookPolicy = "contract-signature-webhook";
     public const int MaxWebhookBytes = 16 * 1024;
+    private const string WebhookIdentity = "contracts.signature-webhook";
     private static readonly JsonSerializerOptions Json = JsonSerializerOptions.Web;
 
-    public static void AddContractSignatureRateLimit(this IServiceCollection services, IConfiguration configuration) =>
+    /// <summary>Webhook'un hız sınırı (IP + sağlayıcı başına dakikada <c>ContractSignature:RateLimitPerMinute</c>, en az 2, varsayılan 120); modülde kaydolur, sınır istek anında okunur.</summary>
+    public static void AddContractSignatureRateLimit(this IServiceCollection services) =>
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            var permits = Math.Max(2, configuration.GetValue("ContractSignature:RateLimitPerMinute", 120));
-            options.AddPolicy(WebhookPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
-                $"signature-webhook|{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["provider"]}",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(WebhookPolicy, context =>
+            {
+                var permits = Math.Max(2, context.RequestServices.GetRequiredService<IConfiguration>().GetValue("ContractSignature:RateLimitPerMinute", 120));
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    $"signature-webhook|{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["provider"]}",
+                    _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
+            });
         });
 
     public static void MapInternal(RouteGroupBuilder contracts)
@@ -70,7 +74,7 @@ internal static class ContractSignatureEndpoints
             }
             catch (FormatException)
             {
-                return RecordEndpoints.ToProblem(new RecordError(RecordErrorCode.ValidationFailed, "Dosya içeriği geçersiz.", [new RecordFieldError("file", "Dosya içeriği geçersiz (base64).")]));
+                return RecordProblems.ToProblem(new RecordError(RecordErrorCode.ValidationFailed, "Dosya içeriği geçersiz.", [new RecordFieldError("file", "Dosya içeriği geçersiz (base64).")]));
             }
 
             return Overview(await signatures.RecordManualAsync(id, signatoryId, new ManualSignatureInput(r.SignedOn, r.Note, r.FileName ?? string.Empty, content), ct));
@@ -96,7 +100,7 @@ internal static class ContractSignatureEndpoints
             var result = await signatures.GetEvidenceAsync(id, fileId, ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             // Yüklenen dosya sunucuda üretilmedi ve taranmadı: tarayıcıda çizilmez, her zaman indirme olarak ve içerik türü koklanmadan sunulur.
@@ -107,15 +111,13 @@ internal static class ContractSignatureEndpoints
         }).RequirePermission(ContractsModule.Permissions.ContractsRead);
     }
 
-    public static IEndpointRouteBuilder MapContractSignatureWebhook(this IEndpointRouteBuilder app)
-    {
-        app.MapPost("/api/public/contracts/signature/{provider}/events", WebhookAsync)
-            .AllowAnonymous().RequireRateLimiting(WebhookPolicy).WithTags("Sözleşme imza sağlayıcısı webhook (herkese açık, imzalı)");
-        return app;
-    }
+    /// <summary><paramref name="routes"/> host tarafından oturumsuz <c>/api/public</c> grubu olarak gelir (ADR-0046); yol <c>/api/public/contracts/signature/{provider}/events</c>.</summary>
+    public static void MapPublic(IEndpointRouteBuilder routes) =>
+        routes.MapPost("/contracts/signature/{provider}/events", WebhookAsync)
+            .RequireRateLimiting(WebhookPolicy).WithTags("Sözleşme imza sağlayıcısı webhook (herkese açık, imzalı)");
 
     private static async Task<IResult> WebhookAsync(
-        string provider, HttpContext http, IConfiguration configuration, ITenantScopeFactory scopes, ModulixDbContext platform, TimeProvider time, ILogger<IContractSignatures> log, CancellationToken ct)
+        string provider, HttpContext http, IConfiguration configuration, IPublicTenantScopes scopes, TimeProvider time, ILogger<IContractSignatures> log, CancellationToken ct)
     {
         http.Response.Headers.CacheControl = "no-store";
         if (http.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
@@ -166,20 +168,13 @@ internal static class ContractSignatureEndpoints
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Olay geçersiz.");
         }
 
-        if (!await platform.Tenants.AsNoTracking().AnyAsync(t => t.Id == tenantId && TenantStatusRules.Operational.Contains(t.Status), ct))
+        // Erişime açık olmayan firma ve yazılabilir olmayan (kapalı ya da salt okunur) modül aynı yanıtı alır; istek "contracts.signature-webhook" kimliğiyle çalışır.
+        if (await scopes.OpenAsync(tenantId.ToString("N"), WebhookIdentity, write: true, http.TraceIdentifier, ct) is not { } opened)
         {
             return Results.NotFound();
         }
 
-        await using var scope = scopes.Create(new TenantContext(tenantId, Guid.Empty, Guid.Empty));
-        var cause = new EventEnvelope(
-            Guid.NewGuid(), tenantId, DomainEventTypes.RecordDeleted, 1, ContractsModule.Entities.Contract, Guid.Empty, null, Guid.Empty,
-            ExecutionSource.Import, http.TraceIdentifier, null, 0, new JsonObject(), time.GetUtcNow());
-        scope.ServiceProvider.GetRequiredService<EventHandlingScope>().Begin(cause, "contracts.signature-webhook");
-        if (!await scope.ServiceProvider.GetRequiredService<IModuleLicense>().IsWritableAsync(tenantId, ContractsModule.ModuleKey, ct))
-        {
-            return Results.NotFound();
-        }
+        await using var scope = opened;
 
         var result = await scope.ServiceProvider.GetRequiredService<IContractSignatures>().ApplyProviderEventAsync(
             new ProviderEventInput(name, payload.EventId ?? string.Empty, payload.Sequence, payload.Type ?? string.Empty, payload.Reference, payload.SignatoryPosition, payload.OccurredAt ?? time.GetUtcNow(), payload.Assurance, payload.Note), ct);
@@ -213,7 +208,7 @@ internal static class ContractSignatureEndpoints
     {
         if (!result.IsSuccess)
         {
-            return RecordEndpoints.ToProblem(result.Error!);
+            return RecordProblems.ToProblem(result.Error!);
         }
 
         var dto = JsonSerializer.Deserialize<ContractSignatureDto>(JsonSerializer.Serialize(result.Value!, Json), Json)!;

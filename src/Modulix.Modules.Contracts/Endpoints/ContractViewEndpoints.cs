@@ -1,17 +1,18 @@
-using System.Text;
 using System.Text.Json.Nodes;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
+using System.Text;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
-using Modulix.Core.Lookups;
-using Modulix.Modules.Contracts;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Contracts.Lifecycle;
 using Modulix.Shared.Contracts;
 
-namespace Modulix.Api.Contracts;
+namespace Modulix.Modules.Contracts.Endpoints;
 
 /// <summary>
 /// Pano ve dışa aktarma uç noktaları (ADR-0022, dilim 9). İkisi de kayıt boru hattından okur: izin, veri kapsamı, gizlilik ve tutar maskesi liste ekranıyla aynıdır.
@@ -36,7 +37,7 @@ internal static class ContractViewEndpoints
             var result = await dashboard.GetAsync(ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             var v = result.Value!;
@@ -58,9 +59,9 @@ internal static class ContractViewEndpoints
     /// etkisizleştirilir. Çıkış denetim kaydına yazılır (kim, kaç kayıt, hangi süzgeç).
     /// </summary>
     private static async Task<IResult> ExportAsync(
-        HttpRequest http, string? search, IRecordPipeline pipeline, ICurrentAccess access, ILookupSearch lookups, IRecordExportAudit exportAudit, CancellationToken ct)
+        HttpRequest http, string? search, IRecordPipeline pipeline, ICurrentAccess access, ILookupLabels lookups, IRecordExportAudit exportAudit, CancellationToken ct)
     {
-        var filters = RecordEndpoints.FiltersFrom(http) ?? new Dictionary<string, string>();
+        var filters = RecordRequests.FiltersFrom(http) ?? new Dictionary<string, string>();
         var items = new List<RecordData>();
         var truncated = false;
         for (var page = 1; items.Count < ExportMaxRows; page++)
@@ -68,7 +69,7 @@ internal static class ContractViewEndpoints
             var result = await pipeline.QueryAsync(new RecordQuery(ContractsModule.Entities.Contract, page, RecordQuery.MaxPageSize, search, filters), ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             items.AddRange(result.Value!.Items);
