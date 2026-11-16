@@ -66,7 +66,7 @@ public class AuditLogTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
     }
 
     [Fact]
-    public async Task Type_and_field_names_and_the_csv_come_in_the_readers_language_while_the_firms_list_values_stay_as_entered()
+    public async Task Type_field_and_built_in_list_value_names_and_the_csv_come_in_the_readers_language()
     {
         var (tenant, editor, company) = await TenantWithCompanyChangeAsync();
         var auditor = await factory.CreateUserAsync(tenant);
@@ -74,13 +74,13 @@ public class AuditLogTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         using var english = await LoginAsync(editor);
         Assert.Equal(HttpStatusCode.OK, (await english.PutAsJsonAsync("/api/account/language", new UpdateLanguageRequest("en"))).StatusCode);
 
-        // İngilizce okur: kayıt türü ve alan adı çevrilir; firmanın seçim listesi değeri (veri) olduğu gibi kalır.
+        // İngilizce okur: kayıt türü, alan adı ve firmanın değiştirmediği hazır liste değeri çevrilir (18c-4; firmanın verdiği ad çevrilmez, ChoiceListTests).
         var page = await english.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company");
         var updated = page!.Items[0];
         Assert.Equal("Company (CRM)", updated.EntityName);
         var status = Assert.Single(updated.Changes, c => c.Field == "status");
         Assert.Equal("Status", status.Label);
-        Assert.Equal("Potansiyel", status.Old);
+        Assert.Equal("Potential", status.Old);
         var filters = await english.GetFromJsonAsync<AuditFiltersResponse>("/api/audit/filters");
         Assert.Contains(filters!.EntityTypes, t => t.Key == "crm.company" && t.Name == "Company (CRM)");
         var history = await english.GetFromJsonAsync<AuditPageResponse>($"/api/records/crm.company/{company}/history");

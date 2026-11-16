@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -22,7 +23,9 @@ internal sealed class ChoiceListService(
     ModuleCatalog catalog,
     IModuleEntitlements entitlements,
     IAuditWriter audit,
-    CustomizationLimits limits) : IChoiceListService, IChoiceLists
+    CustomizationLimits limits,
+    IRequestLanguage language,
+    ITextCatalog texts) : IChoiceListService, IChoiceLists
 {
     private readonly Dictionary<(Guid TenantId, string ListKey), ChoiceList> cache = [];
 
@@ -32,7 +35,7 @@ internal sealed class ChoiceListService(
             ?? throw new InvalidOperationException($"Tanımsız seçim listesi: '{listKey}'.");
         if (tenantAccessor.Current is not { } tenant)
         {
-            return ChoiceListRules.Resolve(definition, null);
+            return MetadataTexts.Localize(ChoiceListRules.Resolve(definition, null), definition, await TextsAsync(cancellationToken));
         }
 
         if (cache.TryGetValue((tenant.TenantId, listKey), out var list))
@@ -41,7 +44,7 @@ internal sealed class ChoiceListService(
         }
 
         var stored = await db.ChoiceLists.AsNoTracking().SingleOrDefaultAsync(l => l.ListKey == listKey, cancellationToken);
-        list = ChoiceListRules.Resolve(definition, stored?.Values);
+        list = MetadataTexts.Localize(ChoiceListRules.Resolve(definition, stored?.Values), definition, await TextsAsync(cancellationToken));
         cache[(tenant.TenantId, listKey)] = list;
         return list;
     }
@@ -51,10 +54,11 @@ internal sealed class ChoiceListService(
         var definitions = await EnabledAsync(cancellationToken);
         var keys = definitions.Select(d => d.Key).ToList();
         var stored = await db.ChoiceLists.AsNoTracking().Where(l => keys.Contains(l.ListKey)).ToListAsync(cancellationToken);
+        var bundle = await TextsAsync(cancellationToken);
         return definitions
             .Select(d => stored.FirstOrDefault(s => s.ListKey == d.Key) is { } row
-                ? new ChoiceListInfo(d, ChoiceListRules.Resolve(d, row.Values), Customized: true)
-                : new ChoiceListInfo(d, ChoiceListRules.Resolve(d, null), Customized: false))
+                ? Localized(new ChoiceListInfo(d, ChoiceListRules.Resolve(d, row.Values), Customized: true), bundle)
+                : Localized(new ChoiceListInfo(d, ChoiceListRules.Resolve(d, null), Customized: false), bundle))
             .ToList();
     }
 
@@ -68,6 +72,9 @@ internal sealed class ChoiceListService(
         }
 
         var row = await db.ChoiceLists.SingleOrDefaultAsync(l => l.ListKey == listKey, cancellationToken);
+        // Okurun dilinde gösterilen hazır ad Türkçe kaynağa döner; firmanın verdiği ad olduğu gibi saklanır (ADR-0034, dilim 18c-4).
+        var bundle = await TextsAsync(cancellationToken);
+        values = [.. values.Select(v => v.Key is { } key ? v with { Label = MetadataTexts.ChoiceValueSource(definition, key, v.Label, bundle) } : v)];
         var current = ChoiceListRules.Resolve(definition, row?.Values);
         var updated = ChoiceListRules.Apply(definition, current, values, limits.MaxValuesPerList);
         var after = ChoiceListRules.Resolve(definition, updated);
@@ -96,8 +103,17 @@ internal sealed class ChoiceListService(
 
         await db.SaveChangesAsync(cancellationToken);
         cache.Clear();
-        return new ChoiceListInfo(definition, after, Customized: true);
+        return Localized(new ChoiceListInfo(definition, after, Customized: true), bundle);
     }
+
+    private IReadOnlyDictionary<string, string>? bundle;
+
+    // Liste adı, kategoriler ve firmanın değiştirmediği hazır değer adları okurun dilinde (ADR-0034, dilim 18c-4); anahtarlar değişmez.
+    private async ValueTask<IReadOnlyDictionary<string, string>> TextsAsync(CancellationToken cancellationToken) =>
+        bundle ??= texts.Bundle(await language.GetAsync(cancellationToken));
+
+    private static ChoiceListInfo Localized(ChoiceListInfo info, IReadOnlyDictionary<string, string> bundle) =>
+        info with { Definition = MetadataTexts.Localize(info.Definition, bundle), List = MetadataTexts.Localize(info.List, info.Definition, bundle) };
 
     // Kapalı modülün listesi görünmez ve düzenlenemez; firmanın düzenlemesi silinmez, modül açılınca geri gelir.
     private async Task<IReadOnlyList<ChoiceListDefinition>> EnabledAsync(CancellationToken cancellationToken)
