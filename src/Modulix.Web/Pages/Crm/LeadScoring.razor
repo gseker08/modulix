@@ -197,19 +197,10 @@
         message = result.Error;
     }
 
-    private static string Condition(RecordResponse rule)
-    {
-        var field = WarehouseLabels.Text(rule, "field");
-        var op = WarehouseLabels.Text(rule, "operator");
-        var label = LeadScoreCatalog.Find(field)?.Label ?? field;
-        return LeadScoreCatalog.NeedsValue(op)
-            ? op == LeadScoreCatalog.AtLeast
-                ? $"{label} {LeadScoreCatalog.OperatorLabel(op)} {WarehouseLabels.Text(rule, "value")}"
-                : $"{label} {LeadScoreCatalog.OperatorLabel(op)} \"{WarehouseLabels.Text(rule, "value")}\""
-            : $"{label} {LeadScoreCatalog.OperatorLabel(op)}";
-    }
+    private static string Condition(RecordResponse rule) =>
+        LeadScoreCatalog.ConditionText(WarehouseLabels.Text(rule, "field"), WarehouseLabels.Text(rule, "operator"), WarehouseLabels.Text(rule, "value"));
 
-    private static string PointsText(int points) => points > 0 ? "+" + points : points.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    private static string PointsText(int points) => LeadScoreCatalog.PointsText(points);
 
     private void NewRule()
     {

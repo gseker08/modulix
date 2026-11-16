@@ -91,6 +91,17 @@ public static class LeadScoring
         return Math.Clamp(total, MinScore, MaxScore);
     }
 
+    /// <summary>
+    /// Puan açıklaması (dilim 4): puana katkı veren etkin kurallar, büyük katkı önce (eşitlikte ada göre). Toplamları <see cref="Calculate"/>'in
+    /// kırpılmamış hâlidir; aynı eşleşme kuralını kullanır.
+    /// </summary>
+    public static IReadOnlyList<LeadScoreRule> Explain(Lead lead, IEnumerable<LeadScoreRule> rules, LeadBehavior? behavior = null)
+    {
+        var facts = behavior ?? LeadBehavior.None;
+        return [.. rules.Where(r => r.IsActive && Matches(lead, facts, r))
+            .OrderByDescending(r => Math.Abs(r.Points)).ThenBy(r => r.Name, StringComparer.Ordinal)];
+    }
+
     public static bool Matches(Lead lead, LeadScoreRule rule) => Matches(lead, LeadBehavior.None, rule);
 
     public static bool Matches(Lead lead, LeadBehavior behavior, LeadScoreRule rule)

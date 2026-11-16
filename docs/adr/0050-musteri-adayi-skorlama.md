@@ -1,8 +1,8 @@
 # ADR-0050: Müşteri adayı skorlama
 
 - **Durum:** Dilim 1 (kural modeli, kayıtta hesaplama, liste sütunu ve sıralama, kural ekranı) 15 Kasım 2026'da teslim edildi (PR #417).
-  Dilim 1b (toplu yeniden hesaplama, PR #441), dilim 2 (davranış puanı, PR #449) ve dilim 3 (zamanla azalma ve eşik) 16 Kasım 2026'da
-  teslim edildi. Dilim 4 öneridir.
+  Dilim 1b (toplu yeniden hesaplama, PR #441), dilim 2 (davranış puanı, PR #449), dilim 3 (zamanla azalma ve eşik, PR #462) ve dilim 4
+  (puan açıklaması) 16-17 Kasım 2026'da teslim edildi.
 - **Kaynak:** [CRM eksik süreç epic listesi](../crm-eksik-surecler-epicleri.md) E1.
 
 ## Bağlam
@@ -111,6 +111,18 @@ Müşteri adayları listesine "Puan" sütunu eklenir (`sort=score`/`-score`, eş
   eklemez.
 - Puan alanının okuma izni yoktur: puan, adayı görebilen herkese görünür (Yetki bölümü).
 
+### Puan açıklaması (dilim 4)
+
+- `GET /api/crm/leads/{id}/score` (`crm.leads.read`) kayıttaki puanı, bugünkü kurallarla hesaplanan puanı ve puana katkı veren etkin
+  kuralları (ad, alan, işleç, değer, puan; büyük katkı önce) döner. Aday önce kayıt boru hattından okunur: görünmeyen aday (kapsam dışı ya da
+  başka tenant) 404'tür. Açıklama, kaydedilirken yapılan hesabın aynı girdileriyle (kurallar ve davranış sayaçları) üretilir.
+- **Kural adı ve koşulu adayı görebilen herkese gösterilir.** Kural yönetimi (`crm.lead-scoring.manage`) yalnızca yazma ve tüm kural listesi
+  içindir; satış temsilcisinin "bu aday neden 70?" sorusunu yanıtlamak ürün amacıdır. Kural sayaç ya da adayın görünür alanına baktığı için
+  açıklama yeni kişisel veri sızdırmaz; firma kural adına hassas bilgi yazmamalıdır.
+- Kayıttaki puan ile hesaplanan farklıysa ekran bunu söyler: açık adayda "birkaç dakika içinde güncellenir" (dilim 1b işi), kapanmış adayda
+  "puan donmuştur".
+- Ekran: müşteri adayı kartında "Puan: N" bölümü; koşul metni kural ekranıyla aynı biçimdedir (`LeadScoreCatalog.ConditionText`).
+
 ## Sonuçlar
 
 - Kural değişikliği açık adaylara birkaç dakika içinde yansır (dilim 1b). Yeniden puanlama `RecordUpdated` olayı ürettiği için aday
@@ -127,7 +139,7 @@ Müşteri adayları listesine "Puan" sütunu eklenir (`sort=score`/`-score`, eş
 | 1b | Toplu yeniden hesaplama: kural değişince arka plan işçisi açık adayları sistem adına, kayıt boru hattından yeniden puanlar | Teslim |
 | 2 | Davranış puanı: gerçekleşen temas, toplantı ve tekrar başvuru sayaçları ("en az N"); aktivite olayına abone | Teslim; kampanya yanıtı Pazarlama iş olayını bekliyor |
 | 3 | Zamanla azalma (hareketsiz gün sayısı) ve eşik: puan otomasyon alanı ve eşik şablonu; ayrı iş olayı yok | Teslim |
-| 4 | Puan açıklaması: kartta hangi kuralın kaç puan verdiği | Öneri |
+| 4 | Puan açıklaması: kartta hangi kuralın kaç puan verdiği | Teslim |
 
 ## Açık kararlar
 
