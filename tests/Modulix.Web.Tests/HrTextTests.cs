@@ -74,6 +74,41 @@ public class HrTextTests
         {
             Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.employment-type", key)]);
         }
+
+        foreach (var (key, label) in HrAccess.AssetStatuses)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.asset-status", key)]);
+        }
+
+        foreach (var (key, label) in HrAccess.AssignmentStatuses)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.assignment-status", key)]);
+        }
+
+        foreach (var (key, label) in HrAccess.ChecklistKinds)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.checklist-kind", key)]);
+        }
+
+        foreach (var (key, label) in HrAccess.ChecklistStatuses)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.checklist-status", key)]);
+        }
+
+        foreach (var (key, label) in HrAccess.TaskStatuses)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.task-status", key)]);
+        }
+
+        foreach (var (key, label) in HrAccess.ChecklistResponsibles)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.responsible", key)]);
+        }
+
+        foreach (var (key, label) in HrAccess.ChecklistTaskTypes)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.task-type", key)]);
+        }
     }
 
     [Fact]
@@ -95,6 +130,13 @@ public class HrTextTests
         Assert.Equal("İzinde", HrLabels.Status("onLeave"));
         Assert.Equal("Belirli süreli", HrLabels.EmploymentType("fixedTerm"));
         Assert.Equal("Unvan girilmedi", HrLabels.NoJobTitle);
+        Assert.Equal("Hurda", HrLabels.AssetStatus("retired"));
+        Assert.Equal("İade alındı", HrLabels.AssignmentStatus("returned"));
+        Assert.Equal("İşten çıkış", HrLabels.ChecklistKind("offboarding"));
+        Assert.Equal("Sürüyor", HrLabels.ChecklistStatus("open"));
+        Assert.Equal("Atlandı", HrLabels.TaskStatus("skipped"));
+        Assert.Equal("Yönetici", HrLabels.Responsible("manager"));
+        Assert.Equal("Zimmet iadesi (açık zimmet kalmamalı)", HrLabels.TaskType("assetReturn"));
         Assert.Equal("1,5 gün", HrLabels.Days(1.5m));
         Assert.Equal("—", HrLabels.Days(null));
     }

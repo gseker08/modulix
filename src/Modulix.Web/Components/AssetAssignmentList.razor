@@ -4,9 +4,9 @@
 @inject ApiClient Api
 @inject IJSRuntime Js
 
-<section aria-label="@Title">
+<section aria-label="@TitleText">
     <div class="list-toolbar mt-3">
-        <h3 class="h6 mb-0 me-auto">@Title</h3>
+        <h3 class="h6 mb-0 me-auto">@TitleText</h3>
         @if (AddButton is not null)
         {
             @AddButton
@@ -24,25 +24,25 @@
     }
     else if (items.Count == 0)
     {
-        <p class="text-muted" role="status">@EmptyText</p>
+        <EmptyState Compact="true" Title="@EmptyTextOrDefault" />
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">@Title</caption>
+            <caption class="visually-hidden">@TitleText</caption>
             <thead>
                 <tr>
                     @if (ShowAsset)
                     {
-                        <th scope="col"><AppIcon Name="package" Size="14" /> Demirbaş</th>
+                        <th scope="col"><AppIcon Name="package" Size="14" /> @Texts.Get("hr.assignments.col.asset")</th>
                     }
                     @if (ShowEmployee)
                     {
-                        <th scope="col"><AppIcon Name="user" Size="14" /> Çalışan</th>
+                        <th scope="col"><AppIcon Name="user" Size="14" /> @Texts.Get("hr.leave.col.employee")</th>
                     }
-                    <th scope="col"><AppIcon Name="calendar" Size="14" /> Teslim</th>
-                    <th scope="col"><AppIcon Name="check-circle" Size="14" /> Durum</th>
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col"><AppIcon Name="calendar" Size="14" /> @Texts.Get("hr.assignments.col.handover")</th>
+                    <th scope="col"><AppIcon Name="check-circle" Size="14" /> @Texts.Get("common.field.status")</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -51,24 +51,24 @@
                     <tr>
                         @if (ShowAsset)
                         {
-                            <td data-label="Demirbaş" class="primary">@WarehouseLabels.Text(item, "assetTag") · @WarehouseLabels.Text(item, "assetName")</td>
+                            <td data-label="@Texts.Get("hr.assignments.col.asset")" class="primary">@WarehouseLabels.Text(item, "assetTag") · @WarehouseLabels.Text(item, "assetName")</td>
                         }
                         @if (ShowEmployee)
                         {
-                            <td data-label="Çalışan" class="@(ShowAsset ? null : "primary")">@WarehouseLabels.Text(item, "employeeName")</td>
+                            <td data-label="@Texts.Get("hr.leave.col.employee")" class="@(ShowAsset ? null : "primary")">@WarehouseLabels.Text(item, "employeeName")</td>
                         }
-                        <td data-label="Teslim">@HrLabels.Date(WarehouseLabels.Text(item, "assignedOn"))@(WarehouseLabels.Text(item, "returnedOn") is { Length: > 0 } back ? $" → {HrLabels.Date(back)}" : "")</td>
-                        <td data-label="Durum">
+                        <td data-label="@Texts.Get("hr.assignments.col.handover")">@HrLabels.Date(WarehouseLabels.Text(item, "assignedOn"))@(WarehouseLabels.Text(item, "returnedOn") is { Length: > 0 } back ? $" → {HrLabels.Date(back)}" : "")</td>
+                        <td data-label="@Texts.Get("common.field.status")">
                             <span class="badge @HrLabels.AssignmentStatusBadge(WarehouseLabels.Text(item, "status"))">@HrLabels.AssignmentStatus(WarehouseLabels.Text(item, "status"))</span>
                             @if (WarehouseLabels.Text(item, "status") == "active" && item.Values["acknowledgedAt"] is null)
                             {
-                                <span class="badge stage-negotiation">Onay bekliyor</span>
+                                <span class="badge stage-negotiation">@Texts.Get("hr.assignments.awaiting-ack")</span>
                             }
                         </td>
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{WarehouseLabels.Text(item, "assetTag")} zimmeti eylemleri")">
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => selected = item"><AppIcon Name="eye" Size="16" /> <span>Aç</span></button>
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DownloadAsync(item)"><AppIcon Name="file-text" Size="16" /> <span>Tutanak (PDF)</span></button>
+                            <RowMenu Label="@Texts.Get("hr.assignments.row-actions", WarehouseLabels.Text(item, "assetTag"))">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => selected = item"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></button>
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => DownloadAsync(item)"><AppIcon Name="file-text" Size="16" /> <span>@Texts.Get("hr.assignments.receipt")</span></button>
                             </RowMenu>
                         </td>
                     </tr>
@@ -82,17 +82,17 @@
         <div class="summary-card mt-2">
             <h4 class="summary-heading">@WarehouseLabels.Text(selected, "assetTag") · @WarehouseLabels.Text(selected, "employeeName")</h4>
             <dl class="summary-facts">
-                <div><dt>Teslim</dt><dd>@HrLabels.Date(WarehouseLabels.Text(selected, "assignedOn"))</dd></div>
-                <div><dt>Beklenen iade</dt><dd>@HrLabels.Date(WarehouseLabels.Text(selected, "expectedReturnOn"))</dd></div>
-                <div><dt>Teslimdeki durum</dt><dd>@(WarehouseLabels.Text(selected, "conditionOut") is { Length: > 0 } outText ? outText : "—")</dd></div>
-                <div><dt>Teslim onayı</dt><dd>@(selected.Values["acknowledgedAt"] is null ? "Onaylanmadı" : "Onaylandı")</dd></div>
+                <div><dt>@Texts.Get("hr.assignments.col.handover")</dt><dd>@HrLabels.Date(WarehouseLabels.Text(selected, "assignedOn"))</dd></div>
+                <div><dt>@Texts.Get("hr.assignments.expected-return")</dt><dd>@HrLabels.Date(WarehouseLabels.Text(selected, "expectedReturnOn"))</dd></div>
+                <div><dt>@Texts.Get("hr.assignments.condition-out")</dt><dd>@(WarehouseLabels.Text(selected, "conditionOut") is { Length: > 0 } outText ? outText : "—")</dd></div>
+                <div><dt>@Texts.Get("hr.assignments.ack")</dt><dd>@(selected.Values["acknowledgedAt"] is null ? Texts.Get("hr.assignments.ack-no") : Texts.Get("hr.assignments.ack-yes"))</dd></div>
                 @if (WarehouseLabels.Text(selected, "conditionIn") is { Length: > 0 } inText)
                 {
-                    <div><dt>İadedeki durum</dt><dd>@inText</dd></div>
+                    <div><dt>@Texts.Get("hr.assignments.condition-in")</dt><dd>@inText</dd></div>
                 }
             </dl>
             <LeaveActionsBar Record="selected" BaseUrl="/api/hr/asset-assignments" Changed="ChangedAsync" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="() => selected = null">Kapat</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="() => selected = null">@Texts.Get("common.close")</button>
         </div>
     }
 </section>
@@ -103,9 +103,13 @@
     private string? message;
     private string? loadedFor;
 
-    [Parameter] public string Title { get; set; } = "Zimmetler";
+    [Parameter] public string? Title { get; set; }
 
-    [Parameter] public string EmptyText { get; set; } = "Zimmet yok.";
+    [Parameter] public string? EmptyText { get; set; }
+
+    private string TitleText => Title ?? Texts.Get("hr.assignments.title");
+
+    private string EmptyTextOrDefault => EmptyText ?? Texts.Get("hr.assignments.empty");
 
     /// <summary>Liste süzgeci (ör. <c>assetId=…</c>, <c>employeeId=…&amp;status=active</c>).</summary>
     [Parameter, EditorRequired] public string Query { get; set; } = string.Empty;
