@@ -8,6 +8,9 @@ public sealed record LocalizedTexts(string Language, ITextCatalog Catalog)
 {
     /// <summary>Anahtarın bu dildeki metni; <paramref name="args"/> yer tutuculara işlenir.</summary>
     public string Get(string key, params object?[] args) => Catalog.Get(Language, key, args);
+
+    /// <summary>Bu dilin bütün metinleri (metadata adlarının çevirisi için, <see cref="MetadataTexts"/>).</summary>
+    public IReadOnlyDictionary<string, string> Bundle => Catalog.Bundle(Language);
 }
 
 /// <summary>

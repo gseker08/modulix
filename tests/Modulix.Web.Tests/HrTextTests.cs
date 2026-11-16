@@ -5,7 +5,7 @@ using Modulix.Web.Services;
 namespace Modulix.Web.Tests;
 
 /// <summary>
-/// ADR-0034 aşama 4, İK dilim 19a (blog ve galeri) ve 19b (duyurular): blog durumları, yayın durumu ve hedef kitle "Herkes" sözlükten gelir; Türkçe kaynak metin (koddaki yedek)
+/// ADR-0034 aşama 4, İK dilim 19a (blog ve galeri) 19b (duyurular) 19c (anketler) 19d (izinler) 19e (masraflar) ve 19f (çalışanlar): blog durumları, yayın durumu, hedef kitle "Herkes", anket durumları, soru türleri, izin, masraf ve çalışan durumları, çalışma şekilleri ve gün biçimi sözlükten gelir; Türkçe kaynak metin (koddaki yedek)
 /// <c>tr.json</c> ile aynıdır. Diller arası anahtar eşitliğini ve kullanılan anahtarların varlığını mimari testler denetler.
 /// </summary>
 public class HrTextTests
@@ -40,6 +40,43 @@ public class HrTextTests
     }
 
     [Fact]
+    public void Survey_statuses_and_question_types_have_a_turkish_text_equal_to_the_source_label()
+    {
+        var tr = Turkish();
+        foreach (var (key, label) in HrAccess.SurveyStatuses)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.survey-status", key)]);
+        }
+
+        foreach (var (key, label) in HrAccess.QuestionTypes)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.question-type", key)]);
+        }
+
+        foreach (var (key, label) in HrAccess.LeaveStatuses)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.leave-status", key)]);
+        }
+
+        Assert.Equal("{0} gün", tr["hr.leave.days"]);
+
+        foreach (var (key, label) in HrAccess.ExpenseStatuses)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.expense-status", key)]);
+        }
+
+        foreach (var (key, label) in HrAccess.Statuses)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.employee-status", key)]);
+        }
+
+        foreach (var (key, label) in HrAccess.EmploymentTypes)
+        {
+            Assert.Equal(label, tr[WarehouseLabels.KeyOf("hr.employment-type", key)]);
+        }
+    }
+
+    [Fact]
     public void Without_a_loaded_dictionary_the_turkish_source_label_and_the_same_badge_are_shown()
     {
         foreach (var status in BlogStatuses)
@@ -51,5 +88,14 @@ public class HrTextTests
         Assert.Equal(("Yayında", "status-customer"), HrLabels.Published(true));
         Assert.Equal(("Taslak", "status-inactive"), HrLabels.Published(false));
         Assert.Equal("Herkes", HrLabels.Everyone);
+        Assert.Equal(HrAccess.SurveyStatuses, HrLabels.SurveyStatuses);
+        Assert.Equal("Çoklu seçim", HrLabels.QuestionType("multiChoice"));
+        Assert.Equal("İptal edildi", HrLabels.LeaveStatus("cancelled"));
+        Assert.Equal("Ödendi", HrLabels.ExpenseStatus("paid"));
+        Assert.Equal("İzinde", HrLabels.Status("onLeave"));
+        Assert.Equal("Belirli süreli", HrLabels.EmploymentType("fixedTerm"));
+        Assert.Equal("Unvan girilmedi", HrLabels.NoJobTitle);
+        Assert.Equal("1,5 gün", HrLabels.Days(1.5m));
+        Assert.Equal("—", HrLabels.Days(null));
     }
 }

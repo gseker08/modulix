@@ -25,8 +25,8 @@
             {
                 <li>
                     <div class="item-main">
-                        <strong>@entry.UserName <span class="history-action">@AuditText.Of(entry.Action).ToLower(Culture)</span></strong>
-                        <span>@CrmLabels.Time(entry.OccurredAt)@(entry.Source == AuditSource.Api ? null : $" · {AuditText.Of(entry.Source, entry.Subscription)}")</span>
+                        <strong>@entry.UserName <span class="history-action">@SettingsLabels.Audit(entry.Action).ToLower(UiLanguage.Culture)</span></strong>
+                        <span>@CrmLabels.Time(entry.OccurredAt)@(entry.Source == AuditSource.Api ? null : $" · {Source(entry)}")</span>
                         @if (entry.Changes.Count == 0 && entry.Action == AuditOperation.Updated)
                         {
                             <span>@Texts.Get("common.history.noFieldChange")</span>
@@ -68,7 +68,6 @@
 </section>
 
 @code {
-    private static readonly System.Globalization.CultureInfo Culture = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
 
     private List<AuditEntryDto>? entries;
     private int total;
@@ -109,6 +108,10 @@
             page = next.Page;
         }
     }
+
+    // İşlem ve kaynak adları okurun dilinde (ADR-0034, dilim 18c); abonelik anahtarı teknik addır, çevrilmez.
+    private static string Source(AuditEntryDto entry) =>
+        entry.Subscription is null ? SettingsLabels.Audit(entry.Source) : $"{SettingsLabels.Audit(entry.Source)} · {entry.Subscription}";
 
     private static string Value(AuditFieldChangeDto change, string? value) =>
         change.Hidden ? Texts.Get("common.history.hidden") : string.IsNullOrEmpty(value) ? Texts.Get("common.history.empty") : value;

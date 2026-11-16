@@ -12,7 +12,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Employee is null ? "Yeni çalışan" : "Çalışan kartı")</h2>
+            <h2>@(Employee is null ? Texts.Get("hr.employee-form.new") : Texts.Get("hr.employee-form.title"))</h2>
             @if (Employee is not null)
             {
                 <p>@personName@(string.IsNullOrWhiteSpace(form.JobTitle) ? "" : $" · {form.JobTitle}")</p>
@@ -20,7 +20,7 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@(CanWrite ? "İptal" : "Kapat")</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@(CanWrite ? Texts.Get("common.cancel") : Texts.Get("common.close"))</button>
             @if (CanWrite)
             {
                 <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">
@@ -44,32 +44,32 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Çalışan özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("hr.employee-form.summary")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true"><AppIcon Name="user" Size="24" /></span>
-                    <strong class="summary-name">@(SummaryName ?? "Çalışan")</strong>
-                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.JobTitle) ? "Unvan girilmedi" : form.JobTitle)</span>
+                    <strong class="summary-name">@(SummaryName ?? Texts.Get("hr.leave.col.employee"))</strong>
+                    <span class="summary-sub">@(string.IsNullOrWhiteSpace(form.JobTitle) ? HrLabels.NoJobTitle : form.JobTitle)</span>
                 </div>
-                <h3 class="summary-heading">Çalışan özeti</h3>
+                <h3 class="summary-heading">@Texts.Get("hr.employee-form.summary")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Departman</dt><dd>@(UnitName ?? "—")</dd></div>
-                    <div><dt>İşe giriş</dt><dd>@(form.HireDate is { } hired ? FleetLabels.Date(hired) : "—")</dd></div>
-                    <div><dt>Kıdem</dt><dd>@Seniority</dd></div>
-                    <div><dt>Durum</dt><dd>@HrLabels.Status(form.Status)</dd></div>
+                    <div><dt>@Texts.Get("hr.audience.unit")</dt><dd>@(UnitName ?? "—")</dd></div>
+                    <div><dt>@Texts.Get("hr.employee.col.hire-date")</dt><dd>@(form.HireDate is { } hired ? FleetLabels.Date(hired) : "—")</dd></div>
+                    <div><dt>@Texts.Get("hr.employee-form.seniority")</dt><dd>@Seniority</dd></div>
+                    <div><dt>@Texts.Get("common.field.status")</dt><dd>@HrLabels.Status(form.Status)</dd></div>
                 </dl>
             </div>
         </aside>
 
         <div class="record-main">
             <fieldset disabled="@(!CanWrite)">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Çalışan formu bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("hr.employee-form.sections")">
                 <Field Context="f">
                     @if (HrAccess.PersonalFields.Contains(f.Key) && !CanSeePersonal)
                     {
                         @if (f.Key == HrAccess.PersonalFields[0])
                         {
-                            <EmptyState Compact="true" Title="Özlük bilgilerini görme izniniz yok (T.C." Text="kimlik no, doğum tarihi, adres, acil durum kişisi, IBAN)." />
+                            <EmptyState Compact="true" Title="@Texts.Get("hr.employee-form.no-personal")" Text="@Texts.Get("hr.employee-form.no-personal-hint")" />
                         }
                     }
                     else
@@ -81,7 +81,7 @@
                             {
                                 <span class="@f.LabelClass()">@f.Label</span>
                                 <p class="mb-0"><strong>@personName</strong></p>
-                                <small class="text-muted">Ad, iş e-postası ve iş telefonu kişi kaydındadır; çalışanın kişisi değiştirilemez.</small>
+                                <small class="text-muted">@Texts.Get("hr.employee-form.person-help")</small>
                             }
                             else
                             {
@@ -90,22 +90,22 @@
                                 {
                                     <div class="form-grid mt-2">
                                         <div class="span-6">
-                                            <label class="form-label required" for="employee-first">Ad</label>
+                                            <label class="form-label required" for="employee-first">@Texts.Get("hr.employee-form.first-name")</label>
                                             <input id="employee-first" class="form-control" maxlength="100" aria-required="true" @bind="form.FirstName" />
                                             <FieldError Field="firstName" Errors="personErrors" />
                                         </div>
                                         <div class="span-6">
-                                            <label class="form-label required" for="employee-last">Soyad</label>
+                                            <label class="form-label required" for="employee-last">@Texts.Get("hr.employee-form.last-name")</label>
                                             <input id="employee-last" class="form-control" maxlength="100" aria-required="true" @bind="form.LastName" />
                                             <FieldError Field="lastName" Errors="personErrors" />
                                         </div>
                                         <div class="span-6">
-                                            <label class="form-label" for="employee-phone">İş telefonu</label>
+                                            <label class="form-label" for="employee-phone">@Texts.Get("hr.employee-form.work-phone")</label>
                                             <input id="employee-phone" class="form-control" type="tel" maxlength="50" @bind="form.Phone" />
                                             <FieldError Field="phone" Errors="personErrors" />
                                         </div>
                                         <div class="span-6">
-                                            <label class="form-label" for="employee-email">İş e-postası</label>
+                                            <label class="form-label" for="employee-email">@Texts.Get("hr.employee-form.work-email")</label>
                                             <input id="employee-email" class="form-control" type="email" maxlength="200" @bind="form.Email" />
                                             <FieldError Field="email" Errors="personErrors" />
                                         </div>
@@ -113,7 +113,7 @@
                                 }
                                 else
                                 {
-                                    <LookupPicker Id="employee-person" LookupKey="@HrAccess.EmployeePersonLookup" @bind-Value="form.PersonId" Required="true" Placeholder="Kayıtlı kişiyi seçin…" Invalid="@(errors?.ContainsKey("personId") == true)" />
+                                    <LookupPicker Id="employee-person" LookupKey="@HrAccess.EmployeePersonLookup" @bind-Value="form.PersonId" Required="true" Placeholder="@Texts.Get("hr.employee-form.choose-person")" Invalid="@(errors?.ContainsKey("personId") == true)" />
                                 }
                                 <FieldError Field="personId" Errors="errors" />
                             }
@@ -131,19 +131,19 @@
                         case "status":
                             <label class="@f.LabelClass()" for="employee-status">@f.Label</label>
                             <select id="employee-status" class="form-select" @bind="form.Status">
-                                @foreach (var (key, label) in HrAccess.Statuses)
+                                @foreach (var (key, label) in HrLabels.Statuses)
                                 {
                                     <option value="@key">@label</option>
                                 }
                             </select>
                             <FieldError Field="status" Errors="errors" />
-                            <small class="text-muted">Kart silinmez; ayrılan çalışanı "Ayrıldı" yapıp ayrılış tarihini girin.</small>
+                            <small class="text-muted">@Texts.Get("hr.employee-form.status-help")</small>
                             break;
                         case "userId":
                             <label class="@f.LabelClass()" for="employee-user">@f.Label</label>
-                            <LookupPicker Id="employee-user" LookupKey="@HrAccess.EmployeeUserLookup" @bind-Value="form.UserId" Placeholder="@(form.UserId is null ? "Hesabı yok" : Lookups.MemberName(form.UserId))" Invalid="@(errors?.ContainsKey("userId") == true)" />
+                            <LookupPicker Id="employee-user" LookupKey="@HrAccess.EmployeeUserLookup" @bind-Value="form.UserId" Placeholder="@(form.UserId is null ? Texts.Get("hr.employee-form.no-account") : Lookups.MemberName(form.UserId))" Invalid="@(errors?.ContainsKey("userId") == true)" />
                             <FieldError Field="userId" Errors="errors" />
-                            <small class="text-muted">İzin ve masraf gibi self servis işlemler için; kullanıcısı olmayan çalışan da kaydedilebilir.</small>
+                            <small class="text-muted">@Texts.Get("hr.employee-form.account-help")</small>
                             break;
                         case "jobTitle":
                             <label class="@f.LabelClass()" for="employee-title">@f.Label</label>
@@ -157,22 +157,22 @@
                             <FieldError Field="businessUnitId" Errors="errors" />
                             @if (UnitFromAccount)
                             {
-                                <small class="text-muted">Kullanıcı hesabı bağlı çalışanın departmanı kullanıcının departmanıdır; Yönetim › Kullanıcılar'dan değiştirilir.</small>
+                                <small class="text-muted">@Texts.Get("hr.employee-form.unit-from-account")</small>
                             }
                             else if (form.UserId is not null && form.UserId != form.SavedUserId)
                             {
-                                <small class="text-muted">Kaydedince bağlanan kullanıcının departmanı (varsa) alınır.</small>
+                                <small class="text-muted">@Texts.Get("hr.employee-form.unit-on-save")</small>
                             }
                             else if (form.LegacyDepartmentKey is { Length: > 0 } legacy && form.BusinessUnitId is null)
                             {
-                                <small class="text-muted">Eski İK departmanı: @Lookups.Label(HrAccess.DepartmentList, legacy). Departman artık Yönetim › Departmanlar ağacından seçilir.</small>
+                                <small class="text-muted">@Texts.Get("hr.employee-form.legacy-unit", Lookups.Label(HrAccess.DepartmentList, legacy))</small>
                             }
                             break;
                         case "managerEmployeeId":
                             <label class="@f.LabelClass()" for="employee-manager">@f.Label</label>
-                            <LookupPicker Id="employee-manager" LookupKey="@HrAccess.EmployeeManagerLookup" @bind-Value="form.ManagerEmployeeId" Placeholder="Yöneticiyi seçin…" Invalid="@(errors?.ContainsKey("managerEmployeeId") == true)" />
+                            <LookupPicker Id="employee-manager" LookupKey="@HrAccess.EmployeeManagerLookup" @bind-Value="form.ManagerEmployeeId" Placeholder="@Texts.Get("hr.employee-form.choose-manager")" Invalid="@(errors?.ContainsKey("managerEmployeeId") == true)" />
                             <FieldError Field="managerEmployeeId" Errors="errors" />
-                            <small class="text-muted">Organizasyon şeması bu bağdan çizilir.</small>
+                            <small class="text-muted">@Texts.Get("hr.employee-form.manager-help")</small>
                             break;
                         case "workLocation":
                             <label class="@f.LabelClass()" for="employee-location">@f.Label</label>
@@ -185,13 +185,13 @@
                                 <label class="@f.LabelClass()" for="employee-position-day">@f.Label</label>
                                 <input id="employee-position-day" class="form-control" type="date" @bind="form.PositionEffectiveDate" />
                                 <FieldError Field="positionEffectiveDate" Errors="errors" />
-                                <small class="text-muted">Unvan, departman, yönetici ya da çalışma şekli değişirse yeni dönem bu günden başlar; boşsa bugün.</small>
+                                <small class="text-muted">@Texts.Get("hr.employee-form.position-date-help")</small>
                             }
                             break;
                         case "employmentType":
                             <label class="@f.LabelClass()" for="employee-type">@f.Label</label>
                             <select id="employee-type" class="form-select" @bind="form.EmploymentType">
-                                @foreach (var (key, label) in HrAccess.EmploymentTypes)
+                                @foreach (var (key, label) in HrLabels.EmploymentTypes)
                                 {
                                     <option value="@key">@label</option>
                                 }
@@ -202,7 +202,7 @@
                             <label class="@f.LabelClass()" for="employee-left">@f.Label</label>
                             <input id="employee-left" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.TerminationDate" />
                             <FieldError Field="terminationDate" Errors="errors" />
-                            <small class="text-muted">İleri tarih girilebilir (planlanan çıkış).</small>
+                            <small class="text-muted">@Texts.Get("hr.employee-form.termination-help")</small>
                             break;
                         case "nationalId":
                             <label class="@f.LabelClass()" for="employee-national">@f.Label</label>
@@ -248,8 +248,8 @@
             @if (CanWrite)
             {
                 <div class="form-actions">
-                    <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
-                    <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+                    <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+                    <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">@Texts.Get("common.save")</button>
                 </div>
             }
         </div>
@@ -260,7 +260,7 @@
     private bool dirty;
     private const string EntityKey = HrAccess.EmployeeEntityKey;
     private static readonly string Url = "/api/records/" + EntityKey;
-    private static readonly IReadOnlyList<SegmentOption<bool>> PersonModes = [new(false, "Kayıtlı kişi"), new(true, "Yeni kişi")];
+    private static IReadOnlyList<SegmentOption<bool>> PersonModes => [new(false, Texts.Get("hr.employee-form.existing-person")), new(true, Texts.Get("hr.employee-form.new-person"))];
 
     private FormLayoutDto? layout;
     private string? layoutError;
@@ -318,7 +318,8 @@
 
             var end = form.TerminationDate is { } left && left < DateOnly.FromDateTime(DateTime.Today) ? left : DateOnly.FromDateTime(DateTime.Today);
             var months = ((end.Year - hired.Year) * 12) + end.Month - hired.Month - (end.Day < hired.Day ? 1 : 0);
-            return months < 0 ? "Henüz başlamadı" : months < 1 ? "1 aydan az" : $"{(months / 12 > 0 ? $"{months / 12} yıl " : "")}{(months % 12 > 0 ? $"{months % 12} ay" : "")}".Trim();
+            return months < 0 ? Texts.Get("hr.employee-form.not-started") : months < 1 ? Texts.Get("hr.employee-form.under-month")
+                : $"{(months / 12 > 0 ? Texts.Get("hr.employee-form.years", months / 12) + " " : "")}{(months % 12 > 0 ? Texts.Get("hr.employee-form.months", months % 12) : "")}".Trim();
         }
     }
 
@@ -326,7 +327,7 @@
     {
         await Session.EnsureLoadedAsync();
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     /// <summary>Form yalnızca başka bir çalışan verildiğinde yeniden doldurulur; yazılanlar kaybolmaz.</summary>
@@ -388,7 +389,7 @@
             {
                 busy = false;
                 personErrors = person.FieldErrors;
-                message = person.FieldErrors is { Count: > 0 } ? "Kişi bilgilerini kontrol edin." : person.Error;
+                message = person.FieldErrors is { Count: > 0 } ? Texts.Get("hr.employee-form.check-person") : person.Error;
                 return;
             }
 

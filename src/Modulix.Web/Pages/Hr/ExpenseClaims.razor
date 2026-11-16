@@ -4,13 +4,13 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Masraf beyanları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.expense-claims") · Modulix</PageTitle>
 
 @* Masraf beyanları (ADR-0042 dilim 3): yönetici onaylayanı olduğu beyanları, İK ve finans bütün beyanları görür (görünürlük sunucuda, veri kapsamı +
    onaylayan). "Onayımı bekleyenler" onaylayanı kullanıcının kendisi olan gönderilmiş beyanlardır; "Ödenecek" onaylanmış beyanlardır. Satır açılınca
    beyan kartı (satırlar, fişler, eylemler) gelir. *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.ExpensesRead">
-    <PageHeader Title="Masraf beyanları" Icon="wallet" Subtitle="@(page is null ? "Masraf beyanlarını onaylayın, iade edin ve ödemesini işaretleyin." : $"{page.TotalCount} kayıt")" />
+    <PageHeader Title="@Texts.Get("nav.app.hr.expense-claims")" Icon="wallet" Subtitle="@(page is null ? Texts.Get("hr.expense-claims.intro") : Texts.Get("common.records", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -26,16 +26,16 @@
         <ExpenseClaimCard Claim="selected" Lookups="Lookups" Changed="ChangedAsync" Closed="() => selected = null" />
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Masraf beyanı görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("hr.expense-claims.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Masraf beyanı ara" placeholder="Çalışan adı ya da başlık ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("hr.expense-claims.search-label")" placeholder="@Texts.Get("hr.expense-claims.search-placeholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (Session.Can(HrAccess.ExpensesManage) && !creating)
         {
-            <button type="button" class="btn btn-primary" @onclick="Create"><AppIcon Name="plus" Size="16" /> Yeni masraf beyanı</button>
+            <button type="button" class="btn btn-primary" @onclick="Create"><AppIcon Name="plus" Size="16" /> @Texts.Get("hr.expense-form.new")</button>
         }
     </div>
 
@@ -48,20 +48,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan masraf beyanı yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("hr.expense-claims.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) masraf beyanı listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("hr.expense-claims.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Masraf beyanları</caption>
+            <caption class="visually-hidden">@Texts.Get("nav.app.hr.expense-claims")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -74,7 +74,7 @@
                         }
                         <td class="row-menu-cell">
                             <RowMenu Label="@($"{WarehouseLabels.Text(claim, "title")} eylemleri")">
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(claim)"><AppIcon Name="eye" Size="16" /> <span>Aç</span></button>
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(claim)"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></button>
                             </RowMenu>
                         </td>
                     </tr>
@@ -96,14 +96,14 @@
     private const string AllViews = "all";
 
     // Sıralama anahtarları kayıt deposunun beyanıdır (ExpenseClaimRecordStore.SortKeys).
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("employee", "Çalışan", "user", "employee", "-employee", Locked: true),
-        new("title", "Başlık", "type", "title", "-title"),
-        new("total", "Toplam", "coins", "totalAmount", "-totalAmount"),
-        new("submittedAt", "Gönderim", "calendar", "submittedAt", "-submittedAt"),
-        new("approver", "Onaylayan", "user-check"),
-        new("status", "Durum", "check-circle", "status", "-status"),
+        new("employee", Texts.Get("hr.leave.col.employee"), "user", "employee", "-employee", Locked: true),
+        new("title", Texts.Get("hr.content.col.title"), "type", "title", "-title"),
+        new("total", Texts.Get("hr.expense.col.total"), "coins", "totalAmount", "-totalAmount"),
+        new("submittedAt", Texts.Get("hr.blog.col.submitted-at"), "calendar", "submittedAt", "-submittedAt"),
+        new("approver", Texts.Get("hr.leave.col.approver"), "user-check"),
+        new("status", Texts.Get("common.field.status"), "check-circle", "status", "-status"),
     ];
 
     private readonly GridViewState grid = new("hr.expense-claims", "-createdAt");
@@ -145,12 +145,12 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        .. Session.Can(HrAccess.ExpensesApprove) ? new[] { new ViewOption(MineToApprove, "Onayımı bekleyenler", Icon: "user-check") } : Array.Empty<ViewOption>(),
-        new(SubmittedView, "Onay bekleyen", Icon: "hourglass"),
-        new(ToPayView, "Ödenecek", Icon: "wallet"),
-        new(PaidView, "Ödenen", Icon: "check-circle"),
-        new(RejectedView, "Reddedilen", Icon: "x"),
-        new(AllViews, "Tüm beyanlar", Icon: "list"),
+        .. Session.Can(HrAccess.ExpensesApprove) ? new[] { new ViewOption(MineToApprove, Texts.Get("hr.leave-requests.view.mine"), Icon: "user-check") } : Array.Empty<ViewOption>(),
+        new(SubmittedView, Texts.Get("hr.leave.pending"), Icon: "hourglass"),
+        new(ToPayView, Texts.Get("hr.expense-claims.view.to-pay"), Icon: "wallet"),
+        new(PaidView, Texts.Get("hr.expense-claims.view.paid"), Icon: "check-circle"),
+        new(RejectedView, Texts.Get("hr.leave-requests.view.rejected"), Icon: "x"),
+        new(AllViews, Texts.Get("hr.expense-claims.view.all"), Icon: "list"),
         .. views.Options,
     ];
 

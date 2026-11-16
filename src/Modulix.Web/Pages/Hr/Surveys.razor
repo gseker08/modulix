@@ -2,12 +2,12 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Anketler · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.surveys") · Modulix</PageTitle>
 
 @* Anketlerim (ADR-0042 dilim 7): kullanıcıya yönelik yanıta açık anketler; yanıtlananlar işaretli, yanıtlanmayanlar formla yanıtlanır. Hangi anketin
    görüneceğine ve yanıtın kabulüne sunucu karar verir. *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.SurveysRespond">
-    <PageHeader Title="Anketler" Icon="clipboard-list" Subtitle="@(page is null ? "Size yönelik anketler." : $"{page.TotalCount} açık anket · {Waiting} yanıt bekliyor")" />
+    <PageHeader Title="@Texts.Get("nav.app.hr.surveys")" Icon="clipboard-list" Subtitle="@(page is null ? Texts.Get("hr.surveys.intro") : Texts.Get("hr.surveys.count-waiting", page.TotalCount, Waiting))" />
 
     @if (message is not null)
     {
@@ -29,11 +29,11 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Şu an size yönelik açık anket yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("hr.surveys.empty")" />
     }
     else
     {
-        <ul class="list-unstyled" aria-label="Açık anketler">
+        <ul class="list-unstyled" aria-label="@Texts.Get("hr.surveys.open-list")">
             @foreach (var survey in page.Items)
             {
                 var done = WarehouseLabels.Flag(survey, "respondedByMe");
@@ -42,16 +42,16 @@
                         <h2 class="h6 mb-0 me-auto">@WarehouseLabels.Text(survey, "title")</h2>
                         @if (WarehouseLabels.Flag(survey, "isAnonymous"))
                         {
-                            <span class="badge status-inactive">Anonim</span>
+                            <span class="badge status-inactive">@Texts.Get("hr.surveys.anonymous")</span>
                         }
-                        <span class="badge @(done ? "status-customer" : "stage-negotiation")">@(done ? "Yanıtlandı" : "Yanıt bekliyor")</span>
+                        <span class="badge @(done ? "status-customer" : "stage-negotiation")">@(done ? Texts.Get("hr.surveys.answered") : Texts.Get("hr.surveys.waiting"))</span>
                     </div>
                     <p class="text-muted mb-2">
-                        @WarehouseLabels.Number(survey, "questionCount") soru@(WarehouseLabels.Text(survey, "closesOn") is { Length: > 0 } closes ? $" · son gün {HrLabels.Date(closes)}" : "")
+                        @Texts.Get("hr.surveys.question-count", WarehouseLabels.Number(survey, "questionCount"))@(WarehouseLabels.Text(survey, "closesOn") is { Length: > 0 } closes ? " · " + Texts.Get("hr.surveys.last-day", HrLabels.Date(closes)) : "")
                     </p>
                     @if (!done)
                     {
-                        <button type="button" class="btn btn-tonal" @onclick="() => { answering = survey; notice = null; }">Yanıtla</button>
+                        <button type="button" class="btn btn-tonal" @onclick="() => { answering = survey; notice = null; }">@Texts.Get("hr.surveys.answer")</button>
                     }
                 </li>
             }
@@ -87,7 +87,7 @@
     private async Task SubmittedAsync(RecordResponse survey)
     {
         answering = null;
-        notice = "Yanıtınız alındı. Teşekkürler.";
+        notice = Texts.Get("hr.surveys.thanks");
         await LoadAsync(page?.Page ?? 1);
     }
 }

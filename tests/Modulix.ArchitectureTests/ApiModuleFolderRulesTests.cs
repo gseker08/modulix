@@ -35,12 +35,10 @@ public partial class ApiModuleFolderRulesTests
     {
         ["Contracts"] =
         [
-            "Modulix.Api.Crm",
             "Modulix.Core.Events",
             "Modulix.Core.Lookups",
             "Modulix.Core.Modules",
             "Modulix.Core.Platform",
-            "Modulix.Core.Records",
             "Modulix.Infrastructure",
         ],
         ["Crm"] =
@@ -60,15 +58,6 @@ public partial class ApiModuleFolderRulesTests
             "Modulix.Api.Platform",
             "Modulix.Api.Users",
             "Modulix.Core.Customs",
-        ],
-        ["Support"] =
-        [
-            "Modulix.Api.Crm",
-            "Modulix.Core.Events",
-            "Modulix.Core.Modules",
-            "Modulix.Core.Platform",
-            "Modulix.Core.Records",
-            "Modulix.Infrastructure",
         ],
     };
 
