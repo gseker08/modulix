@@ -394,6 +394,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         }
 
         await SlaEngine.OnCreatedAsync(Context, entity, cancellationToken);
+        await Context.Acknowledgements.SendAsync(Context, entity, cancellationToken);
     }
 
     /// <summary>Talebin kategorisinin (ve üst kategorisinin) zorunlu alanlarından boş olanlar.</summary>
