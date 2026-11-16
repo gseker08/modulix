@@ -34,6 +34,47 @@ public static class MetadataTexts
     /// <summary>Hazır rolün açıklaması (<see cref="RoleTemplate.Description"/>).</summary>
     public static string RoleTemplateDescriptionKey(string templateKey) => $"meta.role-template.{templateKey}.description";
 
+    /// <summary>Formun adı (<see cref="FormDefinition.DisplayName"/>).</summary>
+    public static string FormKey(string entityKey) => $"meta.form.{entityKey}";
+
+    /// <summary>Formun varsayılan sekmesinin adı.</summary>
+    public static string FormTabKey(string entityKey, string tab) => $"meta.form.{entityKey}.tab.{tab}";
+
+    /// <summary>Formun varsayılan bölümünün adı.</summary>
+    public static string FormSectionKey(string entityKey, string section) => $"meta.form.{entityKey}.section.{section}";
+
+    /// <summary>Formdaki (kodda tanımlı) alanın etiketi.</summary>
+    public static string FormFieldKey(string entityKey, string field) => $"meta.form.{entityKey}.field.{field}";
+
+    /// <summary>Firma ayarının adı (<see cref="SettingDefinition.DisplayName"/>).</summary>
+    public static string SettingKey(string settingKey) => $"meta.setting.{settingKey}";
+
+    /// <summary>Firma ayarının ekrandaki bölüm adı (<see cref="SettingDefinition.Group"/>); ayar başınadır.</summary>
+    public static string SettingGroupKey(string settingKey) => $"meta.setting.{settingKey}.group";
+
+    /// <summary>Firma ayarının açıklaması.</summary>
+    public static string SettingDescriptionKey(string settingKey) => $"meta.setting.{settingKey}.description";
+
+    /// <summary>Seçenekli firma ayarında seçeneğin adı.</summary>
+    public static string SettingOptionKey(string settingKey, string value) => $"meta.setting.{settingKey}.option.{KeySegment(value)}";
+
+    /// <summary>
+    /// Değerin anahtar parçası: harf, rakam ve tire dışındaki karakterler tire olur (ör. saat dilimi "Europe/Istanbul" → "Europe-Istanbul",
+    /// iş saati "08:00-17:00" → "08-00-17-00"); sözlük anahtarı biçimi bu karakterleri kabul etmez.
+    /// </summary>
+    public static string KeySegment(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return string.Create(value.Length, value, static (span, source) =>
+        {
+            for (var i = 0; i < source.Length; i++)
+            {
+                var c = source[i];
+                span[i] = char.IsAsciiLetterOrDigit(c) || c == '-' ? c : '-';
+            }
+        });
+    }
+
     /// <summary>Hazır rolün adı ve açıklaması <paramref name="bundle"/> dilinde.</summary>
     public static RoleTemplate Localize(RoleTemplate template, IReadOnlyDictionary<string, string> bundle)
     {

@@ -175,6 +175,47 @@ public class FormLayoutTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         Assert.True(ok.StatusCode == HttpStatusCode.Created, await ok.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task Default_form_and_setting_names_follow_the_readers_language_while_the_firms_own_names_stay()
+    {
+        var a = await SetUpAsync();
+        using var admin = await LoginAsync(a.Admin);
+        using var rep = await LoginAsync(a.Rep);
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync("/api/account/language", new Modulix.Shared.Account.UpdateLanguageRequest("en"))).StatusCode);
+
+        var english = await LayoutAsync(admin, Company);
+        Assert.Equal("Company", english.EntityName);
+        Assert.Equal("General information", english.Tabs.Single(t => t.Key == "genel").Label);
+        Assert.Equal("Basic information", english.Sections.Single(s => s.Key == "temel").Label);
+        Assert.Equal("Company name", english.Fields.Single(f => f.Key == "name").Label);
+
+        // İngilizce çalışan yönetici "İletişim" sekmesini yeniden adlandırıp kaydeder; öteki varsayılan adlara dokunmaz.
+        var request = ToRequest(english) with
+        {
+            Tabs = [.. english.Tabs.Select(t => t.Key == "iletisim" ? t with { Label = "Bize ulaşın" } : t)],
+        };
+        var saved = await PutAsync(admin, Company, request);
+        Assert.Equal("General information", saved.Tabs.Single(t => t.Key == "genel").Label);
+        Assert.Equal("Bize ulaşın", saved.Tabs.Single(t => t.Key == "iletisim").Label);
+
+        // Tercihsiz (Türkçe) kullanıcı: varsayılan adlar Türkçe kalmış, yeniden adlandırılan sekme firmanın verdiği adla görünür.
+        var turkish = await LayoutAsync(rep, Company);
+        Assert.Equal("Firma", turkish.EntityName);
+        Assert.Equal("Genel bilgiler", turkish.Tabs.Single(t => t.Key == "genel").Label);
+        Assert.Equal("Temel bilgiler", turkish.Sections.Single(s => s.Key == "temel").Label);
+        Assert.Equal("Bize ulaşın", turkish.Tabs.Single(t => t.Key == "iletisim").Label);
+        Assert.Equal("Firma adı", turkish.Fields.Single(f => f.Key == "name").Label);
+
+        // Ayarlar ekranı: ad ve bölüm okurun dilinde, anahtar ve değer aynı.
+        var englishSettings = (await admin.GetFromJsonAsync<Modulix.Shared.Settings.SettingsResponse>("/api/settings"))!.Settings;
+        var currency = englishSettings.Single(s => s.Key == "core.regional.currency");
+        Assert.Equal(("Currency", "Regional settings"), (currency.Label, currency.Group));
+        var turkishCurrency = (await rep.GetFromJsonAsync<Modulix.Shared.Settings.SettingsResponse>("/api/settings"))!.Settings
+            .Single(s => s.Key == "core.regional.currency");
+        Assert.Equal(("Para birimi", "Bölgesel ayarlar"), (turkishCurrency.Label, turkishCurrency.Group));
+        Assert.Equal(currency.Value, turkishCurrency.Value);
+    }
+
     private static string Url(string entityKey) => $"/api/customization/form-layouts/{entityKey}";
 
     private static SaveFormLayoutRequest ToRequest(FormLayoutDto layout, Func<FormFieldDto, SaveFormFieldRequest?>? map = null) => new(

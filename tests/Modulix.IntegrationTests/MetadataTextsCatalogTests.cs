@@ -8,8 +8,8 @@ namespace Modulix.IntegrationTests;
 /// <summary>
 /// ADR-0034 dilim 18c: bütün modüllerin metadata adları üç sözlükte karşılığını taşır, Türkçe sözlük kaynak metinle aynıdır ve sözlükte
 /// hiçbir modülün tanımlamadığı <c>meta.*</c> anahtarı kalmaz. Kapsam: denetim kayıt türleri (tür, alan ve kodda tanımlı seçenek adları;
-/// 18c-1), modül adları, izinlerin açıklaması ve satır adı, hazır roller ("Salt okur" dahil; 18c-2). Veritabanı gerekmez; katalog
-/// uygulamanın kaydettiği modüllerden kurulur.
+/// 18c-1), modül adları, izinlerin açıklaması ve satır adı, hazır roller ("Salt okur" dahil; 18c-2), form düzeni ve firma ayarı adları (18c-3).
+/// Veritabanı gerekmez; katalog uygulamanın kaydettiği modüllerden kurulur.
 /// </summary>
 public class MetadataTextsCatalogTests
 {
@@ -17,7 +17,20 @@ public class MetadataTextsCatalogTests
         (IModule[])typeof(Program).Assembly.GetType("ModulixModules", throwOnError: true)!.GetMethod("Create")!.Invoke(null, null)!);
 
     private static IEnumerable<(string Key, string Source)> Names() =>
-        AuditedNames().Concat(AccessNames());
+        AuditedNames().Concat(AccessNames()).Concat(FormNames()).Concat(SettingNames());
+
+    private static IEnumerable<(string Key, string Source)> FormNames() =>
+        Catalog.Forms.SelectMany(f =>
+            new[] { (MetadataTexts.FormKey(f.Form.EntityKey), f.Form.DisplayName) }
+                .Concat(f.Form.Tabs.Select(t => (MetadataTexts.FormTabKey(f.Form.EntityKey, t.Key), t.Label)))
+                .Concat(f.Form.Sections.Select(s => (MetadataTexts.FormSectionKey(f.Form.EntityKey, s.Key), s.Label)))
+                .Concat(f.Form.Fields.Select(x => (MetadataTexts.FormFieldKey(f.Form.EntityKey, x.Key), x.Label))));
+
+    private static IEnumerable<(string Key, string Source)> SettingNames() =>
+        Catalog.Settings.SelectMany(s =>
+            new[] { (MetadataTexts.SettingKey(s.Definition.Key), s.Definition.DisplayName), (MetadataTexts.SettingGroupKey(s.Definition.Key), s.Definition.Group) }
+                .Concat(s.Definition.Description is { } description ? [(MetadataTexts.SettingDescriptionKey(s.Definition.Key), description)] : [])
+                .Concat(s.Definition.Options.Select(o => (MetadataTexts.SettingOptionKey(s.Definition.Key, o.Value), o.Label))));
 
     private static IEnumerable<(string Key, string Source)> AuditedNames() =>
         Catalog.AuditedEntities.SelectMany(entity =>
