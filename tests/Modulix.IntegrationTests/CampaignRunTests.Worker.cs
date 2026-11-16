@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Marketing;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Marketing;
@@ -15,7 +14,7 @@ namespace Modulix.IntegrationTests;
 /// </summary>
 public partial class CampaignRunTests
 {
-    private MarketingSendRunner Worker => host.Services.GetRequiredService<MarketingSendRunner>();
+    private MarketingSendRunner Worker => new(host.Services);
 
     private async Task<(int Processed, bool Completed)> WorkUntilDoneAsync(Guid tenantId)
     {

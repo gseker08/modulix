@@ -20,6 +20,12 @@ public static class ModuleEndpointMapping
                     .RequireModule(module.Key);
                 endpoints.MapEndpoints(group);
             }
+
+            // Oturumsuz uçlar: oturum ve modül kontrolü yoktur; tenant ve lisans IPublicTenantScopes ile, kötüye kullanım modülün hız sınırıyla denetlenir.
+            if (module is IModulePublicEndpoints publicEndpoints)
+            {
+                publicEndpoints.MapPublicEndpoints(app.MapGroup("/api/public").AllowAnonymous());
+            }
         }
 
         return app;

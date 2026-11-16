@@ -4,8 +4,8 @@
 @using System.Globalization
 @inject ApiClient Api
 
-<section aria-label="Anket sonuçları">
-    <div class="list-toolbar mt-3"><h3 class="h6 mb-0 me-auto">Sonuçlar</h3></div>
+<section aria-label="@Texts.Get("hr.survey-results.label")">
+    <div class="list-toolbar mt-3"><h3 class="h6 mb-0 me-auto">@Texts.Get("hr.survey-results.title")</h3></div>
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
@@ -16,43 +16,43 @@
     }
     else if (results.HiddenReason is { } hidden)
     {
-        <p class="text-muted" role="status">@results.ResponseCount yanıt. @hidden</p>
+        <p class="text-muted" role="status">@Texts.Get("hr.survey-results.responses", results.ResponseCount). @hidden</p>
     }
     else if (results.ResponseCount == 0)
     {
-        <EmptyState Compact="true" Title="Henüz yanıt yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("hr.survey-results.empty")" />
     }
     else
     {
         <div class="list-toolbar">
-            <p class="text-muted mb-0 me-auto">@results.ResponseCount yanıt</p>
-            <a class="btn btn-tonal" href="@($"api/hr/surveys/{SurveyId}/results/export")" download><AppIcon Name="file-text" Size="16" /> CSV olarak indir</a>
+            <p class="text-muted mb-0 me-auto">@Texts.Get("hr.survey-results.responses", results.ResponseCount)</p>
+            <a class="btn btn-tonal" href="@($"api/hr/surveys/{SurveyId}/results/export")" download><AppIcon Name="file-text" Size="16" /> @Texts.Get("hr.survey-results.export")</a>
         </div>
         @foreach (var question in results.Questions)
         {
             <div class="summary-card mb-3">
                 <h4 class="h6">@question.Text</h4>
                 <p class="text-muted mb-2">
-                    @HrLabels.QuestionType(question.QuestionType) · @question.AnswerCount cevap@(question.Average is { } average ? $" · ortalama {average.ToString("0.##", Turkish)}" : "")
+                    @HrLabels.QuestionType(question.QuestionType) · @Texts.Get("hr.survey-results.answers", question.AnswerCount)@(question.Average is { } average ? " · " + Texts.Get("hr.survey-results.average", average.ToString("0.##", Turkish)) : "")
                 </p>
                 @if (question.Counts.Count > 0)
                 {
                     <table class="table record-table">
-                        <caption class="visually-hidden">@question.Text dağılımı</caption>
+                        <caption class="visually-hidden">@Texts.Get("hr.survey-results.distribution", question.Text)</caption>
                         <thead>
                             <tr>
-                                <th scope="col">@(question.QuestionType == "rating" ? "Puan" : "Seçenek")</th>
-                                <th scope="col">Cevap</th>
-                                <th scope="col">Oran</th>
+                                <th scope="col">@OptionHeader(question.QuestionType)</th>
+                                <th scope="col">@Texts.Get("hr.survey-results.col.answers")</th>
+                                <th scope="col">@Texts.Get("hr.survey-results.col.share")</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var count in question.Counts)
                             {
                                 <tr>
-                                    <td data-label="@(question.QuestionType == "rating" ? "Puan" : "Seçenek")">@count.Option</td>
-                                    <td data-label="Cevap">@count.Count</td>
-                                    <td data-label="Oran">@(question.AnswerCount == 0 ? "—" : $"%{Math.Round(100m * count.Count / question.AnswerCount).ToString("0", Turkish)}")</td>
+                                    <td data-label="@OptionHeader(question.QuestionType)">@count.Option</td>
+                                    <td data-label="@Texts.Get("hr.survey-results.col.answers")">@count.Count</td>
+                                    <td data-label="@Texts.Get("hr.survey-results.col.share")">@(question.AnswerCount == 0 ? "—" : $"%{Math.Round(100m * count.Count / question.AnswerCount).ToString("0", Turkish)}")</td>
                                 </tr>
                             }
                         </tbody>
@@ -79,6 +79,9 @@
     private string? message;
 
     [Parameter, EditorRequired] public Guid SurveyId { get; set; }
+
+    private static string OptionHeader(string questionType) =>
+        Texts.Get(questionType == "rating" ? "hr.survey-results.col.rating" : "hr.survey-results.col.option");
 
     protected override async Task OnParametersSetAsync()
     {

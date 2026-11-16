@@ -29,6 +29,17 @@ public sealed class CrmModule : IModule
 {
     public const string ModuleKey = "crm";
 
+    /// <summary>
+    /// Teklif numarası ortak belge serisinden verilir (ADR-0049 dilim 3a): <c>TK-yıl-sıra</c>; revizyonlar ailenin numarasını taşır. Önceki kayıtlar
+    /// rastgele sonekli numarasını korur. Fırsat ve müşteri adayı belge değildir, sıralı seriye geçmedi.
+    /// </summary>
+    public const string QuoteNumberSeries = "crm.quote";
+
+    IReadOnlyList<Modulix.Core.Contracts.Numbering.NumberSeriesDefinition> IModule.NumberSeries { get; } =
+    [
+        new(QuoteNumberSeries, "Teklif", "TK"),
+    ];
+
     public static class Permissions
     {
         public const string CompaniesRead = "crm.companies.read";
@@ -1039,6 +1050,17 @@ public sealed class CrmModule : IModule
     /// Aktivite tamamlanınca Lead'in ilk temasını işler (yalnızca Lead aktiviteleri; sistem adına, audit'li). Abone idempotenttir:
     /// aynı olay tekrar gelse de ilk temas yalnızca daha erken bir temas bulunursa değişir.
     /// </summary>
+    /// <summary>
+    /// Zamanlanmış iş (ADR-0046): host'taki tek zamanlayıcı 5 dakikada bir, CRM modülü yazılabilir olan her tenant için teklif süre dolumu turunu çalıştırır.
+    /// Yapılandırma <c>Jobs:crm.quote-expiry</c>; eski <c>QuoteExpiry</c> bölümü okunmaya devam eder.
+    /// Müşteri adayı puanlarını kural değişikliğinden sonra yeniden hesaplayan iş (ADR-0050 dilim 1b) de 5 dakikada bir çalışır; yapılandırma <c>Jobs:crm.lead-scoring</c>.
+    /// </summary>
+    IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
+    [
+        ModuleJobDefinition.For<QuoteExpiryJob>(QuoteExpiryJob.JobKey, TimeSpan.FromSeconds(300), QuoteExpiryJob.Identity) with { LegacySection = "QuoteExpiry" },
+        ModuleJobDefinition.For<LeadScoreJob>(LeadScoreJob.JobKey, TimeSpan.FromMinutes(5), LeadScoreJob.Identity),
+    ];
+
     IReadOnlyList<EventSubscription> IModule.EventSubscriptions { get; } =
     [
         // Herkese açık Lead toplama ucunun sistem kimliği: olay işlemez, yalnızca "crm.lead-intake" kimliğinin izinlerini tanımlar
@@ -1068,7 +1090,7 @@ public sealed class CrmModule : IModule
             [Entities.Activity],
             [Permissions.ActivitiesRead, Permissions.ActivitiesWrite]),
         EventSubscription.For<QuoteExpiryAnchor>(
-            "crm.quote-expiry",
+            QuoteExpiryJob.Identity,
             [DomainEventTypes.RecordDeleted],
             [Entities.Quote],
             [Permissions.QuotesRead, Permissions.QuotesRecordDecision, Permissions.CompaniesRead, Permissions.OpportunitiesRead, Permissions.ActivitiesRead, Permissions.ActivitiesWrite]),
@@ -1097,15 +1119,6 @@ public sealed class CrmModule : IModule
             [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated, DomainEventTypes.RecordDeleted],
             [Entities.Activity],
             [Permissions.LeadsRead, Permissions.LeadsUpdate, Permissions.LeadsAssign]),
-    ];
-
-    /// <summary>
-    /// Zamanlanmış iş (ADR-0046): müşteri adayı puanlarını kural değişikliğinden sonra yeniden hesaplar (ADR-0050 dilim 1b).
-    /// Yapılandırma <c>Jobs:crm.lead-scoring</c>.
-    /// </summary>
-    IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
-    [
-        ModuleJobDefinition.For<LeadScoreJob>(LeadScoreJob.JobKey, TimeSpan.FromMinutes(5), LeadScoreJob.Identity),
     ];
 
     /// <summary>Tenant ayar anahtarları.</summary>
@@ -1170,6 +1183,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<IQuoteReport, QuoteReport>();
         services.AddScoped<QuoteMarkers>();
         services.AddScoped<IQuoteExpiry, QuoteExpiry>();
+        services.AddScoped<QuoteExpiryJob>();
         services.AddScoped<IAcceptedQuoteSource, AcceptedQuoteSource>();
         services.AddScoped<IQuoteOpportunitySync, QuoteOpportunitySync>();
         services.AddScoped<QuoteLifecycleSubscriber>();

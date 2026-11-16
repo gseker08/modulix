@@ -25,15 +25,16 @@ public class ProjectReferenceRulesTests
 
         // Modüllerin uç nokta yazabilmesi için ASP.NET yardımcıları (ADR-0046). Uç noktası modüle taşınan modül buna ve DTO'lar için
         // Modulix.Shared'a başvurur; sözleşme projeleri başvuramaz.
-        [CoreHosting] = [CoreContracts],
+        // Ortak kaynak uç noktalarının sayfalı yanıtı (PagedResult) için Shared; Shared hiçbir projeye başvurmadığından döngü olmaz.
+        [CoreHosting] = [CoreContracts, Shared],
         ["Modulix.Core"] = [CoreContracts],
         ["Modulix.Infrastructure"] = ["Modulix.Core", CoreContracts],
         ["Modulix.Modules.Crm"] = [CoreContracts, CrmContracts, MarketingContracts],
         ["Modulix.Modules.Logistics"] = [CoreContracts, CoreHosting, Shared, FleetContracts],
         ["Modulix.Modules.Contracts"] = [CoreContracts, CrmContracts],
-        ["Modulix.Modules.Orders"] = [CoreContracts, CrmContracts],
-        ["Modulix.Modules.Support"] = [CoreContracts],
-        ["Modulix.Modules.Marketing"] = [CoreContracts, CrmContracts, MarketingContracts],
+        ["Modulix.Modules.Orders"] = [CoreContracts, CoreHosting, Shared, CrmContracts],
+        ["Modulix.Modules.Support"] = [CoreContracts, CoreHosting, Shared],
+        ["Modulix.Modules.Marketing"] = [CoreContracts, CoreHosting, Shared, CrmContracts, MarketingContracts],
         ["Modulix.Modules.Warehouse"] = [CoreContracts, CoreHosting, Shared],
         ["Modulix.Modules.Fleet"] = [CoreContracts, FleetContracts],
         ["Modulix.Modules.Hr"] = [CoreContracts, CoreHosting, Shared],

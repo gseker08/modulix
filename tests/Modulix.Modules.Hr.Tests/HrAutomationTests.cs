@@ -31,16 +31,18 @@ public partial class HrAutomationTests
         Assert.Equal("recipientId", Assert.Single(blank.ToComplete).Parameter);
     }
 
-    [Fact]
-    public void Blog_rules_run_with_both_the_read_and_the_manage_permission_so_they_can_read_drafts()
+    [Theory]
+    [InlineData(HrModule.Entities.Announcement, HrModule.Permissions.AnnouncementsRead, HrModule.Permissions.AnnouncementsManage)]
+    [InlineData(HrModule.Entities.Survey, HrModule.Permissions.SurveysRespond, HrModule.Permissions.SurveysManage)]
+    [InlineData(HrModule.Entities.BlogPost, HrModule.Permissions.BlogRead, HrModule.Permissions.BlogManage)]
+    [InlineData(HrModule.Entities.PhotoAlbum, HrModule.Permissions.GalleryRead, HrModule.Permissions.GalleryManage)]
+    public void Content_rules_run_with_both_the_read_and_the_manage_permission_even_without_fields(string entityKey, string read, string manage)
     {
-        // Blog deposu okumada "blog okuma", taslak için "blog yönetimi" ister; kuralın kimliği ikisini de taşımalı (bölüm 28).
-        foreach (var template in HrAutomationTemplates.All.Where(t => t.EntityKey == HrModule.Entities.BlogPost))
-        {
-            var identity = AutomationRuleIdentity.Permissions(template.EntityKey, template.Definition, Catalog);
-            Assert.Contains(HrModule.Permissions.BlogRead, identity);
-            Assert.Contains(HrModule.Permissions.BlogManage, identity);
-        }
+        // İçerik deposu okumada okuma, taslak için yönetim izni ister; alan kullanmayan kuralın kimliği de ikisini taşımalı (bölüm 28 ve 29).
+        var bare = new AutomationDefinition(new RecordCreatedTrigger(), null, []);
+        var identity = AutomationRuleIdentity.Permissions(entityKey, bare, Catalog);
+        Assert.Contains(read, identity);
+        Assert.Contains(manage, identity);
     }
 
     [Fact]

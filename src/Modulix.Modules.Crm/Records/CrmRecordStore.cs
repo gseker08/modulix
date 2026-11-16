@@ -217,6 +217,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         }
 
         OnCreated(entity);
+        await CreatedAsync(entity, cancellationToken);
         Data.Set<TEntity>().Add(entity);
         return ToData(entity);
     }
@@ -266,6 +267,9 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     protected virtual void OnCreated(TEntity entity)
     {
     }
+
+    /// <summary><see cref="OnCreated"/>'in ardından, kayıt eklenmeden hemen önce; beklemeli iş içindir (ör. ortak seriden belge numarası almak).</summary>
+    protected virtual Task CreatedAsync(TEntity entity, CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>Sorumlusu verilmeyen yeni kayıt, kaydı oluşturana atanır. Atanmamış kayıt havuzu olan türler (Lead) kapatır.</summary>
     protected virtual bool DefaultsOwnerToCurrentUser => true;

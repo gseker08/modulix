@@ -9,12 +9,12 @@
             <h2>@WarehouseLabels.Text(Survey, "title")</h2>
             @if (WarehouseLabels.Flag(Survey, "isAnonymous"))
             {
-                <p>Anonim anket: cevaplarınız kimliğinizle hiçbir yerde ilişkilendirilmez. Yalnızca anketi yanıtladığınız kaydedilir (ikinci kez yanıtlanmasın diye).</p>
+                <p>@Texts.Get("hr.survey-answer.anonymous-note")</p>
             }
         </div>
         <div class="form-toolbar-actions">
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || questions is not { Count: > 0 })" aria-busy="@(busy ? "true" : null)">Gönder</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || questions is not { Count: > 0 })" aria-busy="@(busy ? "true" : null)">@Texts.Get("hr.survey-answer.submit")</button>
         </div>
     </div>
 
@@ -23,7 +23,7 @@
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <FormTabs Title="Sorular" Label="Anket yanıt formu bölümleri">
+    <FormTabs Title="@Texts.Get("hr.survey-answer.questions")" Label="@Texts.Get("hr.survey-answer.sections")">
         @if (WarehouseLabels.Text(Survey, "description") is { Length: > 0 } description)
         {
             <p class="preline">@description</p>
@@ -56,7 +56,7 @@
                                             <label class="form-check-label" for="@($"q-{id}-{value}")">@value</label>
                                         </div>
                                     }
-                                    <small class="text-muted d-block">1: hiç katılmıyorum / çok kötü · 5: tamamen katılıyorum / çok iyi</small>
+                                    <small class="text-muted d-block">@Texts.Get("hr.survey-answer.rating-help")</small>
                                     break;
                                 case "choice":
                                     var index = 0;
@@ -81,10 +81,10 @@
                                             <label class="form-check-label" for="@key">@option</label>
                                         </div>
                                     }
-                                    <small class="text-muted d-block">Birden çok seçenek işaretleyebilirsiniz.</small>
+                                    <small class="text-muted d-block">@Texts.Get("hr.survey-answer.multi-help")</small>
                                     break;
                                 default:
-                                    <label class="visually-hidden" for="@($"q-{id}-text")">Cevabınız</label>
+                                    <label class="visually-hidden" for="@($"q-{id}-text")">@Texts.Get("hr.survey-answer.your-answer")</label>
                                     <textarea id="@($"q-{id}-text")" class="form-control" rows="3" maxlength="2000" @bind="answers[id].Text"></textarea>
                                     break;
                             }

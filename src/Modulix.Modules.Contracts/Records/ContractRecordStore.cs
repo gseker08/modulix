@@ -165,7 +165,6 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
 
     protected override Task<JsonObject> PrepareNewAsync(Contract entity, JsonObject values, CancellationToken cancellationToken)
     {
-        entity.Number = ContractRules.NewNumber(DateTimeOffset.UtcNow);
         entity.CreatedBy = Context.CurrentUserId;
         return Task.FromResult(values);
     }
@@ -227,11 +226,13 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         }
     }
 
-    protected override Task CreatedAsync(Contract entity, CancellationToken cancellationToken)
+    protected override async Task CreatedAsync(Contract entity, CancellationToken cancellationToken)
     {
+        // Numara doğrulamadan sonra, kayıt eklenmeden hemen önce alınır (ADR-0049 dilim 3a): reddedilen istek sıra harcamaz.
+        entity.Number = await Context.Numbers.NextAsync(ContractsModule.ContractNumberSeries, cancellationToken: cancellationToken);
+
         // Kapı açıkken oluşturma (ör. tekliften) kendi tarihçe türünü ve gerekçesini taşır.
         ContractHistory.Add(Context, entity, Context.Gate.EventKind ?? ContractEventKinds.Created, Context.Gate.Reason);
-        return Task.CompletedTask;
     }
 
     protected override async Task BeforeDeleteAsync(Contract entity, CancellationToken cancellationToken)

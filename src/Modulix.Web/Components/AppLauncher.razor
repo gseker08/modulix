@@ -69,7 +69,7 @@
                             <section class="app-group" aria-labelledby="@(section.Group is null ? null : $"app-group-{section.Group.Id}")">
                                 @if (section.Group is not null)
                                 {
-                                    <h3 id="app-group-@section.Group.Id" class="app-group-title">@AppNames.Of(section.Group)</h3>
+                                    <h3 id="app-group-@(section.Group.Id)" class="app-group-title">@AppNames.Of(section.Group)</h3>
                                 }
                                 <ul class="app-grid">
                                     @foreach (AppDefinition app in section.Apps)

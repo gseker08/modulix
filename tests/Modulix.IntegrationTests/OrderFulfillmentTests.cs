@@ -40,7 +40,8 @@ public partial class OrderFulfillmentTests(ModulixApiFactory factory) : IClassFi
         // Sunucu 2 adet: iki ayrı teslimat 1'er adet planlanır; üçüncü plan kalan kapasiteyi aşar.
         var first = await PlanAsync(ops, order.Id, new DateOnly(2026, 12, 5), (line.LineId, 1m));
         var second = await PlanAsync(ops, order.Id, new DateOnly(2026, 12, 8), (line.LineId, 1m));
-        Assert.StartsWith("TS-", first.Number);
+        Assert.Matches(@"^TS-\d{4}-00001$", first.Number);
+        Assert.Matches(@"^TS-\d{4}-00002$", second.Number);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await PostPlanAsync(ops, order.Id, new DateOnly(2026, 12, 9), (line.LineId, 1m))).StatusCode);
         Assert.Equal("Planned", (await GetOrderAsync(ops, order.Id)).FulfillmentStatus);
 

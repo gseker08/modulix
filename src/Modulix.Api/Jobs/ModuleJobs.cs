@@ -17,9 +17,11 @@ namespace Modulix.Api.Jobs;
 /// <summary>
 /// Bir zamanlanmış işin çalışma ayarı (ADR-0046). Tek kalıp: <c>Jobs:&lt;iş anahtarı&gt;:Enabled</c> ve <c>Jobs:&lt;iş anahtarı&gt;:IntervalSeconds</c>;
 /// <c>Jobs:WorkerEnabled</c> zamanlayıcının tamamını kapatır. Yeni ayar verilmemişse işin eski bölümü
-/// (<see cref="ModuleJobDefinition.LegacySection"/>: <c>WorkerEnabled</c>, <c>PollIntervalSeconds</c>) okunur.
+/// (<see cref="ModuleJobDefinition.LegacySection"/>: <c>WorkerEnabled</c>, <c>PollIntervalSeconds</c>) okunur. Kuyruk işinde
+/// (<see cref="ModuleJobDefinition.BusyInterval"/>) <see cref="BusyInterval"/> da çözülür: <c>Jobs:&lt;iş anahtarı&gt;:BusyIntervalSeconds</c>
+/// (eski bölümde <c>BusyIntervalSeconds</c>).
 /// </summary>
-public sealed record ModuleJobSchedule(bool Enabled, TimeSpan Interval)
+public sealed record ModuleJobSchedule(bool Enabled, TimeSpan Interval, TimeSpan? BusyInterval = null)
 {
     public const string SectionName = "Jobs";
 
@@ -28,6 +30,12 @@ public sealed record ModuleJobSchedule(bool Enabled, TimeSpan Interval)
 
     /// <summary>İşler bundan sık çalışmaz (yanlış yapılandırma veritabanını yormasın).</summary>
     public static readonly TimeSpan MinInterval = TimeSpan.FromSeconds(30);
+
+    /// <summary>Kuyruk işinin boşta aralığı bundan kısa olmaz (eski gönderim işçisinin alt sınırı).</summary>
+    public static readonly TimeSpan QueueMinInterval = TimeSpan.FromSeconds(5);
+
+    /// <summary>Kuyruk işinin yoğun aralığı bundan kısa olmaz.</summary>
+    public static readonly TimeSpan BusyMinInterval = TimeSpan.FromSeconds(1);
 
     public static bool WorkerEnabled(IConfiguration configuration) => configuration.GetValue<bool?>(WorkerEnabledKey) ?? true;
 
@@ -38,7 +46,37 @@ public sealed record ModuleJobSchedule(bool Enabled, TimeSpan Interval)
         bool enabled = section.GetValue<bool?>("Enabled") ?? legacy?.GetValue<bool?>("WorkerEnabled") ?? true;
         int? seconds = section.GetValue<int?>("IntervalSeconds") ?? legacy?.GetValue<int?>("PollIntervalSeconds");
         var interval = seconds is { } value ? TimeSpan.FromSeconds(value) : job.DefaultInterval;
-        return new ModuleJobSchedule(enabled, interval < MinInterval ? MinInterval : interval);
+        if (job.BusyInterval is not { } defaultBusy)
+        {
+            return new ModuleJobSchedule(enabled, interval < MinInterval ? MinInterval : interval);
+        }
+
+        int? busySeconds = section.GetValue<int?>("BusyIntervalSeconds") ?? legacy?.GetValue<int?>("BusyIntervalSeconds");
+        var busy = busySeconds is { } b ? TimeSpan.FromSeconds(b) : defaultBusy;
+        return new ModuleJobSchedule(enabled, interval < QueueMinInterval ? QueueMinInterval : interval, busy < BusyMinInterval ? BusyMinInterval : busy);
+    }
+
+    /// <summary>
+    /// İşe verilen düz ayarlar (<see cref="ModuleJobContext.Settings"/>): eski bölümün değerleri, üzerine <c>Jobs:&lt;iş anahtarı&gt;</c> değerleri
+    /// (aynı adda yeni bölüm kazanır). Yalnızca doğrudan alt değerler alınır.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string?> Settings(IConfiguration configuration, ModuleJobDefinition job)
+    {
+        var settings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        if (job.LegacySection is { Length: > 0 } name)
+        {
+            foreach (var child in configuration.GetSection(name).GetChildren().Where(c => c.Value is not null))
+            {
+                settings[child.Key] = child.Value;
+            }
+        }
+
+        foreach (var child in configuration.GetSection($"{SectionName}:{job.Key}").GetChildren().Where(c => c.Value is not null))
+        {
+            settings[child.Key] = child.Value;
+        }
+
+        return settings;
     }
 }
 
@@ -63,7 +101,7 @@ public sealed record ModuleJobRun(ModuleJobRunStatus Status, ModuleJobResult? Re
 /// (<see cref="ModuleJobDefinition.Identity"/>) çalıştırılır ve değişiklikler kaydedilir. Kilidi alamayan çağrı turu atlar; aynı turun iki kez
 /// çalışması işin sorumluluğunda güvenlidir.
 /// </summary>
-public sealed class ModuleJobRunner(IServiceScopeFactory scopes, ModuleCatalog catalog, TimeProvider time)
+public sealed class ModuleJobRunner(IServiceScopeFactory scopes, ModuleCatalog catalog, TimeProvider time, IConfiguration configuration)
 {
     /// <summary>Kilit adı işin anahtarından türer (ör. "modulix.orders.jobs:&lt;tenant&gt;").</summary>
     public static string LockResource(string jobKey, Guid tenantId) => $"modulix.{jobKey}:{tenantId:N}";
@@ -99,7 +137,8 @@ public sealed class ModuleJobRunner(IServiceScopeFactory scopes, ModuleCatalog c
                 ExecutionSource.Import, null, null, 0, new JsonObject(), time.GetUtcNow());
             services.GetRequiredService<EventHandlingScope>().Begin(cause, job.Identity);
             var runner = (IModuleJob)services.GetRequiredService(job.Runner);
-            var result = await runner.RunAsync(new ModuleJobContext(tenantId), cancellationToken);
+            var context = new ModuleJobContext(tenantId) { Settings = ModuleJobSchedule.Settings(configuration, job) };
+            var result = await runner.RunAsync(context, cancellationToken);
             await services.GetRequiredService<ModulixDbContext>().SaveChangesAsync(cancellationToken);
             return new ModuleJobRun(ModuleJobRunStatus.Completed, result);
         }
@@ -157,7 +196,8 @@ public sealed class ModuleJobRunner(IServiceScopeFactory scopes, ModuleCatalog c
 /// <summary>
 /// Modüllerin zamanlanmış işlerini çalıştıran tek zamanlayıcı (ADR-0046). Host modülü tanımaz: işleri modül kaydından (<c>IModule.Jobs</c>)
 /// okur. Her iş kendi aralığıyla ve diğerlerinden bağımsız döner (bir işin uzun sürmesi ya da hatası diğerini geciktirmez); bir turda
-/// tenant'lar sırayla gezilir, biri başarısız olursa diğerleri etkilenmez ve bir sonraki turda yeniden denenir.
+/// tenant'lar sırayla gezilir, biri başarısız olursa diğerleri etkilenmez ve bir sonraki turda yeniden denenir. Kuyruk işinde bir tenant
+/// sırada iş kaldığını bildirdiyse (<see cref="ModuleJobResult.HasMoreWork"/>) bir sonraki tur yoğun aralıkla başlar.
 /// </summary>
 public sealed class ModuleJobsWorker(
     ModuleCatalog catalog, ModuleJobRunner runner, IConfiguration configuration, IJobMetrics metrics, ILogger<ModuleJobsWorker> logger) : BackgroundService
@@ -175,17 +215,18 @@ public sealed class ModuleJobsWorker(
             var schedule = ModuleJobSchedule.Resolve(configuration, job);
             if (schedule.Enabled)
             {
-                loops.Add(Task.Run(() => RunJobAsync(moduleKey, job, schedule.Interval, stoppingToken), CancellationToken.None));
+                loops.Add(Task.Run(() => RunJobAsync(moduleKey, job, schedule, stoppingToken), CancellationToken.None));
             }
         }
 
         return Task.WhenAll(loops);
     }
 
-    private async Task RunJobAsync(string moduleKey, ModuleJobDefinition job, TimeSpan interval, CancellationToken stoppingToken)
+    private async Task RunJobAsync(string moduleKey, ModuleJobDefinition job, ModuleJobSchedule schedule, CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            bool moreWork = false;
             try
             {
                 foreach (var tenantId in await runner.TenantIdsAsync(moduleKey, stoppingToken))
@@ -193,9 +234,11 @@ public sealed class ModuleJobsWorker(
                     try
                     {
                         var run = await runner.RunTenantAsync(job.Key, tenantId, stoppingToken);
-                        if (run.Result?.Summary is { Length: > 0 } summary)
+                        moreWork |= run.Result?.HasMoreWork == true;
+                        if (run.Result is { Summary: { Length: > 0 } summary } result)
                         {
-                            logger.LogInformation("Tenant {TenantId}, {Job} işi: {Summary}", tenantId, job.Key, summary);
+                            logger.Log(
+                                result.IsWarning ? LogLevel.Warning : LogLevel.Information, "Tenant {TenantId}, {Job} işi: {Summary}", tenantId, job.Key, summary);
                         }
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -223,7 +266,7 @@ public sealed class ModuleJobsWorker(
 
             try
             {
-                await Task.Delay(interval, stoppingToken);
+                await Task.Delay(moreWork && schedule.BusyInterval is { } busy ? busy : schedule.Interval, stoppingToken);
             }
             catch (OperationCanceledException)
             {

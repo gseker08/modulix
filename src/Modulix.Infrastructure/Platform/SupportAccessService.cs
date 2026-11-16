@@ -1,10 +1,12 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -199,26 +201,29 @@ internal sealed class SupportAccessService(
             join membership in tenantDb.Memberships.AsNoTracking() on assignment.MembershipId equals membership.Id
             join user in tenantDb.Users.AsNoTracking() on membership.UserId equals user.Id
             where role.IsSystem && membership.Status == MembershipStatus.Active && user.Email != null
-            select new { user.Email, user.DisplayName })
+            select new { user.Id, user.Email, user.DisplayName })
             .Distinct()
             .ToListAsync(cancellationToken);
 
         var queue = services.GetRequiredService<IEmailQueue>();
+        var languages = services.GetRequiredService<IRecipientLanguage>();
         foreach (var admin in addresses)
         {
-            var until = grant.ExpiresAt.ToString("dd.MM.yyyy HH:mm 'UTC'");
+            // Yöneticinin dilinde (ADR-0034 §6, dilim 18b); kapsam firmanın bağlamında açık olduğu için varsayılan dil o firmanınkidir.
+            LocalizedTexts t = await languages.ForUserAsync(admin.Id, cancellationToken);
+            var until = grant.ExpiresAt.ToString("dd.MM.yyyy HH:mm 'UTC'", CultureInfo.InvariantCulture);
             queue.Enqueue(new EmailMessage(
                 admin.Email!,
-                $"{tenantName}: destek erişimi açıldı",
-                $"<p>Merhaba {WebUtility.HtmlEncode(admin.DisplayName)},</p>"
-                + $"<p>Modulix destek ekibinden <strong>{WebUtility.HtmlEncode(userName)}</strong>, {WebUtility.HtmlEncode(tenantName)} için <strong>salt okunur</strong> destek erişimi açtı. "
-                + $"Erişim {until} tarihinde kendiliğinden sona erer ve verilerinizde değişiklik yapılamaz.</p>"
-                + $"<p>Gerekçe: {WebUtility.HtmlEncode(grant.Reason)}</p>"
-                + "<p>İsterseniz erişimi Ayarlar bölümünden erken kapatabilirsiniz.</p>")
+                t.Get("email.support-access.subject", tenantName),
+                $"<p>{t.Get("email.common.greeting", WebUtility.HtmlEncode(admin.DisplayName))}</p>"
+                + $"<p>{t.Get("email.support-access.body-html", WebUtility.HtmlEncode(userName), WebUtility.HtmlEncode(tenantName), until)}</p>"
+                + $"<p>{WebUtility.HtmlEncode(t.Get("email.support-access.reason", grant.Reason))}</p>"
+                + $"<p>{WebUtility.HtmlEncode(t.Get("email.support-access.close-hint"))}</p>")
             {
                 ToName = admin.DisplayName,
-                TextBody = $"{userName}, {tenantName} için salt okunur destek erişimi açtı. Erişim {until} tarihinde sona erer. Gerekçe: {grant.Reason}",
+                TextBody = t.Get("email.support-access.text", userName, tenantName, until, grant.Reason),
                 Reference = $"core.support-access:{grant.Id}",
+                Language = t.Language,
             });
         }
     }

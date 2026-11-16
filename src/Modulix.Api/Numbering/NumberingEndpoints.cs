@@ -27,7 +27,7 @@ public static class NumberingEndpoints
         {
             if (!Enum.TryParse(request.Reset, ignoreCase: false, out NumberSeriesReset reset) || !Enum.IsDefined(reset))
             {
-                return Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: "Sıfırlama \"Never\" ya da \"Yearly\" olmalı.");
+                return Invalid("Sıfırlama \"Never\" ya da \"Yearly\" olmalı.");
             }
 
             return await admin.ConfigureAsync(key, request.Prefix, request.Digits, reset, request.Version, ct) is { } view ? Results.Ok(ToDto(view)) : NotFound();
@@ -51,9 +51,13 @@ public static class NumberingEndpoints
         }
         catch (NumberSeriesException ex)
         {
-            return Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: ex.Message);
+            return Invalid(ex.Message);
         }
     }
+
+    // İstemci 422'de başlığı değil "message" alanını gösterir (ApiClient); kural iletisi ekrana bu alanla ulaşır.
+    private static IResult Invalid(string message) => Results.Problem(
+        statusCode: StatusCodes.Status422UnprocessableEntity, title: message, extensions: new Dictionary<string, object?> { ["message"] = message });
 
     private static IResult NotFound() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Belge serisi bulunamadı.");
 

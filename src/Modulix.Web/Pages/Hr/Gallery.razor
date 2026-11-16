@@ -2,12 +2,12 @@
 @inject ApiClient Api
 @inject SessionState Session
 
-<PageTitle>Galeri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.gallery") · Modulix</PageTitle>
 
 @* Fotoğraf galerisi (ADR-0042 dilim 8): yayındaki albümler, etkinlik gününe göre en yeni üstte; albüm açılınca fotoğrafları görünür. Fotoğraf
    erişimi albümün erişimidir (sunucu denetler). *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.GalleryRead">
-    <PageHeader Title="Galeri" Icon="image" Subtitle="@(page is null ? "Etkinlik fotoğrafları." : $"{page.TotalCount} albüm")" />
+    <PageHeader Title="@Texts.Get("nav.app.hr.gallery")" Icon="image" Subtitle="@(page is null ? Texts.Get("hr.gallery.intro") : Texts.Get("hr.gallery.count", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -19,13 +19,13 @@
         <section class="summary-card mb-3" aria-label="@WarehouseLabels.Text(selected, "title")">
             <div class="list-toolbar mb-1">
                 <h2 class="h6 mb-0 me-auto">@WarehouseLabels.Text(selected, "title")</h2>
-                <button type="button" class="btn btn-outline-secondary" @onclick="() => selected = null">Kapat</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => selected = null">@Texts.Get("common.close")</button>
             </div>
             @if (WarehouseLabels.Text(selected, "description") is { Length: > 0 } description)
             {
                 <p class="preline">@description</p>
             }
-            <AlbumPhotos @key="selected.Id" AlbumId="selected.Id" Title="@(WarehouseLabels.Text(selected, "title") ?? "Albüm")" />
+            <AlbumPhotos @key="selected.Id" AlbumId="selected.Id" Title="@(WarehouseLabels.Text(selected, "title") ?? Texts.Get("hr.gallery.album"))" />
         </section>
     }
 
@@ -35,11 +35,11 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Henüz yayında albüm yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("hr.gallery.empty")" />
     }
     else
     {
-        <ul class="profile-cards list-unstyled" aria-label="Albümler">
+        <ul class="profile-cards list-unstyled" aria-label="@Texts.Get("hr.gallery.albums")">
             @foreach (var album in page.Items)
             {
                 <li>
@@ -47,7 +47,7 @@
                             @onclick="() => selected = album">
                         <AppIcon Name="image" Size="20" />
                         <strong>@WarehouseLabels.Text(album, "title")</strong>
-                        <span>@(WarehouseLabels.Text(album, "eventDate") is { Length: > 0 } day ? HrLabels.Date(day) : "Tarihsiz")</span>
+                        <span>@(WarehouseLabels.Text(album, "eventDate") is { Length: > 0 } day ? HrLabels.Date(day) : Texts.Get("hr.gallery.undated"))</span>
                     </button>
                 </li>
             }

@@ -74,14 +74,6 @@ public class ContractRulesTests
     }
 
     [Fact]
-    public void Number_has_prefix_date_and_six_unambiguous_characters()
-    {
-        var number = ContractRules.NewNumber(new DateTimeOffset(2026, 10, 31, 12, 0, 0, TimeSpan.Zero));
-        Assert.Matches("^SZ-20261031-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$", number);
-        Assert.NotEqual(number, ContractRules.NewNumber(new DateTimeOffset(2026, 10, 31, 12, 0, 0, TimeSpan.Zero)));
-    }
-
-    [Fact]
     public void Binding_effective_statuses_are_awaiting_start_active_and_suspended()
     {
         Assert.True(EffectiveStatus.IsBinding(EffectiveStatus.AwaitingStart));

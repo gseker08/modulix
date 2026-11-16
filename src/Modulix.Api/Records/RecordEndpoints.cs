@@ -90,27 +90,11 @@ public static class RecordEndpoints
     }
 
     /// <summary>Sayfa ve arama dışındaki sorgu parametreleri filtredir (ör. ?companyId=...); boş değerler yok sayılır.</summary>
-    internal static IReadOnlyDictionary<string, string>? FiltersFrom(HttpRequest http)
-    {
-        var filters = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (key, values) in http.Query)
-        {
-            if (key is not ("page" or "pageSize" or "search") && values.LastOrDefault() is { Length: > 0 } value)
-            {
-                filters[key] = value;
-            }
-        }
+    /// <summary>Uygulama <see cref="RecordRequests"/>'tedir (modül uç noktalarıyla ortak, ADR-0046); host içi çağrılar için bırakıldı.</summary>
+    internal static IReadOnlyDictionary<string, string>? FiltersFrom(HttpRequest http) => RecordRequests.FiltersFrom(http);
 
-        return filters.Count == 0 ? null : filters;
-    }
-
-    /// <summary>Güncelleme ve silme kaydın okunan sürümünü ister; sürümsüz istek son yazanın ezmesine yol açacağı için 428 alır.</summary>
-    internal static IResult VersionRequired() =>
-        LocalizedProblems.Problem(
-            StatusCodes.Status428PreconditionRequired,
-            ServerMessages.Record.VersionRequiredTitle,
-            ServerMessages.Record.VersionRequiredDetail,
-            new Dictionary<string, object?> { ["code"] = "VersionRequired" });
+    /// <summary>Uygulama <see cref="RecordRequests"/>'tedir; host içi çağrılar için bırakıldı.</summary>
+    internal static IResult VersionRequired() => RecordRequests.VersionRequired();
 
     private static RecordResponse ToResponse(RecordData data) => new(data.EntityKey, data.Id, data.Version, data.Values);
 
