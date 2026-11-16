@@ -9,15 +9,15 @@
 }
 @if (files is null)
 {
-    <p class="text-muted" role="status">Fotoğraflar yükleniyor…</p>
+    <LoadingState />
 }
 else if (files.Count == 0)
 {
-    <EmptyState Compact="true" Title="Bu albümde henüz fotoğraf yok." />
+    <EmptyState Compact="true" Title="@Texts.Get("hr.album-photos.empty")" />
 }
 else
 {
-    <ul class="profile-cards list-unstyled" aria-label="@($"{Title} fotoğrafları")">
+    <ul class="profile-cards list-unstyled" aria-label="@Texts.Get("hr.album-photos.label", Title ?? Texts.Get("hr.gallery.album"))">
         @foreach (var file in files)
         {
             <li class="profile-card">
@@ -27,7 +27,7 @@ else
                 }
                 else if (IsImage(file))
                 {
-                    <span role="status">Yükleniyor…</span>
+                    <span role="status">@Texts.Get("common.loading")</span>
                 }
                 <a href="@($"/api/files/{file.Id}/content")" download="@file.FileName"><AppIcon Name="@(IsImage(file) ? "image" : "file-text")" Size="16" /> @file.FileName</a>
             </li>
@@ -45,7 +45,8 @@ else
 
     [Parameter, EditorRequired] public Guid AlbumId { get; set; }
 
-    [Parameter] public string Title { get; set; } = "Albüm";
+    /// <summary>Albümün adı (erişilebilir etiket); boşsa "Albüm".</summary>
+    [Parameter] public string? Title { get; set; }
 
     /// <summary>Değişince liste yeniden yüklenir (ör. yönetim ekranında fotoğraf eklenip silindikçe).</summary>
     [Parameter] public int Revision { get; set; }

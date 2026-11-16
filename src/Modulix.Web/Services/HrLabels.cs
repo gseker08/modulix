@@ -39,6 +39,20 @@ public static class HrLabels
         : WarehouseLabels.Text(record, "audienceDepartmentKey") is { Length: > 0 } legacy ? lookups.Label(HrAccess.DepartmentList, legacy)
         : Everyone;
 
+    /// <summary>
+    /// Blog yazısının durum etiketi ve rozeti (ADR-0042 bölüm 27; ADR-0034 aşama 4, İK dilim 19a): metin sözlükten (<c>hr.blog-status.&lt;değer&gt;</c>),
+    /// sözlük yoksa Türkçe kaynak (<see cref="HrAccess.BlogStatus"/>).
+    /// </summary>
+    public static (string Label, string Badge) BlogStatus(string? status)
+    {
+        var (label, badge) = HrAccess.BlogStatus(status);
+        return (Texts.GetOr($"hr.blog-status.{(status is null or "" ? "draft" : status.ToLowerInvariant())}", label), badge);
+    }
+
+    /// <summary>Yayın durumu metni ve rozeti (albüm, duyuru): yayında başarı tonu, taslak nötr ton.</summary>
+    public static (string Label, string Badge) Published(bool published) =>
+        published ? (Texts.GetOr("hr.content.published", "Yayında"), "status-customer") : (Texts.GetOr("hr.content.draft", "Taslak"), "status-inactive");
+
     public static string Date(string? iso) => FleetLabels.Day(iso) is { } day ? FleetLabels.Date(day) : "—";
 
     /// <summary>Çalışanın adı soyadı (kişi kaydından gelen hesaplanan alan).</summary>

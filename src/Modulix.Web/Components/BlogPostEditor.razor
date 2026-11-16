@@ -9,16 +9,16 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Post is null ? "Yeni yazı" : "Blog yazısı")</h2>
+            <h2>@(Post is null ? Texts.Get("hr.blog-form.new") : Texts.Get("hr.blog-form.title"))</h2>
             @if (Post is not null && WarehouseLabels.Text(Post, "publishedAt") is { Length: > 0 } published && DateTimeOffset.TryParse(published, out var at))
             {
-                <p>Yayın: @at.LocalDateTime.ToString("dd.MM.yyyy HH:mm")</p>
+                <p>@Texts.Get("hr.blog-form.published-at", at.LocalDateTime.ToString("dd.MM.yyyy HH:mm"))</p>
             }
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">@Texts.Get("common.save")</button>
         </div>
     </div>
 
@@ -31,7 +31,7 @@
         <div class="alert alert-danger" role="alert">@layoutError</div>
     }
 
-    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Blog yazısı bölümleri">
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("hr.blog-form.sections")">
         <Field Context="f">
             @switch (f.Key)
             {
@@ -44,7 +44,7 @@
                     <label class="@f.LabelClass()" for="post-summary">@f.Label</label>
                     <textarea id="post-summary" class="form-control" rows="2" maxlength="500" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Summary"></textarea>
                     <FieldError Field="summary" Errors="errors" />
-                    <small class="text-muted">Listede başlığın altında görünür.</small>
+                    <small class="text-muted">@Texts.Get("hr.blog-form.summary-help")</small>
                     break;
                 case "body":
                     <label class="@f.LabelClass()" for="post-body">@f.Label</label>
@@ -97,7 +97,7 @@
             }
             : new PostForm();
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     private async Task SaveAsync()

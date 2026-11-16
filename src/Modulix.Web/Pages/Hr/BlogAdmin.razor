@@ -5,13 +5,13 @@
 @inject CrmLookups Lookups
 @inject ToastService Toasts
 
-<PageTitle>Blog yönetimi · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.blog-admin") · Modulix</PageTitle>
 
 @* Blog yönetimi (ADR-0042 dilim 8): taslak ve yayındaki bütün yazılar; yazma, yayınlama, ek ekleme ve silme. Okurlar yazıları "Blog" ekranında
    görür. Çalışanların onaya gönderdiği yazılar "Onay bekleyen" görünümündedir; açılan yazıda onaylanıp yayınlanır ya da gerekçeyle geri çevrilir
    (bölüm 27). *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.BlogManage">
-    <PageHeader Title="Blog yönetimi" Icon="file-text" Subtitle="@(page is null ? "Kurum içi yazıları hazırlayın ve yayınlayın." : $"{page.TotalCount} yazı")" />
+    <PageHeader Title="@Texts.Get("nav.app.hr.blog-admin")" Icon="file-text" Subtitle="@(page is null ? Texts.Get("hr.blog-admin.intro") : Texts.Get("hr.blog.count", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -27,20 +27,20 @@
         <BlogPostEditor @key="selected?.Id" Post="selected" Lookups="Lookups" Saved="SavedAsync" Cancelled="Close" />
         @if (selected is not null)
         {
-            <AttachmentPanel EntityKey="@HrAccess.BlogPostEntityKey" RecordId="selected.Id" CanWrite="true" Title="Ekler" EmptyText="Bu yazının eki yok." />
+            <AttachmentPanel EntityKey="@HrAccess.BlogPostEntityKey" RecordId="selected.Id" CanWrite="true" Title="@Texts.Get("hr.content.attachments")" EmptyText="@Texts.Get("hr.blog.attachments-empty")" />
         }
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Blog görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("hr.blog-admin.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Yazı ara" placeholder="Başlık ya da metinde ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("hr.blog-admin.search-label")" placeholder="@Texts.Get("hr.blog.search-placeholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (!editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni yazı</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("hr.blog-form.new")</button>
         }
     </div>
 
@@ -53,20 +53,20 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan yazı yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("hr.blog-admin.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) yazı listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("hr.blog-admin.listed", page.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Blog yazıları</caption>
+            <caption class="visually-hidden">@Texts.Get("hr.blog.posts")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -78,8 +78,8 @@
                             @Cell(column, post)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{WarehouseLabels.Text(post, "title")} eylemleri")">
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(post)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                            <RowMenu Label="@Texts.Get("hr.content.row-actions", WarehouseLabels.Text(post, "title"))">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(post)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                 <RowMenuDelete OnConfirm="() => DeleteAsync(post)" />
                             </RowMenu>
                         </td>
@@ -97,12 +97,12 @@
     private const string AllViews = "all";
 
     // Sıralama anahtarları kayıt deposunun beyanıdır (BlogPostRecordStore.SortKeys).
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("title", "Başlık", "file-text", "title", "-title", Locked: true),
-        new("author", "Yazan", "user"),
-        new("publishedAt", "Yayın", "calendar", "publishedAt", "-publishedAt"),
-        new("status", "Durum", "tag"),
+        new("title", Texts.Get("hr.content.col.title"), "file-text", "title", "-title", Locked: true),
+        new("author", Texts.Get("hr.blog.col.author"), "user"),
+        new("publishedAt", Texts.Get("hr.blog.col.published-at"), "calendar", "publishedAt", "-publishedAt"),
+        new("status", Texts.Get("common.field.status"), "tag"),
     ];
 
     private readonly GridViewState grid = new("hr.blog-admin", "-publishedAt");
@@ -120,10 +120,10 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new("all", "Tüm yazılar", Icon: "list"),
-        new("status=submitted", "Onay bekleyen", Icon: "clock"),
-        new("isPublished=true", "Yayında", Icon: "file-text"),
-        new("isPublished=false", "Yayında olmayan", Icon: "pencil"),
+        new("all", Texts.Get("hr.blog-admin.view.all"), Icon: "list"),
+        new("status=submitted", Texts.Get("hr.blog.view.submitted"), Icon: "clock"),
+        new("isPublished=true", HrLabels.Published(true).Label, Icon: "file-text"),
+        new("isPublished=false", Texts.Get("hr.blog-admin.view.unpublished"), Icon: "pencil"),
         .. views.Options,
     ];
 
@@ -223,7 +223,7 @@
         "title" => @<text>@WarehouseLabels.Text(record, "title")</text>,
         "author" => @<text>@(WarehouseLabels.Id(record, "authorUserId") is { } author ? Lookups.MemberName(author) : "—")</text>,
         "publishedAt" => @<text>@(DateTimeOffset.TryParse(WarehouseLabels.Text(record, "publishedAt"), out var at) ? at.LocalDateTime.ToString("dd.MM.yyyy") : "—")</text>,
-        "status" => @<span class="badge @HrAccess.BlogStatus(WarehouseLabels.Text(record, "status")).Badge">@HrAccess.BlogStatus(WarehouseLabels.Text(record, "status")).Label</span>,
+        "status" => @<span class="badge @HrLabels.BlogStatus(WarehouseLabels.Text(record, "status")).Badge">@HrLabels.BlogStatus(WarehouseLabels.Text(record, "status")).Label</span>,
         _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.BlogPostEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
             @<text>@CustomFieldText.Format(field, record.Values["custom"] as JsonObject)</text>,
         _ => @<text></text>,
@@ -260,7 +260,7 @@
     {
         // Karar verilen yazı kapanır: onay kuyruğundan çıkar.
         Close();
-        Toasts.Success(WarehouseLabels.Text(post, "status") == "published" ? "Yazı yayınlandı." : "Yazı yazarına geri çevrildi.");
+        Toasts.Success(Texts.Get(WarehouseLabels.Text(post, "status") == "published" ? "hr.blog-admin.published" : "hr.blog-admin.returned"));
         await LoadAsync(page?.Page ?? 1);
     }
 
