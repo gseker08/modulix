@@ -292,6 +292,7 @@ public static class RecordsSetup
         services.AddScoped<IAuditWriter, EfAuditWriter>();
         services.AddScoped<IDomainEventOutbox, EfDomainEventOutbox>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+        services.AddScoped<IRecordExportAudit, RecordExportAudit>();
         services.AddScoped<IRecordStoreRegistry, RecordStoreRegistry>();
         services.AddScoped<ISharedReferenceMerger, SharedReferenceMerger>();
         services.AddScoped<RecordCommandContext>();

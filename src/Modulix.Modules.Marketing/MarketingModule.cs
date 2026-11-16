@@ -1,7 +1,10 @@
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Marketing.Contracts;
+using Modulix.Modules.Marketing.Endpoints;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
@@ -19,7 +22,7 @@ namespace Modulix.Modules.Marketing;
 /// kayıttır, başka modüllerin alanları yalnızca <see cref="Modulix.Modules.Marketing.Contracts.ISegmentFieldSource"/> sözleşmesiyle kullanılır. İzin ve
 /// engel kararı çekirdeğin <see cref="Core.Contracts.Communication.ICommunicationPreferences"/> sözleşmesindedir; bu modül tercihin sahibi değildir.
 /// </summary>
-public sealed class MarketingModule : IModule
+public sealed class MarketingModule : IModule, IModuleEndpoints
 {
     public const string ModuleKey = "marketing";
 
@@ -328,9 +331,13 @@ public sealed class MarketingModule : IModule
             with { LegacySection = "MarketingSend", BusyInterval = TimeSpan.FromSeconds(2) },
     ];
 
+    /// <summary>Pazarlama uç noktaları (<c>/api/marketing</c>) modüldedir (ADR-0046); grup host tarafından açılır.</summary>
+    public void MapEndpoints(IEndpointRouteBuilder routes) => MarketingEndpoints.MapEndpoints(routes);
+
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddScoped<MarketingSenderAnchor>();
+        services.AddScoped<IMarketingPolicyProvider, MarketingPolicyProvider>();
         services.AddScoped<MarketingSendJob>();
         services.AddSingleton<MarketingSendErrors>();
         services.AddScoped<MarketingStoreContext>();
