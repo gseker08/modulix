@@ -56,6 +56,7 @@ public static class LeadScoring
         new("contacts", "Gerçekleşen temas sayısı", FieldKind.Count, (_, b) => Number(b.Contacts)),
         new("meetings", "Yapılan toplantı sayısı", FieldKind.Count, (_, b) => Number(b.Meetings)),
         new("repeatInquiries", "Tekrar başvuru sayısı", FieldKind.Count, (_, b) => Number(b.RepeatInquiries)),
+        new("inactiveDays", "Hareketsiz gün sayısı", FieldKind.Count, (_, b) => Number(b.InactiveDays)),
     ];
 
     private static readonly Dictionary<string, ScoreField> ByKey = Fields.ToDictionary(f => f.Key, StringComparer.Ordinal);
@@ -129,10 +130,12 @@ public static class LeadScoring
 ///   <item><see cref="Contacts"/>: adaya bağlı, tamamlanmış ve gerçekleşmiş temas sayılan aktiviteler (<see cref="LeadRules.CountsAsContact"/>).</item>
 ///   <item><see cref="Meetings"/>: bunların toplantı olanları.</item>
 ///   <item><see cref="RepeatInquiries"/>: aynı e-posta ya da telefonla gelen diğer müşteri adayları (durumu ne olursa olsun).</item>
+///   <item><see cref="InactiveDays"/> (dilim 3): son gerçekleşen temastan, temas yoksa adayın oluşturulmasından bu yana geçen tam gün. Eksi puanlı
+///   "en az N gün" kuralı zamanla azalmayı ifade eder; gün geçtikçe değiştiği için toplu yeniden puanlama işi yansıtır.</item>
 /// </list>
 /// Özel (gizli) aktiviteler sayılmaz: puan, aktiviteyi göremeyen kullanıcıya varlığını sezdirmesin.
 /// </summary>
-public sealed record LeadBehavior(int Contacts, int Meetings, int RepeatInquiries)
+public sealed record LeadBehavior(int Contacts, int Meetings, int RepeatInquiries, int InactiveDays = 0)
 {
     public static LeadBehavior None { get; } = new(0, 0, 0);
 }
