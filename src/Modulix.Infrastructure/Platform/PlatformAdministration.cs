@@ -360,7 +360,7 @@ internal sealed class PlatformAdministration(
 
     public async Task SetModuleAsync(
         Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken,
-        EntitlementTerms? terms = null, string? reason = null)
+        EntitlementTerms? terms = null, string? reason = null, bool checkDependencies = true)
     {
         if (!catalog.ContainsModule(moduleKey) || ModuleCatalog.IsAlwaysEnabled(moduleKey))
         {
@@ -398,6 +398,13 @@ internal sealed class PlatformAdministration(
 
         var tenant = await db.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId, cancellationToken);
         var after = enabled ? before.Append(moduleKey) : before.Where(m => m != moduleKey);
+        if (checkDependencies)
+        {
+            // Zorunlu bağımlılık (ADR-0051): sağlayanı kapalı modül açılmaz, bağımlısı açık modül kapatılmaz. Önceden var olan
+            // ihlal bu değişikliği engellemez.
+            ModuleDependencyRules.EnsureRequiredSatisfied(catalog, after, nameof(moduleKey), ignore: before);
+        }
+
         var beforeAudit = new JsonObject { ["modules"] = ModuleList(before) };
         var afterAudit = new JsonObject { ["modules"] = ModuleList(after) };
         if (terms is not null)
@@ -830,6 +837,9 @@ internal sealed class PlatformAdministration(
         {
             throw new ArgumentException($"Açılamayan modül: {string.Join(", ", unknown)}.", "modules");
         }
+
+        // Yeni firma, zorunlu bağımlılığı eksik modülle kurulmaz (ADR-0051).
+        ModuleDependencyRules.EnsureRequiredSatisfied(catalog, modules, "modules");
 
         // Katalog sırasıyla; tekrarlar bir kez sayılır.
         return [.. catalog.Modules.Select(m => m.Key).Where(modules.Contains)];
