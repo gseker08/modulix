@@ -4,12 +4,12 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Süreç şablonları · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.checklist-templates") · Modulix</PageTitle>
 
 @* İşe giriş/çıkış şablonları (ADR-0042 dilim 5): şablon ve adımları (başlık, sorumlu, gün farkı, görev türü). Şablon değişikliği yalnızca sonra
    başlatılan süreçleri etkiler; kullanılmış şablon silinmez, pasife alınır. *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.ChecklistsManage">
-    <PageHeader Title="Süreç şablonları" Icon="clipboard-list" Subtitle="@(templates is null ? "İşe giriş ve işten çıkış adımlarını tanımlayın." : $"{templates.TotalCount} şablon")" />
+    <PageHeader Title="@Texts.Get("nav.app.hr.checklist-templates")" Icon="clipboard-list" Subtitle="@(templates is null ? Texts.Get("hr.checklist-templates.intro") : Texts.Get("hr.checklist-templates.count", templates.TotalCount))" />
 
     @if (message is not null)
     {
@@ -28,42 +28,42 @@
             }
 
             <div class="list-toolbar mt-3">
-                <h3 class="h6 mb-0 me-auto">Adımlar</h3>
+                <h3 class="h6 mb-0 me-auto">@Texts.Get("hr.checklist-templates.steps")</h3>
                 @if (!editingItem)
                 {
-                    <button type="button" class="btn btn-tonal" @onclick="() => OpenItem(null)"><AppIcon Name="plus" Size="16" /> Adım ekle</button>
+                    <button type="button" class="btn btn-tonal" @onclick="() => OpenItem(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("hr.checklist-templates.add-step")</button>
                 }
             </div>
             @if (items is null || items.Count == 0)
             {
-                <EmptyState Compact="true" Title="Henüz adım yok." Text="Süreç başlatmak için en az bir adım ekleyin." />
+                <EmptyState Compact="true" Title="@Texts.Get("hr.checklist-templates.steps-empty")" Text="@Texts.Get("hr.checklist-templates.steps-empty-help")" />
             }
             else
             {
                 <table class="table record-table">
-                    <caption class="visually-hidden">Şablon adımları</caption>
+                    <caption class="visually-hidden">@Texts.Get("hr.checklist-templates.steps-caption")</caption>
                     <thead>
                         <tr>
-                            <th scope="col"><AppIcon Name="hash" Size="14" /> Sıra</th>
-                            <th scope="col"><AppIcon Name="check-circle" Size="14" /> Adım</th>
-                            <th scope="col"><AppIcon Name="user-check" Size="14" /> Sorumlu</th>
-                            <th scope="col"><AppIcon Name="calendar" Size="14" /> Gün farkı</th>
-                            <th scope="col"><AppIcon Name="tag" Size="14" /> Tür</th>
-                            <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                            <th scope="col"><AppIcon Name="hash" Size="14" /> @Texts.Get("hr.checklist-templates.col.sequence")</th>
+                            <th scope="col"><AppIcon Name="check-circle" Size="14" /> @Texts.Get("hr.checklist-templates.col.step")</th>
+                            <th scope="col"><AppIcon Name="user-check" Size="14" /> @Texts.Get("hr.checklist-templates.col.responsible")</th>
+                            <th scope="col"><AppIcon Name="calendar" Size="14" /> @Texts.Get("hr.checklist-templates.col.offset")</th>
+                            <th scope="col"><AppIcon Name="tag" Size="14" /> @Texts.Get("common.field.kind")</th>
+                            <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var item in items)
                         {
                             <tr>
-                                <td data-label="Sıra">@WarehouseLabels.Number(item, "sequence")</td>
-                                <td data-label="Adım" class="primary">@WarehouseLabels.Text(item, "title")</td>
-                                <td data-label="Sorumlu">@HrLabels.Responsible(WarehouseLabels.Text(item, "responsibleRole"))</td>
-                                <td data-label="Gün farkı">@WarehouseLabels.Number(item, "dueOffsetDays")</td>
-                                <td data-label="Tür">@HrLabels.TaskType(WarehouseLabels.Text(item, "taskType"))</td>
+                                <td data-label="@Texts.Get("hr.checklist-templates.col.sequence")">@WarehouseLabels.Number(item, "sequence")</td>
+                                <td data-label="@Texts.Get("hr.checklist-templates.col.step")" class="primary">@WarehouseLabels.Text(item, "title")</td>
+                                <td data-label="@Texts.Get("hr.checklist-templates.col.responsible")">@HrLabels.Responsible(WarehouseLabels.Text(item, "responsibleRole"))</td>
+                                <td data-label="@Texts.Get("hr.checklist-templates.col.offset")">@WarehouseLabels.Number(item, "dueOffsetDays")</td>
+                                <td data-label="@Texts.Get("common.field.kind")">@HrLabels.TaskType(WarehouseLabels.Text(item, "taskType"))</td>
                                 <td class="row-menu-cell">
                                     <RowMenu Label="@($"{WarehouseLabels.Text(item, "title")} eylemleri")">
-                                        <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenItem(item)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle</span></button>
+                                        <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenItem(item)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
                                         <RowMenuDelete OnConfirm="() => DeleteItemAsync(item)" />
                                     </RowMenu>
                                 </td>
@@ -75,16 +75,16 @@
         }
     }
 
-    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Şablon görünümleri" NewView="StartNaming" NewViewText="Görünüm" />
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="@Texts.Get("hr.checklist-templates.views")" NewView="StartNaming" />
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Şablon ara" placeholder="Şablon adı ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("hr.checklist-templates.search")" placeholder="@Texts.Get("hr.checklist-templates.search-placeholder")" @bind="search" />
         </form>
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
         @if (!editing)
         {
-            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> Yeni şablon</button>
+            <button type="button" class="btn btn-primary" @onclick="() => Open(null)"><AppIcon Name="plus" Size="16" /> @Texts.Get("hr.checklist-templates.new")</button>
         }
     </div>
 
@@ -97,20 +97,20 @@
     }
     else if (templates.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Bu görünüme uyan şablon yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("hr.checklist-templates.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(templates.TotalCount) şablon listelendi.</p>
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("hr.checklist-templates.listed", templates.TotalCount)</p>
         <table class="table record-table">
-            <caption class="visually-hidden">Süreç şablonları</caption>
+            <caption class="visually-hidden">@Texts.Get("nav.app.hr.checklist-templates")</caption>
             <thead>
                 <tr>
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
                     }
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -122,8 +122,8 @@
                             @Cell(column, template)
                         }
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{WarehouseLabels.Text(template, "name")} eylemleri")">
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(template)"><AppIcon Name="pencil" Size="16" /> <span>Düzenle ve adımlar</span></button>
+                            <RowMenu Label="@Texts.Get("hr.content.row-actions", WarehouseLabels.Text(template, "name"))">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(template)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("hr.checklist-templates.edit-steps")</span></button>
                                 <RowMenuDelete OnConfirm="() => DeleteAsync(template)" />
                             </RowMenu>
                         </td>
@@ -141,12 +141,12 @@
     private const string AllViews = "all";
 
     // Sıralama anahtarları kayıt deposunun beyanıdır (ChecklistTemplateRecordStore.SortKeys); varsayılan sıra tür, sonra ad.
-    private static readonly GridColumnDef[] BaseColumns =
+    private static GridColumnDef[] BaseColumns =>
     [
-        new("name", "Ad", "clipboard-list", "name", "-name", Locked: true),
-        new("kind", "Tür", "tag", "kind", "-kind"),
-        new("description", "Açıklama", "type", DefaultVisible: false),
-        new("active", "Durum", "check-circle"),
+        new("name", Texts.Get("hr.assets.col.name"), "clipboard-list", "name", "-name", Locked: true),
+        new("kind", Texts.Get("common.field.kind"), "tag", "kind", "-kind"),
+        new("description", Texts.Get("common.field.description"), "type", DefaultVisible: false),
+        new("active", Texts.Get("common.field.status"), "check-circle"),
     ];
 
     private readonly GridViewState grid = new("hr.checklist-templates", "kind");
@@ -167,10 +167,10 @@
 
     private IReadOnlyList<ViewOption> ViewOptions =>
     [
-        new(AllViews, "Tüm şablonlar", Icon: "list"),
-        new("onboarding", "İşe giriş", Icon: "user-check"),
-        new("offboarding", "İşten çıkış", Icon: "log-out"),
-        new("inactive", "Pasif", Icon: "x"),
+        new(AllViews, Texts.Get("hr.checklist-templates.view.all"), Icon: "list"),
+        new("onboarding", HrLabels.ChecklistKind("onboarding"), Icon: "user-check"),
+        new("offboarding", HrLabels.ChecklistKind("offboarding"), Icon: "log-out"),
+        new("inactive", WarehouseLabels.ActiveText(false), Icon: "x"),
         .. views.Options,
     ];
 
@@ -280,7 +280,7 @@
         "name" => @<text>@WarehouseLabels.Text(template, "name")</text>,
         "kind" => @<text>@HrLabels.ChecklistKind(WarehouseLabels.Text(template, "kind"))</text>,
         "description" => @<text>@(WarehouseLabels.Text(template, "description") is { Length: > 0 } d ? d : "—")</text>,
-        "active" => @<span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(template, "isActive", true))">@(WarehouseLabels.Flag(template, "isActive", true) ? "Etkin" : "Pasif")</span>,
+        "active" => @<span class="badge @WarehouseLabels.ActiveBadge(WarehouseLabels.Flag(template, "isActive", true))">@WarehouseLabels.ActiveText(WarehouseLabels.Flag(template, "isActive", true))</span>,
         _ when key.StartsWith("custom.", StringComparison.Ordinal) && Lookups.FieldsOf(HrAccess.ChecklistTemplateEntityKey).FirstOrDefault(f => "custom." + f.Key == key) is { } field =>
             @<text>@CustomFieldText.Format(field, template.Values["custom"] as JsonObject)</text>,
         _ => @<text></text>,
