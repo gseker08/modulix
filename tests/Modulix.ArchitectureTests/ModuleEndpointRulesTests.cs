@@ -24,6 +24,8 @@ public partial class ModuleEndpointRulesTests
             "Herkese açık memnuniyet anketi: bağlantı belirteciyle, hız sınırı ve gövde sınırıyla; sistem kimliği support.survey yalnızca talebi okur.",
         ["Modulix.Modules.Support/Endpoints/SupportChannelEndpoints.cs: /answer"] =
             "Herkese açık memnuniyet anketi yanıtı: bağlantı belirteciyle, hız sınırıyla; salt okunur lisansta yazılamaz (IPublicTenantScopes write).",
+        ["Modulix.Modules.Contracts/Endpoints/ContractSignatureEndpoints.cs: /contracts/signature/{provider}/events"] =
+            "İmza sağlayıcısı webhook'u: kimlik doğrulama HMAC-SHA256 imzası ve zaman damgasıdır; hız ve gövde sınırı var; sistem kimliği contracts.signature-webhook.",
     };
 
     [Fact]

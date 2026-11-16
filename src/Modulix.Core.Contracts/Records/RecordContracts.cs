@@ -208,6 +208,9 @@ public sealed class RecordResult<T>
     /// <summary>Çevrilebilir iletiyle hata (<see cref="ServerMessages"/>).</summary>
     public static RecordResult<T> Fail(RecordErrorCode code, ServerMessage message, IReadOnlyList<RecordFieldError>? fieldErrors = null) =>
         new(default, new RecordError(code, message, fieldErrors));
+
+    /// <summary>Başka bir sonucun hatasını (ileti anahtarı ve alan hatalarıyla birlikte) olduğu gibi taşır.</summary>
+    public static RecordResult<T> Fail(RecordError error) => new(default, error);
 }
 
 /// <summary>Kayıtlara erişimin tek yolu. Adımlar: tenant → lisans → yetki → veri kapsamı → doğrulama → kayıt → audit → olay.</summary>

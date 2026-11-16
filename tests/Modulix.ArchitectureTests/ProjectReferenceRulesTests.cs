@@ -31,7 +31,7 @@ public class ProjectReferenceRulesTests
         ["Modulix.Infrastructure"] = ["Modulix.Core", CoreContracts],
         ["Modulix.Modules.Crm"] = [CoreContracts, CrmContracts, MarketingContracts],
         ["Modulix.Modules.Logistics"] = [CoreContracts, CoreHosting, Shared, FleetContracts],
-        ["Modulix.Modules.Contracts"] = [CoreContracts, CrmContracts],
+        ["Modulix.Modules.Contracts"] = [CoreContracts, CoreHosting, Shared, CrmContracts],
         ["Modulix.Modules.Orders"] = [CoreContracts, CoreHosting, Shared, CrmContracts],
         ["Modulix.Modules.Support"] = [CoreContracts, CoreHosting, Shared],
         ["Modulix.Modules.Marketing"] = [CoreContracts, CoreHosting, Shared, CrmContracts, MarketingContracts],

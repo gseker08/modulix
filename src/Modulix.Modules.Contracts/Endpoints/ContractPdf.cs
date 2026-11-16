@@ -4,7 +4,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
-namespace Modulix.Api.Contracts;
+namespace Modulix.Modules.Contracts.Endpoints;
 
 /// <summary>
 /// Sözleşme belgesi (PDF) çizici (ADR-0022, dilim 4). Girdisi yalnızca render edilmiş bloklardır (<see cref="ContractPdfModel"/>): canlı sözleşme,
