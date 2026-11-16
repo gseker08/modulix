@@ -92,6 +92,12 @@ public sealed class MarketingModule : IModule
 
     public string DisplayName => "Pazarlama";
 
+    /// <summary>Alıcıları ve segment alanlarını bugün yalnızca CRM sağlar; CRM olmadan Pazarlama açılamaz (ADR-0051).</summary>
+    public IReadOnlyList<ModuleDependency> Dependencies { get; } =
+    [
+        new ModuleDependency("crm", ModuleDependencyKind.Required, "Kampanya alıcıları, segment alanları ve yanıttan müşteri adayı"),
+    ];
+
     IReadOnlyList<PermissionDefinition> IModule.Permissions { get; } =
     [
         new(Permissions.SegmentsRead, "Segmentleri ve sürümlerini görüntüler; koşul önizlemesinde sayı alır", "Segmentler"),

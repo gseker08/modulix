@@ -118,7 +118,7 @@ Elle denemek için Visual Studio'da `src/Modulix.Api/Modulix.Api.http` dosyasın
 
 ## Modüller, roller ve izinler (Görev E4)
 
-Her modül kendini tek bir `IModule` uygulamasıyla tanıtır (`Modulix.Core.Contracts.Modules`): anahtar (ör. `crm`), ad ve izin listesi. İzin anahtarları modül anahtarıyla başlar (`crm.companies.read`). Modüller `src/Modulix.Api/Program.cs` içinde `AddModulixModules(...)` ile kaydedilir; kaydedilmeyen modül mimari testi kırar.
+Her modül kendini tek bir `IModule` uygulamasıyla tanıtır (`Modulix.Core.Contracts.Modules`): anahtar (ör. `crm`), ad ve izin listesi. İzin anahtarları modül anahtarıyla başlar (`crm.companies.read`). Modüller `src/Modulix.Api/Program.cs` içinde `AddModulixModules(...)` ile kaydedilir; kaydedilmeyen modül mimari testi kırar. Başka bir modüle ihtiyaç duyan modül bunu `IModule.Dependencies` ile beyan eder ([ADR-0051](docs/adr/0051-modul-bagimlilik-beyani.md)): zorunlu (sağlayan olmadan açılamaz) ya da isteğe bağlı (belirtilen özellik eksik kalır). Beyan açılışta doğrulanır (bozuk anahtar, `core`, tekrar ve zorunlu bağımlılıklarda döngü uygulamayı açtırmaz); başka modülün sözleşme projesine beyansız başvuru ve var olmayan modüle beyan mimari testi kırar. Bugünkü beyanlar: Sipariş → CRM, Sözleşme → CRM, Lojistik → Filo (isteğe bağlı), Pazarlama → CRM (zorunlu). Beyan henüz modül hakkı yazılırken denetlenmiyor (ADR-0051 dilim 2).
 
 | Kavram | Nerede | Kural |
 | --- | --- | --- |
