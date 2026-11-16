@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Contracts.Sales;
@@ -254,27 +255,28 @@ internal static class QuoteOwnerEmails
     public const string ExpiredReference = "crm.quote-expired:";
     public const string ApprovalReminderReference = "crm.quote-approval-reminder:";
 
-    public static EmailMessage ApprovalReminder(NotificationRecipient to, Quote quote, string? link) => Build(
-        to, quote, $"Onayınızı bekleyen teklif: {OneLine(quote.QuoteNumber)}",
-        $"\"{OneLine(quote.Title)}\" başlıklı {quote.QuoteNumber} numaralı teklif iç onayınızı bekliyor; henüz karar verilmedi.",
+    public static EmailMessage ApprovalReminder(LocalizedTexts t, NotificationRecipient to, Quote quote, string? link) => Build(
+        t, to, t.Get("email.quote.approval-reminder.subject", OneLine(quote.QuoteNumber)),
+        t.Get("email.quote.approval-reminder.body", OneLine(quote.Title), quote.QuoteNumber),
         link, ApprovalReminderReference + quote.Id.ToString("N"));
 
-    public static EmailMessage ExpiryReminder(NotificationRecipient to, Quote quote, string? link) => Build(
-        to, quote, $"Teklif süresi doluyor: {OneLine(quote.QuoteNumber)}",
-        $"\"{OneLine(quote.Title)}\" başlıklı {quote.QuoteNumber} numaralı teklifin geçerliliği {Date(quote.ValidUntil)} tarihinde sona eriyor; müşteri henüz karar vermedi.",
+    public static EmailMessage ExpiryReminder(LocalizedTexts t, NotificationRecipient to, Quote quote, string? link) => Build(
+        t, to, t.Get("email.quote.expiry-reminder.subject", OneLine(quote.QuoteNumber)),
+        t.Get("email.quote.expiry-reminder.body", OneLine(quote.Title), quote.QuoteNumber, Date(quote.ValidUntil)),
         link, ReminderReference + quote.Id.ToString("N"));
 
-    public static EmailMessage Expired(NotificationRecipient to, Quote quote, string? link) => Build(
-        to, quote, $"Teklif süresi doldu: {OneLine(quote.QuoteNumber)}",
-        $"\"{OneLine(quote.Title)}\" başlıklı {quote.QuoteNumber} numaralı teklifin geçerliliği {Date(quote.ValidUntil)} tarihinde doldu ve teklif \"süresi doldu\" durumuna alındı. Gerekirse yeni revizyon açabilirsiniz.",
+    public static EmailMessage Expired(LocalizedTexts t, NotificationRecipient to, Quote quote, string? link) => Build(
+        t, to, t.Get("email.quote.expired.subject", OneLine(quote.QuoteNumber)),
+        t.Get("email.quote.expired.body", OneLine(quote.Title), quote.QuoteNumber, Date(quote.ValidUntil)),
         link, ExpiredReference + quote.Id.ToString("N"));
 
-    private static EmailMessage Build(NotificationRecipient to, Quote quote, string subject, string body, string? link, string reference)
+    // Alıcının dilinde (ADR-0034 §6, dilim 18b); metin düz yazıdır, HTML'e kodlanarak girer.
+    private static EmailMessage Build(LocalizedTexts t, NotificationRecipient to, string subject, string body, string? link, string reference)
     {
-        var greeting = $"Merhaba {to.DisplayName},";
-        var html = $"<p>{Encode(greeting)}</p><p>{Encode(body)}</p>" + (link is null ? string.Empty : $"<p><a href=\"{Encode(link)}\">Teklifi aç</a></p>");
-        var text = string.Join("\n\n", new[] { greeting, body, link is null ? null : $"Teklifi aç: {link}" }.Where(p => p is not null));
-        return new EmailMessage(to.Email, subject, html) { ToName = to.DisplayName, TextBody = text, Reference = reference };
+        var greeting = t.Get("email.common.greeting", to.DisplayName);
+        var html = $"<p>{Encode(greeting)}</p><p>{Encode(body)}</p>" + (link is null ? string.Empty : $"<p><a href=\"{Encode(link)}\">{Encode(t.Get("email.quote.open"))}</a></p>");
+        var text = string.Join("\n\n", new[] { greeting, body, link is null ? null : t.Get("email.quote.open-text", link) }.Where(p => p is not null));
+        return new EmailMessage(to.Email, subject, html) { ToName = to.DisplayName, TextBody = text, Reference = reference, Language = t.Language };
     }
 
     private static string Date(DateTimeOffset? value) => value is { } v ? v.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) : "—";
@@ -300,7 +302,7 @@ public interface IQuoteExpiry
 
 internal sealed class QuoteExpiry(
     IRecordPipeline pipeline, QuoteWorkflowGate gate, QuoteReader reader, QuoteMarkers markers, IEmailQueue emails, INotificationRecipients recipients,
-    IQuotePolicyProvider? policyProvider = null) : IQuoteExpiry
+    IRecipientLanguage languages, IQuotePolicyProvider? policyProvider = null) : IQuoteExpiry
 {
     private const int BatchSize = 200;
     private static readonly string[] DecisionPermissions = [CrmModule.Permissions.QuotesRecordDecision];
@@ -325,7 +327,7 @@ internal sealed class QuoteExpiry(
             if (result.IsSuccess)
             {
                 expired++;
-                await NotifyOwnerAsync(quote, owner => QuoteOwnerEmails.Expired(owner, quote, recipients.Link($"crm/teklifler/{quote.Id}")), cancellationToken);
+                await NotifyOwnerAsync(quote, (t, owner) => QuoteOwnerEmails.Expired(t, owner, quote, recipients.Link($"crm/teklifler/{quote.Id}")), cancellationToken);
             }
 
             // Sürüm çakışması (aynı anda kabul/iptal/revizyon) hata değildir: o teklif zaten başka bir kararla sonuçlanmıştır.
@@ -365,7 +367,7 @@ internal sealed class QuoteExpiry(
                 if (created is { IsSuccess: true, Value: true })
                 {
                     reminders++;
-                    await NotifyOwnerAsync(quote, owner => QuoteOwnerEmails.ExpiryReminder(owner, quote, recipients.Link($"crm/teklifler/{quote.Id}")), cancellationToken);
+                    await NotifyOwnerAsync(quote, (t, owner) => QuoteOwnerEmails.ExpiryReminder(t, owner, quote, recipients.Link($"crm/teklifler/{quote.Id}")), cancellationToken);
                 }
                 else if (!created.IsSuccess)
                 {
@@ -413,7 +415,7 @@ internal sealed class QuoteExpiry(
                 {
                     try
                     {
-                        emails.Enqueue(QuoteOwnerEmails.ApprovalReminder(to, quote, link));
+                        emails.Enqueue(QuoteOwnerEmails.ApprovalReminder(await languages.ForUserAsync(to.UserId, cancellationToken), to, quote, link));
                         delivered++;
                     }
                     catch (ArgumentException)
@@ -433,7 +435,7 @@ internal sealed class QuoteExpiry(
     }
 
     /// <summary>Sorumluya e-posta; sorumlu yoksa ya da etkin üye değilse sessizce atlanır. Bildirim hatası işin sonucunu bozmaz.</summary>
-    private async Task NotifyOwnerAsync(Quote quote, Func<NotificationRecipient, EmailMessage> build, CancellationToken cancellationToken)
+    private async Task NotifyOwnerAsync(Quote quote, Func<LocalizedTexts, NotificationRecipient, EmailMessage> build, CancellationToken cancellationToken)
     {
         if (quote.OwnerId is not { } ownerId || await recipients.FindAsync(ownerId, cancellationToken) is not { } owner)
         {
@@ -442,7 +444,7 @@ internal sealed class QuoteExpiry(
 
         try
         {
-            emails.Enqueue(build(owner));
+            emails.Enqueue(build(await languages.ForUserAsync(owner.UserId, cancellationToken), owner));
         }
         catch (ArgumentException)
         {

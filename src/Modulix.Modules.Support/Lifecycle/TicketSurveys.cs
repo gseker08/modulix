@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -31,7 +32,7 @@ internal static class SurveyTokens
 /// Anket bağlantısı <c>App:PublicUrl</c> ayarlıysa e-postaya girer; ayarlı değilse anket oluşur ama e-posta yazılmaz (<see cref="SatisfactionSurvey.QueuedAt"/> boş kalır, bu dürüstçe görünür).
 /// Belirteç yalnızca burada, bir kez üretilir.
 /// </summary>
-internal sealed class SurveyIssuer(SupportReader reader, IEmailQueue emails, INotificationRecipients links, ITenantContextAccessor tenant)
+internal sealed class SurveyIssuer(SupportReader reader, IEmailQueue emails, INotificationRecipients links, ITenantContextAccessor tenant, IRecipientLanguage languages)
 {
     public async Task IssueAsync(SupportStoreContext context, SupportTicket ticket, TicketPolicySettings settings, CancellationToken cancellationToken)
     {
@@ -66,16 +67,21 @@ internal sealed class SurveyIssuer(SupportReader reader, IEmailQueue emails, INo
         {
             try
             {
-                var greeting = string.IsNullOrWhiteSpace(name) ? "Merhaba," : $"Merhaba {name.Trim()},";
-                var text = $"{greeting}\n\n{ticket.Number} numaralı talebiniz çözüldü. Deneyiminizi 1-5 arası puanlamanız bizim için değerli.\n\nAnket: {url}\n\nBu bağlantı size özeldir ve {survey.ExpiresAt:dd.MM.yyyy} tarihine kadar geçerlidir.";
-                var html = $"<p>{WebUtility.HtmlEncode(greeting)}</p><p>{WebUtility.HtmlEncode(ticket.Number)} numaralı talebiniz çözüldü. Deneyiminizi 1-5 arası puanlamanız bizim için değerli.</p>"
-                    + $"<p><a href=\"{WebUtility.HtmlEncode(url)}\">Anketi yanıtla</a></p>"
-                    + $"<p style=\"color:#666\">Bu bağlantı size özeldir ve {survey.ExpiresAt:dd.MM.yyyy} tarihine kadar geçerlidir.</p>";
-                emails.Enqueue(new EmailMessage(address, $"[{ticket.Number}] Deneyiminizi puanlayın", html)
+                // Müşterinin hesabı yoktur: firmanın varsayılan dili (ADR-0034 §6, dilim 18b).
+                var t = await languages.ForExternalAsync(cancellationToken);
+                var greeting = string.IsNullOrWhiteSpace(name) ? t.Get("email.common.greeting-anonymous") : t.Get("email.common.greeting", name.Trim());
+                var body = t.Get("email.survey.body", ticket.Number);
+                var footer = t.Get("email.survey.footer", survey.ExpiresAt.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture));
+                var text = $"{greeting}\n\n{body}\n\n{t.Get("email.survey.action-text", url)}\n\n{footer}";
+                var html = $"<p>{WebUtility.HtmlEncode(greeting)}</p><p>{WebUtility.HtmlEncode(body)}</p>"
+                    + $"<p><a href=\"{WebUtility.HtmlEncode(url)}\">{WebUtility.HtmlEncode(t.Get("email.survey.action"))}</a></p>"
+                    + $"<p style=\"color:#666\">{WebUtility.HtmlEncode(footer)}</p>";
+                emails.Enqueue(new EmailMessage(address, t.Get("email.survey.subject", ticket.Number), html)
                 {
                     ToName = string.IsNullOrWhiteSpace(name) ? null : name.Trim(),
                     TextBody = text,
                     Reference = $"support.survey:{survey.Id}",
+                    Language = t.Language,
                 });
                 survey.QueuedAt = context.Time.GetUtcNow();
             }

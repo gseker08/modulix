@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Support.Domain;
@@ -53,7 +54,8 @@ internal sealed class TicketMessages(
     TicketWorkflowGate gate,
     ICurrentAccess access,
     SupportReader reader,
-    IEmailQueue emailQueue) : ITicketMessages
+    IEmailQueue emailQueue,
+    IRecipientLanguage languages) : ITicketMessages
 {
     private const string Key = SupportModule.Entities.Ticket;
 
@@ -208,12 +210,16 @@ internal sealed class TicketMessages(
 
         try
         {
+            // Müşterinin hesabı yoktur: firmanın varsayılan dili (ADR-0034 §6, dilim 18b). Yanıt metni personelin yazdığı gibi kalır.
+            var t = await languages.ForExternalAsync(cancellationToken);
+            var number = t.Get("email.ticket.number", ticket.Number);
             var encoded = WebUtility.HtmlEncode(body).Replace("\r\n", "\n").Replace("\n", "<br />");
-            emailQueue.Enqueue(new EmailMessage(address, $"[{ticket.Number}] {ticket.Subject}", $"<p>{encoded}</p><p>Talep no: {WebUtility.HtmlEncode(ticket.Number)}</p>")
+            emailQueue.Enqueue(new EmailMessage(address, $"[{ticket.Number}] {ticket.Subject}", $"<p>{encoded}</p><p>{WebUtility.HtmlEncode(number)}</p>")
             {
                 ToName = name,
-                TextBody = $"{body}\n\nTalep no: {ticket.Number}",
+                TextBody = $"{body}\n\n{number}",
                 Reference = $"support.reply:{ticket.Id}",
+                Language = t.Language,
             });
             return DeliveryStatus.Queued;
         }

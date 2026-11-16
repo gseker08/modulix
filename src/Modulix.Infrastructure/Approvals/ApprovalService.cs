@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Approvals;
 using Modulix.Core.Contracts.Approvals;
 using Modulix.Core.Contracts.Calendar;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -29,6 +30,7 @@ internal sealed class ApprovalService(
     IRecordPipeline pipeline,
     ModuleCatalog modules,
     ITenantWorkCalendar workCalendar,
+    IRecipientLanguage languages,
     TimeProvider time) : IApprovalService, IApprovalStatusReader, IApprovalGate
 {
     private const int TrendDays = 14;
@@ -509,7 +511,8 @@ internal sealed class ApprovalService(
                         userId, "approval.overdue", $"{request.DefinitionName} sürecinde adımın süresi geçti", CenterPath(request), $"approval:{step.Id}:overdue"), cancellationToken);
                     if (await recipients.FindAsync(userId, cancellationToken) is { } person)
                     {
-                        Send(person, $"Süresi geçti: {request.Title}", $"<strong>{Encode(request.Title)}</strong> talebinin <strong>{Encode(step.Name)}</strong> adımının süresi geçti, kararınız bekleniyor.", recipients.Link(CenterPath(request)), request);
+                        await SendAsync(person, t => (t.Get("email.approval.overdue.subject", request.Title), t.Get("email.approval.overdue.body-html", Encode(request.Title), Encode(step.Name))),
+                            recipients.Link(CenterPath(request)), request, cancellationToken);
                     }
                 }
             }
@@ -1005,7 +1008,8 @@ internal sealed class ApprovalService(
                     userId, "approval.waiting", $"{request.DefinitionName} sürecinde kararınız bekleniyor", CenterPath(request), $"approval:{step.Id}:waiting"), cancellationToken);
                 if (await recipients.FindAsync(userId, cancellationToken) is { } person)
                 {
-                    Send(person, $"Onayınız bekleniyor: {request.Title}", $"<strong>{Encode(request.DefinitionName)}</strong> sürecinde <strong>{Encode(request.Title)}</strong> talebi kararınızı bekliyor (adım: {Encode(step.Name)}).", link, request);
+                    await SendAsync(person, t => (t.Get("email.approval.waiting.subject", request.Title),
+                        t.Get("email.approval.waiting.body-html", Encode(request.DefinitionName), Encode(request.Title), Encode(step.Name))), link, request, cancellationToken);
                 }
             }
         }
@@ -1020,15 +1024,20 @@ internal sealed class ApprovalService(
             request.RequesterId, "approval.result", $"{request.DefinitionName} talebiniz {outcome}", CenterPath(request), $"approval:{request.Id}:result"), cancellationToken);
         if (await recipients.FindAsync(request.RequesterId, cancellationToken) is { } person)
         {
-            string result = request.Status == ApprovalRequestStatus.Approved ? "onaylandı" : "reddedildi";
-            Send(person, $"Talebiniz {result}: {request.Title}", $"<strong>{Encode(request.Title)}</strong> talebiniz {result}.", recipients.Link($"onaylar?talep={request.Id}"), request);
+            string result = request.Status == ApprovalRequestStatus.Approved ? "approved" : "rejected";
+            await SendAsync(person, t => (t.Get($"email.approval.{result}.subject", request.Title), t.Get($"email.approval.{result}.body-html", Encode(request.Title))),
+                recipients.Link($"onaylar?talep={request.Id}"), request, cancellationToken);
         }
     }
 
-    private void Send(NotificationRecipient person, string subject, string html, string? link, ApprovalRequest request)
+    // E-posta alıcının dilinde yazılır (ADR-0034 §6, dilim 18b); HTML'e giren kullanıcı girdisi çağıranda kodlanır.
+    private async Task SendAsync(
+        NotificationRecipient person, Func<LocalizedTexts, (string Subject, string Html)> content, string? link, ApprovalRequest request, CancellationToken cancellationToken)
     {
-        string body = link is null ? $"<p>{html}</p>" : $"<p>{html}</p><p><a href=\"{Encode(link)}\">Onay merkezinde aç</a></p>";
-        emails.Enqueue(new EmailMessage(person.Email, subject, body) { ToName = person.DisplayName, Reference = $"core.approval:{request.Id}" });
+        LocalizedTexts t = await languages.ForUserAsync(person.UserId, cancellationToken);
+        (string subject, string html) = content(t);
+        string body = link is null ? $"<p>{html}</p>" : $"<p>{html}</p><p><a href=\"{Encode(link)}\">{Encode(t.Get("email.approval.open"))}</a></p>";
+        emails.Enqueue(new EmailMessage(person.Email, subject, body) { ToName = person.DisplayName, Reference = $"core.approval:{request.Id}", Language = t.Language });
     }
 
     private static string Encode(string text) => WebUtility.HtmlEncode(text);
