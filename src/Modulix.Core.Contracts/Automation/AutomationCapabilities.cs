@@ -17,6 +17,12 @@ public sealed record AutomationEntityDefinition(string EntityKey, string Display
     public Type? RecordSource { get; init; }
 
     /// <summary>
+    /// Kayıt deposunun okuma izni <see cref="ReadPermission"/>'dan farklıysa (ör. depo okumada "okuma", taslağı görmek için "yönetim" izni ister):
+    /// kuralın kimliği iki izni birlikte taşır, kural kurmak için kullanıcının da ikisine sahip olması gerekir. Boşsa yalnızca <see cref="ReadPermission"/>.
+    /// </summary>
+    public string? RecordReadPermission { get; init; }
+
+    /// <summary>
     /// Kayıt seçicide (kuralı bir kayıt üzerinde denemek, elle çalıştırmak) kaydı tanıtan alanın adı (ör. "title"). Kayıt türünün beyan
     /// edilmiş bir <b>metin</b> alanı olmalıdır; boşsa seçici kaydı yalnızca kısa kimliğiyle gösterir. Kullanıcı alanı göremiyorsa
     /// (<see cref="AutomationFieldDefinition.ReadPermission"/>) katalog etiket alanını vermez.

@@ -586,7 +586,7 @@ Bölüm 27'de kapsam dışı bırakılan bildirimler, İK'nın bildirim düzeniy
   - `hr.blog-review-notify`: yazı onaya gönderilince bildirir. Alıcı kayıtta olmadığı için firma taslakta seçer (`ToComplete`); seçilmeden kural yayınlanamaz.
   - `hr.blog-returned-notify`: yazı geri çevrilince yazara bildirir. Gerekçe bildirimde değil, yazıda görülür.
   - `hr.blog-published-notify`: yazı yayınlanınca (onayla ya da doğrudan) yazara bildirir.
-- **Kuralın kimliği:** blog deposu okumada `hr.blog.read`, taslak ve onay bekleyen yazıyı görmek için `hr.blog.manage` ister. Otomasyon kayıt türünün izni `hr.blog.manage`'dir; blog alanları (`title`, `isPublished`, `status`, `authorUserId`) `hr.blog.read` okuma iznini taşır. Bu alanları kullanan kural (şablonların hepsi başlığı kullanır) iki izinle çalışır; yoksa kural kaydı okuyamaz ve bildirim gitmez (ilk CI çalışmasında yakalandı).
+- **Kuralın kimliği:** blog deposu okumada `hr.blog.read`, taslak ve onay bekleyen yazıyı görmek için `hr.blog.manage` ister. Otomasyon kayıt türünün izni `hr.blog.manage`'dir; ilk düzeltmede blog alanları `hr.blog.read` okuma iznini taşıyordu, bölüm 29'da bu kayıt türü düzeyine (`RecordReadPermission`) taşındı: her blog kuralı iki izinle çalışır; yoksa kural kaydı okuyamaz ve bildirim gitmez (ilk CI çalışmasında yakalandı).
 - **Yetki:** Core bildirimi alıcı kaydı kendi yetkisiyle göremiyorsa göndermez. Onay bildiriminin alıcısı olarak yönetim izni olmayan biri seçilirse onay bekleyen taslağı göremez ve bildirim almaz.
 
 ### Test sonuçları (bölüm 28)
@@ -596,3 +596,30 @@ Bölüm 27'de kapsam dışı bırakılan bildirimler, İK'nın bildirim düzeniy
 | `dotnet test tests/Modulix.Modules.Hr.Tests` | 65/65 geçti (şablon sayısı, bildirime bağlanabilen alanlar, alıcısı taslakta seçilen tek şablon, blog kurallarının kimliği okuma ve yönetim iznini taşır: alan izni geri alınınca kırılıyor) |
 | `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Core.Tests` | 111/111 / 1067/1067 geçti |
 | `HrAutomationTests` (1 yeni entegrasyon testi, 1 genişletilen) | **Bütün şablonlar** gerçek yayın doğrulamasından geçer (alıcı seçilerek). **Blog bildirimleri:** alıcı seçilmeden yayın reddedilir; onaya gönderilen yazı seçilen yönetene bildirilir; geri çevirme ve yayın yazara bildirilir. **Yetki:** yazıyı göremeyen alıcıya bildirim gitmez. **Tenant izolasyonu:** B firmasında bildirim yoktur. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır; ilk çalışmada kuralın kaydı okuyamadığını yakaladı). |
+
+## 29. İçerik kurallarının kayıt okuma izni (16 Kasım 2026)
+
+**Bulunan açık:** bölüm 28'de blog için yakalanan sorun duyuru, anket ve fotoğraf albümünde de vardı. Kural kaydı boru hattından okur. Boru hattı deponun okuma iznini ister:
+- duyuru: `hr.announcements.read`
+- anket: `hr.surveys.respond`
+- albüm: `hr.gallery.read`
+
+Kuralın kimliği ise yalnızca otomasyon kayıt türünün yönetim iznini (`.manage`) taşıyordu. Bu türlerde kurulan her kural kaydı okuyamıyor, "Kayıt kuralın kimliğiyle okunamadı." ile başarısız oluyordu. Alan kullanmayan kurallar da etkileniyordu.
+
+**Çözüm (Core, genel):**
+- `AutomationEntityDefinition.RecordReadPermission`: deponun okuma izni kayıt türünün izninden farklıysa beyan edilir.
+- `AutomationRuleIdentity` bu izni kuralın kimliğine ekler. Kural, taslağı da görmek için yönetim iznini ve depo için okuma iznini birlikte taşır.
+- Kural kataloğu kayıt türünü yalnızca iki izne de sahip kullanıcıya gösterir. Kural kurma, yayın ve çalışma aynı denetimden geçtiği için kimse sahip olmadığı izinle kural kuramaz.
+- Katalog beyanı izni modülün izinlerinde arar.
+- Diğer modüller değişmez (alan boş).
+
+**İK:** duyuru, anket, blog ve albüm `RecordReadPermission` beyan eder. Bölüm 28'deki blog alanı izinleri kaldırıldı; kayıt türü düzeyi bunu kapsar.
+
+### Test sonuçları (bölüm 29)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Core.Tests` | 1070/1070 geçti. `AutomationRecordReadPermissionTests` (3 yeni): alan kullanmayan kuralın kimliği iki izni taşır; izni olmayan kullanıcı kayıt türünü görmez; modülün olmayan izin beyanı reddedilir. |
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 68/68 geçti. Dört içerik türü için alansız kuralın kimliği okuma ve yönetim iznini birlikte taşır. |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Crm.Tests` | 111/111 / 311/311 geçti |
+| `HrAutomationTests` (1 yeni entegrasyon testi) | **Mutlu yol:** alan kullanmayan duyuru kuralı taslak duyuruyu okur ve bildirim yazar. **Tenant izolasyonu:** B firmasında bildirim yoktur. **Yetki:** okuma izni olmayan kural yöneticisi duyuru üzerinde kural kuramaz ya da yayınlayamaz. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |

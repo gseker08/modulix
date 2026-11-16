@@ -84,9 +84,16 @@ public static class AutomationRuleIdentity
         ArgumentNullException.ThrowIfNull(modules);
 
         var permissions = new HashSet<string>(StringComparer.Ordinal);
-        if (modules.FindAutomationEntity(entityKey)?.Entity.ReadPermission is { } entityRead)
+        if (modules.FindAutomationEntity(entityKey)?.Entity is { } entity)
         {
-            permissions.Add(entityRead);
+            // Kayıt türünün izni ve (farklıysa) kayıt deposunun okuma izni: kural kaydı boru hattından okuyabilmeli.
+            foreach (var read in new[] { entity.ReadPermission, entity.RecordReadPermission })
+            {
+                if (read is not null)
+                {
+                    permissions.Add(read);
+                }
+            }
         }
 
         // Erişimi sahip kayda bağlı tür (süreli belge): sahip türlerinin okuma izinleri; yayınlayanın hepsine sahip olduğu katalogda denetlenmiştir.

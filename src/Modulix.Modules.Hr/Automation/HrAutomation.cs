@@ -69,10 +69,23 @@ public static class HrAutomation
             new(HrModule.Entities.ExpenseClaim, "Masraf beyanı", HrModule.Permissions.ExpensesRead) { LabelField = "title" },
             new(HrModule.Entities.AssetAssignment, "Zimmet", HrModule.Permissions.AssetsRead) { RecordSource = typeof(HrAutomationRecordSource), LabelField = "assetTag" },
             new(HrModule.Entities.ChecklistTask, "Süreç görevi", HrModule.Permissions.ChecklistsRead) { RecordSource = typeof(HrAutomationRecordSource), LabelField = "title" },
-            new(HrModule.Entities.Announcement, "Duyuru", HrModule.Permissions.AnnouncementsManage) { LabelField = "title" },
-            new(HrModule.Entities.Survey, "Anket", HrModule.Permissions.SurveysManage) { LabelField = "title" },
-            new(HrModule.Entities.BlogPost, "Blog yazısı", HrModule.Permissions.BlogManage) { LabelField = "title" },
-            new(HrModule.Entities.PhotoAlbum, "Fotoğraf albümü", HrModule.Permissions.GalleryManage) { LabelField = "title" },
+            // İçerik türleri: kural taslağı da görmek için yönetim izniyle çalışır; depo okumada okuma iznini ayrıca ister (bölüm 29).
+            new(HrModule.Entities.Announcement, "Duyuru", HrModule.Permissions.AnnouncementsManage)
+            {
+                LabelField = "title", RecordReadPermission = HrModule.Permissions.AnnouncementsRead,
+            },
+            new(HrModule.Entities.Survey, "Anket", HrModule.Permissions.SurveysManage)
+            {
+                LabelField = "title", RecordReadPermission = HrModule.Permissions.SurveysRespond,
+            },
+            new(HrModule.Entities.BlogPost, "Blog yazısı", HrModule.Permissions.BlogManage)
+            {
+                LabelField = "title", RecordReadPermission = HrModule.Permissions.BlogRead,
+            },
+            new(HrModule.Entities.PhotoAlbum, "Fotoğraf albümü", HrModule.Permissions.GalleryManage)
+            {
+                LabelField = "title", RecordReadPermission = HrModule.Permissions.GalleryRead,
+            },
         ],
         Events =
         [
@@ -174,24 +187,17 @@ public static class HrAutomation
             {
                 Options = [new(Survey.Statuses.Draft, "Taslak"), new(Survey.Statuses.Open, "Yanıta açık"), new(Survey.Statuses.Closed, "Kapalı")],
             },
-            // Blog alanları okuma iznini taşır (bölüm 28): kayıt deposu okumada "blog okuma" ister, taslağı görmek için "blog yönetimi" (kayıt türünün
-            // izni) gerekir. Alan kullanan kuralın kimliği ikisine de sahip olur; yoksa kural kaydı okuyamaz.
-            new(HrModule.Entities.BlogPost, "title", "Başlık", AutomationFieldType.Text) { ReadPermission = HrModule.Permissions.BlogRead },
-            new(HrModule.Entities.BlogPost, "isPublished", "Yayında", AutomationFieldType.Boolean) { ReadPermission = HrModule.Permissions.BlogRead },
+            new(HrModule.Entities.BlogPost, "title", "Başlık", AutomationFieldType.Text),
+            new(HrModule.Entities.BlogPost, "isPublished", "Yayında", AutomationFieldType.Boolean),
             new(HrModule.Entities.BlogPost, "status", "Durum", AutomationFieldType.Choice)
             {
-                ReadPermission = HrModule.Permissions.BlogRead,
                 Options =
                 [
                     new(BlogPost.Statuses.Draft, "Taslak"), new(BlogPost.Statuses.Submitted, "Onay bekliyor"),
                     new(BlogPost.Statuses.Returned, "Geri çevrildi"), new(BlogPost.Statuses.Published, "Yayında"),
                 ],
             },
-            new(HrModule.Entities.BlogPost, "authorUserId", "Yazan", AutomationFieldType.Lookup)
-            {
-                ReadPermission = HrModule.Permissions.BlogRead,
-                LookupKey = NotifyRecipientLookup,
-            },
+            new(HrModule.Entities.BlogPost, "authorUserId", "Yazan", AutomationFieldType.Lookup) { LookupKey = NotifyRecipientLookup },
             new(HrModule.Entities.PhotoAlbum, "title", "Başlık", AutomationFieldType.Text),
             new(HrModule.Entities.PhotoAlbum, "isPublished", "Yayında", AutomationFieldType.Boolean),
         ],
