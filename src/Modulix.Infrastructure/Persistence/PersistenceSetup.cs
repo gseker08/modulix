@@ -162,6 +162,7 @@ public static class PersistenceSetup
         services.AddScoped<IReportCenter, ReportCenter>();
         services.AddScoped<ReportAccessStamp>();
         services.AddScoped<IReportExports, ReportExports>();
+        services.AddScoped<Modulix.Core.Contracts.Reporting.IReportTableExports, ReportTableExports>();
         services.AddScoped<IReportSchedules, ReportSchedules>();
         services.AddScoped<CustomFieldService>();
         services.AddScoped<ICustomFieldService>(sp => sp.GetRequiredService<CustomFieldService>());

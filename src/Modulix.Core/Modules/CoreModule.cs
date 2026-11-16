@@ -76,7 +76,7 @@ public sealed class CoreModule : IModule
         public const string ManageApprovals = "core.approvals.manage";
 
         /// <summary>Rapor merkezini açar, hazır ve paylaşılan raporları çalıştırır (ADR-0035, dilim 3). Veri erişimi vermez: her rapor çalıştıranın kayıt yetkisiyle çalışır.</summary>
-        public const string ReadReports = "core.reports.read";
+        public const string ReadReports = Modulix.Core.Contracts.Reporting.ReportPermissions.Read;
 
         /// <summary>Kendi raporlarını oluşturur, düzenler ve siler; rapor oluşturucuyu kullanır.</summary>
         public const string ManageReports = "core.reports.manage";
@@ -85,7 +85,7 @@ public sealed class CoreModule : IModule
         public const string ShareReports = "core.reports.share";
 
         /// <summary>Rapor sonucunu CSV olarak dışa aktarır (ADR-0035, dilim 4). Dosya yalnızca sahibine, indirme anında yetki yeniden denetlenerek verilir.</summary>
-        public const string ExportReports = "core.reports.export";
+        public const string ExportReports = Modulix.Core.Contracts.Reporting.ReportPermissions.Export;
 
         /// <summary>Kendi raporlarını zamanlar; zamanlanmış rapor çalışırken sahibinin yetkisi yeniden denetlenir, yetki kaybında teslim durur.</summary>
         public const string ScheduleReports = "core.reports.schedule";
@@ -298,8 +298,8 @@ public sealed class CoreModule : IModule
         public const string Address = "core.profile.address";
         public const string Phone = "core.profile.phone";
         public const string Email = "core.profile.email";
-        public const string TimeZone = "core.regional.time-zone";
-        public const string Currency = "core.regional.currency";
+        public const string TimeZone = Modulix.Core.Contracts.Settings.RegionalSettingKeys.TimeZone;
+        public const string Currency = Modulix.Core.Contracts.Settings.RegionalSettingKeys.Currency;
         public const string Format = "core.regional.format";
         public const string Language = "core.regional.language";
         public const string RequireTwoFactor = "core.security.require-two-factor";

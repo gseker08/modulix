@@ -1,20 +1,19 @@
 using System.Globalization;
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Reporting;
 using Modulix.Core.Contracts.Settings;
 using Modulix.Core.Contracts.Tenancy;
-using Modulix.Core.Modules;
-using Modulix.Core.Reporting;
-using Modulix.Core.Settings;
-using Modulix.Modules.Crm;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Crm.Reporting;
 using Modulix.Shared.Crm;
 
-namespace Modulix.Api.Crm;
+namespace Modulix.Modules.Crm.Endpoints;
 
 /// <summary>
 /// Satış raporlama ve tahmin uç noktaları (ADR-0035): /api/crm/sales/overview, /api/crm/sales-targets, /api/crm/sales/forecasts. Hepsi kayıt boru hattından geçer:
@@ -39,8 +38,8 @@ internal static class SalesPlanningEndpoints
         // kartı görmek (satış raporları) ve dışa aktarmak (rapor merkezi); indirme rapor merkezinin /api/reports/exports/{id}/download ucundandır.
         sales.MapPost("/overview/cards/{card}/exports", ExportCardAsync)
             .RequirePermission(CrmModule.Permissions.SalesReportsRead)
-            .RequirePermission(CoreModule.Permissions.ReadReports)
-            .RequirePermission(CoreModule.Permissions.ExportReports);
+            .RequirePermission(ReportPermissions.Read)
+            .RequirePermission(ReportPermissions.Export);
 
         var analytics = sales.MapGroup("/analytics");
         analytics.MapGet("/quotes", (string? kind, DateOnly? date, DateOnly? asOf, Guid? ownerId, string? currency, ISalesAnalytics analysis, CancellationToken ct) =>
@@ -79,13 +78,13 @@ internal static class SalesPlanningEndpoints
         }
 
         var result = await overview.BuildAsync(new SalesOverviewQuery(periodKind, date, ownerId, currency), ct);
-        return result.IsSuccess ? Results.Ok(Map<SalesOverviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        return result.IsSuccess ? Results.Ok(Map<SalesOverviewDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
     }
 
     private static async Task<IResult> MyDayAsync(IMyDay myDay, CancellationToken ct)
     {
         var result = await myDay.BuildAsync(ct);
-        return result.IsSuccess ? Results.Ok(Map<MyDayDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        return result.IsSuccess ? Results.Ok(Map<MyDayDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
     }
 
     private static async Task<IResult> CardAsync(string card, string? kind, DateOnly? date, Guid? ownerId, string? currency, ISalesOverview overview, CancellationToken ct)
@@ -101,44 +100,68 @@ internal static class SalesPlanningEndpoints
         }
 
         var result = await overview.DetailAsync(parsed, new SalesOverviewQuery(periodKind, date, ownerId, currency), ct);
-        return result.IsSuccess ? Results.Ok(Map<SalesCardDetailDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        return result.IsSuccess ? Results.Ok(Map<SalesCardDetailDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
     }
 
-    private static Task<IResult> ExportCardAsync(
+    private static async Task<IResult> ExportCardAsync(
         string card, string? kind, DateOnly? date, Guid? ownerId, string? currency, string? format,
-        ISalesOverview overview, IReportExports exports, ITenantMembers members, IChoiceLists choiceLists, TimeProvider time, CancellationToken ct) =>
-        Reports.ReportEndpoints.RunAsync(async () =>
+        ISalesOverview overview, IReportTableExports exports, ITenantMembers members, IChoiceLists choiceLists, TimeProvider time, CancellationToken ct)
+    {
+        if (!Enum.TryParse<SalesCard>(card, ignoreCase: true, out var parsed) || !Enum.IsDefined(parsed) || char.IsDigit(card[0]))
         {
-            if (!Enum.TryParse<SalesCard>(card, ignoreCase: true, out var parsed) || !Enum.IsDefined(parsed) || char.IsDigit(card[0]))
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["card"] = [$"Şunlardan biri olmalıdır: {string.Join(", ", Enum.GetNames<SalesCard>())}."] }, statusCode: StatusCodes.Status422UnprocessableEntity);
-            }
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["card"] = [$"Şunlardan biri olmalıdır: {string.Join(", ", Enum.GetNames<SalesCard>())}."] }, statusCode: StatusCodes.Status422UnprocessableEntity);
+        }
 
-            if (!TryKind(kind, out var periodKind))
-            {
-                return InvalidKind();
-            }
+        if (!TryKind(kind, out var periodKind))
+        {
+            return InvalidKind();
+        }
 
-            if (!Reports.ReportEndpoints.TryFormat(format, out var fileFormat))
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["format"] = ["Biçim csv ya da xlsx olmalıdır."] }, statusCode: StatusCodes.Status400BadRequest);
-            }
+        if (!TryFormat(format, out var fileFormat))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["format"] = ["Biçim csv ya da xlsx olmalıdır."] }, statusCode: StatusCodes.Status400BadRequest);
+        }
 
-            // Ayrıntı, ekrandaki kartla aynı hesaptan ve çağıranın yetkisiyle gelir (izin, veri kapsamı, tutar izni).
-            var detail = await overview.DetailAsync(parsed, new SalesOverviewQuery(periodKind, date, ownerId, currency), ct);
-            if (!detail.IsSuccess)
-            {
-                return RecordEndpoints.ToProblem(detail.Error!);
-            }
+        // Ayrıntı, ekrandaki kartla aynı hesaptan ve çağıranın yetkisiyle gelir (izin, veri kapsamı, tutar izni).
+        var detail = await overview.DetailAsync(parsed, new SalesOverviewQuery(periodKind, date, ownerId, currency), ct);
+        if (!detail.IsSuccess)
+        {
+            return RecordProblems.ToProblem(detail.Error!);
+        }
 
-            var dto = Map<SalesCardDetailDto>(detail.Value!);
-            var owners = (await members.ListActiveAsync(ct)).ToDictionary(m => m.UserId, m => m.DisplayName);
-            var stages = await choiceLists.GetAsync(CrmLists.OpportunityStage, ct);
-            var label = SalesCardExport.Label(parsed);
-            var result = SalesCardExport.Build(dto, owners, stages, label, time.GetUtcNow());
-            var export = await exports.CreateFromResultAsync($"Satış kartı - {label} - {dto.PeriodLabel}", SalesCardExport.DatasetKey, result, fileFormat, ct);
-            return Results.Created($"/api/reports/exports/{export.Id}", Reports.ReportEndpoints.ToDto(export));
-        });
+        var dto = Map<SalesCardDetailDto>(detail.Value!);
+        var owners = (await members.ListActiveAsync(ct)).ToDictionary(m => m.UserId, m => m.DisplayName);
+        var stages = await choiceLists.GetAsync(CrmLists.OpportunityStage, ct);
+        var label = SalesCardExport.Label(parsed);
+        var table = SalesCardExport.Build($"Satış kartı - {label} - {dto.PeriodLabel}", dto, owners, stages, label, time.GetUtcNow());
+        var created = await exports.CreateAsync(table, fileFormat, ct);
+        if (!created.IsSuccess)
+        {
+            return RecordProblems.ToProblem(created.Error!);
+        }
+
+        var e = created.Value!;
+        return Results.Created($"/api/reports/exports/{e.Id}", new Modulix.Shared.Reporting.ReportExportDto(
+            e.Id, e.ReportId, e.ReportName, e.DatasetKey, e.FileName, e.SizeBytes, e.RowCount, e.Truncated, e.Source, e.CreatedAt, e.ExpiresAt, e.DownloadCount, e.Expired));
+    }
+
+    /// <summary>Dosya biçimi: boş ya da "csv" CSV, "xlsx" Excel; başka değer geçersiz (rapor merkezinin kuralıyla aynı).</summary>
+    private static bool TryFormat(string? value, out ReportTableFormat format)
+    {
+        format = ReportTableFormat.Csv;
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "csv", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(value, "xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            format = ReportTableFormat.Xlsx;
+            return true;
+        }
+
+        return false;
+    }
 
     // ---- Analizler
 
@@ -152,7 +175,7 @@ internal static class SalesPlanningEndpoints
         }
 
         var result = await analyze(new AnalyticsQuery(periodKind, date, asOf, ownerId, currency), ct);
-        return result.IsSuccess ? Results.Ok(Map<TDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        return result.IsSuccess ? Results.Ok(Map<TDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
     }
 
     // ---- Tahmin
@@ -160,7 +183,7 @@ internal static class SalesPlanningEndpoints
     private static async Task<IResult> ListAsync(DateOnly? from, DateOnly? to, string? status, IForecastWorkflow workflow, CancellationToken ct)
     {
         var result = await workflow.ListAsync(from, to, status, ct);
-        return result.IsSuccess ? Results.Ok(Map<List<ForecastHeaderDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        return result.IsSuccess ? Results.Ok(Map<List<ForecastHeaderDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
     }
 
     private static async Task<IResult> GetAsync(Guid id, IForecastWorkflow workflow, CancellationToken ct) => Detail(await workflow.GetAsync(id, ct));
@@ -168,7 +191,7 @@ internal static class SalesPlanningEndpoints
     private static async Task<IResult> CompareAsync(Guid id, Guid? against, IForecastWorkflow workflow, CancellationToken ct)
     {
         var result = await workflow.CompareAsync(id, against, ct);
-        return result.IsSuccess ? Results.Ok(Map<ForecastComparisonDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        return result.IsSuccess ? Results.Ok(Map<ForecastComparisonDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
     }
 
     private static async Task<IResult> CreateAsync(CreateForecastRequestDto request, IForecastWorkflow workflow, CancellationToken ct)
@@ -179,7 +202,7 @@ internal static class SalesPlanningEndpoints
         }
 
         var result = await workflow.CreateAsync(new CreateForecastRequest(kind, request.Anchor, request.ScopeType, request.ScopeUserId, request.Currency), ct);
-        return result.IsSuccess ? Results.Created($"/api/crm/sales/forecasts/{result.Value!.Header.Id}", Map<ForecastDetailDto>(result.Value)) : RecordEndpoints.ToProblem(result.Error!);
+        return result.IsSuccess ? Results.Created($"/api/crm/sales/forecasts/{result.Value!.Header.Id}", Map<ForecastDetailDto>(result.Value)) : RecordProblems.ToProblem(result.Error!);
     }
 
     private static async Task<IResult> RefreshAsync(Guid id, ForecastVersionRequestDto request, IForecastWorkflow workflow, CancellationToken ct) =>
@@ -206,11 +229,11 @@ internal static class SalesPlanningEndpoints
     private static async Task<IResult> DeleteAsync(Guid id, long? version, IForecastWorkflow workflow, CancellationToken ct)
     {
         var result = await workflow.DeleteDraftAsync(id, version, ct);
-        return result.IsSuccess ? Results.NoContent() : RecordEndpoints.ToProblem(result.Error!);
+        return result.IsSuccess ? Results.NoContent() : RecordProblems.ToProblem(result.Error!);
     }
 
     private static IResult Detail(RecordResult<ForecastDetail> result) =>
-        result.IsSuccess ? Results.Ok(Map<ForecastDetailDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+        result.IsSuccess ? Results.Ok(Map<ForecastDetailDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
 
     // ---- Yardımcılar
 
@@ -226,15 +249,15 @@ internal static class SalesPlanningEndpoints
     private static T Map<T>(object value) => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(value, Json), Json)!;
 }
 
-/// <summary>Satış raporlama politikasını tenant ayarlarından okur (modül ayar altyapısına erişemez).</summary>
+/// <summary>Satış raporlama politikasını tenant ayarlarından okur (<see cref="ITenantSettingReader"/>, saat dilimi <see cref="ITenantClock"/>); modülün kendi <c>ConfigureServices</c>'inde kaydolur (ADR-0046).</summary>
 internal sealed class SalesReportingPolicyProvider(IServiceProvider services) : ISalesReportingPolicyProvider
 {
     public async Task<SalesReportingPolicy> GetAsync(CancellationToken cancellationToken)
     {
         // Ayar servisi kayıt boru hattını kullanır; kayıt depoları bu sağlayıcıya bağlı olabileceğinden çözümleme gecikmelidir (döngüyü önler).
         var settings = services.GetRequiredService<ITenantSettingReader>();
-        var zone = RegionalTime.Find(await settings.GetValueAsync(CoreModule.SettingKeys.TimeZone, cancellationToken));
-        var currency = (await settings.GetValueAsync(CoreModule.SettingKeys.Currency, cancellationToken)) is { Length: 3 } code ? code.ToUpperInvariant() : RegionalOptions.DefaultCurrency;
+        var zone = (await services.GetRequiredService<ITenantClock>().GetAsync(cancellationToken)).Zone;
+        var currency = (await settings.GetValueAsync(RegionalSettingKeys.Currency, cancellationToken)) is { Length: 3 } code ? code.ToUpperInvariant() : RegionalSettingKeys.DefaultCurrency;
 
         async Task<int> Number(string key, int fallback, int min, int max) =>
             int.TryParse(await settings.GetValueAsync(key, cancellationToken), NumberStyles.None, CultureInfo.InvariantCulture, out var value) && value >= min && value <= max ? value : fallback;
