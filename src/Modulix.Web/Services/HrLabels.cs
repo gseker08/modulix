@@ -6,7 +6,13 @@ namespace Modulix.Web.Services;
 /// <summary>İK ekranlarının etiket ve rozet kuralları. Rozet tonları yalnızca mevcut tasarım sınıflarından seçilir.</summary>
 public static class HrLabels
 {
-    public static string Status(string? key) => HrAccess.Statuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Çalışan durumları; metin sözlükten (<c>hr.employee-status.&lt;değer küçük harf&gt;</c>), yoksa Türkçe kaynak (ADR-0034, İK dilim 19f).</summary>
+    public static IReadOnlyList<(string Key, string Label)> Statuses => WarehouseLabels.Translate("hr.employee-status", HrAccess.Statuses);
+
+    /// <summary>Çalışma şekilleri; metin sözlükten (<c>hr.employment-type.&lt;değer küçük harf&gt;</c>), yoksa Türkçe kaynak.</summary>
+    public static IReadOnlyList<(string Key, string Label)> EmploymentTypes => WarehouseLabels.Translate("hr.employment-type", HrAccess.EmploymentTypes);
+
+    public static string Status(string? key) => Statuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Çalışıyor başarı tonu, izinde dikkat tonu, ayrılan nötr ton.</summary>
     public static string StatusBadge(string? key) => key switch
@@ -16,7 +22,10 @@ public static class HrLabels
         _ => "status-inactive",
     };
 
-    public static string EmploymentType(string? key) => HrAccess.EmploymentTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    public static string EmploymentType(string? key) => EmploymentTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    /// <summary>Unvanı boş çalışan için gösterilen metin.</summary>
+    public static string NoJobTitle => Texts.GetOr("hr.employee.no-title", "Unvan girilmedi");
 
     /// <summary>"yyyy-AA-gg" tarihini gg.AA.yyyy gösterir; boşsa "—".</summary>
     public static string Everyone => Texts.GetOr("hr.audience.everyone", "Herkes");
