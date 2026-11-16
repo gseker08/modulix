@@ -915,6 +915,7 @@ Bu kurallar `tests/Modulix.ArchitectureTests` ile her test çalışmasında dene
 ## Sorun giderme
 
 - **"A compatible .NET SDK was not found"**: `global.json` .NET 10 SDK istiyor. `dotnet --list-sdks` ile kurulu sürümleri kontrol edin.
+- **Razor hatası yalnızca bazı makinelerde (`RZ1006`, `RZ9979`, "The 'section' directive must appear at the start of the line")**: en düşük desteklenen SDK 10.0.100'dür (`global.json`, CI); 10.0.1xx bandının Razor derleyicisi `@section.X` ifadesini ve `@code` içinde satır başındaki `< 0 =>` desenini yeni bantlardan farklı ayrıştırır. `@(section.X)` ve karşılaştırma ifadesi (`x < 0 ? … : …`) yazın; `RazorCompatibilityRulesTests` bunu denetler.
 - **PowerShell betik çalıştırmayı engelliyor**: Komutu yukarıdaki gibi `-ExecutionPolicy Bypass` ile çalıştırın.
 - **Docker "Engine" çalışmıyor**: Docker Desktop'ı açın, "Engine running" yazısını bekleyin.
 - **`.env` silindi, SQL Server artık açılmıyor**: Veritabanı eski şifreyle kalır. Yerel veriyi silip baştan kurmak için `docker compose down -v`, ardından `scripts\db-up.ps1`.
