@@ -53,7 +53,6 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
 
             // Olay işleyicisi de çalışmaz; olay testleri işleyiciyi kendisi çağırır (EventTests).
             .UseSetting("Events:WorkerEnabled", "false")
-            .UseSetting("QuoteExpiry:WorkerEnabled", "false")
             .UseSetting("ContractJobs:WorkerEnabled", "false")
             .UseSetting("Jobs:WorkerEnabled", "false")
             .UseSetting("Automation:WorkerEnabled", "false")
