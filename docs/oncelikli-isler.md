@@ -54,7 +54,7 @@ Kaynaklar: ADR-0046 ve ADR-0049 durum satırları, `core-mimari-degerlendirme-20
 
 | Sıra | İş | Kaynak | Durum |
 |------|----|--------|-------|
-| C1 | Kalan modül işlerinin tek zamanlayıcıya taşınması: Destek → `QuoteExpiry` → `ContractJobs` → `MarketingSend` (iş başına bir PR) | ADR-0046 dilim 4, E3 | Destek yapıldı (15 Kasım); diğer üçü sırada |
+| C1 | Kalan modül işlerinin tek zamanlayıcıya taşınması: Destek → `QuoteExpiry` → `ContractJobs` → `MarketingSend` (iş başına bir PR) | ADR-0046 dilim 4, E3 | Destek (15 Kasım), `QuoteExpiry` ve `ContractJobs` (16 Kasım, tek PR) yapıldı; `MarketingSend` sırada |
 | C2 | Orta modüllerin uç noktaları modüle (Sipariş, Destek, Marketing) | ADR-0046 dilim 5, H3 | Sırada |
 | C3 | Büyük modüllerin uç noktaları modüle (Sözleşme, CRM; CRM birden çok PR) | ADR-0046 dilim 6, H3 | C2'den sonra |
 | C4 | Customs'ın Antrepo'ya taşınması ve Core hazır listelerindeki sektör sözlüğü | ADR-0046 dilim 7, H1, H2 | C3'ten bağımsız başlanabilir |

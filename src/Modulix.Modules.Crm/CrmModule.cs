@@ -1068,7 +1068,7 @@ public sealed class CrmModule : IModule
             [Entities.Activity],
             [Permissions.ActivitiesRead, Permissions.ActivitiesWrite]),
         EventSubscription.For<QuoteExpiryAnchor>(
-            "crm.quote-expiry",
+            QuoteExpiryJob.Identity,
             [DomainEventTypes.RecordDeleted],
             [Entities.Quote],
             [Permissions.QuotesRead, Permissions.QuotesRecordDecision, Permissions.CompaniesRead, Permissions.OpportunitiesRead, Permissions.ActivitiesRead, Permissions.ActivitiesWrite]),
@@ -1083,6 +1083,15 @@ public sealed class CrmModule : IModule
             [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated],
             [Entities.Activity],
             [Permissions.ActivitiesRead, Permissions.ActivitiesViewPrivate, Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite]),
+    ];
+
+    /// <summary>
+    /// Zamanlanmış iş (ADR-0046): host'taki tek zamanlayıcı 5 dakikada bir, CRM modülü yazılabilir olan her tenant için teklif süre dolumu turunu çalıştırır.
+    /// Yapılandırma <c>Jobs:crm.quote-expiry</c>; eski <c>QuoteExpiry</c> bölümü okunmaya devam eder.
+    /// </summary>
+    IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
+    [
+        ModuleJobDefinition.For<QuoteExpiryJob>(QuoteExpiryJob.JobKey, TimeSpan.FromSeconds(300), QuoteExpiryJob.Identity) with { LegacySection = "QuoteExpiry" },
     ];
 
     /// <summary>Tenant ayar anahtarları.</summary>
@@ -1147,6 +1156,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<IQuoteOpportunitySync, QuoteOpportunitySync>();
         services.AddScoped<QuoteLifecycleSubscriber>();
         services.AddScoped<QuoteExpiryAnchor>();
+        services.AddScoped<QuoteExpiryJob>();
         services.AddScoped<IQuoteCustomerPortal, QuoteCustomerPortal>();
         services.AddScoped<QuoteCustomerAnchor>();
         services.AddScoped<IPriceCalculator, PriceCalculator>();

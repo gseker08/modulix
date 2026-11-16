@@ -119,7 +119,7 @@ public class QuoteMultiStepApprovalTests(ModulixApiFactory factory) : IClassFixt
         await PostAsync<QuoteApprovalDelegationDto>(admin, "/api/crm/quote-approval-delegations", new SaveQuoteApprovalDelegationRequest(s.ApproverA.Id, s.Admin.Id));
         await SetSettingAsync(admin, "crm.quote.approval-reminder-hours", "2");
         var quote = await SubmittedQuoteAsync(admin, s.CompanyId);
-        var runner = factory.Services.GetRequiredService<QuoteExpiryRunner>();
+        var runner = new QuoteExpiryRunner(factory.Services);
 
         // Henüz 2 saat geçmedi: hatırlatma yok.
         Assert.Equal(0, (await runner.RunTenantAsync(s.TenantId, CancellationToken.None)).ApprovalRemindersSent);
