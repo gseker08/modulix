@@ -95,7 +95,10 @@ public static class HrLabels
         return (start == end ? start : $"{start} – {end}") + half;
     }
 
-    public static string ExpenseStatus(string? key) => HrAccess.ExpenseStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Masraf beyanı durumları; metin sözlükten (<c>hr.expense-status.&lt;değer&gt;</c>), yoksa Türkçe kaynak (ADR-0034, İK dilim 19e).</summary>
+    public static IReadOnlyList<(string Key, string Label)> ExpenseStatuses => WarehouseLabels.Translate("hr.expense-status", HrAccess.ExpenseStatuses);
+
+    public static string ExpenseStatus(string? key) => ExpenseStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Taslak nötr, onay bekleyen dikkat, onaylanan marka, ödenen başarı, reddedilen kayıp, iptal nötr ton.</summary>
     public static string ExpenseStatusBadge(string? key) => key switch
