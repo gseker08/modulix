@@ -434,6 +434,11 @@ public class AppNavigationTests
             Nav([HrAccess.ModuleKey], [HrAccess.LeavesManage, CoreAccess.ManageHolidays]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
         Assert.Equal("yonetim/resmi-tatiller", Nav([], [CoreAccess.ManageHolidays]).Find("admin.holidays")!.Route);
 
+        // Belge numaraları ekranı (ADR-0049 dilim 2b) yalnızca numaralama izniyle görünür; kuruluş ayarları izni yetmez.
+        Assert.Equal("yonetim/belge-numaralari", Nav([], [CoreAccess.ManageNumbering]).Find("admin.numbering")!.Route);
+        Assert.Contains("Belge numaraları", Nav([], [CoreAccess.ManageNumbering]).MenuEntries(AppCatalog.Admin).Select(e => e.Name));
+        Assert.DoesNotContain("Belge numaraları", Nav([], [CoreAccess.ManageSettings]).MenuEntries(AppCatalog.Admin).Select(e => e.Name));
+
         // Masraf: çalışan "Masraflarım"ı, onaylayan/İK/finans "Masraf beyanları"nı görür.
         Assert.Equal(["Masraflarım"], Nav([HrAccess.ModuleKey], [HrAccess.ExpensesRead, HrAccess.ExpensesRequest]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));
         Assert.Equal(["Masraf beyanları"], Nav([HrAccess.ModuleKey], [HrAccess.ExpensesRead, HrAccess.ExpensesPay]).MenuEntries(AppCatalog.Hr).Select(e => e.Name));

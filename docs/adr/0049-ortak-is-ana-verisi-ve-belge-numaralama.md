@@ -39,7 +39,8 @@ Bu üç kavram Core'a alınır; modüller sözleşme üzerinden kullanır. Dilim
 - **Çakışmazlık:** sayaç seri ve dönem başına tutulduğu için önek ya da basamak değişikliği sayacı sıfırlamaz; sıfırlama değişince dönem değişir (yıllık seride yıl, sıfırlanmayan seride 0). Önek yalnızca büyük harf ve rakam olduğu için iki biçim aynı metni üretemez.
 - **İleri alma:** yalnızca ileri ve yalnızca bu dönemin sayacı açıldıktan sonra. Sayaç yokken ileri almak, modülün geçişte eski numaralardan devam etmek için kullandığı tohumu atlayıp çakışan numara verebilirdi. Güncelleme tek ifadede `LastValue < hedef` koşuluyla yapılır; aynı anda verilen numarayla yarışmaz.
 - **İzin ve denetim:** `core.numbering.manage` (migration'da `core.settings.manage` taşıyan rollere verildi); yapılandırma ve ileri alma `core.number-series` denetim kaydına yazılır. Ayar satırının sürümü iki işlemi de sıraya sokar (409).
-- **Dilim 2b:** Yönetim ekranı (Yönetim > Belge numaraları). **Dilim 2c:** şirket başına seri.
+- **Dilim 2b (teslim edildi):** Yönetim > Belge numaraları ekranı (`/yonetim/belge-numaralari`, `core.numbering.manage`). Seri listesi (modül, sıradaki numara, sıfırlama, firmaya özel mi), çekmecede önek/basamak/sıfırlama ve canlı ön izleme, "Varsayılana dön", bu dönemde numara verildiyse onaylı "Sayacı ileri al". Kurallar 2a'daki sunucu uçlarındadır; ekran yalnızca onları çağırır, çakışmada (409) güncel hâli yükler.
+- **Dilim 2c:** şirket başına seri.
 
 ### Dilim 3: mevcut üreticilerin geçişi (ürün kararı ister)
 
