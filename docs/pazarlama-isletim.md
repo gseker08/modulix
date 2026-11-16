@@ -6,7 +6,7 @@ Bu not kampanya/segment modülünü işleten kişi içindir. Davranışın ayrı
 
 - Gerçek e-posta/SMS/WhatsApp sağlayıcısı **yoktur**. Firma ayarı `marketing.provider` varsayılan "yok"tur; bu durumda çalıştırma başlatılamaz. Seçilebilen tek sağlayıcı iletiyi hiçbir yere göndermeyen test sağlayıcısıdır. Bu sürümde hiçbir ileti müşteriye ulaşmaz.
 - Sağlayıcı bağlanmadan önce: İYS ve KVKK kararları (aydınlatma/rıza metni sürümü, İYS kaydı), `List-Unsubscribe` başlıklarının sağlayıcıda yazılması (RFC 8058), geri dönen ileti ve şikâyet olaylarının (webhook) engel olarak işlenmesi. Bunlar yapılmadan gerçek gönderim açılmamalıdır.
-- **Gönderim işçisi (dilim 10):** kullanıcı bir çalıştırmayı "başlat" ile başlattıktan sonra sıradaki satırları arka plan işçisi gönderir (`MarketingSend:WorkerEnabled`, varsayılan açık). İşçi başlatmaz, onaylamaz; planlanan zamanda kendiliğinden başlama **yoktur**. Elle "sıradaki grubu işle" de çalışmaya devam eder.
+- **Gönderim işçisi (dilim 10):** kullanıcı bir çalıştırmayı "başlat" ile başlattıktan sonra sıradaki satırları arka plan işçisi gönderir (`marketing.send` işi, host'taki tek zamanlayıcıdan; `Jobs:marketing.send:Enabled`, varsayılan açık). Erişime açık (Active ve Trial) firmalarda çalışır. İşçi başlatmaz, onaylamaz; planlanan zamanda kendiliğinden başlama **yoktur**. Elle "sıradaki grubu işle" de çalışmaya devam eder.
 
 ## 2. Gerekli yapılandırma
 
@@ -16,7 +16,7 @@ Bu not kampanya/segment modülünü işleten kişi içindir. Davranışın ayrı
 | `marketing.provider` (firma ayarı) | Varsayılan `none`. |
 | `marketing.frequency.daily-limit` (firma ayarı) | Adres başına günlük pazarlama iletisi sınırı, varsayılan 1; kampanyalar arasında ortak; 0 kapatır. |
 | `marketing.approval.required` (firma ayarı) | Varsayılan evet; hazırlayan kendi çalıştırmasını onaylayamaz. |
-| `MarketingSend:WorkerEnabled` / `PollIntervalSeconds` / `BusyIntervalSeconds` | Gönderim işçisi (varsayılan açık, boşta 15 sn, iş varken 2 sn). `BatchSize` (100), `MaxBatchesPerRun` (5) ve `MaxRunsPerTenant` (5) bir turda bir tenant'ın harcayacağı işi sınırlar. Birden çok uygulama örneği güvenle çalışır. |
+| `Jobs:marketing.send:Enabled` / `IntervalSeconds` / `BusyIntervalSeconds` | Gönderim işi (varsayılan açık, boşta 15 sn, en az 5; iş varken 2 sn, en az 1). Eski `MarketingSend:WorkerEnabled` / `PollIntervalSeconds` / `BusyIntervalSeconds` ve parti ayarları yeni ayar verilmemişse okunur. `Jobs:marketing.send:BatchSize` (100), `MaxBatchesPerRun` (5) ve `MaxRunsPerTenant` (5) bir turda bir tenant'ın harcayacağı işi sınırlar. Birden çok uygulama örneği güvenle çalışır. |
 | `CommunicationPublic:RateLimitPerMinute` | Oturumsuz tercih merkezi uçlarının IP+tenant başına dakikalık sınırı, varsayılan 30. |
 
 ## 3. Ölçülen performans (100.000 sentetik kişi)
