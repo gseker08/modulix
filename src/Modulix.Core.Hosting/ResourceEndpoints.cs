@@ -1,15 +1,18 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Modulix.Api.Access;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Modulix.Core.Contracts.Records;
 using Modulix.Shared.Records;
 
-namespace Modulix.Api.Records;
+namespace Modulix.Core.Hosting;
 
 /// <summary>
 /// Bir modül kaynağının tipli CRUD uç noktaları; her biri tek bir kayıt boru hattı çağrısıdır. Tenant, modül hakkı, izin, doğrulama,
 /// audit ve olay boru hattında uygulanır. Modül tenant için kapalıysa veya izin yoksa 403; başka tenant'ın kaydı 404 döner.
-/// CRM ve sözleşme modülü aynı kalıbı kullanır; yeni bir modül tek satırda kaynak ekler.
+/// CRM ve sözleşme modülü aynı kalıbı kullanır; yeni bir modül tek satırda kaynak ekler. Uç noktası modüle taşınan modül de kullanabilsin diye
+/// <c>Modulix.Api/Records</c>'tan buraya alındı (ADR-0046).
 /// </summary>
 public static class ResourceEndpoints
 {
@@ -19,7 +22,7 @@ public static class ResourceEndpoints
     /// <param name="createPermission">Oluşturma izni; verilmezse yazma izni.</param>
     /// <param name="deletePermission">Silme izni; verilmezse yazma izni.</param>
     public static void MapResource<TDto, TSave>(
-        RouteGroupBuilder group, string apiPrefix, string path, string entityKey, string readPermission, string writePermission,
+        IEndpointRouteBuilder group, string apiPrefix, string path, string entityKey, string readPermission, string writePermission,
         string? createPermission = null, string? deletePermission = null)
         where TSave : class
     {
@@ -39,17 +42,17 @@ public static class ResourceEndpoints
     {
         public async Task<IResult> ListAsync(int? page, int? pageSize, string? search, HttpRequest http, IRecordPipeline pipeline, CancellationToken ct)
         {
-            var query = new RecordQuery(entityKey, page ?? 1, pageSize ?? 50, search, RecordEndpoints.FiltersFrom(http));
+            var query = new RecordQuery(entityKey, page ?? 1, pageSize ?? 50, search, RecordRequests.FiltersFrom(http));
             var result = await pipeline.QueryAsync(query, ct);
             return result.IsSuccess
                 ? Results.Ok(new PagedResult<TDto>(result.Value!.Items.Select(ToDto<TDto>).ToList(), result.Value.Page, result.Value.PageSize, result.Value.TotalCount))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }
 
         public async Task<IResult> GetAsync(Guid id, IRecordPipeline pipeline, CancellationToken ct)
         {
             var result = await pipeline.GetAsync(new RecordRef(entityKey, id), ct);
-            return result.IsSuccess ? Results.Ok(ToDto<TDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToDto<TDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }
 
         public async Task<IResult> CreateAsync(HttpRequest http, IRecordPipeline pipeline, CancellationToken ct)
@@ -61,7 +64,7 @@ public static class ResourceEndpoints
 
             var (values, _) = ToValues(request);
             var result = await pipeline.CreateAsync(new RecordCommand(entityKey, null, values), ct);
-            return result.IsSuccess ? Results.Created($"{location}/{result.Value!.Id}", ToDto<TDto>(result.Value)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Created($"{location}/{result.Value!.Id}", ToDto<TDto>(result.Value)) : RecordProblems.ToProblem(result.Error!);
         }
 
         public async Task<IResult> UpdateAsync(Guid id, HttpRequest http, IRecordPipeline pipeline, CancellationToken ct)
@@ -74,22 +77,22 @@ public static class ResourceEndpoints
             var (values, version) = ToValues(request);
             if (version is null)
             {
-                return RecordEndpoints.VersionRequired();
+                return RecordRequests.VersionRequired();
             }
 
             var result = await pipeline.UpdateAsync(new RecordCommand(entityKey, id, values, version), ct);
-            return result.IsSuccess ? Results.Ok(ToDto<TDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToDto<TDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }
 
         public async Task<IResult> DeleteAsync(Guid id, long? version, IRecordPipeline pipeline, CancellationToken ct)
         {
             if (version is null)
             {
-                return RecordEndpoints.VersionRequired();
+                return RecordRequests.VersionRequired();
             }
 
             var result = await pipeline.DeleteAsync(new RecordRef(entityKey, id), version, ct);
-            return result.IsSuccess ? Results.NoContent() : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.NoContent() : RecordProblems.ToProblem(result.Error!);
         }
 
         private static async Task<TSave?> ReadAsync(HttpRequest http, CancellationToken ct)
