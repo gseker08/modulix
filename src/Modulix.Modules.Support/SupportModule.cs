@@ -18,6 +18,17 @@ public sealed class SupportModule : IModule
 {
     public const string ModuleKey = "support";
 
+    /// <summary>
+    /// Talep numarası ortak belge serisinden verilir (ADR-0049 dilim 3b): <c>önek-yıl-sıra</c>. Önek <c>DT</c>'dir (<c>TK</c> teklifin önekidir); önceki
+    /// talepler rastgele sonekli <c>TK-…</c> numarasını korur. Gelen e-posta eşleştirmesi önekten bağımsızdır (<c>InboundRules.TicketNumberCandidates</c>).
+    /// </summary>
+    public const string TicketNumberSeries = "support.ticket";
+
+    IReadOnlyList<Modulix.Core.Contracts.Numbering.NumberSeriesDefinition> IModule.NumberSeries { get; } =
+    [
+        new(TicketNumberSeries, "Destek talebi", "DT"),
+    ];
+
     public static class Permissions
     {
         public const string TicketsRead = "support.tickets.read";

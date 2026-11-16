@@ -12,6 +12,7 @@ using Modulix.Core.Records;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Numbering;
 using Modulix.Shared.Settings;
 using Modulix.Shared.Support;
 using static Modulix.Modules.Support.SupportModule.Permissions;
@@ -301,6 +302,7 @@ public class SupportChannelTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         var intruder = await IngestAsync(integration, Email("<x1@baska.test>", "saldirgan@baska.example.test", $"[{ticket.Number}] Benim de talebim", "Sızma denemesi."), HttpStatusCode.Created);
         Assert.Equal("Created", intruder.Outcome);
         Assert.NotEqual(ticket.Id, intruder.TicketId);
+        Assert.Equal("Benim de talebim", (await GetAsync(lead, intruder.TicketId!.Value)).Subject);
         Assert.Equal(3, (await MessagesAsync(lead, ticket.Id)).Count);
         var chain = await IngestAsync(integration, Email("<x2@baska.test>", "saldirgan@baska.example.test", "Re: konu", "Zincir tahmini.", inReplyTo: "<m1@mail.firma.test>"), HttpStatusCode.Created);
         Assert.NotEqual(ticket.Id, chain.TicketId);
@@ -352,6 +354,52 @@ public class SupportChannelTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         Assert.Equal(HttpStatusCode.Forbidden, (await writer.PostAsJsonAsync("/api/support/inbound", Email("<p2>", from))).StatusCode);
         using var anonymous = Anonymous();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync("/api/support/inbound", Email("<p3>", from))).StatusCode);
+    }
+
+    /// <summary>
+    /// ADR-0049 dilim 3b: konudaki numara önekten bağımsız eşleşir. Seriye geçişten önce açılmış talep rastgele sonekli <c>TK-…</c> numarasını korur,
+    /// firma öneki ekrandan değiştirebilir; ikisinde de yanıt talebine bağlanır ve gönderen denetimi sürer.
+    /// </summary>
+    [Fact]
+    public async Task Inbound_matches_legacy_and_tenant_configured_ticket_numbers_in_the_subject()
+    {
+        var s = await SetUpAsync();
+        var admin = await factory.CreateUserAsync(s.Tenant);
+        await factory.MakeAdministratorAsync(s.Tenant.Id, admin);
+        using var integration = await LoginAsync(s.Integration);
+        using var lead = await LoginAsync(s.Lead);
+        using var numbering = await LoginAsync(admin);
+        const string from = "musteri@firma.example.test";
+        const string legacyNumber = "TK-20261101-AB12CD";
+        const string series = "/api/numbering/series";
+
+        // Geçişten önce açılmış talep: numarası eski biçimde durur.
+        var legacy = await IngestAsync(integration, Email("<e1@mail.firma.test>", from, "Eski talep"), HttpStatusCode.Created);
+        Assert.Matches(@"^DT-\d{4}-00001$", legacy.TicketNumber);
+        using (var scope = factory.OpenScope(s.Tenant.Id))
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+            Assert.Equal(1, await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE support.Tickets SET Number = {legacyNumber} WHERE Id = {legacy.TicketId!.Value}"));
+        }
+
+        var legacyReply = await IngestAsync(integration, Email("<e2@mail.firma.test>", from, $"Re: [{legacyNumber}] Eski talep", "Eski numarayla yanıt."));
+        Assert.Equal(("Appended", legacy.TicketId), (legacyReply.Outcome, legacyReply.TicketId));
+
+        // Firma öneki değiştirir: yeni talep o önekle numaralanır ve yanıtı yine eşleşir.
+        var current = Assert.Single((await numbering.GetFromJsonAsync<List<NumberSeriesDto>>(series))!, x => x.Key == "support.ticket");
+        var configured = await numbering.PutAsJsonAsync($"{series}/support.ticket", new ConfigureNumberSeriesRequest("DESTEK", 4, "Never", current.Version));
+        Assert.True(configured.StatusCode == HttpStatusCode.OK, await configured.Content.ReadAsStringAsync());
+
+        var custom = await IngestAsync(integration, Email("<e3@mail.firma.test>", from, "Yeni talep"), HttpStatusCode.Created);
+        Assert.Equal("DESTEK-0001", custom.TicketNumber);
+        var customReply = await IngestAsync(integration, Email("<e4@mail.firma.test>", from, "Ynt: [acil] [DESTEK-0001] Yeni talep", "Yeni numarayla yanıt."));
+        Assert.Equal(("Appended", custom.TicketId), (customReply.Outcome, customReply.TicketId));
+
+        // Numarayı bilen yabancı gönderen yine giremez; açılan talebin konusundan numara etiketi atılır, başka etiket kalır.
+        var intruder = await IngestAsync(integration, Email("<e5@baska.test>", "saldirgan@baska.example.test", "[acil] [DESTEK-0001] Benim talebim", "Sızma denemesi."), HttpStatusCode.Created);
+        Assert.NotEqual(custom.TicketId, intruder.TicketId);
+        Assert.Equal("[acil] Benim talebim", (await GetAsync(lead, intruder.TicketId!.Value)).Subject);
+        Assert.Equal(2, (await MessagesAsync(lead, custom.TicketId!.Value)).Count);
     }
 
     [Fact]
