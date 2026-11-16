@@ -1,0 +1,60 @@
+@inject ApiClient Api
+
+@* Denetim kaydı arşivi (ADR-0052 dilim 3): sıcak saklama süresinden eski aylar ekranda aranmaz; her dönem gzip'li JSON Lines dosyası olarak
+   indirilir. İndirme sunucuda denetim kaydına yazılır. SHA-256 özeti dosyanın bütünlüğünü doğrulamak içindir; tamamı ipucunda görünür. *@
+<p class="text-muted">@Texts.Get("admin.audit.archive.intro")</p>
+
+@if (message is not null)
+{
+    <div class="alert alert-danger" role="alert">@message</div>
+}
+else if (archives is null)
+{
+    <LoadingState Kind="LoadingKind.Table" />
+}
+else if (archives.Count == 0)
+{
+    <EmptyState Title="@Texts.Get("admin.audit.archive.empty")" />
+}
+else
+{
+    <table class="table record-table">
+        <thead>
+            <tr>
+                <th scope="col"><span class="th-label"><AppIcon Name="calendar" Size="14" /> @Texts.Get("admin.audit.archive.period")</span></th>
+                <th scope="col"><span class="th-label"><AppIcon Name="hash" Size="14" /> @Texts.Get("admin.audit.archive.rows")</span></th>
+                <th scope="col"><span class="th-label"><AppIcon Name="layers" Size="14" /> @Texts.Get("admin.audit.archive.size")</span></th>
+                <th scope="col"><span class="th-label"><AppIcon Name="clock" Size="14" /> @Texts.Get("admin.audit.archive.archivedAt")</span></th>
+                <th scope="col"><span class="th-label"><AppIcon Name="shield" Size="14" /> SHA-256</span></th>
+                <th scope="col" class="actions"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var archive in archives)
+            {
+                <tr>
+                    <td data-label="@Texts.Get("admin.audit.archive.period")" class="primary">@archive.Period</td>
+                    <td data-label="@Texts.Get("admin.audit.archive.rows")">@archive.RowCount.ToString("N0", Regional.Numbers)</td>
+                    <td data-label="@Texts.Get("admin.audit.archive.size")">@ReportCenterLabels.Size(archive.SizeBytes)</td>
+                    <td data-label="@Texts.Get("admin.audit.archive.archivedAt")">@CrmLabels.Time(archive.ArchivedAt)</td>
+                    <td data-label="SHA-256"><code title="@archive.Sha256">@archive.Sha256[..16]…</code></td>
+                    <td class="actions">
+                        <a class="btn btn-sm btn-outline-secondary" href="api/audit/archives/@archive.Id/download" download>@Texts.Get("admin.audit.archive.download")</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<AuditArchiveDto>? archives;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<List<AuditArchiveDto>>("/api/audit/archives");
+        archives = result.Value;
+        message = result.Error;
+    }
+}
