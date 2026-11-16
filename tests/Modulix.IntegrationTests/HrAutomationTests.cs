@@ -186,6 +186,48 @@ public class HrAutomationTests(CrmAutomationFixture fixture) : IClassFixture<Crm
             (await client.PostAsync($"/api/automation/templates/{HrAutomationTemplates.OffboardingOnTermination}/use", null)).StatusCode);
     }
 
+    [Fact]
+    public async Task A_rule_on_announcements_reads_draft_records_even_without_fields_and_needs_both_permissions_to_be_built()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var admin = await LoginAsync(a.Admin);
+
+        // Alan kullanmayan kural (sabit ileti): kimliği kayıt türünün yönetim iznini ve deponun okuma iznini birlikte taşır (bölüm 29).
+        var definition = new AutomationDefinition(
+            new RecordCreatedTrigger(),
+            null,
+            [new AutomationActionStep("bildir", HrAutomation.NotifyAction, new JsonObject { ["recipientId"] = a.Admin.Id.ToString(), ["title"] = "Yeni duyuru hazırlandı" })]);
+        var create = await admin.PostAsJsonAsync("/api/automation/rules", new CreateAutomationRuleRequest(
+            "hr", "hr.announcement", "Duyuru bildirimi", null, 100, false, null, null, JsonSerializer.SerializeToElement(definition, AutomationJson.Options)));
+        Assert.True(create.StatusCode == HttpStatusCode.Created, await create.Content.ReadAsStringAsync());
+        var rule = (await create.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!.Rule.Id;
+        Assert.True((await admin.PostAsJsonAsync($"/api/automation/rules/{rule}/publish", new PublishAutomationRuleRequest(true, null))).IsSuccessStatusCode);
+
+        // Yayında olmayan (taslak) duyuru: kural kaydı okur ve bildirim yazar; B firmasında kural yok.
+        await PostAsync(admin, "/api/records/hr.announcement", new JsonObject { ["title"] = "Taslak duyuru", ["body"] = "Metin" });
+        await DeliverAndRunAsync(a.TenantId);
+        Assert.Contains("Yeni duyuru hazırlandı", await InboxAsync(admin));
+        await DeliverAndRunAsync(b.TenantId);
+        using var adminB = await LoginAsync(b.Admin);
+        Assert.Empty(await InboxAsync(adminB));
+
+        // Yetki: yönetim izni olup okuma izni olmayan kural yöneticisi duyuru üzerinde kural kuramaz.
+        var ruleManager = await fixture.Factory.CreateUserAsync(a.Tenant);
+        await fixture.Factory.CreateRoleAsync(a.TenantId,
+            [Modulix.Core.Modules.CoreModule.Permissions.ReadAutomation, Modulix.Core.Modules.CoreModule.Permissions.ManageAutomation, AnnouncementsManage],
+            Scope.All, ruleManager);
+        using var manager = await LoginAsync(ruleManager);
+        var denied = await manager.PostAsJsonAsync("/api/automation/rules", new CreateAutomationRuleRequest(
+            "hr", "hr.announcement", "Yetkisiz", null, 100, false, null, null, JsonSerializer.SerializeToElement(definition, AutomationJson.Options)));
+        if (denied.IsSuccessStatusCode)
+        {
+            // Taslak açılabilse de yayın reddedilir: kural, kuranın sahip olmadığı izinle çalışamaz.
+            var draft = (await denied.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!.Rule.Id;
+            Assert.False((await manager.PostAsJsonAsync($"/api/automation/rules/{draft}/publish", new PublishAutomationRuleRequest(true, null))).IsSuccessStatusCode);
+        }
+    }
+
     // --- yardımcılar ---
 
     private sealed record Setup(Modulix.Core.Platform.Tenant Tenant, Guid TenantId, ModulixUser Admin, ModulixUser Staff, Guid StaffEmployee);

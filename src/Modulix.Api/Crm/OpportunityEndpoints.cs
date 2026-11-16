@@ -7,7 +7,6 @@ using Modulix.Api.Access;
 using Modulix.Api.Records;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
-using Modulix.Core.Records;
 using Modulix.Core.Contracts.Settings;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Opportunities;
@@ -113,8 +112,7 @@ internal static class OpportunityEndpoints
     // ---- Dışa aktarma
 
     private static async Task<IResult> ExportAsync(
-        HttpRequest http, string? search, IRecordPipeline pipeline, ITenantContextAccessor tenant, IAuditWriter audit, IUnitOfWork unitOfWork,
-        CancellationToken ct)
+        HttpRequest http, string? search, IRecordPipeline pipeline, IRecordExportAudit exportAudit, CancellationToken ct)
     {
         var filters = RecordEndpoints.FiltersFrom(http) ?? new Dictionary<string, string>();
         var items = new List<RecordData>();
@@ -134,13 +132,7 @@ internal static class OpportunityEndpoints
         }
 
         // Çıkış denetim kaydına yazılır (kim, kaç kayıt, hangi süzgeç).
-        if (tenant.Current is { } current)
-        {
-            audit.Add(new AuditEntry(current.TenantId, current.UserId, CrmModule.Entities.Opportunity, Guid.Empty, AuditAction.Exported,
-                new JsonObject { ["count"] = items.Count, ["filters"] = string.Join('&', filters.Select(f => $"{f.Key}={f.Value}")) },
-                ExecutionSource.Api, null));
-            await unitOfWork.SaveChangesAsync(ct);
-        }
+        await exportAudit.RecordAsync(CrmModule.Entities.Opportunity, items.Count, filters, null, ct);
 
         // Tutar sütunları hassas alandır: izni olmayan çağıran için kayıt boru hattı zaten göndermez, hücre boş kalır.
         string[] columns =
@@ -152,7 +144,7 @@ internal static class OpportunityEndpoints
         csv.AppendLine(string.Join(',', columns));
         foreach (var item in items)
         {
-            csv.AppendLine(string.Join(',', columns.Select(c => LeadEndpoints.Csv(item.Values[c]?.ToString()))));
+            csv.AppendLine(string.Join(',', columns.Select(c => CsvText.Escape(item.Values[c]?.ToString()))));
         }
 
         return Results.File(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray(), "text/csv; charset=utf-8", "firsatlar.csv");

@@ -59,7 +59,7 @@ public sealed class AssignmentEmailSubscriber(
         emails.Enqueue(Message(
             texts,
             recipient,
-            entity?.DisplayName ?? envelope.EntityKey,
+            entity is null ? envelope.EntityKey : MetadataTexts.Text(texts.Bundle, MetadataTexts.EntityKey(entity.EntityKey), entity.DisplayName),
             string.IsNullOrEmpty(title) ? texts.Get("email.assignment.untitled") : title,
             await ActorNameAsync(texts, envelope.UserId, cancellationToken),
             link));

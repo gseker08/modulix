@@ -3,12 +3,12 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Blog · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.blog") · Modulix</PageTitle>
 
 @* Kurum içi blog (ADR-0042 dilim 8): yayındaki yazılar, en yeni üstte. Yazı açılınca metni (düz metin) ve ekleri görünür. Hangi yazının görüneceğine
    sunucu karar verir. *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.BlogRead">
-    <PageHeader Title="Blog" Icon="file-text" Subtitle="@(page is null ? "Kurum içi yazılar." : $"{page.TotalCount} yazı")" />
+    <PageHeader Title="@Texts.Get("nav.app.hr.blog")" Icon="file-text" Subtitle="@(page is null ? Texts.Get("hr.blog.intro") : Texts.Get("hr.blog.count", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -17,7 +17,7 @@
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Yazılarda ara" placeholder="Başlık ya da metinde ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("hr.blog.search-label")" placeholder="@Texts.Get("hr.blog.search-placeholder")" @bind="search" />
         </form>
     </div>
 
@@ -27,11 +27,11 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Henüz yayında yazı yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("hr.blog.empty")" />
     }
     else
     {
-        <ul class="list-unstyled" aria-label="Blog yazıları">
+        <ul class="list-unstyled" aria-label="@Texts.Get("hr.blog.posts")">
             @foreach (var post in page.Items)
             {
                 var open = opened == post.Id;
@@ -45,12 +45,12 @@
                     @if (open)
                     {
                         <p class="preline mb-2">@WarehouseLabels.Text(post, "body")</p>
-                        <AttachmentPanel EntityKey="@HrAccess.BlogPostEntityKey" RecordId="post.Id" Title="Ekler" EmptyText="Bu yazının eki yok." />
+                        <AttachmentPanel EntityKey="@HrAccess.BlogPostEntityKey" RecordId="post.Id" Title="@Texts.Get("hr.content.attachments")" EmptyText="@Texts.Get("hr.blog.attachments-empty")" />
                         <ContentDiscussion Route="blog-posts" CommentEntityKey="@HrAccess.BlogCommentEntityKey" Content="post" Lookups="Lookups"
                                            CanModerate="@Session.Can(HrAccess.BlogManage)" />
                     }
                     <button type="button" class="btn btn-ghost" aria-expanded="@(open ? "true" : "false")" @onclick="() => opened = open ? null : post.Id">
-                        <AppIcon Name="@(open ? "chevron-down" : "chevron-right")" Size="16" /> @(open ? "Kapat" : "Devamını oku")
+                        <AppIcon Name="@(open ? "chevron-down" : "chevron-right")" Size="16" /> @(open ? Texts.Get("common.close") : Texts.Get("hr.blog.read-more"))
                     </button>
                 </li>
             }

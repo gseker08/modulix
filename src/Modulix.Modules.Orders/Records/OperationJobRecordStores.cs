@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Records;
@@ -21,19 +20,6 @@ internal static class JobHistory
             ToStatus = to,
             Note = note is { Length: > SalesOrder.ReasonMaxLength } ? note[..SalesOrder.ReasonMaxLength] : note,
         });
-
-    /// <summary>Yeni iş numarası: OP-yyyyMMdd-XXXXXX (karışmayan harf/rakam alfabesi).</summary>
-    public static string NewNumber(DateTimeOffset createdAt)
-    {
-        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        Span<char> suffix = stackalloc char[6];
-        for (var i = 0; i < suffix.Length; i++)
-        {
-            suffix[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
-        }
-
-        return $"OP-{createdAt:yyyyMMdd}-{new string(suffix)}";
-    }
 }
 
 /// <summary>
@@ -141,13 +127,14 @@ internal sealed class OperationJobRecordStore(OrdersStoreContext context) : Orde
             throw new RecordValidationException([new RecordFieldError("orderId", "Operasyon işi yalnızca devir kabulünden ya da sipariş ekranındaki iş açma işleminden oluşur.")]);
         }
 
-        entity.Number = JobHistory.NewNumber(DateTimeOffset.UtcNow);
         entity.CreatedBy = Context.CurrentUserId;
         return Task.FromResult(values);
     }
 
     protected override async Task CreatedAsync(OperationJob entity, CancellationToken cancellationToken)
     {
+        // Numara doğrulamadan sonra, kayıt eklenmeden hemen önce alınır (ADR-0049 dilim 3a): reddedilen istek sıra harcamaz.
+        entity.Number = await Context.Numbers.NextAsync(OrdersModule.JobNumberSeries, cancellationToken: cancellationToken);
         if (Context.Gate.JobEffect is { } effect)
         {
             await effect(Context, entity, cancellationToken);

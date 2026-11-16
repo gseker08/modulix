@@ -3,12 +3,12 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Masraflarım · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.my-expenses") · Modulix</PageTitle>
 
 @* Self servis (ADR-0042 dilim 3): kullanıcının bağlı çalışan kartı bulunur; masraf beyanları, yeni beyan, satırlar ve fişler, onaya gönderme.
    Kullanıcı hesabı bir çalışan kartına bağlı değilse İK'ya yönlendirilir. Görünürlük sunucudadır (veri kapsamı "kendi"). *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.ExpensesRequest">
-    <PageHeader Title="Masraflarım" Icon="wallet" Subtitle="Harcamalarınızı fişleriyle beyan edin, onaya gönderin ve ödemesini izleyin." />
+    <PageHeader Title="@Texts.Get("nav.app.hr.my-expenses")" Icon="wallet" Subtitle="@Texts.Get("hr.my-expenses.intro")" />
 
     @if (message is not null)
     {
@@ -21,7 +21,7 @@
     }
     else if (employee is null)
     {
-        <div class="alert alert-info" role="status">Kullanıcı hesabınız bir çalışan kartına bağlı değil. Masraf beyan edebilmek için İK'dan çalışan kartınıza hesabınızı bağlamasını isteyin.</div>
+        <div class="alert alert-info" role="status">@Texts.Get("hr.my-expenses.no-employee")</div>
     }
     else
     {
@@ -35,39 +35,39 @@
         }
 
         <div class="list-toolbar">
-            <h2 class="h5 mb-0 me-auto">Beyanlarım</h2>
+            <h2 class="h5 mb-0 me-auto">@Texts.Get("hr.my-expenses.claims")</h2>
             @if (!creating)
             {
-                <button type="button" class="btn btn-primary" @onclick="Create"><AppIcon Name="plus" Size="16" /> Yeni masraf beyanı</button>
+                <button type="button" class="btn btn-primary" @onclick="Create"><AppIcon Name="plus" Size="16" /> @Texts.Get("hr.expense-form.new")</button>
             }
         </div>
 
         @if (claims is null || claims.Items.Count == 0)
         {
-            <EmptyState Icon="wallet" Title="Henüz masraf beyanınız yok." />
+            <EmptyState Icon="wallet" Title="@Texts.Get("hr.my-expenses.empty")" />
         }
         else
         {
             <table class="table record-table">
-                <caption class="visually-hidden">Masraf beyanlarım</caption>
+                <caption class="visually-hidden">@Texts.Get("hr.my-expenses.caption")</caption>
                 <thead>
                     <tr>
-                        <th scope="col"><SortHeader Label="Başlık" ColumnIcon="type" Asc="title" Desc="-title" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
-                        <th scope="col" class="text-end"><SortHeader Label="Toplam" ColumnIcon="coins" Asc="totalAmount" Desc="-totalAmount" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
-                        <th scope="col"><SortHeader Label="Durum" ColumnIcon="check-circle" Asc="status" Desc="-status" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
-                        <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("hr.content.col.title")" ColumnIcon="type" Asc="title" Desc="-title" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col" class="text-end"><SortHeader Label="@Texts.Get("hr.expense.col.total")" ColumnIcon="coins" Asc="totalAmount" Desc="-totalAmount" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("common.field.status")" ColumnIcon="check-circle" Asc="status" Desc="-status" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                        <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var claim in claims.Items)
                     {
                         <tr>
-                            <td data-label="Başlık" class="primary">@WarehouseLabels.Text(claim, "title")</td>
-                            <td data-label="Toplam" class="text-end">@HrLabels.Money(HrLabels.Decimal(claim, "totalAmount"), WarehouseLabels.Text(claim, "currency"))</td>
-                            <td data-label="Durum"><span class="badge @HrLabels.ExpenseStatusBadge(WarehouseLabels.Text(claim, "status"))">@HrLabels.ExpenseStatus(WarehouseLabels.Text(claim, "status"))</span></td>
+                            <td data-label="@Texts.Get("hr.content.col.title")" class="primary">@WarehouseLabels.Text(claim, "title")</td>
+                            <td data-label="@Texts.Get("hr.expense.col.total")" class="text-end">@HrLabels.Money(HrLabels.Decimal(claim, "totalAmount"), WarehouseLabels.Text(claim, "currency"))</td>
+                            <td data-label="@Texts.Get("common.field.status")"><span class="badge @HrLabels.ExpenseStatusBadge(WarehouseLabels.Text(claim, "status"))">@HrLabels.ExpenseStatus(WarehouseLabels.Text(claim, "status"))</span></td>
                             <td class="row-menu-cell">
                                 <RowMenu Label="@($"{WarehouseLabels.Text(claim, "title")} eylemleri")">
-                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(claim)"><AppIcon Name="eye" Size="16" /> <span>Aç</span></button>
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Open(claim)"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></button>
                                 </RowMenu>
                             </td>
                         </tr>

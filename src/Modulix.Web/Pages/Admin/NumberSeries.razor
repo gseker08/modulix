@@ -1,0 +1,248 @@
+@page "/yonetim/belge-numaralari"
+@using System.Globalization
+@inject ApiClient Api
+@inject ToastService Toasts
+
+<PageTitle>@Texts.Get("nav.app.admin.numbering") · Modulix</PageTitle>
+
+@* Belge numarası serileri (ADR-0049 dilim 2b): firma modüllerin beyan ettiği serilerin önekini, basamak sayısını ve sıfırlamasını değiştirir,
+   sayacı ileri alır. Kurallar sunucudadır (/api/numbering/series, core.numbering.manage); değişiklik yalnızca bundan sonra verilecek numaraları etkiler.
+   Seri listesi kısa ve sabittir (modül beyanı); sayfalama, görünüm ve sıralama yoktur. *@
+<AuthGate Permission="@CoreAccess.ManageNumbering">
+    <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
+
+    <PageHeader Title="@Texts.Get("nav.app.admin.numbering")" Icon="hash" Subtitle="@Texts.Get("admin.numbering.subtitle")" />
+
+    <Notice Text="@message" Failed="true" />
+
+    @if (series is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (series.Count == 0)
+    {
+        <EmptyState Icon="hash" Title="@Texts.Get("admin.numbering.empty")" Text="@Texts.Get("admin.numbering.emptyHelp")" />
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">@Texts.Get("nav.app.admin.numbering")</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><AppIcon Name="type" Size="14" /> @Texts.Get("admin.numbering.series")</th>
+                    <th scope="col"><AppIcon Name="layers" Size="14" /> @Texts.Get("admin.numbering.module")</th>
+                    <th scope="col"><AppIcon Name="hash" Size="14" /> @Texts.Get("admin.numbering.next")</th>
+                    <th scope="col"><AppIcon Name="calendar" Size="14" /> @Texts.Get("admin.numbering.reset")</th>
+                    <th scope="col"><AppIcon Name="tag" Size="14" /> @Texts.Get("common.field.status")</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in series)
+                {
+                    <tr>
+                        <td data-label="@Texts.Get("admin.numbering.series")" class="primary">@item.DisplayName</td>
+                        <td data-label="@Texts.Get("admin.numbering.module")">@Texts.GetOr($"nav.app.{item.ModuleKey}", item.ModuleKey)</td>
+                        <td data-label="@Texts.Get("admin.numbering.next")"><code>@item.NextNumber</code></td>
+                        <td data-label="@Texts.Get("admin.numbering.reset")">@ResetName(item.Reset)</td>
+                        <td data-label="@Texts.Get("common.field.status")">
+                            <span class="badge @(item.IsCustomized ? "stage-open" : "tag")">@(item.IsCustomized ? Texts.Get("admin.numbering.customized") : Texts.Get("admin.numbering.default"))</span>
+                        </td>
+                        <td class="row-menu-cell">
+                            <RowMenu Label="@Texts.Get("common.rowActionsOf", item.DisplayName)">
+                                <button type="button" class="dropdown-item" role="menuitem" @onclick="() => Edit(item)">@Texts.Get("common.edit")</button>
+                            </RowMenu>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <Drawer Open="current is not null" Label="@Texts.Get("admin.numbering.series")" OnClose="Close">
+        @if (current is { } item)
+        {
+            <div class="section-header">
+                <h2>@item.DisplayName</h2>
+                <button type="button" class="btn btn-icon btn-ghost" aria-label="@Texts.Get("common.close")" @onclick="Close"><AppIcon Name="x" Size="18" /></button>
+            </div>
+            <FormTabs Title="@Texts.Get("admin.numbering.series")">
+                <FormSection Title="@Texts.Get("admin.numbering.format")" Icon="type">
+                    <div class="mb-3">
+                        <label class="form-label" for="series-prefix">@Texts.Get("admin.numbering.prefix")</label>
+                        <input id="series-prefix" class="form-control" maxlength="10" autocomplete="off" @bind="prefix" @bind:event="oninput" />
+                        <small class="text-muted">@Texts.Get("admin.numbering.prefixHelp", item.DefaultPrefix)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="series-digits">@Texts.Get("admin.numbering.digits")</label>
+                        <input id="series-digits" class="form-control" type="number" min="3" max="10" @bind="digits" @bind:event="oninput" />
+                        <small class="text-muted">@Texts.Get("admin.numbering.digitsHelp", item.DefaultDigits)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="series-reset">@Texts.Get("admin.numbering.reset")</label>
+                        <select id="series-reset" class="form-select" @bind="reset">
+                            <option value="Yearly">@ResetName("Yearly")</option>
+                            <option value="Never">@ResetName("Never")</option>
+                        </select>
+                        <small class="text-muted">@Texts.Get("admin.numbering.resetHelp", ResetName(item.DefaultReset))</small>
+                    </div>
+                    <p class="mb-3" aria-live="polite">
+                        @if (reset == item.Reset)
+                        {
+                            @Texts.Get("admin.numbering.preview") <code>@Preview(item.LastValue + 1)</code>
+                        }
+                        else
+                        {
+                            @Texts.Get("admin.numbering.previewNewPeriod") <code>@Preview(1)</code>
+                        }
+                    </p>
+                    <button type="button" class="btn btn-tonal" disabled="@(busy || IsDefault(item))" @onclick="() => RestoreDefaults(item)">@Texts.Get("admin.numbering.restoreDefaults")</button>
+                </FormSection>
+                <FormSection Title="@Texts.Get("admin.numbering.counter")" Icon="hash">
+                    @if (item.LastValue == 0)
+                    {
+                        <p class="text-muted">@Texts.Get("admin.numbering.noCounter")</p>
+                    }
+                    else
+                    {
+                        <p>@Texts.Get("admin.numbering.lastValue", item.LastValue, item.NextNumber)</p>
+                        <div class="mb-3">
+                            <label class="form-label" for="series-next">@Texts.Get("admin.numbering.nextValue")</label>
+                            <input id="series-next" class="form-control" type="number" min="@(item.LastValue + 2)" @bind="nextValue" />
+                            <small class="text-muted">@Texts.Get("admin.numbering.advanceHelp")</small>
+                        </div>
+                        <ConfirmAction Class="btn btn-tonal" Disabled="@(busy || nextValue is null || nextValue <= item.LastValue + 1)"
+                                       Question="@Texts.Get("admin.numbering.advanceQuestion", nextValue ?? 0)" OnConfirm="AdvanceAsync">
+                            @Texts.Get("admin.numbering.advance")
+                        </ConfirmAction>
+                    }
+                </FormSection>
+            </FormTabs>
+            <Notice Text="@formError" Failed="true" />
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-secondary" @onclick="Close">@Texts.Get("common.cancel")</button>
+                <button type="button" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : null)" @onclick="SaveAsync">@Texts.Get("common.save")</button>
+            </div>
+        }
+    </Drawer>
+</AuthGate>
+
+@code {
+    private const string Url = "/api/numbering/series";
+
+    private List<NumberSeriesDto>? series;
+    private NumberSeriesDto? current;
+    private string prefix = string.Empty;
+    private int digits;
+    private string reset = "Yearly";
+    private long? nextValue;
+    private string? message;
+    private string? formError;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<List<NumberSeriesDto>>(Url);
+        series = result.Value ?? [];
+        message = result.Error;
+    }
+
+    private static string ResetName(string value) => Texts.GetOr("admin.numbering.reset." + value, value);
+
+    // Sunucudaki biçimin aynısı (NumberSeriesDefinition.Format): yıllık seride "ÖNEK-YYYY-0001", sıfırlanmayanda "ÖNEK-0001".
+    private string Preview(long value)
+    {
+        var shownPrefix = prefix.Trim().ToUpperInvariant();
+        var head = reset == "Yearly" ? $"{shownPrefix}-{current!.Year.ToString("D4", CultureInfo.InvariantCulture)}-" : $"{shownPrefix}-";
+        return head + value.ToString("D" + Math.Clamp(digits, 1, 10).ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
+    }
+
+    private bool IsDefault(NumberSeriesDto item) =>
+        prefix.Trim().ToUpperInvariant() == item.DefaultPrefix && digits == item.DefaultDigits && reset == item.DefaultReset;
+
+    private void Edit(NumberSeriesDto item)
+    {
+        current = item;
+        prefix = item.Prefix;
+        digits = item.Digits;
+        reset = item.Reset;
+        nextValue = null;
+        formError = null;
+    }
+
+    private void RestoreDefaults(NumberSeriesDto item)
+    {
+        prefix = item.DefaultPrefix;
+        digits = item.DefaultDigits;
+        reset = item.DefaultReset;
+    }
+
+    private void Close()
+    {
+        current = null;
+        formError = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        var result = await RunAsync(item => Api.PutAsync<NumberSeriesDto>($"{Url}/{Uri.EscapeDataString(item.Key)}",
+            new ConfigureNumberSeriesRequest(prefix.Trim(), digits, reset, item.Version)));
+        if (result is not null)
+        {
+            Close();
+            Toasts.Success(Texts.Get("admin.numbering.saved"));
+        }
+    }
+
+    private async Task AdvanceAsync()
+    {
+        if (nextValue is not { } value)
+        {
+            return;
+        }
+
+        var result = await RunAsync(item => Api.PostAsync<NumberSeriesDto>($"{Url}/{Uri.EscapeDataString(item.Key)}/advance",
+            new AdvanceNumberSeriesRequest(value, item.Version)));
+        if (result is not null)
+        {
+            // Çekmece açık kalır; biçimde kaydedilmemiş değişiklik varsa korunur, sürüm yenisiyle sürer.
+            current = result;
+            nextValue = null;
+            Toasts.Success(Texts.Get("admin.numbering.advanced", result.NextNumber));
+        }
+    }
+
+    // Yazma işlemini çalıştırır ve listeyi günceller. Çakışmada (409) liste yenilenir ve çekmece güncel sürümle kalır.
+    private async Task<NumberSeriesDto?> RunAsync(Func<NumberSeriesDto, Task<ApiResult<NumberSeriesDto>>> write)
+    {
+        if (current is not { } item)
+        {
+            return null;
+        }
+
+        busy = true;
+        formError = null;
+        var result = await write(item);
+        busy = false;
+        if (result.Value is { } updated)
+        {
+            series![series.FindIndex(s => s.Key == updated.Key)] = updated;
+            return updated;
+        }
+
+        if (result.Status == System.Net.HttpStatusCode.Conflict)
+        {
+            await LoadAsync();
+            current = series?.FirstOrDefault(s => s.Key == item.Key);
+            formError = Texts.Get("admin.numbering.conflict");
+        }
+        else
+        {
+            formError = result.Error ?? Texts.Get("common.saveFailed");
+        }
+
+        return null;
+    }
+}

@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Records;
@@ -89,13 +88,14 @@ internal sealed class OrderDeliveryRecordStore(OrdersStoreContext context) : Ord
             throw new RecordValidationException([new RecordFieldError("orderId", "Teslimat yalnızca sipariş ekranındaki teslimat planlama işlemiyle oluşur.")]);
         }
 
-        entity.Number = FulfillmentNumbers.NewDeliveryNumber(DateTimeOffset.UtcNow);
         entity.CreatedBy = Context.CurrentUserId;
         return Task.FromResult(values);
     }
 
     protected override async Task CreatedAsync(OrderDelivery entity, CancellationToken cancellationToken)
     {
+        // Numara doğrulamadan sonra, kayıt eklenmeden hemen önce alınır (ADR-0049 dilim 3a): reddedilen istek sıra harcamaz.
+        entity.Number = await Context.Numbers.NextAsync(OrdersModule.DeliveryNumberSeries, cancellationToken: cancellationToken);
         if (Context.Gate.DeliveryEffect is { } effect)
         {
             await effect(Context, entity, cancellationToken);
@@ -122,22 +122,6 @@ internal sealed class OrderDeliveryRecordStore(OrdersStoreContext context) : Ord
 
     protected override Task BeforeDeleteAsync(OrderDelivery entity, CancellationToken cancellationToken) =>
         throw new RecordConflictException("Teslimat silinemez; geçmişi korunur. Planlı teslimat iptal edilir, başarısız teslimat yeniden planlanır.");
-}
-
-/// <summary>Teslimat ve hizmet başlangıcı numaraları.</summary>
-internal static class FulfillmentNumbers
-{
-    public static string NewDeliveryNumber(DateTimeOffset createdAt)
-    {
-        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        Span<char> suffix = stackalloc char[6];
-        for (var i = 0; i < suffix.Length; i++)
-        {
-            suffix[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
-        }
-
-        return $"TS-{createdAt:yyyyMMdd}-{new string(suffix)}";
-    }
 }
 
 /// <summary>

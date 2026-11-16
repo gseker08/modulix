@@ -14,8 +14,17 @@ namespace Modulix.ArchitectureTests;
 /// </remarks>
 public partial class ModuleEndpointRulesTests
 {
-    /// <summary>İzin çağrısı aranmayan uç noktalar: "proje/dosya: yol" → gerekçe. Bugün boş.</summary>
-    private static readonly Dictionary<string, string> WithoutPermission = [];
+    /// <summary>
+    /// İzin çağrısı aranmayan uç noktalar: "proje/dosya: yol" → gerekçe. Yalnızca oturumsuz uçlar (<c>IModulePublicEndpoints</c>, ADR-0046): tenant ve lisans
+    /// <c>IPublicTenantScopes</c> ile, kayıt erişimi bağlantı belirteci ve sistem kimliğinin izinleriyle denetlenir.
+    /// </summary>
+    private static readonly Dictionary<string, string> WithoutPermission = new()
+    {
+        ["Modulix.Modules.Support/Endpoints/SupportChannelEndpoints.cs: /view"] =
+            "Herkese açık memnuniyet anketi: bağlantı belirteciyle, hız sınırı ve gövde sınırıyla; sistem kimliği support.survey yalnızca talebi okur.",
+        ["Modulix.Modules.Support/Endpoints/SupportChannelEndpoints.cs: /answer"] =
+            "Herkese açık memnuniyet anketi yanıtı: bağlantı belirteciyle, hız sınırıyla; salt okunur lisansta yazılamaz (IPublicTenantScopes write).",
+    };
 
     [Fact]
     public void Module_endpoints_require_a_permission()

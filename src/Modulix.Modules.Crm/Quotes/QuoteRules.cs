@@ -208,16 +208,4 @@ public static class QuoteRevisionRules
         QuoteStatus.Accepted => "Kabul edilmiş teklif yeniden yazılamaz; sonraki ticari değişiklik ayrı süreçtir.",
         _ => "Bu durumdaki tekliften revizyon açılamaz.",
     };
-
-    public static string NewNumber(DateTimeOffset createdAt)
-    {
-        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        Span<char> suffix = stackalloc char[6];
-        for (var i = 0; i < suffix.Length; i++)
-        {
-            suffix[i] = alphabet[System.Security.Cryptography.RandomNumberGenerator.GetInt32(alphabet.Length)];
-        }
-
-        return $"TK-{createdAt:yyyyMMdd}-{new string(suffix)}";
-    }
 }

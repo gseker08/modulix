@@ -3,12 +3,12 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Rehber · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.directory") · Modulix</PageTitle>
 
 @* Rehber (ADR-0042 dilim 1): ayrılmamış çalışanların kartları; ad, unvan, departman, iş e-postası ve iş telefonu kişi kaydından gelir.
    Özlük bilgileri gösterilmez (hassas alanlar zaten sunucudan gelmez). Arama ve departman süzgeci sunucuda uygulanır. *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.EmployeesRead">
-    <PageHeader Title="Rehber" Icon="phone" Subtitle="@(page is null ? "Çalışma arkadaşlarınızın iletişim bilgilerine ulaşın." : $"{page.TotalCount} kişi")" />
+    <PageHeader Title="@Texts.Get("nav.app.hr.directory")" Icon="phone" Subtitle="@(page is null ? Texts.Get("hr.directory.intro") : Texts.Get("hr.directory.count", page.TotalCount))" />
 
     @if (message is not null)
     {
@@ -17,7 +17,7 @@
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Rehberde ara" placeholder="Ad, soyad, e-posta, telefon veya unvan ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("hr.directory.search-label")" placeholder="@Texts.Get("hr.directory.search-placeholder")" @bind="search" />
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="@(businessUnitId is null ? 0 : 1)" />
     </div>
@@ -25,7 +25,7 @@
     @if (filtersOpen || businessUnitId is not null)
     {
         <div class="filters">
-            <HrBusinessUnitSelect AriaLabel="Departman" EmptyLabel="Tüm departmanlar" Value="businessUnitId" ValueChanged="UnitFilterAsync" />
+            <HrBusinessUnitSelect AriaLabel="@Texts.Get("hr.audience.unit")" EmptyLabel="@Texts.Get("hr.employees.all-units")" Value="businessUnitId" ValueChanged="UnitFilterAsync" />
         </div>
     }
 
@@ -35,12 +35,12 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Aramaya uyan çalışan yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("hr.directory.empty")" />
     }
     else
     {
-        <p class="visually-hidden" role="status" aria-live="polite">@(page.TotalCount) kişi listelendi.</p>
-        <ul class="profile-cards list-unstyled" aria-label="Çalışanlar">
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("hr.directory.listed", page.TotalCount)</p>
+        <ul class="profile-cards list-unstyled" aria-label="@Texts.Get("nav.app.hr.employees")">
             @foreach (var employee in page.Items)
             {
                 var email = WarehouseLabels.Text(employee, "email");
@@ -51,7 +51,7 @@
                         <span class="avatar avatar-tone-@(Math.Abs(employee.Id.GetHashCode()) % 5)" aria-hidden="true">@HrLabels.Initials(employee)</span>
                         <strong>@HrLabels.Name(employee)</strong>
                     </span>
-                    <span>@(string.IsNullOrWhiteSpace(WarehouseLabels.Text(employee, "jobTitle")) ? "Unvan girilmedi" : WarehouseLabels.Text(employee, "jobTitle"))@(department.Length > 0 ? $" · {department}" : "")</span>
+                    <span>@(string.IsNullOrWhiteSpace(WarehouseLabels.Text(employee, "jobTitle")) ? HrLabels.NoJobTitle : WarehouseLabels.Text(employee, "jobTitle"))@(department.Length > 0 ? $" · {department}" : "")</span>
                     @if (email.Length > 0)
                     {
                         <a href="mailto:@email" class="owner-cell"><AppIcon Name="mail" Size="16" /> @email</a>

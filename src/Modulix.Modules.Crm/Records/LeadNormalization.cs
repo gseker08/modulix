@@ -1,27 +1,15 @@
-using System.Security.Cryptography;
+using Modulix.Core.Contracts.Numbering;
 
 namespace Modulix.Modules.Crm.Records;
 
 /// <summary>Lead'e özgü normalizasyon yardımcıları (numara üretimi, alan adı çıkarma).</summary>
 internal static class LeadNormalization
 {
-    // Okunabilirlik için 0/O ve 1/I/L karışmaz.
-    private const string Alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-
     /// <summary>
-    /// "LD-20261028-7K2M4Q": tarih + 6 rastgele karakter. Sıralı sayaç yarış koşulu yaratacağı için rastgele sonek kullanılır;
-    /// çakışma (neredeyse imkânsız) benzersiz indeksle 409 olur ve istemci yeniden dener.
+    /// "LD-20261028-7K2M4Q": tarih + 6 rastgele karakter (ortak yardımcı, ADR-0049 dilim 3a). Müşteri adayı belge değildir ve toplu içe aktarmayla
+    /// çok sayıda açılır; sıralı seriye geçmedi. Çakışma (neredeyse imkânsız) benzersiz indeksle 409 olur ve istemci yeniden dener.
     /// </summary>
-    public static string NewNumber(DateTimeOffset createdAt)
-    {
-        Span<char> suffix = stackalloc char[6];
-        for (var i = 0; i < suffix.Length; i++)
-        {
-            suffix[i] = Alphabet[RandomNumberGenerator.GetInt32(Alphabet.Length)];
-        }
-
-        return $"LD-{createdAt:yyyyMMdd}-{new string(suffix)}";
-    }
+    public static string NewNumber(DateTimeOffset createdAt) => RandomDocumentNumber.New("LD", createdAt);
 
     /// <summary>"https://www.Acme.com/x" → "acme.com"; alan adı çıkarılamazsa null.</summary>
     public static string? Domain(string? website)

@@ -8,16 +8,16 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Survey is null ? "Yeni anket" : "Anket")</h2>
+            <h2>@(Survey is null ? Texts.Get("hr.survey-form.new") : Texts.Get("hr.survey-form.title"))</h2>
             @if (Survey is not null)
             {
-                <p>@HrLabels.SurveyStatus(WarehouseLabels.Text(Survey, "status")) · @WarehouseLabels.Number(Survey, "questionCount") soru · @WarehouseLabels.Number(Survey, "responseCount") yanıt</p>
+                <p>@HrLabels.SurveyStatus(WarehouseLabels.Text(Survey, "status")) · @Texts.Get("hr.surveys.question-count", WarehouseLabels.Number(Survey, "questionCount")) · @Texts.Get("hr.survey-results.responses", WarehouseLabels.Number(Survey, "responseCount"))</p>
             }
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">@Texts.Get("common.save")</button>
         </div>
     </div>
 
@@ -30,13 +30,13 @@
         <div class="alert alert-danger" role="alert">@layoutError</div>
     }
 
-    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Anket bölümleri">
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("hr.survey-form.sections")">
         <Field Context="f">
             @switch (f.Key)
             {
                 case "title":
                     <label class="@f.LabelClass()" for="survey-title">@f.Label</label>
-                    <input id="survey-title" class="form-control" maxlength="200" required aria-required="true" placeholder="ör. Çalışan memnuniyeti 2026" @bind="form.Title" />
+                    <input id="survey-title" class="form-control" maxlength="200" required aria-required="true" placeholder="@Texts.Get("hr.survey-form.title-placeholder")" @bind="form.Title" />
                     <FieldError Field="title" Errors="errors" />
                     break;
                 case "description":
@@ -49,7 +49,7 @@
                         <input id="survey-anonymous" class="form-check-input" type="checkbox" disabled="@(form.Id is not null)" @bind="form.IsAnonymous" />
                         <label class="form-check-label" for="survey-anonymous">@f.Label</label>
                     </div>
-                    <small class="text-muted">Tam anonim: cevaplar yanıtlayana hiçbir yerde (sonuç, denetim kaydı, veritabanı) bağlanmaz; yalnızca kimin katıldığı tutulur. En az @MinAnonymousResponses yanıt gelince özet görünür. Kaydettikten sonra değişmez.</small>
+                    <small class="text-muted">@Texts.Get("hr.survey-form.anonymous-help", MinAnonymousResponses)</small>
                     break;
                 case "audienceBusinessUnitIds":
                     <label class="@f.LabelClass()" for="survey-audience-units">@f.Label</label>
@@ -58,11 +58,11 @@
                     <FieldError Field="audienceBusinessUnitIds" Errors="errors" />
                     @if (!form.UnitsTouched && form.AudienceUnits.Count == 0 && form.LegacyAudience is { Length: > 0 } legacy)
                     {
-                        <small class="text-muted">Eski İK departmanına hedefli: @Lookups.Label(HrAccess.DepartmentList, legacy). Departman seçilince Core departmanına geçer.</small>
+                        <small class="text-muted">@Texts.Get("hr.audience.legacy", Lookups.Label(HrAccess.DepartmentList, legacy))</small>
                     }
                     else
                     {
-                        <small class="text-muted">Alt departmanlardakiler de dahildir. Departman ve kişi seçilmezse bütün çalışanlara yöneliktir.</small>
+                        <small class="text-muted">@Texts.Get("hr.audience.help")</small>
                     }
                     break;
                 case "audienceUserIds":
@@ -75,7 +75,7 @@
                     <label class="@f.LabelClass()" for="survey-closes">@f.Label</label>
                     <input id="survey-closes" class="form-control" type="date" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ClosesOn" />
                     <FieldError Field="closesOn" Errors="errors" />
-                    <small class="text-muted">Boşsa elle kapatılana kadar açık.</small>
+                    <small class="text-muted">@Texts.Get("hr.survey-form.closes-help")</small>
                     break;
             }
         </Field>
@@ -116,7 +116,7 @@
             }
             : new SurveyForm();
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     // Hedef birden çok Core departmanı ve/veya kişidir (bölüm 23c). Eski İK departman hedefi olan kayıtta departmanlar değiştirilmedikçe gönderilmez

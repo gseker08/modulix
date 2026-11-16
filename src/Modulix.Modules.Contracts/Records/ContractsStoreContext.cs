@@ -10,8 +10,11 @@ namespace Modulix.Modules.Contracts.Records;
 /// <summary>Kayıt depolarının ihtiyaç duyduğu servisler: veri, tenant üyeleri, seçim listeleri, isteği yapan kullanıcı ve iş akışı kapısı.</summary>
 internal sealed class ContractsStoreContext(
     IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access,
-    ICurrentAccess permissions, ContractWorkflowGate gate, IRecordCommandContext? command = null)
+    ICurrentAccess permissions, ContractWorkflowGate gate, Modulix.Core.Contracts.Numbering.IDocumentNumbers numbers, IRecordCommandContext? command = null)
 {
+    /// <summary>Ortak belge numaralama (ADR-0049 dilim 3a): sözleşme numarası.</summary>
+    public Modulix.Core.Contracts.Numbering.IDocumentNumbers Numbers => numbers;
+
     public IModuleData Data => data;
 
     public ITenantMembers Members => members;

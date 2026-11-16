@@ -1,29 +1,30 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
 using Modulix.Core.Contracts.Records;
-using Modulix.Modules.Orders;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Orders.Lifecycle;
 using Modulix.Shared.Orders;
 
-namespace Modulix.Api.Orders;
+namespace Modulix.Modules.Orders.Endpoints;
 
 /// <summary>
 /// Sipariş uç noktaları (/api/orders/...; ADR-0023). Liste, detay ve taslak düzenleme kayıt boru hattından geçer; genel uçtan sipariş
 /// oluşturulamaz ve silinemez (depo reddeder). Sipariş yalnızca kabul edilmiş tekliften oluşur (<c>POST /api/orders/from-quote/{quoteId}</c>).
 /// Tenant her istekte oturumdan çözülür; istemciden gelen kayıt kimliği tek başına yetki kanıtı değildir (kapsam boru hattında uygulanır).
+/// Uç noktalar modüldedir (ADR-0046); grup host tarafından açılır.
 /// </summary>
-public static class OrdersEndpoints
+internal static class OrdersEndpoints
 {
     private const string Prefix = "/api/orders";
     private static readonly JsonSerializerOptions Json = JsonSerializerOptions.Web;
 
-    public static IEndpointRouteBuilder MapOrdersEndpoints(this IEndpointRouteBuilder app)
+    /// <summary><paramref name="routes"/> host tarafından <c>/api/orders</c> grubu olarak, oturum ve modül kontrolüyle sarılmış gelir (ADR-0046).</summary>
+    public static void MapEndpoints(IEndpointRouteBuilder routes)
     {
-        var group = app.MapGroup(Prefix)
-            .RequireAuthorization()
-            .RequireModule(OrdersModule.ModuleKey)
+        var group = routes.MapGroup(string.Empty)
             .WithTags("Siparişler");
 
         ResourceEndpoints.MapResource<OrderDto, SaveOrderRequest>(group, Prefix, "orders", OrdersModule.Entities.Order,
@@ -49,7 +50,7 @@ public static class OrdersEndpoints
         group.MapGet("/summary", async (IOrderSummary service, CancellationToken ct) =>
         {
             var result = await service.GetAsync(ct);
-            return result.IsSuccess ? Results.Ok(Map<OrderSummaryDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<OrderSummaryDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
 
         var orders = group.MapGroup("/orders");
@@ -58,7 +59,7 @@ public static class OrdersEndpoints
             var result = await queries.HistoryAsync(id, ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value!.Select(e => new OrderHistoryDto(e.Id, e.Kind, e.At, e.ActorId, e.FromStatus, e.ToStatus, e.Reason)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
 
         // Kabul edilmiş tekliften sipariş: önizleme ve oluşturma. İzinler serviste denetlenir (oluşturma + finansal).
@@ -68,7 +69,7 @@ public static class OrdersEndpoints
             var result = await service.PreviewAsync(quoteId, ct);
             return result.IsSuccess
                 ? Results.Ok(JsonSerializer.Deserialize<OrderSourceDto>(JsonSerializer.Serialize(result.Value, Json), Json))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         fromQuote.MapPost("/{quoteId:guid}", async (Guid quoteId, CreateOrderFromQuoteRequest r, IOrderFromQuote service, CancellationToken ct) =>
         {
@@ -78,7 +79,7 @@ public static class OrdersEndpoints
                 r.Title, r.OwnerId, r.DeliveryAddress, r.Location, r.PlannedStartDate, r.PlannedDeliveryDate, r.Commitments, r.OperationsNotes), ct);
             return result.IsSuccess
                 ? Results.Created($"{Prefix}/orders/{result.Value!.Id}", ResourceEndpoints.ToDto<OrderDto>(result.Value))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
 
         // Durum geçişleri (dilim 2): eylem izinleri serviste, kayıt bulunduktan SONRA denetlenir (kapsam dışı kayıt 404, izinsiz eylem 403).
@@ -87,14 +88,14 @@ public static class OrdersEndpoints
             var result = await workflow.ActionsAsync(id, ct);
             return result.IsSuccess
                 ? Results.Ok(result.Value!.Select(a => new OrderActionDto(a.Action, a.Allowed, a.Code, a.Message, a.RequiresReason)).ToList())
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         foreach (var action in OrderAction.All)
         {
             orders.MapPost($"/{{id:guid}}/{action}", async (Guid id, OrderTransitionRequest r, IOrderWorkflow workflow, CancellationToken ct) =>
             {
                 var result = await workflow.RunAsync(id, action, r.Version, r.Reason, ct);
-                return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<OrderDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+                return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<OrderDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
             }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         }
 
@@ -102,62 +103,62 @@ public static class OrdersEndpoints
         orders.MapGet("/{id:guid}/change-requests", async (Guid id, IOrderChangeRequests service, CancellationToken ct) =>
         {
             var result = await service.ListAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<OrderChangeRequestDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<OrderChangeRequestDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         orders.MapPost("/{id:guid}/change-requests/preview", async (Guid id, OrderChangeRequestInputDto r, IOrderChangeRequests service, CancellationToken ct) =>
         {
             var result = await service.PreviewAsync(id, ToInput(r), ct);
-            return result.IsSuccess ? Results.Ok(Map<OrderChangePreviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<OrderChangePreviewDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         orders.MapPost("/{id:guid}/change-requests", async (Guid id, OrderChangeRequestInputDto r, IOrderChangeRequests service, CancellationToken ct) =>
         {
             var result = await service.CreateAsync(id, ToInput(r), ct);
             return result.IsSuccess
                 ? Results.Created($"{Prefix}/change-requests/{result.Value!.Id}", Map<OrderChangeRequestDto>(result.Value))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
 
         var requests = group.MapGroup("/change-requests");
         requests.MapPost("/{id:guid}/approve", async (Guid id, DecideOrderChangeRequest r, IOrderChangeRequests service, CancellationToken ct) =>
         {
             var result = await service.DecideAsync(id, true, r.Version, r.Note, ct);
-            return result.IsSuccess ? Results.Ok(Map<OrderChangeRequestDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<OrderChangeRequestDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         requests.MapPost("/{id:guid}/reject", async (Guid id, DecideOrderChangeRequest r, IOrderChangeRequests service, CancellationToken ct) =>
         {
             var result = await service.DecideAsync(id, false, r.Version, r.Note, ct);
-            return result.IsSuccess ? Results.Ok(Map<OrderChangeRequestDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<OrderChangeRequestDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         requests.MapPost("/{id:guid}/withdraw", async (Guid id, WithdrawOrderChangeRequest r, IOrderChangeRequests service, CancellationToken ct) =>
         {
             var result = await service.WithdrawAsync(id, r.Version, ct);
-            return result.IsSuccess ? Results.Ok(Map<OrderChangeRequestDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<OrderChangeRequestDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
 
         // Satış devri (dilim 3): sipariş başına tek yapılandırılmış kayıt; eylemlerin izinleri serviste, kayıt bulunduktan SONRA denetlenir.
         orders.MapGet("/{id:guid}/handover", async (Guid id, IOrderHandovers service, CancellationToken ct) =>
         {
             var result = await service.GetByOrderAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(ToDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToDetail(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         orders.MapPost("/{id:guid}/handover", async (Guid id, IOrderHandovers service, CancellationToken ct) =>
         {
             var result = await service.CreateAsync(id, ct);
-            return result.IsSuccess ? Results.Created($"{Prefix}/orders/{id}/handover", ToDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Created($"{Prefix}/orders/{id}/handover", ToDetail(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
 
         var handovers = group.MapGroup("/handovers");
         handovers.MapGet("/{id:guid}/detail", async (Guid id, IOrderHandovers service, CancellationToken ct) =>
         {
             var result = await service.GetAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(ToDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToDetail(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         foreach (var action in HandoverAction.All)
         {
             handovers.MapPost($"/{{id:guid}}/{action}", async (Guid id, HandoverActionRequest r, IOrderHandovers service, CancellationToken ct) =>
             {
                 var result = await service.RunAsync(id, action, r.Version, r.Note, r.ResponsibleUserId, ct);
-                return result.IsSuccess ? Results.Ok(ToDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+                return result.IsSuccess ? Results.Ok(ToDetail(result.Value!)) : RecordProblems.ToProblem(result.Error!);
             }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         }
 
@@ -165,50 +166,50 @@ public static class OrdersEndpoints
         orders.MapPost("/{id:guid}/jobs", async (Guid id, CreateOperationJobRequest r, IOperationJobs service, CancellationToken ct) =>
         {
             var result = await service.CreateManualAsync(id, new ManualJobInput(r.Title, r.LineIds, r.Priority, r.ResponsibleUserId, r.TeamName, r.PlannedStartDate, r.PlannedEndDate, r.Location, r.Notes), ct);
-            return result.IsSuccess ? Results.Created($"{Prefix}/operation-jobs/{result.Value!.Job.Id}", ToJobDetail(result.Value)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Created($"{Prefix}/operation-jobs/{result.Value!.Job.Id}", ToJobDetail(result.Value)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
 
         var jobs = group.MapGroup("/operation-jobs");
         jobs.MapGet("/{id:guid}/detail", async (Guid id, IOperationJobs service, CancellationToken ct) =>
         {
             var result = await service.GetAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         foreach (var action in JobAction.All)
         {
             jobs.MapPost($"/{{id:guid}}/{action}", async (Guid id, OperationJobActionRequest r, IOperationJobs service, CancellationToken ct) =>
             {
                 var result = await service.RunAsync(id, action, r.Version, new JobActionInput(r.Reason, r.ResponsibleUserId, r.TeamName), ct);
-                return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+                return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordProblems.ToProblem(result.Error!);
             }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         }
 
         jobs.MapPost("/{id:guid}/dependencies", async (Guid id, AddJobDependencyRequest r, IOperationJobs service, CancellationToken ct) =>
         {
             var result = await service.AddDependencyAsync(id, r.DependsOnJobId, ct);
-            return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         jobs.MapDelete("/{id:guid}/dependencies/{dependsOnJobId:guid}", async (Guid id, Guid dependsOnJobId, IOperationJobs service, CancellationToken ct) =>
         {
             var result = await service.RemoveDependencyAsync(id, dependsOnJobId, ct);
-            return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ToJobDetail(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
 
         // Teslimat ve hizmet başlangıcı (dilim 5): ürün kalemleri çoklu/kısmi teslimatla, hizmet kalemleri başlangıç kaydıyla ayrı izlenir.
         orders.MapGet("/{id:guid}/fulfillment", async (Guid id, IOrderFulfillment service, CancellationToken ct) =>
         {
             var result = await service.GetAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(Map<FulfillmentDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<FulfillmentDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         orders.MapPost("/{id:guid}/deliveries", async (Guid id, PlanDeliveryRequest r, IOrderFulfillment service, CancellationToken ct) =>
         {
             var result = await service.PlanDeliveryAsync(id, new PlanDeliveryInput(r.PlannedDate, r.Lines?.Select(l => new QuantityRequest(l.LineId, l.Quantity)).ToList(), r.JobId, r.Notes), ct);
-            return result.IsSuccess ? Results.Created($"{Prefix}/deliveries/{result.Value!.Id}", Map<DeliveryViewDto>(result.Value)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Created($"{Prefix}/deliveries/{result.Value!.Id}", Map<DeliveryViewDto>(result.Value)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         orders.MapPost("/{id:guid}/service-starts", async (Guid id, PlanServiceRequest r, IOrderFulfillment service, CancellationToken ct) =>
         {
             var result = await service.PlanServiceAsync(id, r.OrderLineId, r.PlannedStartDate, ct);
-            return result.IsSuccess ? Results.Created($"{Prefix}/orders/{id}/fulfillment", Map<ServiceLineDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Created($"{Prefix}/orders/{id}/fulfillment", Map<ServiceLineDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead);
 
         var deliveries = group.MapGroup("/deliveries");
@@ -218,7 +219,7 @@ public static class OrdersEndpoints
             {
                 var input = new DeliveryActionInput(r.Reason, r.ReceiverName, r.ReceiverNote, r.ActualDate, r.Lines?.Select(l => new QuantityRequest(l.LineId, l.Quantity)).ToList(), r.PlannedDate);
                 var result = await service.RunDeliveryAsync(id, action, r.Version, input, ct);
-                return result.IsSuccess ? Results.Ok(Map<DeliveryViewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+                return result.IsSuccess ? Results.Ok(Map<DeliveryViewDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
             }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         }
 
@@ -244,14 +245,14 @@ public static class OrdersEndpoints
             }
 
             var result = await service.AddEvidenceAsync(id, fileName, request.ContentType, buffer.ToArray(), description, ct);
-            return result.IsSuccess ? Results.Ok(Map<DeliveryViewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<DeliveryViewDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(OrdersModule.Permissions.OrdersRead).DisableAntiforgery();
         deliveries.MapGet("/{id:guid}/evidence/{evidenceId:guid}", async (Guid id, Guid evidenceId, HttpContext http, IOrderFulfillment service, CancellationToken ct) =>
         {
             var result = await service.GetEvidenceAsync(id, evidenceId, ct);
             if (!result.IsSuccess)
             {
-                return RecordEndpoints.ToProblem(result.Error!);
+                return RecordProblems.ToProblem(result.Error!);
             }
 
             http.Response.Headers.CacheControl = "no-store";
@@ -265,11 +266,9 @@ public static class OrdersEndpoints
             serviceStarts.MapPost($"/{{id:guid}}/{action}", async (Guid id, ServiceActionRequest r, IOrderFulfillment service, CancellationToken ct) =>
             {
                 var result = await service.RunServiceAsync(id, action, r.Version, new ServiceActionInput(r.ConfirmedBy, r.Note), ct);
-                return result.IsSuccess ? Results.Ok(Map<ServiceLineDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+                return result.IsSuccess ? Results.Ok(Map<ServiceLineDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
             }).RequirePermission(OrdersModule.Permissions.OrdersRead);
         }
-
-        return app;
     }
 
     private static OperationJobDetailDto ToJobDetail(OperationJobView view) => new(
@@ -296,7 +295,7 @@ public static class OrdersEndpoints
     private static T Map<T>(object value) => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(value, Json), Json)!;
 }
 
-/// <summary>Sipariş politikası: tenant ayarlarından okunur (modül Core'un ayar servisini görmez; host bu köprüyü sağlar).</summary>
+/// <summary>Sipariş politikası: tenant ayarlarından okunur (<see cref="Modulix.Core.Contracts.Settings.ITenantSettingReader"/>); modülün kendi <c>ConfigureServices</c>'inde kaydolur (ADR-0046).</summary>
 internal sealed class OrderPolicyProvider(IServiceProvider services) : IOrderPolicyProvider
 {
     public async Task<OrderPolicySettings> GetAsync(CancellationToken cancellationToken)

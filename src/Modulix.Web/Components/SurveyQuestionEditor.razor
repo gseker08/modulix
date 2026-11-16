@@ -8,12 +8,12 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Question is null ? "Yeni soru" : "Soru")</h2>
+            <h2>@(Question is null ? Texts.Get("hr.question-form.new") : Texts.Get("hr.question-form.title"))</h2>
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">@Texts.Get("common.save")</button>
         </div>
     </div>
 
@@ -26,18 +26,18 @@
         <div class="alert alert-danger" role="alert">@layoutError</div>
     }
 
-    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Soru bölümleri">
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("hr.question-form.sections")">
         <Field Context="f">
             @switch (f.Key)
             {
                 case "text":
                     <label class="@f.LabelClass()" for="question-text">@f.Label</label>
-                    <input id="question-text" class="form-control" maxlength="500" required aria-required="true" placeholder="ör. İş yükünüzden ne kadar memnunsunuz?" @bind="form.Text" />
+                    <input id="question-text" class="form-control" maxlength="500" required aria-required="true" placeholder="@Texts.Get("hr.question-form.text-placeholder")" @bind="form.Text" />
                     <FieldError Field="text" Errors="errors" />
                     break;
                 case "sequence":
                     <label class="@f.LabelClass()" for="question-sequence">@f.Label</label>
-                    <input id="question-sequence" class="form-control" type="number" min="1" max="10000" placeholder="Son sorudan sonra" @bind="form.Sequence" />
+                    <input id="question-sequence" class="form-control" type="number" min="1" max="10000" placeholder="@Texts.Get("hr.question-form.sequence-placeholder")" @bind="form.Sequence" />
                     <FieldError Field="sequence" Errors="errors" />
                     break;
                 case "isRequired":
@@ -49,7 +49,7 @@
                 case "questionType":
                     <label class="@f.LabelClass()" for="question-type">@f.Label</label>
                     <select id="question-type" class="form-select" @bind="form.QuestionType">
-                        @foreach (var (key, label) in HrAccess.QuestionTypes)
+                        @foreach (var (key, label) in HrLabels.QuestionTypes)
                         {
                             <option value="@key">@label</option>
                         }
@@ -59,9 +59,9 @@
                 case "options":
                     <label class="@f.LabelClass()" for="question-options">@f.Label</label>
                     <textarea id="question-options" class="form-control" rows="5" maxlength="2000" disabled="@(form.QuestionType is not ("choice" or "multiChoice"))"
-                              placeholder="@("Evet\nKısmen\nHayır")" @bind="form.Options"></textarea>
+                              placeholder="@Texts.Get("hr.question-form.options-placeholder")" @bind="form.Options"></textarea>
                     <FieldError Field="options" Errors="errors" />
-                    <small class="text-muted">Yalnızca tek seçim sorusunda kullanılır.</small>
+                    <small class="text-muted">@Texts.Get("hr.question-form.options-help")</small>
                     break;
             }
         </Field>
@@ -102,7 +102,7 @@
             }
             : new QuestionForm();
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     private async Task SaveAsync()

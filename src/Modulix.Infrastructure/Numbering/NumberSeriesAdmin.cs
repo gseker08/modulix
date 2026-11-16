@@ -16,20 +16,31 @@ namespace Modulix.Infrastructure.Numbering;
 /// okur. Sayacı ileri alma tek SQL ifadesiyle ve yalnızca ileriye yapılır (aynı anda verilen numarayla yarışmaz). Her değişiklik denetim kaydına girer.
 /// </summary>
 internal sealed class NumberSeriesAdmin(
-    ModulixDbContext db, ModuleCatalog modules, ITenantContextAccessor tenantAccessor, ITenantClock clock, IAuditWriter audit, TimeProvider time) : INumberSeriesAdmin
+    ModulixDbContext db, ModuleCatalog modules, ITenantContextAccessor tenantAccessor, ITenantClock clock, IAuditWriter audit, TimeProvider time,
+    Modulix.Core.Contracts.Authorization.ICurrentAccess access) : INumberSeriesAdmin
 {
     public async Task<IReadOnlyList<NumberSeriesView>> ListAsync(CancellationToken cancellationToken)
     {
         int year = (await clock.GetAsync(cancellationToken)).Today.Year;
         Dictionary<string, NumberSeriesSetting> settings = await db.NumberSeriesSettings.AsNoTracking().ToDictionaryAsync(s => s.SeriesKey, StringComparer.Ordinal, cancellationToken);
         List<NumberCounter> counters = await db.NumberCounters.AsNoTracking().ToListAsync(cancellationToken);
-        return [.. modules.NumberSeries.Select(s => View(s.ModuleKey, s.Series, settings.GetValueOrDefault(s.Series.Key), counters, year))];
+        List<NumberSeriesView> views = [];
+        foreach ((string moduleKey, NumberSeriesDefinition series) in modules.NumberSeries)
+        {
+            // Firmada açık olmayan modülün serisi listelenmez ve yönetilemez.
+            if (await access.IsModuleEnabledAsync(moduleKey, cancellationToken))
+            {
+                views.Add(View(moduleKey, series, settings.GetValueOrDefault(series.Key), counters, year));
+            }
+        }
+
+        return views;
     }
 
     public async Task<NumberSeriesView?> ConfigureAsync(
         string seriesKey, string? prefix, int digits, NumberSeriesReset reset, long expectedVersion, CancellationToken cancellationToken)
     {
-        if (Find(seriesKey) is not { } found)
+        if (await FindAsync(seriesKey, cancellationToken) is not { } found)
         {
             return null;
         }
@@ -53,7 +64,7 @@ internal sealed class NumberSeriesAdmin(
 
     public async Task<NumberSeriesView?> AdvanceAsync(string seriesKey, long nextValue, long expectedVersion, CancellationToken cancellationToken)
     {
-        if (Find(seriesKey) is not { } found)
+        if (await FindAsync(seriesKey, cancellationToken) is not { } found)
         {
             return null;
         }
@@ -89,11 +100,11 @@ internal sealed class NumberSeriesAdmin(
         return await ViewAsync(found.ModuleKey, found.Series, setting, cancellationToken);
     }
 
-    private (string ModuleKey, NumberSeriesDefinition Series)? Find(string seriesKey)
+    private async Task<(string ModuleKey, NumberSeriesDefinition Series)?> FindAsync(string seriesKey, CancellationToken cancellationToken)
     {
         foreach ((string ModuleKey, NumberSeriesDefinition Series) entry in modules.NumberSeries)
         {
-            if (entry.Series.Key == seriesKey)
+            if (entry.Series.Key == seriesKey && await access.IsModuleEnabledAsync(entry.ModuleKey, cancellationToken))
             {
                 return entry;
             }

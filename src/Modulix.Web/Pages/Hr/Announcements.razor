@@ -3,13 +3,13 @@
 @inject SessionState Session
 @inject CrmLookups Lookups
 
-<PageTitle>Duyurular · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.announcements") · Modulix</PageTitle>
 
 @* Duyuru akışı (ADR-0042 dilim 6): kullanıcıya hedeflenen, yayında ve süresi dolmamış duyurular; sabitlenmiş olanlar üstte, okunmamışlar "Yeni"
    işaretli. Duyuru açılınca okundu yazılır ve ekleri (görsel, belge; ADR-0040 dosyaları, bölüm 23a) listelenir. Hangi duyurunun görüneceğine sunucu karar verir.
    Metin düz metindir (HTML yorumlanmaz). *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.AnnouncementsRead">
-    <PageHeader Title="Duyurular" Icon="bell" Subtitle="@(page is null ? "Kurum içi duyurular." : $"{page.TotalCount} duyuru · {Unread} okunmamış")" />
+    <PageHeader Title="@Texts.Get("nav.app.hr.announcements")" Icon="bell" Subtitle="@(page is null ? Texts.Get("hr.announcements.intro") : Texts.Get("hr.announcements.count-unread", page.TotalCount, Unread))" />
 
     @if (message is not null)
     {
@@ -18,7 +18,7 @@
 
     <div class="list-toolbar">
         <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-            <input class="form-control" type="search" aria-label="Duyurularda ara" placeholder="Başlık ya da metinde ara" @bind="search" />
+            <input class="form-control" type="search" aria-label="@Texts.Get("hr.announcements.search-label")" placeholder="@Texts.Get("hr.blog.search-placeholder")" @bind="search" />
         </form>
     </div>
 
@@ -28,11 +28,11 @@
     }
     else if (page.Items.Count == 0)
     {
-        <EmptyState Compact="true" Title="Şu an size yönelik duyuru yok." />
+        <EmptyState Compact="true" Title="@Texts.Get("hr.announcements.empty")" />
     }
     else
     {
-        <ul class="list-unstyled" aria-label="Duyurular">
+        <ul class="list-unstyled" aria-label="@Texts.Get("nav.app.hr.announcements")">
             @foreach (var announcement in page.Items)
             {
                 var open = expanded.Contains(announcement.Id);
@@ -41,11 +41,11 @@
                         <h2 class="h6 mb-0 me-auto">@WarehouseLabels.Text(announcement, "title")</h2>
                         @if (WarehouseLabels.Flag(announcement, "isPinned"))
                         {
-                            <span class="badge stage-qualified">Sabitlenmiş</span>
+                            <span class="badge stage-qualified">@Texts.Get("home.announcements.pinned")</span>
                         }
                         @if (!WarehouseLabels.Flag(announcement, "readByMe"))
                         {
-                            <span class="badge stage-negotiation">Yeni</span>
+                            <span class="badge stage-negotiation">@Texts.Get("home.announcements.new")</span>
                         }
                     </div>
                     <p class="text-muted mb-2">
@@ -54,12 +54,12 @@
                     @if (open)
                     {
                         <p class="preline mb-2">@WarehouseLabels.Text(announcement, "body")</p>
-                        <AttachmentPanel EntityKey="@HrAccess.AnnouncementEntityKey" RecordId="announcement.Id" Title="Ekler" EmptyText="Bu duyurunun eki yok." />
+                        <AttachmentPanel EntityKey="@HrAccess.AnnouncementEntityKey" RecordId="announcement.Id" Title="@Texts.Get("hr.content.attachments")" EmptyText="@Texts.Get("hr.announcements.attachments-empty")" />
                         <ContentDiscussion Route="announcements" CommentEntityKey="@HrAccess.AnnouncementCommentEntityKey" Content="announcement" Lookups="Lookups"
                                            CanModerate="@Session.Can(HrAccess.AnnouncementsManage)" />
                     }
                     <button type="button" class="btn btn-ghost" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleAsync(announcement)">
-                        <AppIcon Name="@(open ? "chevron-down" : "chevron-right")" Size="16" /> @(open ? "Kapat" : "Oku")
+                        <AppIcon Name="@(open ? "chevron-down" : "chevron-right")" Size="16" /> @(open ? Texts.Get("common.close") : Texts.Get("hr.announcements.read"))
                     </button>
                 </li>
             }

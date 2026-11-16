@@ -1,8 +1,10 @@
+using System.Globalization;
 using System.Net;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
@@ -219,7 +221,8 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
             }
 
             var link = services.GetRequiredService<INotificationRecipients>().Link("raporlar/disa-aktarimlar");
-            services.GetRequiredService<IEmailQueue>().Enqueue(Message(recipient, export, link));
+            var texts = await services.GetRequiredService<IRecipientLanguage>().ForUserAsync(recipient.UserId, cancellationToken);
+            services.GetRequiredService<IEmailQueue>().Enqueue(Message(texts, recipient, export, link));
             await services.GetRequiredService<ModulixDbContext>().SaveChangesAsync(cancellationToken);
             var recipientNote = await DeliverToRecipientsAsync(tenantId, claim, recipient.DisplayName, cancellationToken);
             return (Outcome.Delivered, export.Id, $"{export.RowCount} satırlık dosya hazırlandı.{recipientNote}");
@@ -325,7 +328,8 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
                 return "raporu göremiyor";
             }
 
-            services.GetRequiredService<IEmailQueue>().Enqueue(Message(recipient, export, recipients.Link("raporlar/disa-aktarimlar"), ownerName));
+            var texts = await services.GetRequiredService<IRecipientLanguage>().ForUserAsync(recipient.UserId, cancellationToken);
+            services.GetRequiredService<IEmailQueue>().Enqueue(Message(texts, recipient, export, recipients.Link("raporlar/disa-aktarimlar"), ownerName));
             await services.GetRequiredService<ModulixDbContext>().SaveChangesAsync(cancellationToken);
             return null;
         }
@@ -378,21 +382,25 @@ public sealed class ReportScheduleRunner(IServiceScopeFactory scopes, TimeProvid
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static EmailMessage Message(NotificationRecipient recipient, ReportExportInfo export, string? link, string? scheduledBy = null)
+    // Alıcının dilinde (ADR-0034 §6, dilim 18b); kullanıcı girdisi (rapor ve kişi adı) HTML'e kodlanarak girer.
+    private static EmailMessage Message(LocalizedTexts t, NotificationRecipient recipient, ReportExportInfo export, string? link, string? scheduledBy = null)
     {
+        var name = WebUtility.HtmlEncode(export.ReportName);
+        var expires = export.ExpiresAt.ToUniversalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
         var html = string.Concat(
-            $"<p>Merhaba {WebUtility.HtmlEncode(recipient.DisplayName)},</p>",
+            $"<p>{t.Get("email.common.greeting", WebUtility.HtmlEncode(recipient.DisplayName))}</p>",
             scheduledBy is null
-                ? $"<p>Zamanlanmış raporunuz hazır: <strong>{WebUtility.HtmlEncode(export.ReportName)}</strong> ({export.RowCount} satır).</p>"
-                : $"<p>{WebUtility.HtmlEncode(scheduledBy)} tarafından zamanlanan rapor sizin yetkinizle hazırlandı: <strong>{WebUtility.HtmlEncode(export.ReportName)}</strong> ({export.RowCount} satır).</p>",
+                ? $"<p>{t.Get("email.report.ready-html", name, export.RowCount)}</p>"
+                : $"<p>{t.Get("email.report.ready-for-html", WebUtility.HtmlEncode(scheduledBy), name, export.RowCount)}</p>",
             link is null
-                ? "<p>Dosyayı Modülix'te Raporlar &gt; Dışa aktarımlar bölümünden indirebilirsiniz.</p>"
-                : $"<p><a href=\"{WebUtility.HtmlEncode(link)}\">Dosyayı indir</a></p>",
-            $"<p style=\"color:#666\">Dosya {export.ExpiresAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC'ye kadar saklanır. Veri bu e-postada yer almaz; indirirken yetkiniz yeniden denetlenir.</p>");
-        return new EmailMessage(recipient.Email, $"Zamanlanmış rapor hazır: {export.ReportName.ReplaceLineEndings(" ")}", html)
+                ? $"<p>{t.Get("email.report.download-hint-html")}</p>"
+                : $"<p><a href=\"{WebUtility.HtmlEncode(link)}\">{WebUtility.HtmlEncode(t.Get("email.report.download"))}</a></p>",
+            $"<p style=\"color:#666\">{WebUtility.HtmlEncode(t.Get("email.report.footer", expires))}</p>");
+        return new EmailMessage(recipient.Email, t.Get("email.report.subject", export.ReportName.ReplaceLineEndings(" ")), html)
         {
             ToName = recipient.DisplayName,
             Reference = $"core.report-export:{export.Id}",
+            Language = t.Language,
         };
     }
 
