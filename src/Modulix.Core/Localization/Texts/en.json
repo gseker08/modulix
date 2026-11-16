@@ -6817,6 +6817,8 @@
   "platform.moduleRights.intro": "Which modules are enabled in which companies. Disabling does not delete data; when the module is enabled again, the permissions in roles apply again. The core (Administration) is enabled in every company.",
   "platform.moduleRights.disabled": "{0}: {1} disabled. No data was deleted.",
   "platform.moduleRights.enabled": "{0}: {1} enabled.",
+  "admin.home.dependencies": "Module dependencies",
+  "admin.home.dependenciesIntro": "Some of your enabled modules depend on a module that is disabled. Modules are managed by the platform; contact your provider to have one enabled.",
   "platform.dependency.required": "Required dependency: cannot be enabled without {0} ({1})",
   "platform.dependency.optional": "Optional dependency: while {0} is disabled, this is unavailable: {1}",
   "platform.dependency.missingRequired": "{0} cannot be used without {1} ({2}).",

@@ -1,6 +1,6 @@
 # ADR-0051: Modül bağımlılık beyanı
 
-- **Durum:** Kabul edildi, 16 Kasım 2026 (açık sorular aynı gün karara bağlandı, aşağıda). Dilim 1 (beyan, katalog doğrulaması, ilk beyanlar, mimari test) ve dilim 2 (zorunlu bağımlılığın hak yazılırken denetimi) teslim edildi. Dilim 3a (platform: bağımlılık bilgisi, eksik bağımlılık uyarısı, rapor) teslim edildi; firma tarafındaki bilgi dilim 3b'de.
+- **Durum:** Kabul edildi, 16 Kasım 2026 (açık sorular aynı gün karara bağlandı, aşağıda). Dilim 1 (beyan, katalog doğrulaması, ilk beyanlar, mimari test) ve dilim 2 (zorunlu bağımlılığın hak yazılırken denetimi) teslim edildi. Dilim 3a (platform: bağımlılık bilgisi, eksik bağımlılık uyarısı, rapor) ve dilim 3b (firma yöneticisine bilgi) teslim edildi.
 - **Kaynak:** [Core mimari değerlendirmesi](../core-mimari-degerlendirme-2026-11.md) H7; [öncelik listesi](../oncelikli-isler.md) C6.
 - **İlgili:** ADR-0028 (lisans ve tenant yönetimi), ADR-0044 (modül sözleşme projeleri).
 
@@ -140,8 +140,10 @@ Dilim 3 ikiye bölündü:
   `missingDependencies` taşır (zorunlu ve isteğe bağlı eksikler, gerekçesiyle); `GET /api/platform/dependency-gaps` zorunlu bağımlılığı
   eksik, erişime açık firmaları listeler. Ekran: firma detayında modülün altında bağımlılık satırı ve eksikler için uyarı/bilgi kutusu,
   katalogda bağımlılık satırı, platform ana sayfasında "Bağımlılığı eksik firmalar".
-- **3b (firma tarafı, bekliyor).** Firma yöneticisinin gördüğü bilgi. Bugün firma tarafında modülleri listeleyen bir ekran yok; yeri
-  3b'de kararlaştırılır.
+- **3b (firma tarafı, teslim edildi).** Firma tarafında modülleri listeleyen ayrı bir ekran olmadığı için bilgi Yönetim ana sayfasına
+  ("Modül bağımlılıkları" bölümü, yalnızca eksik varsa) kondu. Veri `GET /api/tenant/access` yanıtındaki `missingDependencies` ile gelir
+  (lisans uyarısıyla aynı kalıp); yalnızca firma yöneticisine dolar. Her sayfada görünen bant yapılmadı: isteğe bağlı eksik kalıcı bir
+  durumdur, uyarı değil bilgidir.
 
 Karar 3'teki tablodan sapma: isteğe bağlı eksik için uyarı, hak yazan altı işlemin yanıtında değil firma yanıtında
 (`missingDependencies`) döner. Modül açma/kapama ve plan atama gövdesiz 204 döndürür; ekran işlemden sonra firmayı zaten yeniden okur.

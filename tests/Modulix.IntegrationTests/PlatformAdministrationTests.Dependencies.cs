@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Modules;
+using Modulix.Shared.Access;
 using Modulix.Shared.Platform;
 
 namespace Modulix.IntegrationTests;
@@ -229,5 +230,39 @@ public partial class PlatformAdministrationTests
 
         Assert.Equal(HttpStatusCode.Forbidden, (await tenantClient.GetAsync("/api/platform/dependency-gaps")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/platform/dependency-gaps")).StatusCode);
+    }
+
+    // ADR-0051 dilim 3b: firma yöneticisi eksik bağımlılığı bilgi olarak görür; hakkı değiştiremez.
+
+    [Fact]
+    public async Task A_tenant_administrator_sees_missing_dependencies_and_members_and_other_tenants_do_not()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        var other = await factory.CreateTenantAsync();
+        var admin = await factory.CreateUserAsync(tenant);
+        await MakeAdministratorAsync(tenant.Id, admin);
+        var member = await factory.CreateUserAsync(tenant);
+        var otherAdmin = await factory.CreateUserAsync(other);
+        await MakeAdministratorAsync(other.Id, otherAdmin);
+        using var platform = await LoginAsync(await CreatePlatformAdministratorAsync());
+        Assert.Equal(HttpStatusCode.NoContent, (await SetModuleAsync(platform, tenant.Id, "orders", true)).StatusCode);
+
+        using var adminClient = await LoginAsync(admin);
+        var missing = Assert.Single((await adminClient.GetFromJsonAsync<MyAccessResponse>("/api/tenant/access"))!.MissingDependencies);
+        Assert.Equal(("orders", Crm, false), (missing.ModuleKey, missing.DependencyKey, missing.Required));
+        Assert.False(string.IsNullOrWhiteSpace(missing.ModuleName));
+        Assert.False(string.IsNullOrWhiteSpace(missing.DependencyName));
+        Assert.False(string.IsNullOrWhiteSpace(missing.Reason));
+
+        // Yönetici olmayan üye ve başka firmanın yöneticisi bu bilgiyi görmez.
+        using var memberClient = await LoginAsync(member);
+        Assert.Empty((await memberClient.GetFromJsonAsync<MyAccessResponse>("/api/tenant/access"))!.MissingDependencies);
+        using var otherClient = await LoginAsync(otherAdmin);
+        Assert.Empty((await otherClient.GetFromJsonAsync<MyAccessResponse>("/api/tenant/access"))!.MissingDependencies);
+
+        // Firma yöneticisi hakkı değiştiremez; sağlayan platformdan açılınca bilgi kalkar.
+        Assert.Equal(HttpStatusCode.Forbidden, (await SetModuleAsync(adminClient, tenant.Id, Crm, true)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SetModuleAsync(platform, tenant.Id, Crm, true)).StatusCode);
+        Assert.Empty((await adminClient.GetFromJsonAsync<MyAccessResponse>("/api/tenant/access"))!.MissingDependencies);
     }
 }

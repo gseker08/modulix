@@ -6817,6 +6817,8 @@
   "platform.moduleRights.intro": "Şirkətlərdə hansı modulların açıq olduğu. Bağlamaq məlumatı silmir; modul yenidən açıldıqda rollardakı icazələr yenidən qüvvəyə minir. Nüvə (İdarəetmə) hər şirkətdə açıqdır.",
   "platform.moduleRights.disabled": "{0}: {1} bağlandı. Məlumat silinmədi.",
   "platform.moduleRights.enabled": "{0}: {1} açıldı.",
+  "admin.home.dependencies": "Modul asılılıqları",
+  "admin.home.dependenciesIntro": "Açıq modullarınızdan bəziləri bağlı bir moduldan asılıdır. Modulları platforma idarə edir; açdırmaq üçün xidmət təminatçınıza müraciət edin.",
   "platform.dependency.required": "Məcburi asılılıq: {0} açıq olmadan açıla bilməz ({1})",
   "platform.dependency.optional": "İstəyə bağlı asılılıq: {0} bağlı olduqda bu əskik qalır: {1}",
   "platform.dependency.missingRequired": "{0}, {1} açıq olmadan istifadə edilə bilməz ({2}).",
