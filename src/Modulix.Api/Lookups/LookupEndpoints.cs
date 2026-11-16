@@ -1,6 +1,7 @@
 using Modulix.Api.Access;
 using Modulix.Api.Records;
 using Modulix.Api.Tenancy;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Lookups;
 using Modulix.Core.Modules;
@@ -22,8 +23,11 @@ public static class LookupEndpoints
             .AddEndpointFilter<RequireTenantFilter>()
             .WithTags("Lookups");
 
-        lookups.MapGet("/", async (ILookupSettings settings, ModuleCatalog catalog, CancellationToken ct) =>
-            (await settings.ListAsync(ct)).Select(i => ToDto(i, catalog)).ToList());
+        lookups.MapGet("/", async (ILookupSettings settings, ModuleCatalog catalog, IRequestLanguage language, ITextCatalog texts, CancellationToken ct) =>
+        {
+            var bundle = texts.Bundle(await language.GetAsync(ct));
+            return (await settings.ListAsync(ct)).Select(i => ToDto(i, catalog, bundle)).ToList();
+        });
 
         lookups.MapGet("/{key}/search", async (
             string key, string? q, int? page, int? pageSize, Guid? parentId, ILookupSearch search, CancellationToken ct) =>
@@ -55,30 +59,36 @@ public static class LookupEndpoints
             .AddEndpointFilter<RequireTenantFilter>()
             .RequirePermission(CoreModule.Permissions.ManageCustomization)
             .WithTags("Customization")
-            .MapPut("/{key}", async (string key, SaveLookupSettingRequest request, ILookupSettings settings, ModuleCatalog catalog, CancellationToken ct) =>
+            .MapPut("/{key}", async (
+                string key, SaveLookupSettingRequest request, ILookupSettings settings, ModuleCatalog catalog, IRequestLanguage language, ITextCatalog texts,
+                CancellationToken ct) =>
             {
                 var result = await settings.SaveAsync(key, request.Searchable, request.Version, ct);
-                return result.IsSuccess ? Results.Ok(ToDto(result.Value!, catalog)) : RecordEndpoints.ToProblem(result.Error!);
+                return result.IsSuccess ? Results.Ok(ToDto(result.Value!, catalog, texts.Bundle(await language.GetAsync(ct)))) : RecordEndpoints.ToProblem(result.Error!);
             });
 
         return app;
     }
 
-    private static string? NameOf(ModuleCatalog catalog, string entityKey) => catalog.FindAuditedEntity(entityKey)?.DisplayName;
+    // Kayıt türü adları, lookup başlığı, aranan alan açıklaması ve bağımlılık ipucu okurun dilinde (ADR-0034, dilim 18c-4).
+    private static string? NameOf(ModuleCatalog catalog, string entityKey, IReadOnlyDictionary<string, string> bundle) =>
+        catalog.FindAuditedEntity(entityKey) is { } entity ? MetadataTexts.Text(bundle, MetadataTexts.EntityKey(entityKey), entity.DisplayName) : null;
 
     private static LookupItemDto ToDto(LookupItem item) => new(item.Id, item.Label, item.Secondary, item.Unavailable);
 
-    internal static LookupDto ToDto(LookupInfo info, ModuleCatalog catalog) => new(
+    internal static LookupDto ToDto(LookupInfo info, ModuleCatalog catalog, IReadOnlyDictionary<string, string> bundle) => new(
         info.Definition.Key,
         info.ModuleKey,
         info.Definition.SourceEntityKey,
-        NameOf(catalog, info.Definition.SourceEntityKey) ?? info.Definition.SourceEntityKey,
+        NameOf(catalog, info.Definition.SourceEntityKey, bundle) ?? info.Definition.SourceEntityKey,
         info.Definition.Field,
-        info.Definition.Title,
+        MetadataTexts.Text(bundle, MetadataTexts.LookupKey(info.Definition.Key), info.Definition.Title),
         info.Definition.IsMember,
         info.Definition.TargetEntityKey,
-        info.Definition.TargetEntityKey is null ? null : NameOf(catalog, info.Definition.TargetEntityKey),
-        info.Definition.SearchDescription,
+        info.Definition.TargetEntityKey is null ? null : NameOf(catalog, info.Definition.TargetEntityKey, bundle),
+        info.Definition.SearchDescription.Length == 0
+            ? info.Definition.SearchDescription
+            : MetadataTexts.Text(bundle, MetadataTexts.LookupDescriptionKey(info.Definition.Key), info.Definition.SearchDescription),
         info.Definition.DefaultSearchable,
         info.Searchable,
         info.Customized,
@@ -86,6 +96,6 @@ public static class LookupEndpoints
         info.Definition.MinSearchLength,
         info.Definition.PageSize,
         info.Definition.DependsOnField,
-        info.Definition.DependsOnHint,
+        info.Definition.DependsOnHint is null ? null : MetadataTexts.Text(bundle, MetadataTexts.LookupHintKey(info.Definition.Key), info.Definition.DependsOnHint),
         info.Definition.ViewPath);
 }

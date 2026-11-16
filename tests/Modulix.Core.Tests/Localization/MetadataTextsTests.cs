@@ -69,6 +69,42 @@ public class MetadataTextsTests
     }
 
     [Fact]
+    public void Built_in_choice_values_are_translated_unless_the_firm_renamed_them_and_save_returns_the_turkish_source()
+    {
+        var definition = new ChoiceListDefinition(
+            "crm.stage", "Fırsat aşaması", "crm.opportunity", "stage", true, [new ChoiceCategory("won", "Kazanıldı")],
+            [new ChoiceValueDefinition("New", "Yeni"), new ChoiceValueDefinition("Won", "Kazanıldı", "won")]);
+        var bundle = new Dictionary<string, string>
+        {
+            ["meta.choice-list.crm.stage"] = "Opportunity stage",
+            ["meta.choice-list.crm.stage.category.won"] = "Won",
+            ["meta.choice-list.crm.stage.value.New"] = "New",
+            ["meta.choice-list.crm.stage.value.Won"] = "Won",
+        };
+        // Firma "Won" değerini yeniden adlandırmış ve kendi "demo_yapildi" değerini eklemiş.
+        var list = new Core.Contracts.Customization.ChoiceList(
+            "crm.stage",
+            [new("New", "Yeni", null, true, true), new("Won", "Satış oldu", "won", true, true), new("demo_yapildi", "Demo yapıldı", null, true, false)]);
+
+        var localized = MetadataTexts.Localize(list, definition, bundle);
+        var localizedDefinition = MetadataTexts.Localize(definition, bundle);
+
+        Assert.Equal(["New", "Satış oldu", "Demo yapıldı"], localized.Values.Select(v => v.Label));
+        Assert.Equal(list.Values.Select(v => (v.Key, v.Category, v.Active, v.BuiltIn)), localized.Values.Select(v => (v.Key, v.Category, v.Active, v.BuiltIn)));
+        Assert.Equal(("Opportunity stage", "Won"), (localizedDefinition.DisplayName, localizedDefinition.Categories[0].DisplayName));
+        Assert.Equal("Yeni", MetadataTexts.ChoiceValueSource(definition, "New", "New", bundle));
+        Assert.Equal("Satış oldu", MetadataTexts.ChoiceValueSource(definition, "Won", "Satış oldu", bundle));
+        Assert.Equal("Demo", MetadataTexts.ChoiceValueSource(definition, "demo_yapildi", "Demo", bundle));
+    }
+
+    [Theory]
+    [InlineData("Europe/Istanbul", "Europe-Istanbul")]
+    [InlineData("08:00-17:00", "08-00-17-00")]
+    [InlineData("demo_yapildi", "demo-yapildi")]
+    public void Key_segment_replaces_characters_the_dictionary_key_does_not_accept(string value, string expected) =>
+        Assert.Equal(expected, MetadataTexts.KeySegment(value));
+
+    [Fact]
     public void An_empty_dictionary_leaves_the_entity_as_written() =>
         Assert.Equal("Firma (CRM)", MetadataTexts.Localize(Entity, new Dictionary<string, string>()).DisplayName);
 

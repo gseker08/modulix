@@ -281,7 +281,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
     {
         var rules = await Context.Data.Set<LeadScoreRule>().AsNoTracking().Where(r => r.IsActive).ToListAsync(cancellationToken);
         LeadBehavior? behavior = LeadScoring.NeedsBehavior(rules)
-            ? await new LeadBehaviorReader(Context.Data).ForLeadAsync(entity, cancellationToken)
+            ? await new LeadBehaviorReader(Context.Data, Context.Now).ForLeadAsync(entity, cancellationToken)
             : null;
         entity.Score = LeadScoring.Calculate(entity, rules, behavior);
     }

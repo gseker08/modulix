@@ -23,7 +23,7 @@
     var labelStep = Math.Max(1, (int)Math.Ceiling(Categories.Count / 8.0));
 }
 <div class="line-chart">
-    <svg viewBox="0 0 @Num(width) @Num(height)" role="img" aria-label="@Title">
+    <svg viewBox="0 0 @Num(width) @Num(height)" role="img" aria-label="@(Title ?? Texts.Get("chart.line"))">
         @foreach (var tick in new[] { min, (min + max) / 2, max })
         {
             @* SVG <text> öğesi Razor'ın <text> etiketiyle karışmasın diye <g> içinde yazılır. *@
@@ -90,7 +90,7 @@
 
     [Parameter, EditorRequired] public IReadOnlyList<LineSeries> Series { get; set; } = [];
 
-    [Parameter] public string Title { get; set; } = "Çizgi grafik";
+    [Parameter] public string? Title { get; set; }
 
     private static string Num(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 }
