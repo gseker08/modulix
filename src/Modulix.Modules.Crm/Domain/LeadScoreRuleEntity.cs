@@ -42,7 +42,13 @@ public static class LeadScoreOperator
     public const string IsSet = "isSet";
     public const string IsEmpty = "isEmpty";
 
-    public static readonly IReadOnlyList<string> All = [EqualsTo, NotEquals, Contains, IsSet, IsEmpty];
+    /// <summary>Sayaç alanı (dilim 2, davranış): sayı en az değer kadar. Değer 1..<see cref="MaxCount"/> tam sayıdır.</summary>
+    public const string AtLeast = "atLeast";
+
+    /// <summary>"En az" işlecinin alabileceği en büyük değer.</summary>
+    public const int MaxCount = 1000;
+
+    public static readonly IReadOnlyList<string> All = [EqualsTo, NotEquals, Contains, IsSet, IsEmpty, AtLeast];
 
     /// <summary>Değer gerektirmeyen işleçler.</summary>
     public static bool IsPresenceCheck(string op) => op is IsSet or IsEmpty;

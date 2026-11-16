@@ -274,12 +274,16 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
 
     /// <summary>
     /// Puan (ADR-0050) her kayıtta etkin kurallardan yeniden hesaplanır; değişiklik denetim kaydına ve olaya kayıtla aynı işlemde girer.
-    /// Kurallar iç okuyucuyla okunur: puan kuralı sunucu kararıdır, kural okuma izni gerekmez.
+    /// Kurallar iç okuyucuyla okunur: puan kuralı sunucu kararıdır, kural okuma izni gerekmez. Davranış sayaçları (dilim 2) yalnızca bir etkin
+    /// kural kullanıyorsa okunur.
     /// </summary>
     private async Task ScoreAsync(Lead entity, CancellationToken cancellationToken)
     {
         var rules = await Context.Data.Set<LeadScoreRule>().AsNoTracking().Where(r => r.IsActive).ToListAsync(cancellationToken);
-        entity.Score = LeadScoring.Calculate(entity, rules);
+        LeadBehavior? behavior = LeadScoring.NeedsBehavior(rules)
+            ? await new LeadBehaviorReader(Context.Data).ForLeadAsync(entity, cancellationToken)
+            : null;
+        entity.Score = LeadScoring.Calculate(entity, rules, behavior);
     }
 
     /// <summary>Sektör alanı kataloğa göre çözülür (<see cref="IndustryResolution"/>); sektör seçilince katalog öncesi serbest metin temizlenir.</summary>
