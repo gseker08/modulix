@@ -155,7 +155,7 @@ public class QuotePostAcceptTests(ModulixApiFactory factory) : IClassFixture<Mod
         var s = await SetUpAsync();
         using var admin = await LoginAsync(s.Admin);
         await SetSettingAsync(admin, "crm.quote.expiry-reminder-days", "5");
-        var runner = factory.Services.GetRequiredService<QuoteExpiryRunner>();
+        var runner = new QuoteExpiryRunner(factory.Services);
 
         var soon = await PresentedQuoteAsync(admin, s.CompanyId, validUntil: DateTimeOffset.UtcNow.AddDays(3));
         var later = await PresentedQuoteAsync(admin, s.CompanyId, validUntil: DateTimeOffset.UtcNow.AddDays(30));
@@ -200,7 +200,7 @@ public class QuotePostAcceptTests(ModulixApiFactory factory) : IClassFixture<Mod
     public async Task The_expiry_job_skips_the_round_while_another_instance_holds_the_lock()
     {
         var s = await SetUpAsync();
-        var runner = factory.Services.GetRequiredService<QuoteExpiryRunner>();
+        var runner = new QuoteExpiryRunner(factory.Services);
         var connectionString = factory.Services.GetRequiredService<Modulix.Infrastructure.Persistence.ModulixDatabaseOptions>().AppConnectionString;
 
         await using var other = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
