@@ -1,6 +1,7 @@
 using Modulix.Api.Access;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Modules;
 using Modulix.Core.Organization;
 using Modulix.Core.Platform;
@@ -104,14 +105,15 @@ public static class UserEndpoints
 
     /// <summary>"Bu kullanıcı neye erişebilir": geçerli izinler, veren rollerle; matris için açık modüllerin izinleri.</summary>
     private static async Task<IResult> GetAccessAsync(
-        Guid membershipId, IUserAdministration admin, ModuleCatalog catalog, ICurrentAccess access, CancellationToken ct)
+        Guid membershipId, IUserAdministration admin, ModuleCatalog catalog, ICurrentAccess access, IRequestLanguage language, ITextCatalog texts,
+        CancellationToken ct)
     {
         try
         {
             var result = await admin.GetAccessAsync(membershipId, ct);
             return Results.Ok(new UserAccessDto(
                 result.IsAdministrator,
-                await AccessEndpoints.AssignablePermissionsAsync(catalog, access, ct),
+                await AccessEndpoints.AssignablePermissionsAsync(catalog, access, language, texts, ct),
                 result.Permissions.Select(p => new PermissionGrantDto(p.Key, p.GrantedBy.Select(r => new UserRoleDto(r.Id, r.Name, r.IsSystem, r.ViaBusinessUnit)).ToList())).ToList(),
                 (Shared.Access.RecordScope)result.Scope,
                 result.Teams,

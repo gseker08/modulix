@@ -19,6 +19,32 @@ public static class MetadataTexts
     /// <summary>Kayıt türünün kodda tanımlı seçenekli alanındaki değerin adı.</summary>
     public static string OptionKey(string entityKey, string field, string value) => $"meta.option.{entityKey}.{field}.{value}";
 
+    /// <summary>Modülün adı (<see cref="IModule.DisplayName"/>).</summary>
+    public static string ModuleKey(string moduleKey) => $"meta.module.{moduleKey}";
+
+    /// <summary>İznin rol ekranındaki açıklaması (<see cref="PermissionDefinition.DisplayName"/>).</summary>
+    public static string PermissionKey(string permissionKey) => $"meta.permission.{permissionKey}";
+
+    /// <summary>İznin rol ekranındaki satır (kaynak) adı (<see cref="PermissionDefinition.ResourceName"/>).</summary>
+    public static string PermissionResourceKey(string permissionKey) => $"meta.permission.{permissionKey}.resource";
+
+    /// <summary>Hazır rolün adı (<see cref="RoleTemplate.Name"/>).</summary>
+    public static string RoleTemplateKey(string templateKey) => $"meta.role-template.{templateKey}";
+
+    /// <summary>Hazır rolün açıklaması (<see cref="RoleTemplate.Description"/>).</summary>
+    public static string RoleTemplateDescriptionKey(string templateKey) => $"meta.role-template.{templateKey}.description";
+
+    /// <summary>Hazır rolün adı ve açıklaması <paramref name="bundle"/> dilinde.</summary>
+    public static RoleTemplate Localize(RoleTemplate template, IReadOnlyDictionary<string, string> bundle)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        return template with
+        {
+            Name = Text(bundle, RoleTemplateKey(template.Key), template.Name),
+            Description = Text(bundle, RoleTemplateDescriptionKey(template.Key), template.Description),
+        };
+    }
+
     /// <summary>Anahtarın sözlükteki metni; yoksa <paramref name="source"/> (Türkçe kaynak metin).</summary>
     public static string Text(IReadOnlyDictionary<string, string> bundle, string key, string source)
     {

@@ -97,6 +97,36 @@ public class ModulesAndRolesTests(ModulixApiFactory factory) : IClassFixture<Mod
     }
 
     [Fact]
+    public async Task Permission_module_template_and_scope_type_names_come_in_the_readers_language()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "crm", enabled: true);
+        var english = await factory.CreateUserAsync(tenant);
+        var turkish = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [ManageRoles, CompaniesRead], english, turkish);
+        using var englishClient = await LoginAsync(english.Email!);
+        Assert.Equal(HttpStatusCode.OK, (await englishClient.PutAsJsonAsync("/api/account/language", new Shared.Account.UpdateLanguageRequest("en"))).StatusCode);
+
+        // İngilizce okur: izin açıklaması, satır ve modül adı, hazır roller ve kapsam türleri İngilizce; anahtarlar değişmez.
+        var permissions = await englishClient.GetFromJsonAsync<List<PermissionDto>>("/api/roles/permissions");
+        var read = Assert.Single(permissions!, p => p.Key == CompaniesRead);
+        Assert.Equal(("Views companies", "Companies", "CRM", "crm"), (read.DisplayName, read.ResourceName, read.ModuleName, read.ModuleKey));
+        Assert.Contains(permissions!, p => p.ModuleKey == "core" && p.ModuleName == "Core");
+        var templates = await englishClient.GetFromJsonAsync<List<RoleTemplateDto>>("/api/roles/templates");
+        Assert.Contains(templates!, t => t.Key == "crm.sales-rep" && t.Name == "Sales representative" && t.Permissions.Count > 0);
+        Assert.Contains(templates!, t => t.Key == "core.read-only" && t.Name == "Read-only");
+        var scopes = await englishClient.GetFromJsonAsync<List<RoleScopeTypeDto>>("/api/roles/scope-types");
+        Assert.Contains(scopes!, s => s.EntityKey == "crm.company" && s.Label == "Company (CRM)");
+
+        // Aynı firmanın tercihsiz kullanıcısı Türkçe görür.
+        using var turkishClient = await LoginAsync(turkish.Email!);
+        var same = await turkishClient.GetFromJsonAsync<List<PermissionDto>>("/api/roles/permissions");
+        var sameRead = Assert.Single(same!, p => p.Key == CompaniesRead);
+        Assert.Equal(("Firmaları görüntüler", "Firmalar", "CRM"), (sameRead.DisplayName, sameRead.ResourceName, sameRead.ModuleName));
+        Assert.Contains(await turkishClient.GetFromJsonAsync<List<RoleTemplateDto>>("/api/roles/templates") ?? [], t => t.Key == "core.read-only" && t.Name == "Salt okur");
+    }
+
+    [Fact]
     public async Task Duplicate_role_name_and_unknown_permission_are_rejected()
     {
         var tenant = await factory.CreateTenantAsync();

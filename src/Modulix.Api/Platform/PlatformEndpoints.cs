@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Modulix.Api.Customization;
+using Modulix.Api.Localization;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
 using Modulix.Core.Modules;
@@ -182,33 +184,37 @@ public static class PlatformEndpoints
             result.Page, result.PageSize, result.TotalCount));
     }
 
-    private static PlatformModulesResponse ListModules(ModuleCatalog catalog)
+    private static async Task<PlatformModulesResponse> ListModules(
+        ModuleCatalog catalog, IRequestLanguage language, ITextCatalog texts, CancellationToken ct)
     {
+        var bundle = await MetadataLabels.BundleAsync(language, texts, ct);
         var modules = catalog.Modules
             .Where(m => !ModuleCatalog.IsAlwaysEnabled(m.Key))
             .Select(m => new PlatformModuleDto(
                 m.Key,
-                m.DisplayName,
-                m.RoleTemplates.Select(t => new RoleTemplateDto(t.Key, t.Name, t.Description, t.Permissions)).ToList()))
+                MetadataLabels.Module(m, bundle),
+                m.RoleTemplates.Select(t => MetadataLabels.Template(t, bundle)).ToList()))
             .ToList();
 
         var readOnly = catalog.TemplatesFor(catalog.Modules.Select(m => m.Key).ToHashSet(StringComparer.Ordinal))
             .Single(t => t.Key == ModuleCatalog.ReadOnlyTemplateKey);
-        return new PlatformModulesResponse(modules, new RoleTemplateDto(readOnly.Key, readOnly.Name, readOnly.Description, []));
+        return new PlatformModulesResponse(modules, MetadataLabels.Template(readOnly, bundle, withPermissions: false));
     }
 
     /// <summary>Modül kataloğu (Y4b): kayıtlı modüller, izinleri, hazır rolleri ve kaç firmada açık oldukları.</summary>
-    private static async Task<List<CatalogModuleDto>> GetCatalogAsync(ModuleCatalog catalog, IPlatformAdministration admin, CancellationToken ct)
+    private static async Task<List<CatalogModuleDto>> GetCatalogAsync(
+        ModuleCatalog catalog, IPlatformAdministration admin, IRequestLanguage language, ITextCatalog texts, CancellationToken ct)
     {
         var usage = (await admin.GetModuleUsageAsync(ct)).ToDictionary(u => u.ModuleKey, u => u.EnabledTenantCount);
+        var bundle = await MetadataLabels.BundleAsync(language, texts, ct);
         return catalog.Modules
             .Select(m => new CatalogModuleDto(
                 m.Key,
-                m.DisplayName,
+                MetadataLabels.Module(m, bundle),
                 ModuleCatalog.IsAlwaysEnabled(m.Key),
                 usage.TryGetValue(m.Key, out var count) ? count : null,
-                m.Permissions.Select(p => new PermissionDto(p.Key, p.DisplayName, m.Key, m.DisplayName, p.ResourceName ?? AccessKeys.ResourceOf(p.Key))).ToList(),
-                m.RoleTemplates.Select(t => new RoleTemplateDto(t.Key, t.Name, t.Description, t.Permissions)).ToList()))
+                m.Permissions.Select(p => MetadataLabels.Permission(p, m, bundle)).ToList(),
+                m.RoleTemplates.Select(t => MetadataLabels.Template(t, bundle)).ToList()))
             .ToList();
     }
 
