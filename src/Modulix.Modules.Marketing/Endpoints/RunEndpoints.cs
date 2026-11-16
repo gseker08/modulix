@@ -1,10 +1,11 @@
-using Modulix.Api.Access;
-using Modulix.Api.Records;
-using Modulix.Modules.Marketing;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Marketing.Runs;
 using Modulix.Shared.Marketing;
 
-namespace Modulix.Api.Marketing;
+namespace Modulix.Modules.Marketing.Endpoints;
 
 /// <summary>
 /// Kampanya içeriği ve çalıştırma uç noktaları (ADR-0025, dilim 5). İçerik sürümleri değişmez. Çalıştırma durumu yalnızca eylem uç noktalarıyla değişir
@@ -28,7 +29,7 @@ internal static class RunEndpoints
         group.MapPost("/campaign-contents/{id:guid}/test-send", async (Guid id, ICampaignTestSends service, CancellationToken ct) =>
         {
             var result = await service.SendAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(new TestSendResultDto(result.Value!.Outcome, result.Value.Code)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(new TestSendResultDto(result.Value!.Outcome, result.Value.Code)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(MarketingModule.Permissions.CampaignsRead);
 
         var runs = group.MapGroup("/campaign-runs");
@@ -37,7 +38,7 @@ internal static class RunEndpoints
             runs.MapPost($"/{{id:guid}}/{action}", async (Guid id, RunActionRequest? r, ICampaignRuns service, CancellationToken ct) =>
             {
                 var result = await service.ActAsync(id, action, r?.Reason, r?.Version, ct);
-                return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<CampaignRunDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+                return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<CampaignRunDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
             }).RequirePermission(MarketingModule.Permissions.CampaignsRead);
         }
 
@@ -48,7 +49,7 @@ internal static class RunEndpoints
                 ? Results.Ok(new ProcessResultDto(
                     result.Value!.Processed, result.Value.Accepted, result.Value.Failed, result.Value.Skipped, result.Value.Unknown, result.Value.Requeued,
                     result.Value.Remaining, result.Value.Completed))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(MarketingModule.Permissions.CampaignsRead);
 
         runs.MapGet("/{id:guid}/summary", async (Guid id, ICampaignRuns service, CancellationToken ct) =>
@@ -56,7 +57,7 @@ internal static class RunEndpoints
             var result = await service.SummaryAsync(id, ct);
             return result.IsSuccess
                 ? Results.Ok(new RunSummaryDto(result.Value!.Status, result.Value.Total, result.Value.Statuses, result.Value.Codes, result.Value.ProviderConfigured, result.Value.Provider, result.Value.UnsubscribeLinkAvailable))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(MarketingModule.Permissions.CampaignsRead);
 
         runs.MapGet("/{id:guid}/deliveries", async (Guid id, string? status, string? code, int? page, int? pageSize, ICampaignRuns service, CancellationToken ct) =>
@@ -66,7 +67,7 @@ internal static class RunEndpoints
                 ? Results.Ok(new CampaignDeliveryPageDto(
                     [.. result.Value!.Items.Select(d => new CampaignDeliveryDto(d.Id, d.TargetId, d.PersonId, d.Status, d.Code, d.Attempts, d.ProviderMessageId, d.UpdatedAt))],
                     result.Value.Page, result.Value.PageSize, result.Value.TotalCount))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(MarketingModule.Permissions.CampaignsRead);
     }
 }

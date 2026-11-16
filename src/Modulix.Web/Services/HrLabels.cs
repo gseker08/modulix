@@ -6,7 +6,13 @@ namespace Modulix.Web.Services;
 /// <summary>İK ekranlarının etiket ve rozet kuralları. Rozet tonları yalnızca mevcut tasarım sınıflarından seçilir.</summary>
 public static class HrLabels
 {
-    public static string Status(string? key) => HrAccess.Statuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Çalışan durumları; metin sözlükten (<c>hr.employee-status.&lt;değer küçük harf&gt;</c>), yoksa Türkçe kaynak (ADR-0034, İK dilim 19f).</summary>
+    public static IReadOnlyList<(string Key, string Label)> Statuses => WarehouseLabels.Translate("hr.employee-status", HrAccess.Statuses);
+
+    /// <summary>Çalışma şekilleri; metin sözlükten (<c>hr.employment-type.&lt;değer küçük harf&gt;</c>), yoksa Türkçe kaynak.</summary>
+    public static IReadOnlyList<(string Key, string Label)> EmploymentTypes => WarehouseLabels.Translate("hr.employment-type", HrAccess.EmploymentTypes);
+
+    public static string Status(string? key) => Statuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Çalışıyor başarı tonu, izinde dikkat tonu, ayrılan nötr ton.</summary>
     public static string StatusBadge(string? key) => key switch
@@ -16,7 +22,10 @@ public static class HrLabels
         _ => "status-inactive",
     };
 
-    public static string EmploymentType(string? key) => HrAccess.EmploymentTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    public static string EmploymentType(string? key) => EmploymentTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+
+    /// <summary>Unvanı boş çalışan için gösterilen metin.</summary>
+    public static string NoJobTitle => Texts.GetOr("hr.employee.no-title", "Unvan girilmedi");
 
     /// <summary>"yyyy-AA-gg" tarihini gg.AA.yyyy gösterir; boşsa "—".</summary>
     public static string Everyone => Texts.GetOr("hr.audience.everyone", "Herkes");
@@ -66,7 +75,10 @@ public static class HrLabels
         return string.Concat(first is { Length: > 0 } f ? f[..1] : string.Empty, last is { Length: > 0 } l ? l[..1] : string.Empty).ToUpper(System.Globalization.CultureInfo.GetCultureInfo("tr-TR"));
     }
 
-    public static string LeaveStatus(string? key) => HrAccess.LeaveStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>İzin talebi durumları; metin sözlükten (<c>hr.leave-status.&lt;değer&gt;</c>), yoksa Türkçe kaynak (ADR-0034, İK dilim 19d).</summary>
+    public static IReadOnlyList<(string Key, string Label)> LeaveStatuses => WarehouseLabels.Translate("hr.leave-status", HrAccess.LeaveStatuses);
+
+    public static string LeaveStatus(string? key) => LeaveStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Bekleyen dikkat tonu, onaylanan başarı tonu, reddedilen kayıp tonu, iptal nötr ton.</summary>
     public static string LeaveStatusBadge(string? key) => key switch
@@ -78,7 +90,8 @@ public static class HrLabels
     };
 
     /// <summary>Gün sayısı: "3 gün", "0,5 gün".</summary>
-    public static string Days(decimal? days) => days is { } d ? $"{d.ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))} gün" : "—";
+    public static string Days(decimal? days) =>
+        days is { } d ? string.Format(System.Globalization.CultureInfo.InvariantCulture, Texts.GetOr("hr.leave.days", "{0} gün"), d.ToString("0.#", System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))) : "—";
 
     public static decimal? Decimal(RecordResponse record, string field) => record.Values[field]?.GetValue<decimal>();
 
@@ -87,11 +100,14 @@ public static class HrLabels
     {
         var start = Date(WarehouseLabels.Text(request, "startDate"));
         var end = Date(WarehouseLabels.Text(request, "endDate"));
-        var half = WarehouseLabels.Flag(request, "halfDay") ? " (yarım gün)" : string.Empty;
+        var half = WarehouseLabels.Flag(request, "halfDay") ? " (" + Texts.GetOr("hr.leave.half-day", "yarım gün") + ")" : string.Empty;
         return (start == end ? start : $"{start} – {end}") + half;
     }
 
-    public static string ExpenseStatus(string? key) => HrAccess.ExpenseStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Masraf beyanı durumları; metin sözlükten (<c>hr.expense-status.&lt;değer&gt;</c>), yoksa Türkçe kaynak (ADR-0034, İK dilim 19e).</summary>
+    public static IReadOnlyList<(string Key, string Label)> ExpenseStatuses => WarehouseLabels.Translate("hr.expense-status", HrAccess.ExpenseStatuses);
+
+    public static string ExpenseStatus(string? key) => ExpenseStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     /// <summary>Taslak nötr, onay bekleyen dikkat, onaylanan marka, ödenen başarı, reddedilen kayıp, iptal nötr ton.</summary>
     public static string ExpenseStatusBadge(string? key) => key switch
@@ -153,7 +169,13 @@ public static class HrLabels
 
     public static string TaskType(string? key) => HrAccess.ChecklistTaskTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
-    public static string SurveyStatus(string? key) => HrAccess.SurveyStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    /// <summary>Anket durumları; metin sözlükten (<c>hr.survey-status.&lt;değer&gt;</c>), yoksa Türkçe kaynak (ADR-0034, İK dilim 19c).</summary>
+    public static IReadOnlyList<(string Key, string Label)> SurveyStatuses => WarehouseLabels.Translate("hr.survey-status", HrAccess.SurveyStatuses);
+
+    /// <summary>Soru türleri; metin sözlükten (<c>hr.question-type.&lt;değer küçük harf&gt;</c>), yoksa Türkçe kaynak.</summary>
+    public static IReadOnlyList<(string Key, string Label)> QuestionTypes => WarehouseLabels.Translate("hr.question-type", HrAccess.QuestionTypes);
+
+    public static string SurveyStatus(string? key) => SurveyStatuses.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 
     public static string SurveyStatusBadge(string? key) => key switch
     {
@@ -162,5 +184,5 @@ public static class HrLabels
         _ => "status-inactive",
     };
 
-    public static string QuestionType(string? key) => HrAccess.QuestionTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
+    public static string QuestionType(string? key) => QuestionTypes.FirstOrDefault(s => s.Key == key).Label ?? key ?? string.Empty;
 }

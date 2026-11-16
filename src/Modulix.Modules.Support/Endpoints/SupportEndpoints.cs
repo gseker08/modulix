@@ -1,29 +1,30 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Access;
-using Modulix.Api.Records;
-using Modulix.Modules.Support;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Support.Lifecycle;
 using Modulix.Shared.Support;
 
-namespace Modulix.Api.Support;
+namespace Modulix.Modules.Support.Endpoints;
 
 /// <summary>
 /// Destek uç noktaları (/api/support/...; ADR-0024). Liste, detay, oluşturma ve düzenleme kayıt boru hattından geçer; talep silinemez (depo reddeder).
 /// Durum, sorumlu, kuyruk, öncelik ve çözüm yalnızca eylem uç noktalarıyla (<c>POST /api/support/tickets/{id}/{eylem}</c>) değişir; genel PUT bunları
 /// yok sayar. Mesajlar (müşteriye görünen yanıt ve iç not) genel kayıt uçlarında yoktur; yalnızca mesaj uç noktalarından, iç not okuma iznine göre döner.
 /// Tenant her istekte oturumdan çözülür; istemciden gelen kayıt kimliği tek başına yetki kanıtı değildir (kapsam boru hattında uygulanır).
+/// Uç noktalar modüldedir (ADR-0046); grup host tarafından açılır.
 /// </summary>
-public static class SupportEndpoints
+internal static class SupportEndpoints
 {
     private const string Prefix = "/api/support";
     private static readonly JsonSerializerOptions Json = JsonSerializerOptions.Web;
 
-    public static IEndpointRouteBuilder MapSupportEndpoints(this IEndpointRouteBuilder app)
+    /// <summary><paramref name="routes"/> host tarafından <c>/api/support</c> grubu olarak, oturum ve modül kontrolüyle sarılmış gelir (ADR-0046).</summary>
+    public static void MapEndpoints(IEndpointRouteBuilder routes)
     {
-        var group = app.MapGroup(Prefix)
-            .RequireAuthorization()
-            .RequireModule(SupportModule.ModuleKey)
+        var group = routes.MapGroup(string.Empty)
             .WithTags("Destek");
 
         ResourceEndpoints.MapResource<TicketDto, SaveTicketRequest>(group, Prefix, "tickets", SupportModule.Entities.Ticket,
@@ -36,7 +37,7 @@ public static class SupportEndpoints
         group.MapGet("/summary", async (ITicketSummary service, CancellationToken ct) =>
         {
             var result = await service.GetAsync(ct);
-            return result.IsSuccess ? Results.Ok(Map<TicketSummaryDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<TicketSummaryDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
         ResourceEndpoints.MapResource<SlaCalendarDto, SaveSlaCalendarRequest>(group, Prefix, "sla-calendars", SupportModule.Entities.SlaCalendar,
@@ -48,7 +49,7 @@ public static class SupportEndpoints
         group.MapPost("/sla/preview", async (SlaPreviewRequest r, ITicketSla sla, CancellationToken ct) =>
         {
             var result = await sla.PreviewAsync(new SlaPreviewInput(r.TypeKey, r.CategoryId, r.Priority, r.PartyId, r.StartAt, r.ContractId), ct);
-            return result.IsSuccess ? Results.Ok(Map<SlaPreviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<SlaPreviewDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.SlaManage);
 
         ResourceEndpoints.MapResource<RoutingRuleDto, SaveRoutingRuleRequest>(group, Prefix, "routing-rules", SupportModule.Entities.RoutingRule,
@@ -58,19 +59,19 @@ public static class SupportEndpoints
         group.MapGet("/priority-matrix", async (IPriorityMatrixService matrix, CancellationToken ct) =>
         {
             var result = await matrix.GetAsync(ct);
-            return result.IsSuccess ? Results.Ok(Map<List<PriorityCellDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<PriorityCellDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         group.MapPut("/priority-matrix", async (SavePriorityMatrixRequest r, IPriorityMatrixService matrix, CancellationToken ct) =>
         {
             var result = await matrix.SaveAsync([.. r.Cells.Select(c => new PriorityCell(c.Impact, c.Urgency, c.Priority))], ct);
-            return result.IsSuccess ? Results.Ok(Map<List<PriorityCellDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<PriorityCellDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.SettingsManage);
 
         // Yönlendirme denemesi: hangi kural eşleşir, hangi kuyruk/sorumlu çıkar? Hiçbir şey yazmaz.
         group.MapPost("/routing/preview", async (RoutingPreviewRequest r, ITicketRoutingPreview preview, CancellationToken ct) =>
         {
             var result = await preview.PreviewAsync(new RoutingPreviewInput(r.Channel, r.TypeKey, r.CategoryId, r.Priority, r.PartyId), ct);
-            return result.IsSuccess ? Results.Ok(Map<RoutingPreviewDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<RoutingPreviewDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.SettingsManage);
 
         var tickets = group.MapGroup("/tickets");
@@ -79,65 +80,65 @@ public static class SupportEndpoints
         tickets.MapGet("/duplicates", async (Guid? partyId, string? reporterEmail, string? reporterPhone, string? subject, Guid? categoryId, Guid? excludeId, ITicketDuplicates duplicates, CancellationToken ct) =>
         {
             var result = await duplicates.FindAsync(new DuplicateProbe(partyId, reporterEmail, reporterPhone, subject, categoryId, excludeId), ct);
-            return result.IsSuccess ? Results.Ok(Map<List<TicketDuplicateDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketDuplicateDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
         // Birleştirme: ayrı yetki ve gerekçe; kaynak son duruma geçer, geçmiş ve mesajlar korunur.
         tickets.MapPost("/{id:guid}/merge", async (Guid id, MergeTicketRequest r, ITicketMerge merge, CancellationToken ct) =>
         {
             var result = await merge.MergeAsync(id, r.TargetId, r.Version, r.Reason, ct);
-            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<TicketDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<TicketDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
         // Alt işler: engelleyici açık alt iş varken talep çözülemez. Yazma talep düzenleme iznine bağlıdır (serviste, talep bulunduktan SONRA).
         tickets.MapGet("/{id:guid}/tasks", async (Guid id, ITicketTasks tasks, CancellationToken ct) =>
         {
             var result = await tasks.ListAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<TicketTaskDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketTaskDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapPost("/{id:guid}/tasks", async (Guid id, AddTicketTaskRequest r, ITicketTasks tasks, CancellationToken ct) =>
         {
             var result = await tasks.AddAsync(id, r.Title, r.AssigneeId, r.IsBlocking, ct);
-            return result.IsSuccess ? Results.Created($"{Prefix}/tickets/{id}/tasks", Map<List<TicketTaskDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Created($"{Prefix}/tickets/{id}/tasks", Map<List<TicketTaskDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapPost("/{id:guid}/tasks/{taskId:guid}/complete", async (Guid id, Guid taskId, ITicketTasks tasks, CancellationToken ct) =>
         {
             var result = await tasks.SetDoneAsync(id, taskId, true, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<TicketTaskDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketTaskDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapPost("/{id:guid}/tasks/{taskId:guid}/reopen", async (Guid id, Guid taskId, ITicketTasks tasks, CancellationToken ct) =>
         {
             var result = await tasks.SetDoneAsync(id, taskId, false, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<TicketTaskDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketTaskDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapGet("/{id:guid}/sla", async (Guid id, ITicketSla sla, CancellationToken ct) =>
         {
             var result = await sla.GetAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<SlaInstanceDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<SlaInstanceDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapPost("/{id:guid}/sla/recalculate", async (Guid id, SlaRecalculateRequest r, ITicketSla sla, CancellationToken ct) =>
         {
             var result = await sla.RecalculateAsync(id, r.Version, r.Reason, ct);
-            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<TicketDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<TicketDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapGet("/{id:guid}/history", async (Guid id, ITicketQueries queries, CancellationToken ct) =>
         {
             var result = await queries.HistoryAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<TicketHistoryDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketHistoryDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
         // Mesajlar: iç not yalnızca iç not okuma izni olana döner; ekleme izni serviste, talep bulunduktan SONRA denetlenir (kapsam dışı 404, izinsiz 403).
         tickets.MapGet("/{id:guid}/messages", async (Guid id, ITicketMessages messages, CancellationToken ct) =>
         {
             var result = await messages.ListAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<TicketMessageDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketMessageDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         tickets.MapPost("/{id:guid}/messages", async (Guid id, AddTicketMessageRequest r, ITicketMessages messages, CancellationToken ct) =>
         {
             var result = await messages.AddAsync(id, new AddMessageInput(r.Kind, r.Body), ct);
             return result.IsSuccess
                 ? Results.Created($"{Prefix}/tickets/{id}/messages", Map<TicketMessageDto>(result.Value!))
-                : RecordEndpoints.ToProblem(result.Error!);
+                : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
 
         SupportChannelEndpoints.MapInternal(group, tickets);
@@ -146,7 +147,7 @@ public static class SupportEndpoints
         tickets.MapGet("/{id:guid}/actions", async (Guid id, ITicketWorkflow workflow, CancellationToken ct) =>
         {
             var result = await workflow.ActionsAsync(id, ct);
-            return result.IsSuccess ? Results.Ok(Map<List<TicketActionDto>>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+            return result.IsSuccess ? Results.Ok(Map<List<TicketActionDto>>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(SupportModule.Permissions.TicketsRead);
         foreach (var action in TicketAction.All)
         {
@@ -154,18 +155,16 @@ public static class SupportEndpoints
             {
                 var result = await workflow.RunAsync(id, action, new TicketActionInput(
                     r.Version, r.Reason, r.OwnerId, r.QueueId, r.ResolutionCode, r.ResolutionNote, r.RootCause, r.CorrectiveAction, r.Priority), ct);
-                return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<TicketDto>(result.Value!)) : RecordEndpoints.ToProblem(result.Error!);
+                return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<TicketDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
             }).RequirePermission(SupportModule.Permissions.TicketsRead);
         }
-
-        return app;
     }
 
     /// <summary>Alan adları aynı olan alan modeli ve DTO arasında JSON üzerinden eşleme.</summary>
     private static T Map<T>(object value) => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(value, Json), Json)!;
 }
 
-/// <summary>Destek politikası: tenant ayarlarından okunur (modül Core'un ayar servisini görmez; host bu köprüyü sağlar).</summary>
+/// <summary>Destek politikası: tenant ayarlarından okunur (<see cref="Modulix.Core.Contracts.Settings.ITenantSettingReader"/>); modülün kendi <c>ConfigureServices</c>'inde kaydolur (ADR-0046).</summary>
 internal sealed class SupportPolicyProvider(IServiceProvider services) : ISupportPolicyProvider
 {
     public async Task<TicketPolicySettings> GetAsync(CancellationToken cancellationToken)

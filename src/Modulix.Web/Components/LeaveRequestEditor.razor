@@ -10,7 +10,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>Yeni izin talebi</h2>
+            <h2>@Texts.Get("hr.leave-form.new")</h2>
             @if (EmployeeName is not null)
             {
                 <p>@EmployeeName</p>
@@ -18,13 +18,13 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
                 }
-                Talebi gönder
+                @Texts.Get("hr.leave-form.submit")
             </button>
         </div>
     </div>
@@ -39,17 +39,17 @@
     }
 
     <div class="record-layout">
-        <aside class="record-summary" aria-label="Talep özeti">
+        <aside class="record-summary" aria-label="@Texts.Get("hr.leave-form.summary")">
             <div class="summary-card">
                 <div class="summary-identity">
                     <span class="summary-avatar" aria-hidden="true"><AppIcon Name="calendar" Size="24" /></span>
                     <strong class="summary-name">@HrLabels.Days(preview?.Days)</strong>
-                    <span class="summary-sub">İş günü (hafta sonu ve resmî tatiller düşülür)</span>
+                    <span class="summary-sub">@Texts.Get("hr.leave-form.working-days")</span>
                 </div>
-                <h3 class="summary-heading">Yıllık izin</h3>
+                <h3 class="summary-heading">@Texts.Get("hr.leave-form.annual")</h3>
                 <dl class="summary-facts">
-                    <div><dt>Kalan hak</dt><dd>@HrLabels.Days(preview?.RemainingDays)</dd></div>
-                    <div><dt>Onay bekleyen</dt><dd>@HrLabels.Days(preview?.PendingDays)</dd></div>
+                    <div><dt>@Texts.Get("hr.leave-form.remaining")</dt><dd>@HrLabels.Days(preview?.RemainingDays)</dd></div>
+                    <div><dt>@Texts.Get("hr.leave.pending")</dt><dd>@HrLabels.Days(preview?.PendingDays)</dd></div>
                 </dl>
                 @if (previewError is not null)
                 {
@@ -59,7 +59,7 @@
         </aside>
 
         <div class="record-main">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="İzin talebi bölümleri">
+            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("hr.leave-form.sections")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
@@ -72,7 +72,7 @@
                             else
                             {
                                 <label class="@f.LabelClass()" for="leave-employee">@f.Label</label>
-                                <LookupPicker Id="leave-employee" LookupKey="@HrAccess.LeaveRequestEmployeeLookup" Value="form.EmployeeId" ValueChanged="EmployeeChangedAsync" Required="true" Placeholder="Çalışanı seçin…" Invalid="@(errors?.ContainsKey("employeeId") == true)" />
+                                <LookupPicker Id="leave-employee" LookupKey="@HrAccess.LeaveRequestEmployeeLookup" Value="form.EmployeeId" ValueChanged="EmployeeChangedAsync" Required="true" Placeholder="@Texts.Get("hr.leave-form.choose-employee")" Invalid="@(errors?.ContainsKey("employeeId") == true)" />
                             }
                             <FieldError Field="employeeId" Errors="errors" />
                             break;
@@ -85,7 +85,7 @@
                                 }
                             </select>
                             <FieldError Field="leaveTypeKey" Errors="errors" />
-                            <small class="text-muted">Yalnızca yıllık izin türleri haktan düşer.</small>
+                            <small class="text-muted">@Texts.Get("hr.leave-form.type-help")</small>
                             break;
                         case "startDate":
                             <label class="@f.LabelClass()" for="leave-start">@f.Label</label>
@@ -114,8 +114,8 @@
             </LayoutForm>
 
             <div class="form-actions">
-                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Talebi gönder</button>
+                <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">@Texts.Get("hr.leave-form.submit")</button>
             </div>
         </div>
     </div>
@@ -159,7 +159,7 @@
             EndDate = today,
         };
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
         await PreviewAsync();
     }
 
