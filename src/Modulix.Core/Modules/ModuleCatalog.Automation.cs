@@ -78,6 +78,7 @@ public sealed partial class ModuleCatalog
                 if (!entity.EntityKey.StartsWith(Prefix(), StringComparison.Ordinal)
                     || string.IsNullOrWhiteSpace(entity.DisplayName)
                     || (entity.ReadPermission is { } read && module.Permissions.All(p => p.Key != read))
+                    || (entity.RecordReadPermission is { } recordRead && module.Permissions.All(p => p.Key != recordRead))
                     || !automationEntities.TryAdd(entity.EntityKey, (module.Key, entity)))
                 {
                     throw Fail($"kayıt türü '{entity.EntityKey}' modülün olmalı, tekil olmalı, adı ve (varsa) izni modülün olmalı");
