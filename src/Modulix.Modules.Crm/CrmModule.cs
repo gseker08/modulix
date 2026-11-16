@@ -1090,6 +1090,13 @@ public sealed class CrmModule : IModule
             [DomainEventTypes.RecordDeleted],
             [Entities.LeadScoreRule],
             [Permissions.LeadsRead, Permissions.LeadsUpdate, Permissions.LeadsAssign]),
+        // Davranış puanı (ADR-0050 dilim 2): adaya bağlı aktivite değişince adayın puanını hemen yeniden hesaplar; yalnızca puan değişecekse
+        // boş değerli güncelleme yazar. İzinler toplu işle aynıdır (havuzdaki aday için atama izni).
+        EventSubscription.For<LeadBehaviorScoreSubscriber>(
+            LeadBehaviorScoreSubscriber.Key,
+            [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated, DomainEventTypes.RecordDeleted],
+            [Entities.Activity],
+            [Permissions.LeadsRead, Permissions.LeadsUpdate, Permissions.LeadsAssign]),
     ];
 
     /// <summary>
@@ -1130,6 +1137,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<LeadScoreJob>();
         services.AddScoped<LeadScoreJobAnchor>();
         services.AddScoped<LeadScoreReader>();
+        services.AddScoped<LeadBehaviorScoreSubscriber>();
         services.AddScoped<CrmStoreContext>();
         services.AddScoped<ISharedRecordVisibility, CrmSharedRecordVisibility>();
         services.AddScoped<IRecordStore, CompanyRecordStore>();

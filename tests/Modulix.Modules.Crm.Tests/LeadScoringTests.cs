@@ -3,7 +3,7 @@ using Modulix.Modules.Crm.Leads;
 
 namespace Modulix.Modules.Crm.Tests;
 
-/// <summary>Müşteri adayı puan hesabı (ADR-0050, dilim 1; veritabanı gerektirmez).</summary>
+/// <summary>Müşteri adayı puan hesabı (ADR-0050, dilim 1 ve 2; veritabanı gerektirmez).</summary>
 public class LeadScoringTests
 {
     private static LeadScoreRule Rule(string field, string op, string? value, int points, bool active = true) =>
@@ -67,5 +67,45 @@ public class LeadScoringTests
     public void Budget_is_not_a_scoring_field()
     {
         Assert.DoesNotContain(LeadScoring.Fields, f => f.Key == "estimatedBudget");
+    }
+
+    [Fact]
+    public void Behavior_counts_score_with_at_least_rules_and_default_to_zero()
+    {
+        var lead = new Lead();
+        var rules = new[]
+        {
+            Rule("contacts", LeadScoreOperator.AtLeast, "2", 20),
+            Rule("meetings", LeadScoreOperator.AtLeast, "1", 30),
+            Rule("repeatInquiries", LeadScoreOperator.AtLeast, "1", 10),
+        };
+
+        Assert.Equal(0, LeadScoring.Calculate(lead, rules));
+        Assert.Equal(20, LeadScoring.Calculate(lead, rules, new LeadBehavior(2, 0, 0)));
+        Assert.Equal(60, LeadScoring.Calculate(lead, rules, new LeadBehavior(3, 1, 4)));
+        Assert.True(LeadScoring.NeedsBehavior(rules));
+        Assert.False(LeadScoring.NeedsBehavior([Rule("country", LeadScoreOperator.EqualsTo, "TR", 10), Rule("contacts", LeadScoreOperator.AtLeast, "1", 10, active: false)]));
+    }
+
+    [Theory]
+    [InlineData("1", 1)]
+    [InlineData(" 03 ", 3)]
+    [InlineData("1000", 1000)]
+    [InlineData("0", null)]
+    [InlineData("1001", null)]
+    [InlineData("-2", null)]
+    [InlineData("2.5", null)]
+    [InlineData("iki", null)]
+    public void At_least_value_is_a_whole_number_between_one_and_a_thousand(string value, int? expected)
+    {
+        Assert.Equal(expected, LeadScoring.ParseCount(value));
+    }
+
+    [Fact]
+    public void At_least_is_only_valid_on_counters_and_counters_only_take_at_least()
+    {
+        Assert.False(LeadScoring.Matches(new Lead { JobTitle = "5" }, Rule("jobTitle", LeadScoreOperator.AtLeast, "1", 10)));
+        Assert.False(LeadScoring.Matches(new Lead(), new LeadBehavior(5, 0, 0), Rule("contacts", LeadScoreOperator.IsSet, null, 10)));
+        Assert.True(LeadScoring.Matches(new Lead(), new LeadBehavior(5, 0, 0), Rule("contacts", LeadScoreOperator.AtLeast, "5", 10)));
     }
 }

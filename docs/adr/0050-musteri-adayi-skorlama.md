@@ -1,7 +1,7 @@
 # ADR-0050: Müşteri adayı skorlama
 
 - **Durum:** Dilim 1 (kural modeli, kayıtta hesaplama, liste sütunu ve sıralama, kural ekranı) 15 Kasım 2026'da teslim edildi (PR #417).
-  Dilim 1b (toplu yeniden hesaplama) 16 Kasım 2026'da teslim edilir. Diğer dilimler öneridir.
+  Dilim 1b (toplu yeniden hesaplama, PR #441) ve dilim 2 (davranış puanı) 16 Kasım 2026'da teslim edilir. Diğer dilimler öneridir.
 - **Kaynak:** [CRM eksik süreç epic listesi](../crm-eksik-surecler-epicleri.md) E1.
 
 ## Bağlam
@@ -72,6 +72,27 @@ Müşteri adayları listesine "Puan" sütunu eklenir (`sort=score`/`-score`, eş
 - İşin sistem kimliği yalnızca `crm.leads.read`, `crm.leads.update` ve `crm.leads.assign` taşır. Atama izni yalnızca sorumlusu boş
   adayları (atama havuzu) görmek içindir; iş sorumlu ya da durum yazmaz.
 - Kural ekranı ve silme onayı "birkaç dakika içinde yansır" der.
+### Davranış puanı (dilim 2)
+
+- Kural modeline sayaç alanları ve `atLeast` ("en az") işleci eklenir; değer 1..1000 tam sayıdır. Yeni tablo ya da migration yoktur: kural
+  aynı satırda (alan, işleç, değer, puan) durur.
+- Sayaçlar saklanmaz, aday puanlanırken CRM'in kendi tablolarından türetilir (`LeadBehavior`, `Records/LeadBehaviorReader`):
+  - `contacts` (gerçekleşen temas sayısı): adaya bağlı, tamamlanmış ve ilk temas kuralına göre gerçekleşmiş temas sayılan aktiviteler
+    (`LeadRules.CountsAsContact`: ulaşılan arama, gönderilen/ulaşılan e-posta, cevapsız olmayan toplantı).
+  - `meetings` (yapılan toplantı sayısı): bunların toplantı olanları.
+  - `repeatInquiries` (tekrar başvuru sayısı): aynı normalleştirilmiş e-posta ya da telefonla gelen diğer müşteri adayları, durumu ne olursa
+    olsun, yalnızca aynı tenant'ta.
+  Türetmek, aktivite silinince ya da başka adaya taşınınca sayacın kendiliğinden doğru kalmasını sağlar ve dilim 3'teki zamanla azalmayı
+  (son N gün) aynı sorguya bir süzgeç olarak ekletir.
+- Gizli aktiviteler sayılmaz: puanı gören ama aktiviteyi göremeyen kullanıcıya varlığı sezdirilmez.
+- Sayaçlar yalnızca bir etkin kural sayaç kullanıyorsa okunur; kullanmayan tenant'ta ek sorgu yoktur.
+- Tetikleyici: `crm.lead-behavior-score` aboneliği `crm.activity` kayıt olaylarını (oluşturma, güncelleme, silme) dinler; etkilenen adaylar
+  olay farkındaki `leadId` eski/yeni değerleri ve aktivitenin bugünkü adayıdır. Puan yalnızca değişecekse kayıt boru hattından boş değerli
+  güncellemeyle yazılır (boş güncelleme de denetim satırı ve olay ürettiği için önceden bakılır); tekrar teslim ikinci yazım üretmez.
+  Tekrar başvuruda eski adayların puanı toplu işle (dilim 1b) birkaç dakika içinde güncellenir; yeni aday kaydedilirken zaten doğru puanlanır.
+- ADR-0039 iş olaylarından şimdilik yararlanılmaz: kampanya yanıtı ve teklif görüntüleme için yayınlanan bir iş olayı yok; teklif adaya değil
+  fırsata bağlıdır. Pazarlama modülü yanıt olayı yayınladığında yeni bir sayaç bu dilimin kalıbıyla eklenir.
+
 ## Sonuçlar
 
 - Kural değişikliği açık adaylara birkaç dakika içinde yansır (dilim 1b). Yeniden puanlama `RecordUpdated` olayı ürettiği için aday
@@ -86,7 +107,7 @@ Müşteri adayları listesine "Puan" sütunu eklenir (`sort=score`/`-score`, eş
 |---|---|---|
 | 1 | Kural modeli, kayıtta hesaplama, liste sütunu/sıralama/süzgeç, kural ekranı | Teslim |
 | 1b | Toplu yeniden hesaplama: kural değişince arka plan işçisi açık adayları sistem adına, kayıt boru hattından yeniden puanlar | Teslim |
-| 2 | Davranış puanı: iş olaylarına abone (tamamlanan aktivite, kampanya yanıtı, teklif görüntüleme) | Öneri; olay listesi ADR-0039'dan |
+| 2 | Davranış puanı: gerçekleşen temas, toplantı ve tekrar başvuru sayaçları ("en az N"); aktivite olayına abone | Teslim; kampanya yanıtı Pazarlama iş olayını bekliyor |
 | 3 | Zamanla azalma (hareketsiz gün sayısı) ve eşik olayı `crm.lead.score-changed`; atama/bildirim otomasyonla (ADR-0027) | Öneri |
 | 4 | Puan açıklaması: kartta hangi kuralın kaç puan verdiği | Öneri |
 
