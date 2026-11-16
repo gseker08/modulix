@@ -1,6 +1,7 @@
 using Modulix.Api.Access;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Customization;
 using Modulix.Core.Modules;
 using Modulix.Shared.Customization;
@@ -30,8 +31,14 @@ public static class CustomFieldEndpoints
             .AddEndpointFilter<RequireTenantFilter>()
             .RequirePermission(CoreModule.Permissions.ManageCustomization)
             .WithTags("Customization");
-        fields.MapGet("/entities", async (ICustomFieldService service, CancellationToken ct) =>
-            (await service.ListEntitiesAsync(ct)).Select(e => new CustomizableEntityDto(e.EntityKey, e.DisplayName)).ToList());
+        fields.MapGet("/entities", async (ICustomFieldService service, IRequestLanguage language, ITextCatalog texts, CancellationToken ct) =>
+        {
+            // Tür adları okurun dilinde (ADR-0034, dilim 18c-4).
+            var bundle = texts.Bundle(await language.GetAsync(ct));
+            return (await service.ListEntitiesAsync(ct))
+                .Select(e => new CustomizableEntityDto(e.EntityKey, MetadataTexts.Text(bundle, MetadataTexts.CustomizableKey(e.EntityKey), e.DisplayName)))
+                .ToList();
+        });
         fields.MapGet("/fields", async (string? entityKey, ICustomFieldService service, CancellationToken ct) =>
             (await service.ListAsync(entityKey, includeArchived: true, ct)).Select(ToDto).ToList());
         fields.MapPost("/fields", (SaveCustomFieldRequest request, ICustomFieldService service, CancellationToken ct) => RunAsync(async () =>

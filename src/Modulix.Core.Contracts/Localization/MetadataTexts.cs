@@ -58,6 +58,71 @@ public static class MetadataTexts
     /// <summary>Seçenekli firma ayarında seçeneğin adı.</summary>
     public static string SettingOptionKey(string settingKey, string value) => $"meta.setting.{settingKey}.option.{KeySegment(value)}";
 
+    /// <summary>Seçim listesinin adı (<see cref="ChoiceListDefinition.DisplayName"/>).</summary>
+    public static string ChoiceListKey(string listKey) => $"meta.choice-list.{listKey}";
+
+    /// <summary>Seçim listesinde kategorinin adı.</summary>
+    public static string ChoiceCategoryKey(string listKey, string category) => $"meta.choice-list.{listKey}.category.{KeySegment(category)}";
+
+    /// <summary>Seçim listesinde kodda tanımlı hazır değerin adı.</summary>
+    public static string ChoiceValueKey(string listKey, string value) => $"meta.choice-list.{listKey}.value.{KeySegment(value)}";
+
+    /// <summary>Özel alan eklenebilen kayıt türünün adı (<see cref="CustomizableEntity.DisplayName"/>).</summary>
+    public static string CustomizableKey(string entityKey) => $"meta.customizable.{entityKey}";
+
+    /// <summary>Lookup alanının başlığı (<see cref="LookupDefinition.Title"/>).</summary>
+    public static string LookupKey(string lookupKey) => $"meta.lookup.{lookupKey}";
+
+    /// <summary>Lookup alanında aranan alanların açıklaması (<see cref="LookupDefinition.SearchDescription"/>).</summary>
+    public static string LookupDescriptionKey(string lookupKey) => $"meta.lookup.{lookupKey}.description";
+
+    /// <summary>Bağımlı lookup alanının ipucu (<see cref="LookupDefinition.DependsOnHint"/>).</summary>
+    public static string LookupHintKey(string lookupKey) => $"meta.lookup.{lookupKey}.hint";
+
+    /// <summary>Kayıt devrinde sayıyla birlikte gösterilen tür adı (<see cref="OwnedRecordType.Label"/>, ör. "12 firma").</summary>
+    public static string OwnedRecordKey(string entityKey) => $"meta.owned.{entityKey}";
+
+    /// <summary>
+    /// Firmanın listesi okurun dilinde: kodda tanımlı hazır değerin adı, firma değiştirmediyse (tanımdaki adla aynıysa) çevrilir; firmanın
+    /// verdiği ad ve eklediği değerler firmanın verisidir, olduğu gibi kalır. Anahtar, kategori ve etkinlik değişmez.
+    /// </summary>
+    public static Customization.ChoiceList Localize(Customization.ChoiceList list, ChoiceListDefinition definition, IReadOnlyDictionary<string, string> bundle)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        ArgumentNullException.ThrowIfNull(definition);
+        var defaults = definition.Values.ToDictionary(v => v.Key, v => v.Label, StringComparer.OrdinalIgnoreCase);
+        return list with
+        {
+            Values = [.. list.Values.Select(v => v.BuiltIn && defaults.TryGetValue(v.Key, out var source) && source == v.Label
+                ? v with { Label = Text(bundle, ChoiceValueKey(definition.Key, v.Key), source) }
+                : v)],
+        };
+    }
+
+    /// <summary>Liste tanımının adı ve kategori adları okurun dilinde (değerler <see cref="Localize(Customization.ChoiceList, ChoiceListDefinition, IReadOnlyDictionary{string, string})"/> ile).</summary>
+    public static ChoiceListDefinition Localize(ChoiceListDefinition definition, IReadOnlyDictionary<string, string> bundle)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        return definition with
+        {
+            DisplayName = Text(bundle, ChoiceListKey(definition.Key), definition.DisplayName),
+            Categories = [.. definition.Categories.Select(c => c with { DisplayName = Text(bundle, ChoiceCategoryKey(definition.Key, c.Key), c.DisplayName) })],
+        };
+    }
+
+    /// <summary>
+    /// Kaydedilecek değer adı: okurun dilinde gösterilmiş hazır ad Türkçe kaynak metne döner (yönetici adı değiştirmeden kaydederse öteki
+    /// dillerde çevrilmeye devam eder); değiştirilmiş ad olduğu gibi saklanır.
+    /// </summary>
+    public static string ChoiceValueSource(ChoiceListDefinition definition, string valueKey, string label, IReadOnlyDictionary<string, string> bundle)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        return definition.Values.FirstOrDefault(v => string.Equals(v.Key, valueKey, StringComparison.OrdinalIgnoreCase)) is { } builtIn
+            && label == Text(bundle, ChoiceValueKey(definition.Key, builtIn.Key), builtIn.Label)
+            ? builtIn.Label
+            : label;
+    }
+
     /// <summary>
     /// Değerin anahtar parçası: harf, rakam ve tire dışındaki karakterler tire olur (ör. saat dilimi "Europe/Istanbul" → "Europe-Istanbul",
     /// iş saati "08:00-17:00" → "08-00-17-00"); sözlük anahtarı biçimi bu karakterleri kabul etmez.
