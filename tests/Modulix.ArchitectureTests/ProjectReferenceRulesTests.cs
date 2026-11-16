@@ -10,6 +10,8 @@ namespace Modulix.ArchitectureTests;
 public class ProjectReferenceRulesTests
 {
     private const string CoreContracts = "Modulix.Core.Contracts";
+    private const string CoreHosting = "Modulix.Core.Hosting";
+    private const string Shared = "Modulix.Shared";
     private const string ModulePrefix = "Modulix.Modules.";
     private const string FleetContracts = "Modulix.Modules.Fleet.Contracts";
     private const string CrmContracts = "Modulix.Modules.Crm.Contracts";
@@ -20,17 +22,22 @@ public class ProjectReferenceRulesTests
     {
         [CoreContracts] = [],
         ["Modulix.Shared"] = [],
+
+        // Modüllerin uç nokta yazabilmesi için ASP.NET yardımcıları (ADR-0046). Uç noktası modüle taşınan modül buna ve DTO'lar için
+        // Modulix.Shared'a başvurur; sözleşme projeleri başvuramaz.
+        // Ortak kaynak uç noktalarının sayfalı yanıtı (PagedResult) için Shared; Shared hiçbir projeye başvurmadığından döngü olmaz.
+        [CoreHosting] = [CoreContracts, Shared],
         ["Modulix.Core"] = [CoreContracts],
         ["Modulix.Infrastructure"] = ["Modulix.Core", CoreContracts],
         ["Modulix.Modules.Crm"] = [CoreContracts, CrmContracts, MarketingContracts],
-        ["Modulix.Modules.Logistics"] = [CoreContracts, FleetContracts],
+        ["Modulix.Modules.Logistics"] = [CoreContracts, CoreHosting, Shared, FleetContracts],
         ["Modulix.Modules.Contracts"] = [CoreContracts, CrmContracts],
-        ["Modulix.Modules.Orders"] = [CoreContracts, CrmContracts],
-        ["Modulix.Modules.Support"] = [CoreContracts],
-        ["Modulix.Modules.Marketing"] = [CoreContracts, CrmContracts, MarketingContracts],
-        ["Modulix.Modules.Warehouse"] = [CoreContracts],
+        ["Modulix.Modules.Orders"] = [CoreContracts, CoreHosting, Shared, CrmContracts],
+        ["Modulix.Modules.Support"] = [CoreContracts, CoreHosting, Shared],
+        ["Modulix.Modules.Marketing"] = [CoreContracts, CoreHosting, Shared, CrmContracts, MarketingContracts],
+        ["Modulix.Modules.Warehouse"] = [CoreContracts, CoreHosting, Shared],
         ["Modulix.Modules.Fleet"] = [CoreContracts, FleetContracts],
-        ["Modulix.Modules.Hr"] = [CoreContracts],
+        ["Modulix.Modules.Hr"] = [CoreContracts, CoreHosting, Shared],
 
         // Modül sözleşme projeleri (ADR-0044): yalnızca arayüz ve veri tipleri; başka modüle ya da sözleşmeye bağlanmaz.
         [CrmContracts] = [CoreContracts],
@@ -44,6 +51,7 @@ public class ProjectReferenceRulesTests
         ["Modulix.Api"] =
         [
             CoreContracts,
+            CoreHosting,
             "Modulix.Core",
             "Modulix.Infrastructure",
             "Modulix.Modules.Crm",
@@ -123,13 +131,15 @@ public class ProjectReferenceRulesTests
                 continue;
             }
 
-            // Modül: Core sözleşmeleri + (kendi ya da başka modülün) sözleşme projeleri. Başka modülün ana projesi asla.
+            // Modül: Core sözleşmeleri + (kendi ya da başka modülün) sözleşme projeleri; uç noktası modülde olan modül ayrıca
+            // Core.Hosting ve Shared (ADR-0046). Başka modülün ana projesi, Core ve Infrastructure asla.
             var forbidden = allowed
-                .Where(reference => reference != CoreContracts && !RepositoryLayout.IsModuleContracts(reference))
+                .Where(reference => reference != CoreContracts && reference != CoreHosting && reference != Shared
+                                    && !RepositoryLayout.IsModuleContracts(reference))
                 .ToList();
             Assert.True(
                 allowed.Contains(CoreContracts) && forbidden.Count == 0,
-                $"{module} yalnızca {CoreContracts} ve modül sözleşme projelerine referans verebilir; izin verilmeyen: {string.Join(", ", forbidden)}.");
+                $"{module} yalnızca {CoreContracts}, {CoreHosting}, {Shared} ve modül sözleşme projelerine referans verebilir; izin verilmeyen: {string.Join(", ", forbidden)}.");
         }
 
         Assert.True(

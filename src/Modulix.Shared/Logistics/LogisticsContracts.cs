@@ -100,6 +100,22 @@ public static class LogisticsAccess
         ("rejected", "Reddedildi"),
     ];
 
+    /// <summary>
+    /// Masraf düzenlenebilir mi (ADR-0038 bölüm 25): beklemede ya da reddedilmiş masraf ve iptal edilmemiş sefer (masraf kaydının <c>tripCancelled</c>
+    /// alanı). Arayüz yalnızca düğmeyi gizler; kararı sunucu verir.
+    /// </summary>
+    public static bool ExpenseEditable(string? expenseStatus, bool tripCancelled) =>
+        expenseStatus is "pending" or "rejected" && !tripCancelled;
+
+    /// <summary>Masrafın makbuzu ve fişi eklenip silinebilir mi (ADR-0038 bölüm 24): kaydın düzenleme kuralıyla aynı (<see cref="ExpenseEditable"/>).</summary>
+    public static bool ExpenseFilesWritable(string? expenseStatus, bool tripCancelled) => ExpenseEditable(expenseStatus, tripCancelled);
+
+    /// <summary>
+    /// Teslim kanıtının fotoğrafı ve imzası eklenip silinebilir mi (ADR-0038 bölüm 24): sevkiyatın seferi açıkken; sefer tamamlanınca ya da iptal
+    /// edilince kanıt donar. Arayüz yalnızca düğmeleri gizler; kararı sunucu verir. Sefer durumu bilinmiyorsa (boş) düğmeler gösterilir.
+    /// </summary>
+    public static bool ProofFilesWritable(string? tripStatus) => tripStatus is not ("completed" or "cancelled");
+
     /// <summary>Masraf türü kategorileri (sabit; sunucudaki <c>ExpenseKindCategories</c>): arayüz yakıt alanlarını ve rücu işaretini kategoriye göre gösterir.</summary>
     public const string FuelCategory = "fuel";
     public const string FineCategory = "fine";
@@ -154,11 +170,17 @@ public static class LogisticsAccess
     ];
 }
 
-/// <summary>Talep ve sevkiyat iş akışı eylemi (ADR-0038 K7): yapılabilir mi, değilse neden; gerekçe ister mi; yıkıcı mı (iptal, ret).</summary>
-public sealed record LogisticsActionDto(string Action, string Label, bool Allowed, string? Message, bool RequiresReason, bool Destructive);
+/// <summary>
+/// Talep ve sevkiyat iş akışı eylemi (ADR-0038 K7): yapılabilir mi, değilse neden; gerekçe ister mi; yıkıcı mı (iptal, ret). Uyarı eylemi engellemez,
+/// sonucunu anlatır; arayüz gerekçe ya da onay adımında gösterir (ADR-0038 bölüm 26).
+/// </summary>
+public sealed record LogisticsActionDto(string Action, string Label, bool Allowed, string? Message, bool RequiresReason, bool Destructive, string? Warning = null);
 
 /// <summary>İş akışı eylemi isteği; sürüm eşzamanlı değişikliği yakalar (409).</summary>
 public sealed record RunLogisticsActionRequest(string Action, long Version, string? Reason);
+
+/// <summary>İptal edilen seferin beklemedeki masrafını başka sefere aktarma isteği (ADR-0038 bölüm 28); gerekçe zorunludur.</summary>
+public sealed record TransferExpenseRequest(Guid TripId, long Version, string? Reason);
 
 /// <summary>Seferin uygunluk denetimi (ADR-0038 dilim 5): engel varsa plan onaylanmaz; uyarılar onayla birlikte seferde saklanır.</summary>
 public sealed record TripCheckDto(bool CanConfirm, IReadOnlyList<TripCheckIssueDto> Issues, TripLoadDto Load);

@@ -146,7 +146,7 @@ internal sealed class TicketSla(
                 continue;
             }
 
-            var calendar = SlaSnapshots.CalendarOf(SlaEngine.Snapshot(selection.Policy, selection.Calendar, metric));
+            var calendar = SlaSnapshots.CalendarOf(SlaEngine.Snapshot(selection, metric));
             var target = TimeSpan.FromMinutes(minutes);
             var warning = rules.Where(r => r.Metric == metric && r.Percent < 100).Select(r => (int?)r.Percent).Min();
             metrics.Add(new SlaPreviewMetric(
@@ -154,7 +154,7 @@ internal sealed class TicketSla(
                 warning is { } percent ? SlaClock.ThresholdAt(calendar, start, target, TimeSpan.Zero, percent) : null));
         }
 
-        var snapshot = SlaEngine.Snapshot(selection.Policy, selection.Calendar, SlaMetric.Resolution);
+        var snapshot = SlaEngine.Snapshot(selection, SlaMetric.Resolution);
         return RecordResult<SlaPreviewResult>.Ok(new SlaPreviewResult(
             true, selection.Policy.Id, selection.Policy.Name, selection.Policy.Revision, selection.Calendar?.Name, snapshot.Calendar.AlwaysOpen, selection.Policy.PauseOnWaitingCustomer,
             selection.Policy.PauseOnWaitingInternal, metrics, rules));

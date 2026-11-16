@@ -66,6 +66,39 @@ public class AuditLogTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
     }
 
     [Fact]
+    public async Task Type_and_field_names_and_the_csv_come_in_the_readers_language_while_the_firms_list_values_stay_as_entered()
+    {
+        var (tenant, editor, company) = await TenantWithCompanyChangeAsync();
+        var auditor = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [ReadAudit, CompaniesRead], auditor);
+        using var english = await LoginAsync(editor);
+        Assert.Equal(HttpStatusCode.OK, (await english.PutAsJsonAsync("/api/account/language", new UpdateLanguageRequest("en"))).StatusCode);
+
+        // İngilizce okur: kayıt türü ve alan adı çevrilir; firmanın seçim listesi değeri (veri) olduğu gibi kalır.
+        var page = await english.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company");
+        var updated = page!.Items[0];
+        Assert.Equal("Company (CRM)", updated.EntityName);
+        var status = Assert.Single(updated.Changes, c => c.Field == "status");
+        Assert.Equal("Status", status.Label);
+        Assert.Equal("Potansiyel", status.Old);
+        var filters = await english.GetFromJsonAsync<AuditFiltersResponse>("/api/audit/filters");
+        Assert.Contains(filters!.EntityTypes, t => t.Key == "crm.company" && t.Name == "Company (CRM)");
+        var history = await english.GetFromJsonAsync<AuditPageResponse>($"/api/records/crm.company/{company}/history");
+        Assert.Equal("Status", Assert.Single(history!.Items[0].Changes, c => c.Field == "status").Label);
+
+        var csv = await ReadCsvAsync(english, "/api/audit/export?entityKey=crm.company");
+        Assert.StartsWith("Date;User;Email;Record type;Record;Action;Source;Field;Old value;New value", csv);
+        Assert.Contains(";Company (CRM);Anka Gıda;Changed;", csv);
+
+        // Aynı firmanın tercihsiz okuru Türkçe görür; bir okurun dili ötekine geçmez.
+        using var turkish = await LoginAsync(auditor);
+        var same = await turkish.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company");
+        Assert.Equal("Firma (CRM)", same!.Items[0].EntityName);
+        Assert.Equal("Durum", Assert.Single(same.Items[0].Changes, c => c.Field == "status").Label);
+        Assert.StartsWith("Tarih;Kullanıcı;E-posta;Kayıt türü", await ReadCsvAsync(turkish, "/api/audit/export?entityKey=crm.company"));
+    }
+
+    [Fact]
     public async Task Values_of_types_the_reader_cannot_view_are_hidden_and_other_tenants_are_not_visible()
     {
         var (tenant, _, _) = await TenantWithCompanyChangeAsync();

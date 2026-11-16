@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
@@ -27,6 +28,7 @@ internal sealed class RecordHandover(
     ITenantContextAccessor tenantAccessor,
     INotificationRecipients recipients,
     IEmailQueue emails,
+    IRecipientLanguage languages,
     ModulixDbContext db)
 {
     private const int BatchSize = RecordQuery.MaxPageSize;
@@ -113,11 +115,13 @@ internal sealed class RecordHandover(
         var names = await db.Users.AsNoTracking()
             .Where(u => u.Id == fromUserId || u.Id == actorId)
             .ToDictionaryAsync(u => u.Id, u => u.DisplayName, cancellationToken);
+        var texts = await languages.ForUserAsync(recipient.UserId, cancellationToken);
         emails.Enqueue(UserEmails.RecordsTransferred(
+            texts,
             recipient.Email,
             recipient.DisplayName,
-            actorId is { } actor && names.TryGetValue(actor, out var actorName) ? actorName : "Firma yöneticisi",
-            names.GetValueOrDefault(fromUserId) ?? "Bir kullanıcı",
+            actorId is { } actor && names.TryGetValue(actor, out var actorName) ? actorName : texts.Get("email.user.records-transferred.default-actor"),
+            names.GetValueOrDefault(fromUserId) ?? texts.Get("email.common.someone"),
             string.Join(", ", counts.Select(c => $"{c.Count} {c.Label}")),
             recipients.Link(string.Empty)));
         await db.SaveChangesAsync(cancellationToken);

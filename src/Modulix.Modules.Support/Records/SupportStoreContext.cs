@@ -49,6 +49,9 @@ internal sealed class SupportStoreContext(
     /// <summary>Saat kaynağı (testte sabitlenebilir).</summary>
     public TimeProvider Time => time;
 
+    /// <summary>Firmanın resmî tatil listesi (Core, ADR-0049 dilim 6b); SLA takvimi isterse anlık görüntüye eklenir. Yalnızca SLA seçiminde gerektiği için geç çözülür.</summary>
+    public Modulix.Core.Contracts.Calendar.IHolidayCalendar Holidays => services.GetRequiredService<Modulix.Core.Contracts.Calendar.IHolidayCalendar>();
+
     /// <summary>Çalışan yazma komutunun nedeni (yalnızca güvenilir iç çağıranlar verir, ör. kayıt devri).</summary>
     public string? CommandReason => command?.Reason;
 

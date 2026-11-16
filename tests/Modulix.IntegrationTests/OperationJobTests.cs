@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Orders;
 using Modulix.Core.Authorization;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
@@ -36,7 +35,7 @@ public class OperationJobTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.Equal(2, jobs.Count);
         var delivery = jobs.Single(j => j.Kind == "Delivery");
         var service = jobs.Single(j => j.Kind == "Service");
-        Assert.StartsWith("OP-", delivery.Number);
+        Assert.Matches(@"^IS-\d{4}-\d{5}$", delivery.Number);
         Assert.Equal(("kind:Product", "Planned", "High", s.Ops.Id, "Handover"), (delivery.GroupKey, delivery.Status, delivery.Priority, delivery.ResponsibleUserId, delivery.Source));
         Assert.Equal((new DateOnly(2026, 12, 1), new DateOnly(2026, 12, 15), "Gebze depo"), (delivery.PlannedStartDate, delivery.PlannedEndDate, delivery.Location));
         Assert.Equal("kind:Service", service.GroupKey);
@@ -300,7 +299,7 @@ public class OperationJobTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var jobs = (await ops.GetFromJsonAsync<PagedResult<OperationJobDto>>($"/api/orders/operation-jobs?orderId={order.Id}"))!.Items;
         var delivery = jobs.Single(j => j.Kind == "Delivery");
         var service = jobs.Single(j => j.Kind == "Service");
-        var runner = factory.Services.GetRequiredService<OrderJobsRunner>();
+        var runner = new OrderJobsRunner(factory.Services);
 
         // Atama bekleyen iş: servis işini iptal edip kalemini atanmamış bir işe taşıyoruz; 48 saat önce açılmış gibi yaşlandırılır.
         var lineId = (await JobDetailAsync(ops, service.Id)).Lines.Single().OrderLineId;

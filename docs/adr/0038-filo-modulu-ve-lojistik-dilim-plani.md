@@ -584,3 +584,151 @@ Lojistik, kural altyapısına (ADR-0027) kayıt türlerini ve alanlarını dilim
 | `dotnet test tests/Modulix.Modules.Logistics.Tests` | 36 (6 yeni): gerçek katalog ve gerçek tanım doğrulayıcısıyla on şablonun her biri; tek sorun boş alıcı, alıcı seçilince sorun yok; sevkiyat okuma izni olmayana sevkiyat şablonları kapalı; modül kapalıyken liste boş; tarama şablonları kayıt kaynağının desteklediği tarih alanlarını kullanır |
 | `dotnet test tests/Modulix.Core.Tests --filter "AutomationTemplate"` | 6 yeni: boşluk beyanının katalog denetimi; beyan edilen boşluk şablonu açık tutar, beyan edilmeyen eksik / izin / modül sorunu tutmaz |
 | `... --filter "LogisticsAutomationTemplateTests"` (SQL Server; CI koşar) | 4 test yazıldı. **Mutlu yol:** şablon taslak açar, alıcı seçilince yayınlanır, tarama yalnızca yarın yüklenecek talebi bulur ve alıcıya bildirim yazar. **Doğrulama:** alıcı seçilmeden yayın reddedilir; on şablonun hepsi alıcıyla yayın doğrulamasından geçer. **Tenant izolasyonu:** bir firmada kullanılan şablon diğerinde kural açmaz. **Yetki:** yönetme izni olmayan 403, kayıt türünü okuyamayan 400, modül kapalıyken 404 |
+
+## 24. Kayıt düzeyinde dosya izni: masraf belgesi ve teslim kanıtı (14 Kasım 2026)
+
+Karar (kullanıcı, 14 Kasım 2026): reddedilmiş masrafın belgesi açık kalır; teslim kanıtının dosyaları sefer kapanınca donar.
+
+**Bulunan açık:** ADR-0040 K2'de dosya ekleme ve silme kaydı okuyabilmeye ve kayıt **türünün** güncelleme iznine bağlıdır; kayıt düzeyinde kural ancak depo `IRecordWriteGuard` uygularsa sorulur (İK masraf satırı için aynı açık ADR-0042 bölüm 25'te kapatıldı). Lojistik depoları bunu uygulamıyordu:
+- **Sefer masrafı:** onaylanmış masraf değişmez, iptal edilen sefere masraf açılmaz; ama makbuz ve fiş, onaydan sonra da masraf yazma izni olan herkesçe eklenip silinebiliyordu (onaylanan belge sessizce değişebiliyordu).
+- **Teslim kanıtı:** kayıt değişmez (güncellenmez, silinmez); ama fotoğraf ve imza herhangi bir zamanda, sevkiyat yazma izni olan herkesçe eklenip silinebiliyordu (kanıt sonradan değiştirilebiliyordu).
+
+**Çözüm:**
+- `LogisticsRecordStore` her lojistik deposu için `IRecordWriteGuard` uygular (`FileWriteDeniedAsync`; varsayılan kural yok, diğer türlerde davranış değişmez). Core'da yeni kod yok: dosya deposu tür izninden sonra bu kancayı zaten soruyordu.
+- **Masraf:** kural kaydın güncelleme kuralıyla aynıdır. Beklemedeki ve reddedilmiş masrafın belgesi eklenir ve silinir; onaylanmış masrafın belgesi değişmez (403, "Onaylanmış masrafın makbuzu ve fişi değiştirilemez…"). İptal edilmiş seferin masrafına belge eklenmez, silinmez (403).
+  - **Reddedilmiş masraf bilerek açık:** reddedilen masraf düzeltilip yeniden gönderilir ve en sık ret nedeni belgedir ("Fiş okunmuyor"); belgeyi kilitlemek düzeltme akışını bozardı.
+- **Teslim kanıtı:** kayıt dosyadan önce doğar (fotoğraf ve imza teslimden sonra eklenir), bu yüzden kaydın "hiç değişmez" kuralı dosyaya birebir uygulanamaz. Kural: sevkiyatın seferi açıkken (tamamlanmamış, iptal edilmemiş) dosya eklenir ve silinir; sefer kapanınca kanıt dosyalarıyla birlikte donar (403). Seferi olmayan sevkiyatın kanıtı da donmuş sayılır (yoldaki sevkiyat seferden ayrılamadığı için beklenmez).
+- Okuma ve indirme değişmedi: kaydı okuyan dosyaları listeler ve indirir.
+- **Arayüz:** `AttachmentPanel CanWrite` aynı koşulla (`LogisticsAccess.ExpenseFilesWritable`, `ProofFilesWritable`): sefer kartındaki masraf panelinde seferin durumu kayıttan; Masraflar ekranında ve teslim panelinde seferin durumu sefer okuma izni varsa okunur, yoksa düğme yalnızca masrafın durumuna bakar ve kararı sunucu verir (403 iletisi panelde görünür). Yeni CSS sınıfı ya da token yok.
+
+**Kapsam dışı (bilerek):**
+- İptal edilmiş seferin **beklemedeki masrafının kendisi** hâlâ düzenlenebilir (kayıt kuralı yalnızca oluştururken seferin iptaline bakıyor); dosya kuralı daha sıkıdır. Kaydın kuralını da sıkılaştırmak ayrı karardır. **Bölüm 25'te kapatıldı.**
+- Teslim kanıtı için süre penceresi (ör. teslimden sonra 24 saat) ya da "yalnızca ekle, silme yok" kuralı: ikincisi Core sözleşmesinde işlem türü (ekle/sil) ayrımı gerektirir; ilk ihtiyaçta.
+- Sefer tamamlama yolu entegrasyon testinde iptal ile sınandı (kural iki durumu aynı koşulla denetler); tamamlama araç, sürücü ve durak varışı kurulumu gerektirir.
+
+### Test sonuçları (bölüm 24)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet build` | Hatasız (SDK 10.0.404). Not: 10.0.100 ve Ubuntu'nun 10.0.115 paketiyle `Modulix.Web` bu değişiklikten bağımsız Razor hataları veriyor (`DashKpi`, `AppLauncher`, `LayoutForm`, `FormDesigner`, `ImportLog`); CI `rollForward: latestFeature` ile runner'daki daha yeni SDK'yı kullanır |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Web.Tests` | 94/94 / 36/36 / 258/258 |
+| `... --filter "LogisticsExpenseTests\|LogisticsDeliveryTests"` (yerel SQL Server) | 16/16 (5 yeni test + 2 genişletilen). **Masraf, mutlu yol:** beklemedeki masrafa makbuz eklenir ve silinir; reddedilen masrafta doğru fiş eklenir, yanlışı silinir, yeniden gönderilir. **Kural (403):** onaylanmış masrafa giren de müdür de ekleyemez ve silemez, okuma ve indirme sürer; iptal edilen seferin beklemedeki masrafına eklenemez, silinemez. **Tenant izolasyonu:** başka tenant ekleyemez, listeleyemez, indiremez, silemez (404). **Yetki:** yalnızca okuyan listeler ama ekleyemez ve silemez (403); masrafı okuyamayan ulaşamaz. **Teslim kanıtı:** sefer açıkken fotoğraf eklenir ve silinir, sefer kapanınca (iptal) ekleme ve silme 403, okuma sürer; başka tenant kanıt dosyasını indiremez ve silemez (404); okuyan silemez (403). Kural kodu geri alınınca tam olarak iki kural testi kırılıyor |
+| `... --filter "Logistics\|File"` (yerel SQL Server) | 99 geçti, 2 atlandı (önceden atlanan), 0 kırık |
+
+## 25. İptal edilen seferin masrafı düzenlenmez (15 Kasım 2026)
+
+Bölüm 24'te kapsam dışı bırakılan açık. İptal edilen sefere masraf açılmıyordu ve masrafın belgesi bölüm 24'ten beri değişmiyordu; ama beklemedeki ya da reddedilmiş masrafın kendisi (tutar, tür, tarih, belge no) sefer iptal edildikten sonra da düzenlenebiliyordu. Kayıt kuralı dosya kuralından gevşekti.
+
+**Çözüm:**
+- `TripExpenseRecordStore`: genel güncellemede (iş akışı kapısı kapalıyken) seferin durumu da denetlenir; sefer iptal edilmişse 409 ("İptal edilen seferin masrafı düzenlenmez; gerekirse masrafı reddedin."). Böylece masrafın düzenleme kuralı ile belge kuralı aynıdır.
+- **Karar komutları açık kalır:** onay, ret ve yeniden gönderme kapıdan geçer, kural onları durdurmaz. İptal edilen seferin bekleyen masrafı reddedilerek kapatılır (masraf silinmez, K12). Seferi iptal etmek bekleyen masrafları kendiliğinden reddetmez; bu bir iş kuralıdır, firma otomasyonla kurabilir.
+- **Arayüz:** sefer kartındaki masraf panelinde "Düzenle" düğmesi aynı koşulla gizlenir (`LogisticsAccess.ExpenseEditable`; `ExpenseFilesWritable` artık buna dayanır, iki kural tek yerde). Yeni CSS sınıfı ya da token yok.
+- Sıra korunur: başka tenant 404, yalnızca okuyan 403 alır; kural iletisi (409) yalnızca kaydı görüp yazma izni olana döner.
+
+**Kapsam dışı (bilerek):** seferi iptal edince bekleyen masrafların otomatik reddi; iptal edilen seferin masrafını onaylamayı yasaklamak (sefer yola çıkmadan yapılmış gerçek bir harcama olabilir; karar onaylayanındır).
+
+### Test sonuçları (bölüm 25)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet build` | Hatasız (SDK 10.0.404) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Web.Tests` | 94/94 / 36/36 / 282/282 |
+| `... --filter "Logistics"` (yerel SQL Server) | 54/54 (2 yeni). **Mutlu yol ve kural:** açık seferin bekleyen masrafı düzenlenir; sefer iptal edilince bekleyen ve reddedilmiş masrafın düzenlemesi 409 ve değer değişmez; bekleyen reddedilir, reddedilen yeniden gönderilir. **Tenant izolasyonu ve yetki:** iptal edilmiş seferin masrafında başka tenant 404, yalnızca okuyan 403 (kural iletisi sızmaz). Kural kodu geri alınınca kural testi kırılıyor |
+
+## 26. İptal edilen seferin bekleyen masrafı: uyarı ve gerekçeli onay (15 Kasım 2026)
+
+Karar (kullanıcı, 15 Kasım 2026: "B + 3"). Bölüm 25'ten sonra iki soru açıktı: sefer iptal edilince bekleyen masraflar kendiliğinden reddedilsin mi, iptal edilen seferin masrafı onaylanabilsin mi.
+
+**Senaryolar:** sefer yalnızca Planlanıyor ya da Hazır durumdayken iptal edilir (yola çıkmış sefer iptal edilemez), yani masraf hep sefer başlamadan girilmiştir. Bekleyen masraf (1) gerçekten harcanmış olabilir: depoda yakıt, peşin geçiş ücreti, harcırah avansı; (2) tahmini girilmiş olup hiç harcanmamış olabilir; (3) yakıt gibi, sevkiyatlar başka sefere atanınca o seferde kullanılmış olabilir; (4) depoda yazılan ceza gibi nadir bir gerçek maliyet olabilir.
+
+**Reddedilen seçenekler:**
+- **Otomatik ret:** yalnızca (2)'de doğru; diğerlerinde gerçek harcamayı sessizce reddeder. Seferi iptal eden (sefer yazma izni) masraf onay iznine sahip olmayabilir; onun adına karar vermek yetki modeline aykırı.
+- **Onay yasağı:** (1) ve (4)'teki gerçek maliyeti kaybettirir.
+- **İptali engellemek** ("önce masrafları karara bağlayın"): onaylayan yokken operasyonu tıkar.
+
+**Çözüm:**
+- **Uyarı (B):** eylem listesine isteğe bağlı `warning` alanı eklendi (`LogisticsActionState`/`LogisticsActionDto`, geriye uyumlu). Sefer iptal eyleminde, seferin bekleyen masrafı varsa "Bu seferin N bekleyen masrafı var…" uyarısı gelir; sayı yalnızca masraf okuma izni olana söylenir. Eylem çubuğu uyarıyı gerekçe adımında gösterir; iptal engellenmez.
+- **Masraf kaydında `tripCancelled`:** hesaplanan alan. Masrafın kendi kuralını belirlediği için masraf alanıdır (düzenleme, belge, gerekçeli onay); seferin başka bilgisi açılmaz. Değer `LogisticsRecordStore.PrepareAsync` kancasıyla, liste sayfası için tek sorguda yüklenir (İK deposundaki desen). Masraflar ekranı satırda ve ayrıntıda "Sefer iptal edildi" rozeti gösterir (sefer durumu rozet tonu); ekran artık seferi ayrıca okumaz (bölüm 24'teki ek istek kalktı).
+- **Gerekçeli onay (3):** iptal edilen seferin masrafını onaylamak gerekçe ister (eylem listesinde `requiresReason` dinamik, gerekçesiz 422). Gerekçe masrafın durum gerekçesine (`statusReason`) ve denetim kaydına yazılır; ayrıntıda "Onay gerekçesi" olarak görünür. Ret zaten gerekçe istiyordu; açık seferde onay değişmedi. Firma onayı genel onay sürecine bağladıysa (ADR-0027) o kapı da sorulmaya devam eder.
+- Onaylanan masraf, geliri olmayan iptal edilmiş seferde kalır; bu "iptal maliyeti" olarak doğru bilgidir.
+
+**Kapsam dışı (bilerek):** masrafı başka sefere aktarma komutu (senaryo 3; gerçek ihtiyaçta, denetim kayıtlı ayrı iş akışı olarak); sefer iptalinde onaylayana bildirim şablonu (firma kural olarak kurabilir: `logistics.trip.updated` olayı, durum = iptal koşuluyla). **Arayüz tarayıcıda denetlendi** (örnek veriyle, açık ve koyu tema): Masraflar kuyruğunda ve ayrıntıda "Sefer iptal edildi" rozeti, onay ve iptal adımında uyarı, gerekçeyle onaylanan masrafta "Onay gerekçesi" satırı; yeni CSS sınıfı ya da token yok. Denetimde gerekçe kutusunun yer tutucusu ("Onayla gerekçesi", "İptal et gerekçesi") düzeltildi: artık "Gerekçe yazın"; uyarı kutuya `aria-describedby` ile bağlı.
+
+### Test sonuçları (bölüm 26)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet build` | Hatasız (SDK 10.0.404) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Web.Tests` | 94/94 / 36/36 / 282/282 |
+| `... --filter "Logistics\|File"` (yerel SQL Server) | 103 geçti, 2 atlandı (önceden atlanan), 0 kırık; 2 yeni test. **Mutlu yol ve kural:** açık seferde onay gerekçesiz; iptal adımı "2 bekleyen masrafı" uyarısını verir ve engellenmez; iptalden sonra masraf ve liste `tripCancelled`; onay gerekçe ister (eylem listesi ve 422, masraf beklemede kalır), gerekçeyle onaylanır ve gerekçe masrafta kalır, ret değişmez, denetim kaydı. **Tenant izolasyonu ve yetki:** başka tenant eylemleri alamaz ve gerekçeyle de onaylayamaz (404); onay izni olmayan 403 alır ve onay eylemini görmez; seferi yönetip masrafları göremeyen kişiye iptal uyarısı sayı söylemez. Gerekçe kuralı geri alınınca kural testi kırılıyor |
+
+## 27. Talep, sevkiyat, sefer ve durak belgeleri süreç kapanınca donar (15 Kasım 2026)
+
+Karar (kullanıcı, 15 Kasım 2026: "Kapanınca donsun").
+
+**Bulunan açık:** bölüm 24 masraf ve teslim kanıtını kapattı; ADR-0040 K2'ye göre güncellemesi durumla sınırlı her deponun dosya kuralı da olmalı. Taşıma talebi (yalnızca "Yeni"), sevkiyat (yük bilgisi yüklemeye kadar), sefer ve durak (yalnızca planlanırken) bu kuralı vermiyordu: tamamlanmış ya da iptal edilmiş sefere, teslim edilmiş sevkiyata ve karara bağlanmış talebe API'den her zaman belge eklenip silinebiliyordu. Arayüzde bu kayıtlar için ek paneli henüz yok.
+
+**Çözüm:** belge kaydın düzenleme kuralından **geniştir**; süreç kapanana kadar açık kalır, çünkü CMR, irsaliye ve yol belgeleri kayıt kilitlendikten sonra (yolda) gelir. Kapanınca ekleme ve silme 403 döner; okuma ve indirme sürer.
+
+| Kayıt | Belge açık | Donar |
+| --- | --- | --- |
+| Taşıma talebi | Yeni | Onaylandı, reddedildi, iptal (belge sevkiyata eklenir) |
+| Sevkiyat | Planlama bekliyor, planlandı, yükleniyor, yolda | Teslim edildi, kısmi, başarısız, iptal (teslim belgesi teslim kanıtına eklenir) |
+| Sefer | Planlanıyor, hazır, yolda | Tamamlandı, iptal |
+| Durak | Seferi açıkken | Seferi tamamlanınca ya da iptal edilince |
+
+Kod: `CargoRecordStore.IsClosed` (talep ve sevkiyat), `TripFiles.Denied` (sefer ve durak), hepsi `LogisticsRecordStore.FileWriteDeniedAsync` üzerinden (bölüm 24'teki kanca). Core'da ve arayüzde değişiklik yok; ek paneli eklendiğinde `CanWrite` aynı koşulla verilmeli.
+
+**Kapsam dışı:** sürücü kartı ve taşıyıcı anlaşmasında kayıt düzeyinde kısıt yok (tür izni yeter); değişiklik gerekmedi.
+
+### Test sonuçları (bölüm 27)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` | 111/111 / 36/36 |
+| `LogisticsRecordFileTests` (3 yeni entegrasyon testi) | **Mutlu yol ve kural:** yeni talebe belge eklenir ve silinir, onaydan sonra 403; planlanan ve yoldaki sevkiyata eklenir, teslimden sonra 403; sevkiyat teslim edilmişken açık sefere ve durağa eklenir, sefer iptal edilince ikisi de 403; donan belgeler listelenir ve indirilir. **Tenant izolasyonu:** başka tenant ekleyemez, listeleyemez, indiremez, silemez (404). **Yetki:** yalnızca okuyan açık kayda ekleyemez ve silemez (403), indirir. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |
+
+## 28. Masrafı başka sefere aktarma (15 Kasım 2026)
+
+Karar (kullanıcı, 15 Kasım 2026: "İkisi de"; önce aktarma, sonra bildirim şablonu, ayrı PR'lar). Bölüm 26'daki senaryo (3): sefer iptal edilince sevkiyatlar "Planlama bekliyor"a döner ve başka sefere atanabilir; depoda alınan yakıt gibi harcama o yeni seferde kullanılır. Masrafın seferi yalnızca oluştururken seçildiği için bugüne kadar tek yol masrafı reddedip yeni seferde yeniden girmekti (belge yeniden yüklenir, denetim izi kopar).
+
+**Çözüm:**
+- **Komut:** `POST /api/logistics/expenses/{id}/transfer` (`TransferExpenseRequest { tripId, version, reason }`; `ILogisticsWorkflow.TransferExpenseAsync`). Sefer alanı genel uçtan değişmemeye devam eder; komut iş akışı kapısını hedef seferle açar (`LinkedId`), boru hattından değer göndermeden günceller (izin, kapsam, sürüm, denetim, olay).
+- **Kurallar (depoda, `TripExpenseRecordStore.TransferAsync`):**
+  - Yalnızca **beklemedeki** masraf aktarılır (409). Reddedilen önce yeniden onaya gönderilir (iptal edilen seferde bu açık kalır, bölüm 25); onaylanmış masraf değişmez.
+  - Kaynak sefer **iptal edilmiş** olmalıdır (409). Genel "yanlış sefer düzeltmesi" değildir; açık seferde yanlış sefere girilen masraf reddedilip doğru sefere girilir.
+  - Hedef sefer bu tenant'ta olmalı ve iptal edilmemiş olmalıdır; aynı sefer olamaz (422, alan `tripId`). Başka tenant'ın seferi "bulunamadı".
+- **Gerekçe:** zorunlu (422), en çok 500 karakter. `statusReason`'a yazılır (son iş akışı adımının gerekçesi); ayrıntıda "Aktarma gerekçesi" olarak görünür. Eski ve yeni sefer denetim kaydında `tripId` değişimi olarak durur. Boru hattının olay nedeni (`RecordCommand.Reason`) kodlu nedenler içindir (ör. `transfer`, `import`), serbest metin yazılmaz.
+- **İzin:** masraf yazma izni (`logistics.expenses.write`); masrafı göremeyen 403/404 (boru hattının okuma kuralı). Hedef seferin seçicisi sefer okuma izni ister; arayüz düğmeyi iki izinle gösterir.
+- **Durum değişmez:** masraf beklemede kalır; açık seferde onay gerekçe istemez, düzenleme ve belge yeniden açılır (`tripCancelled` false). Belgeler masrafa bağlıdır, onunla gider.
+- **Arayüz:** Masraflar ekranında, seferi iptal edilmiş beklemedeki masrafın ayrıntısında "Başka sefere aktar" (`ExpenseTransferPanel`): hedef sefer (`LookupPicker`, `logistics.trip-expense.trip`; sefer numarasıyla arama), gerekçe, "Aktar"; başarıda toast. Sayfa içi küçük eylem formu, sekmesiz; yeni CSS sınıfı ya da token yok. Tarayıcıda açık ve koyu temada denetlendi (form, aktarma sonrası "Aktarma gerekçesi" ve kalkan "Sefer iptal edildi" rozeti).
+
+**Kapsam dışı (bilerek):** sefer kartındaki masraf panelinden aktarma (onay kuyruğu Masraflar ekranıdır); hedef seçicide iptal edilmiş seferleri gizlemek (sunucu reddeder; arama tanımı süzgeç desteklemiyor); toplu aktarma.
+
+### Test sonuçları (bölüm 28)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet build` | Hatasız (SDK 10.0.404) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Web.Tests` | 111/111 / 36/36 / 282/282 |
+| `... --filter "Logistics\|File"` (yerel SQL Server) | 109 geçti, 2 atlandı (önceden atlanan), 1 kırık: `S3BlobStorageTests` yerelde S3 servisi gerektiriyor (CI kurar; bu değişiklikle ilgisiz). 4 yeni test. **Mutlu yol:** iptal edilen seferin bekleyen yakıt masrafı makbuzuyla açık sefere geçer; durum beklemede, gerekçe masrafta, sefer süzgeçleri yeni seferi gösterir, masraf yeniden düzenlenir ve gerekçesiz onaylanır, denetim kaydında `tripId` değişimi. **Kural:** gerekçesiz, iptal edilmiş/bilinmeyen/aynı hedef 422; açık seferdeki, reddedilmiş, onaylanmış masraf ve eski sürüm 409; masraf değişmez. **Tenant izolasyonu:** başka tenant 404; başka tenant'ın seferine aktarma 422. **Yetki:** yalnızca okuyan 403, masraf okuma izni olmayan 403. Durum ve kaynak kuralı geri alınınca kural testi kırılıyor |
+
+## 29. "Sefer iptal edilince bildir" şablonu (15 Kasım 2026)
+
+Karar (kullanıcı, 15 Kasım 2026: "İkisi de"; bölüm 28'den sonra ayrı PR). Bölüm 26'da reddedilen otomatik ret yerine kararı onaylayana bırakmıştık; onaylayanın iptali Masraflar kuyruğundaki rozetten görmesi gerekiyordu. Firma bu bildirimi kural olarak kendisi de kurabiliyordu; şablon bunu tek tıkla yapılır kılar.
+
+- **Şablon** `logistics.trip-cancelled-notify` ("Sefer iptal edilince bildir"): sefer kaydı, durum geçişi tetikleyicisi (`logistics.trip.status` → `cancelled`, kaynak durum serbest), koşulsuz, Core "Bildirim gönder". İleti: "Sefer iptal edildi: {sefer no} ({iptal gerekçesi}). Bekleyen masrafları Masraflar ekranında karara bağlayın." Alıcı diğer lojistik şablonlarındaki gibi taslakta boştur; firma seçmeden kural yayınlanamaz (ADR-0027 Dilim 3b). Alıcı seferi kendi yetkisiyle göremiyorsa Core bildirimi göndermez.
+- **Kural alanı:** sefer için `statusReason` ("İptal / durum gerekçesi") otomasyon alanı olarak beyan edildi; iletide kayıt değişkeni olarak kullanılır.
+- Şablon sayısı on bir. Bekleyen masraf sayısı iletide yok: kural koşulu ve değişkenleri yalnızca tetikleyen kaydın alanlarını okur; sayı iptal adımında masraf okuyana uyarı olarak zaten gösterilir (bölüm 26).
+- **Migration yok:** şablon kodda beyandır.
+
+**Kapsam dışı (bilerek):** yalnızca bekleyen masrafı olan seferde bildirmek (kural koşulu başka kayıt türünü saymaz); masrafı giren kişiye bildirim (masrafta sorumlu kullanıcı alanı yok).
+
+### Test sonuçları (bölüm 29)
+
+| Komut | Sonuç |
+| --- | --- |
+| `dotnet build` | Hatasız (SDK 10.0.404) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Core.Tests` | 111/111 / 36/36 / 1053/1053. Lojistik şablon testleri: on bir şablon sırayla kayıtlı; durum geçişi tetikleyicisi kaydın beyan edilmiş `status` alanına ve seçeneklerinden birine bağlı; her şablon alıcı seçilince doğrulamadan geçer |
+| `... --filter "AutomationTemplate"` (yerel SQL Server) | 10/10 (1 yeni). **Mutlu yol:** şablondan taslak, alıcı seçilip yayın; sefer API'den iptal edilir, outbox'taki gerçek güncelleme olayı otomasyon işleyicisine teslim edilir, alıcının kutusuna sefer numarası ve iptal gerekçesiyle bildirim düşer. **Kural:** iptal edilmeyen seferin güncellemesi kural çalıştırmaz. Mevcut testler: alıcısız yayın reddi (doğrulama), başka firmada kural açılmaz (tenant), yönetme/okuma izni olmayan şablonu kullanamaz (yetki); yeni şablon "her şablon yayın doğrulamasından geçer" testine de girer. Tetikleyici "tamamlandı"ya çevrilince yeni test kırılıyor |
+

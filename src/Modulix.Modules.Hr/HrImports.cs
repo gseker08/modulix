@@ -75,14 +75,7 @@ internal static class HrImports
             new("carriedOverDays", "Devreden (gün)", ImportFieldType.Decimal),
             new("notes", "Notlar"),
         ]),
-        new(HrModule.Entities.Holiday, "Resmî tatil", HrModule.Permissions.LeavesManage,
-        [
-            new("date", "Tarih", ImportFieldType.Date, Required: true),
-            new("name", "Ad", Required: true),
-            new("halfDay", "Yarım gün", ImportFieldType.YesNo),
-        ])
-        {
-            MatchRules = [new("date", null, Exact: true)],
-        },
+
+        // Resmî tatil listesi Core'a taşındı (ADR-0049 dilim 6a); içe aktarma tanımı CoreModule'dadır (core.holiday).
     ];
 }

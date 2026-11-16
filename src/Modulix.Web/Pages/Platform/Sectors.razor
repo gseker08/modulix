@@ -1,16 +1,14 @@
 @page "/platform/sektorler"
 @inject ApiClient Api
 
-<PageTitle>Sektörler ve faaliyetler · Platform · Modulix</PageTitle>
+<PageTitle>@Texts.Get("platform.home.sectors") · @Texts.Get("nav.app.platform") · Modulix</PageTitle>
 
-@* Sektör/faaliyet kataloğu (ADR-0029, Dilim B). Global katalogdur; firmalar buradan faaliyet seçer. Düğüm silinmez, pasife alınır; taşıma yoktur. *@
+@* Sektör/faaliyet kataloğu (ADR-0029, Dilim B). Global katalogdur; firmalar buradan faaliyet seçer. Düğüm silinmez, pasife alınır; taşıma yoktur.
+   Düğüm ve yetenek adları ile açıklamaları sunucu verisidir, çevrilmez (ADR-0034 dilim 18). *@
 <PlatformGate>
-    <a class="back-link" href="platform">← Platform</a>
-    <h1>Sektörler ve faaliyetler</h1>
-    <p class="text-muted">
-        Sektör → faaliyet grubu → alt faaliyet ağacı. Faaliyetin katalogda bulunması ilgili operasyon modülünün hazır olduğunu söylemez:
-        hazırlık durumunu "Hazır" yapmadan faaliyet yalnızca katalog kaydıdır. Düğüm silinmez, pasife alınır.
-    </p>
+    <a class="back-link" href="platform">← @Texts.Get("nav.app.platform")</a>
+    <h1>@Texts.Get("platform.home.sectors")</h1>
+    <p class="text-muted">@Texts.Get("platform.sectors.intro")</p>
 
     @if (message is not null)
     {
@@ -38,53 +36,57 @@
     else
     {
         <div class="form-actions">
-            <button type="button" class="btn btn-primary" @onclick="() => NewNode(null)">Yeni sektör</button>
+            <button type="button" class="btn btn-primary" @onclick="() => NewNode(null)">@Texts.Get("platform.sectors.new")</button>
         </div>
 
         @if (form is not null)
         {
             <section class="record-form settings-group" aria-live="polite">
-                <h2>@(form.Id is null ? (form.ParentName is null ? "Yeni sektör" : $"Yeni alt kayıt · {form.ParentName}") : $"Düzenle · {form.Code}")</h2>
+                <h2>@(form.Id is null ? (form.ParentName is null ? Texts.Get("platform.sectors.new") : Texts.Get("platform.sectors.newChild", form.ParentName)) : Texts.Get("platform.sectors.editTitle", form.Code))</h2>
                 <form @onsubmit="SaveNodeAsync">
                     <div class="form-grid">
                         @if (form.Id is null)
                         {
                             <div>
-                                <label class="form-label" for="nodeCode">Kod *</label>
-                                <input id="nodeCode" class="form-control" maxlength="50" placeholder="ör. antrepo" @bind="form.Code" @bind:event="oninput" />
-                                <div class="form-text">Küçük harf, rakam ve "-". Sonradan değişmez.</div>
+                                <label class="form-label" for="nodeCode">@Texts.Get("platform.codeRequired")</label>
+                                <input id="nodeCode" class="form-control" maxlength="50" placeholder="@Texts.Get("platform.sectors.codePlaceholder")" @bind="form.Code" @bind:event="oninput" />
+                                <div class="form-text">@Texts.Get("platform.codeHint")</div>
                             </div>
                             @if (form.ParentId is not null)
                             {
                                 <div>
-                                    <label class="form-label" for="nodeKind">Tür</label>
+                                    <label class="form-label" for="nodeKind">@Texts.Get("common.field.kind")</label>
                                     <select id="nodeKind" class="form-select" @bind="form.Kind">
-                                        <option value="Group">Faaliyet grubu</option>
-                                        <option value="Activity">Alt faaliyet</option>
+                                        @foreach (var (key, label) in PlatformLabels.NodeKinds.Where(k => k.Key != PlatformLabels.SectorKind))
+                                        {
+                                            <option value="@key">@label</option>
+                                        }
                                     </select>
                                 </div>
                             }
                         }
                         <div>
-                            <label class="form-label" for="nodeName">Ad *</label>
+                            <label class="form-label" for="nodeName">@Texts.Get("common.field.nameRequired")</label>
                             <input id="nodeName" class="form-control" maxlength="100" @bind="form.Name" @bind:event="oninput" />
                         </div>
                         <div>
-                            <label class="form-label" for="nodeOrder">Sıra</label>
+                            <label class="form-label" for="nodeOrder">@Texts.Get("platform.sectors.order")</label>
                             <input id="nodeOrder" class="form-control" type="number" @bind="form.SortOrder" />
                         </div>
                         @if (form.Id is not null)
                         {
                             <div>
-                                <label class="form-label" for="nodeReadiness">Operasyon modülü</label>
+                                <label class="form-label" for="nodeReadiness">@Texts.Get("platform.sectors.readiness")</label>
                                 <select id="nodeReadiness" class="form-select" @bind="form.Readiness">
-                                    <option value="CatalogOnly">Yalnızca katalog</option>
-                                    <option value="Available">Hazır</option>
+                                    @foreach (var (key, label) in PlatformLabels.NodeReadinesses)
+                                    {
+                                        <option value="@key">@label</option>
+                                    }
                                 </select>
                             </div>
                         }
                         <div>
-                            <label class="form-label" for="nodeDescription">Açıklama</label>
+                            <label class="form-label" for="nodeDescription">@Texts.Get("common.field.description")</label>
                             <textarea id="nodeDescription" class="form-control" rows="2" maxlength="500" @bind="form.Description"></textarea>
                         </div>
                     </div>
@@ -92,10 +94,10 @@
                     @if (form.Id is not null)
                     {
                         <fieldset class="mt-3">
-                            <legend class="form-label">Gerektirdiği yetenekler</legend>
+                            <legend class="form-label">@Texts.Get("platform.sectors.requiredCapabilities")</legend>
                             @if (catalog.Capabilities.Count == 0)
                             {
-                                <p class="text-muted">Henüz yetenek tanımlı değil; aşağıdan ekleyebilirsiniz.</p>
+                                <p class="text-muted">@Texts.Get("platform.sectors.noCapabilities")</p>
                             }
                             @foreach (var capability in catalog.Capabilities)
                             {
@@ -109,8 +111,8 @@
                     }
 
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(form.Name) || (form.Id is null && string.IsNullOrWhiteSpace(form.Code)))">Kaydet</button>
-                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => form = null">Vazgeç</button>
+                        <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(form.Name) || (form.Id is null && string.IsNullOrWhiteSpace(form.Code)))">@Texts.Get("common.save")</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
                     </div>
                 </form>
             </section>
@@ -118,32 +120,32 @@
 
         @if (catalog.Nodes.Count == 0)
         {
-            <p class="text-muted">Katalog boş. "Yeni sektör" ile başlayın.</p>
+            <p class="text-muted">@Texts.Get("platform.sectors.emptyCatalog")</p>
         }
         else
         {
             <section class="detail-section">
-                <h2>Ağaç</h2>
+                <h2>@Texts.Get("platform.sectors.tree")</h2>
                 <table class="table record-table">
-                    <thead><tr><th>Ad</th><th>Tür</th><th>Kod</th><th>Operasyon modülü</th><th>Durum</th><th></th></tr></thead>
+                    <thead><tr><th>@Texts.Get("common.field.name")</th><th>@Texts.Get("common.field.kind")</th><th>@Texts.Get("warehouse.code")</th><th>@Texts.Get("platform.sectors.readiness")</th><th>@Texts.Get("common.field.status")</th><th></th></tr></thead>
                     <tbody>
                         @foreach (var row in Rows())
                         {
                             <tr>
-                                <td data-label="Ad" class="primary">@(new string('—', row.Depth) + (row.Depth > 0 ? " " : string.Empty))@row.Node.Name</td>
-                                <td data-label="Tür">@KindLabel(row.Node.Kind)</td>
-                                <td data-label="Kod"><code>@row.Node.Code</code></td>
-                                <td data-label="Operasyon modülü">
-                                    <span class="badge @(row.Node.Readiness == "Available" ? "success" : "tag")">@(row.Node.Readiness == "Available" ? "Hazır" : "Yalnızca katalog")</span>
+                                <td data-label="@Texts.Get("common.field.name")" class="primary">@(new string('—', row.Depth) + (row.Depth > 0 ? " " : string.Empty))@row.Node.Name</td>
+                                <td data-label="@Texts.Get("common.field.kind")">@PlatformLabels.NodeKindOf(row.Node.Kind)</td>
+                                <td data-label="@Texts.Get("warehouse.code")"><code>@row.Node.Code</code></td>
+                                <td data-label="@Texts.Get("platform.sectors.readiness")">
+                                    <span class="badge @(row.Node.Readiness == PlatformLabels.Available ? "success" : "tag")">@PlatformLabels.NodeReadinessOf(row.Node.Readiness)</span>
                                 </td>
-                                <td data-label="Durum">
-                                    <span class="badge @(row.Node.IsActive ? "success" : "category")">@(row.Node.IsActive ? "Etkin" : "Pasif")</span>
+                                <td data-label="@Texts.Get("common.field.status")">
+                                    <span class="badge @(row.Node.IsActive ? "success" : "category")">@WarehouseLabels.ActiveText(row.Node.IsActive)</span>
                                 </td>
                                 <td class="actions">
-                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(row.Node)">Düzenle</button>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => NewNode(row.Node)">Alt kayıt ekle</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => Edit(row.Node)">@Texts.Get("common.edit")</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => NewNode(row.Node)">@Texts.Get("platform.sectors.addChild")</button>
                                     <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@busy" @onclick="() => SetActiveAsync(row.Node)">
-                                        @(row.Node.IsActive ? "Pasife al" : "Etkinleştir")
+                                        @(row.Node.IsActive ? Texts.Get("admin.subProfiles.deactivate") : Texts.Get("admin.subProfiles.activate"))
                                     </button>
                                 </td>
                             </tr>
@@ -154,28 +156,25 @@
         }
 
         <section class="detail-section">
-            <h2>Yetenekler</h2>
-            <p class="text-muted">
-                Uygulamanın desteklediği işlevler. Bir yetenek başka yeteneklere bağlı olabilir (döngü kabul edilmez). Faaliyetlere
-                yukarıdan, düğüm düzenlenirken bağlanır.
-            </p>
+            <h2>@Texts.Get("platform.sectors.capabilities")</h2>
+            <p class="text-muted">@Texts.Get("platform.sectors.capabilitiesIntro")</p>
             <form class="form-actions" @onsubmit="CreateCapabilityAsync">
-                <input class="form-control" aria-label="Yetenek kodu" maxlength="100" placeholder="kod, ör. quote.templates" @bind="capabilityCode" @bind:event="oninput" />
-                <input class="form-control" aria-label="Yetenek adı" maxlength="100" placeholder="Ad" @bind="capabilityName" @bind:event="oninput" />
-                <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(capabilityCode) || string.IsNullOrWhiteSpace(capabilityName))">Yetenek ekle</button>
+                <input class="form-control" aria-label="@Texts.Get("platform.sectors.capabilityCode")" maxlength="100" placeholder="@Texts.Get("platform.sectors.capabilityCodePlaceholder")" @bind="capabilityCode" @bind:event="oninput" />
+                <input class="form-control" aria-label="@Texts.Get("platform.sectors.capabilityName")" maxlength="100" placeholder="@Texts.Get("common.field.name")" @bind="capabilityName" @bind:event="oninput" />
+                <button type="submit" class="btn btn-outline-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(capabilityCode) || string.IsNullOrWhiteSpace(capabilityName))">@Texts.Get("platform.sectors.addCapability")</button>
             </form>
 
             @if (catalog.Capabilities.Count > 0)
             {
                 <table class="table record-table">
-                    <thead><tr><th>Ad</th><th>Kod</th><th>Bağlı olduğu yetenekler</th></tr></thead>
+                    <thead><tr><th>@Texts.Get("common.field.name")</th><th>@Texts.Get("warehouse.code")</th><th>@Texts.Get("platform.sectors.dependsOn")</th></tr></thead>
                     <tbody>
                         @foreach (var capability in catalog.Capabilities)
                         {
                             <tr>
-                                <td data-label="Ad" class="primary">@capability.Name</td>
-                                <td data-label="Kod"><code>@capability.Code</code></td>
-                                <td data-label="Bağlı olduğu yetenekler">
+                                <td data-label="@Texts.Get("common.field.name")" class="primary">@capability.Name</td>
+                                <td data-label="@Texts.Get("warehouse.code")"><code>@capability.Code</code></td>
+                                <td data-label="@Texts.Get("platform.sectors.dependsOn")">
                                     @foreach (var other in catalog.Capabilities.Where(c => c.Code != capability.Code))
                                     {
                                         <label class="form-check">
@@ -219,14 +218,6 @@
             byParent[parentId].OrderBy(n => n.SortOrder).ThenBy(n => n.Name).SelectMany(n => Walk(n.Id, depth + 1).Prepend((n, depth)));
         return Walk(null, 0);
     }
-
-    private static string KindLabel(string kind) => kind switch
-    {
-        "Sector" => "Sektör",
-        "Group" => "Faaliyet grubu",
-        "Activity" => "Alt faaliyet",
-        _ => kind,
-    };
 
     private void NewNode(ActivityNodeDto? parent)
     {

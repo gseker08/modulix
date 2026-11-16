@@ -31,6 +31,9 @@ internal sealed class ImportRunConfiguration : IEntityTypeConfiguration<ImportRu
 
         // Aynı dosya uyarısı ve "hepsi ya da hiç" için kuru çalışma eşlemesi dosya özetiyle aranır.
         builder.HasIndex(r => new { r.TenantId, r.FileHash, r.CreatedAt });
+
+        // Hata raporu temizliği süresi dolanları arar; raporu olmayan koşular indekse girmez.
+        builder.HasIndex(r => new { r.TenantId, r.ErrorReportExpiresAt }).HasFilter("[ErrorReportExpiresAt] IS NOT NULL");
     }
 }
 

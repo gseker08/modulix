@@ -230,7 +230,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
         {
             entity.FamilyId = entity.Id;
             entity.RevisionNo = 1;
-            entity.QuoteNumber = QuoteRevisionRules.NewNumber(entity.CreatedAt);
+            numberPending = true;
         }
 
         if (entity.IssueDate == default)
@@ -241,6 +241,18 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
         entity.CreatedBy = Context.CurrentUserId;
         entity.UpdatedBy = Context.CurrentUserId;
         QuoteHistory.Add(Context, entity, copyMode == "revisionOfId" ? "Revised" : "Created", null, QuoteStatus.Draft, null);
+    }
+
+    // Yeni teklif ailesi numarasını ortak seriden alır (ADR-0049 dilim 3a); revizyon ailesinin numarasını taşır, seriden numara almaz.
+    private bool numberPending;
+
+    protected override async Task CreatedAsync(Quote entity, CancellationToken cancellationToken)
+    {
+        if (numberPending)
+        {
+            numberPending = false;
+            entity.QuoteNumber = await Context.Numbers.NextAsync(CrmModule.QuoteNumberSeries, cancellationToken: cancellationToken);
+        }
     }
 
     protected override async Task AppliedAsync(Quote entity, JsonObject values, CancellationToken cancellationToken)

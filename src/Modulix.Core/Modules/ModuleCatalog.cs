@@ -27,8 +27,11 @@ public sealed partial class ModuleCatalog
     private readonly Dictionary<string, (string ModuleKey, LookupDefinition Lookup)> lookups = new(StringComparer.Ordinal);
     private readonly List<SharedRecordAccess> sharedAccess = [];
     private readonly Dictionary<string, (string ModuleKey, CredentialOwner Owner)> credentialOwners = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Modulix.Core.Contracts.Numbering.NumberSeriesDefinition> numberSeries = new(StringComparer.Ordinal);
+    private readonly List<(string ModuleKey, Modulix.Core.Contracts.Numbering.NumberSeriesDefinition Series)> numberSeriesOwners = [];
     private readonly Dictionary<string, (string ModuleKey, EventSubscription Subscription)> subscriptions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string ModuleKey, BusinessEventDefinition Definition)> businessEvents = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string ModuleKey, ModuleJobDefinition Job)> jobs = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> eventSchemaVersions = new(DomainEventTypes.SchemaVersions, StringComparer.Ordinal);
 
     public ModuleCatalog(IEnumerable<IModule> modules)
@@ -157,6 +160,19 @@ public sealed partial class ModuleCatalog
                 }
             }
 
+            foreach (var series in module.NumberSeries)
+            {
+                if (!series.IsValid
+                    || !series.Key.StartsWith(module.Key + ".", StringComparison.Ordinal)
+                    || !numberSeries.TryAdd(series.Key, series))
+                {
+                    throw new InvalidOperationException(
+                        $"Geçersiz belge serisi: '{series.Key}' ({module.Key}). Anahtar modül anahtarıyla başlamalı ve bir kez bildirilmeli; önek büyük harf ve rakamdan oluşmalı, basamak sayısı {Modulix.Core.Contracts.Numbering.NumberSeriesDefinition.MinDigits}-{Modulix.Core.Contracts.Numbering.NumberSeriesDefinition.MaxDigits} olmalı.");
+                }
+
+                numberSeriesOwners.Add((module.Key, series));
+            }
+
             foreach (var businessEvent in module.BusinessEvents)
             {
                 ValidateBusinessEvent(module, businessEvent);
@@ -174,6 +190,15 @@ public sealed partial class ModuleCatalog
                 if (!subscriptions.TryAdd(subscription.Key, (module.Key, subscription)))
                 {
                     throw new InvalidOperationException($"Olay aboneliği iki kez tanımlı: '{subscription.Key}'.");
+                }
+            }
+
+            foreach (var job in module.Jobs)
+            {
+                ValidateJob(module, job);
+                if (!jobs.TryAdd(job.Key, (module.Key, job)))
+                {
+                    throw new InvalidOperationException($"Zamanlanmış iş iki kez tanımlı: '{job.Key}'.");
                 }
             }
 
@@ -332,6 +357,13 @@ public sealed partial class ModuleCatalog
     public (string ModuleKey, CredentialOwner Owner)? FindCredentialOwner(string entityKey) =>
         credentialOwners.TryGetValue(entityKey, out var owner) ? owner : null;
 
+    /// <summary>Beyan edilmiş belge serisi (ADR-0049); bildirilmemişse null.</summary>
+    public Modulix.Core.Contracts.Numbering.NumberSeriesDefinition? FindNumberSeries(string seriesKey) =>
+        numberSeries.GetValueOrDefault(seriesKey);
+
+    /// <summary>Beyan edilmiş belge serileri, modül ve beyan sırasıyla (ADR-0049 dilim 2a: firma yönetimi listesi).</summary>
+    public IReadOnlyList<(string ModuleKey, Modulix.Core.Contracts.Numbering.NumberSeriesDefinition Series)> NumberSeries => numberSeriesOwners;
+
     /// <summary>Süreli belge taşıyabilen kayıt türleri, modül ve tanım sırasıyla.</summary>
     public IEnumerable<(string ModuleKey, CredentialOwner Owner)> CredentialOwners =>
         Modules.SelectMany(m => m.CredentialOwners.Select(o => (m.Key, o)));
@@ -351,6 +383,12 @@ public sealed partial class ModuleCatalog
     /// <summary>Olayın gideceği abonelikler (tür ve kayıt türü eşleşen), anahtar sırasıyla.</summary>
     public IEnumerable<(string ModuleKey, EventSubscription Subscription)> SubscriptionsFor(string eventType, string entityKey) =>
         subscriptions.Values.Where(s => s.Subscription.Matches(eventType, entityKey)).OrderBy(s => s.Subscription.Key, StringComparer.Ordinal);
+
+    /// <summary>Modüllerin zamanlanmış işleri (ADR-0046), anahtar sırasıyla. Host'taki tek zamanlayıcı bunları çalıştırır.</summary>
+    public IReadOnlyList<(string ModuleKey, ModuleJobDefinition Job)> Jobs => [.. jobs.Values.OrderBy(j => j.Job.Key, StringComparer.Ordinal)];
+
+    /// <summary>Anahtarı verilen zamanlanmış iş; yoksa <c>null</c>.</summary>
+    public (string ModuleKey, ModuleJobDefinition Job)? FindJob(string jobKey) => jobs.TryGetValue(jobKey, out var job) ? job : null;
 
     /// <summary>Tüm olay abonelikleri, modül ve tanım sırasıyla.</summary>
     public IEnumerable<(string ModuleKey, EventSubscription Subscription)> EventSubscriptions =>
@@ -482,6 +520,38 @@ public sealed partial class ModuleCatalog
 
     [GeneratedRegex("^[a-z][a-z0-9]*(\\.[a-z0-9]+(-[a-z0-9]+)*)+$")]
     private static partial Regex SubscriptionKeyPattern();
+
+    // Anahtar modülle başlar ve abonelik anahtarıyla aynı biçimdedir (yapılandırma ve kilit adı olur); aralık pozitiftir, kuyruk işinin yoğun aralığı
+    // ondan kısadır; iş sınıfı IModuleJob uygular; sistem kimliği modülün kendi aboneliğidir (işin izinleri oradan gelir).
+    private static void ValidateJob(IModule module, ModuleJobDefinition job)
+    {
+        var key = job.Key;
+        if (!key.StartsWith(module.Key + ".", StringComparison.Ordinal) || key.Length > SubscriptionKeyMaxLength || !SubscriptionKeyPattern().IsMatch(key))
+        {
+            throw new InvalidOperationException(
+                $"Geçersiz zamanlanmış iş anahtarı: '{key}' ({module.Key}). Biçim: '{module.Key}.ad' (küçük harf, rakam, tire).");
+        }
+
+        if (job.DefaultInterval <= TimeSpan.Zero)
+        {
+            throw new InvalidOperationException($"'{key}' işinin aralığı pozitif olmalı.");
+        }
+
+        if (job.BusyInterval is { } busy && (busy <= TimeSpan.Zero || busy >= job.DefaultInterval))
+        {
+            throw new InvalidOperationException($"'{key}' işinin yoğun aralığı pozitif ve olağan aralıktan kısa olmalı.");
+        }
+
+        if (!typeof(IModuleJob).IsAssignableFrom(job.Runner) || job.Runner.IsAbstract)
+        {
+            throw new InvalidOperationException($"'{key}' işinin sınıfı {job.Runner.Name} IModuleJob uygulamıyor.");
+        }
+
+        if (module.EventSubscriptions.All(s => s.Key != job.Identity))
+        {
+            throw new InvalidOperationException($"'{key}' işinin sistem kimliği '{job.Identity}' modülün olay aboneliklerinde yok ({module.Key}).");
+        }
+    }
 
     // İş olayı (ADR-0039): tür modül önekli ve "modül.kayıt.fiil" biçiminde, kayıt olayı adıyla çakışmaz, sürüm 1 ya da üstü,
     // kayıt türü modülün, alan adları dolu ve tekil.

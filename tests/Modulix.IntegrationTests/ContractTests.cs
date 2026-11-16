@@ -32,7 +32,7 @@ public class ContractTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         var created = await PostAsync<ContractDto>(admin, "/api/contracts/contracts", new SaveContractRequest(
             "Yıllık bakım hizmeti", s.PartyId, PersonId: s.PersonId, StartDate: new DateOnly(2026, 11, 1), EndDate: new DateOnly(2027, 10, 31),
             RenewalMode: "Manual", RenewalPeriodMonths: 12, NoticePeriodDays: 60, ContractValue: 50_000m));
-        Assert.Matches("^SZ-", created.Number);
+        Assert.Matches(@"^SZ-\d{4}-\d{5}$", created.Number);
         Assert.Equal(("Draft", "NotRequired", "NotSent", "NotInForce"), (created.PreparationStatus, created.ApprovalStatus, created.SignatureStatus, created.EffectiveStatus));
         Assert.Equal(new DateOnly(2027, 9, 1), created.NoticeDeadline);
         Assert.Equal(s.Admin.Id, created.OwnerId);

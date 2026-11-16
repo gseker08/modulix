@@ -189,6 +189,7 @@ public static class AppCatalog
         new("crm.settings", Crm, "Genel CRM ayarları", "wrench", ModuleSettingsRoute(CrmAccess.ModuleKey), 5, CrmAccess.ModuleKey, CoreAccess.ManageSettings, Group: CrmSettingsGroup),
         new("crm.quote-rules", Crm, "Teklif kuralları", "shield", "crm/teklif-kurallari", 10, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmSettingsGroup),
         new("crm.quote-delegations", Crm, "Onay vekâletleri", "users", "crm/onay-vekaletleri", 20, CrmAccess.ModuleKey, CrmAccess.QuoteRulesManage, Group: CrmSettingsGroup),
+        new("crm.lead-scoring", Crm, "Müşteri adayı puanı", "trending-up", "crm/aday-puani", 30, CrmAccess.ModuleKey, CrmAccess.LeadScoringManage, Group: CrmSettingsGroup),
         new("crm.product-categories", Crm, "Ürün kategorileri", "layers", "crm/urun-kategorileri", 40, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmSettingsGroup),
         new("crm.units", Crm, "Ölçü birimleri", "sliders", "crm/birimler", 50, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmSettingsGroup),
         new("crm.tax-rates", Crm, "Vergi ve kur", "landmark", "crm/vergi-kur", 60, CrmAccess.ModuleKey, CrmAccess.PricesRead, Group: CrmSettingsGroup),
@@ -259,7 +260,7 @@ public static class AppCatalog
         new("hr.my-leaves", Hr, "İzinlerim", "calendar", "ik/izinlerim", 40, HrAccess.ModuleKey, HrAccess.LeavesRequest, Tone: AppTone.Teal),
         new("hr.leave-requests", Hr, "İzin talepleri", "check-circle", "ik/izin-talepleri", 50, HrAccess.ModuleKey, AnyPermission: [HrAccess.LeavesApprove, HrAccess.LeavesManage]),
         new("hr.leave-balances", Hr, "İzin hakları", "star", "ik/izin-haklari", 60, HrAccess.ModuleKey, HrAccess.LeavesManage, Tone: AppTone.Teal),
-        new("hr.holidays", Hr, "Resmî tatiller", "sun", "ik/resmi-tatiller", 70, HrAccess.ModuleKey, HrAccess.LeavesManage),
+        new("hr.holidays", Hr, "Resmî tatiller", "sun", "ik/resmi-tatiller", 70, HrAccess.ModuleKey, CoreAccess.ManageHolidays), // liste Core'dadır (ADR-0049 dilim 6a)
         new("hr.my-expenses", Hr, "Masraflarım", "wallet", "ik/masraflarim", 80, HrAccess.ModuleKey, HrAccess.ExpensesRequest, Tone: AppTone.Teal),
         new("hr.my-assets", Hr, "Zimmetlerim", "package", "ik/zimmetlerim", 100, HrAccess.ModuleKey, HrAccess.AssetsRead, Tone: AppTone.Teal),
         new("hr.assets", Hr, "Demirbaşlar", "clipboard-list", "ik/demirbaslar", 110, HrAccess.ModuleKey, HrAccess.AssetsManage),
@@ -270,6 +271,7 @@ public static class AppCatalog
         new("hr.surveys", Hr, "Anketler", "clipboard-list", "ik/anketler", 6, HrAccess.ModuleKey, HrAccess.SurveysRespond, Tone: AppTone.Teal),
         new("hr.blog", Hr, "Blog", "file-text", "ik/blog", 7, HrAccess.ModuleKey, HrAccess.BlogRead, Tone: AppTone.Teal),
         new("hr.gallery", Hr, "Galeri", "image", "ik/galeri", 8, HrAccess.ModuleKey, HrAccess.GalleryRead, Tone: AppTone.Teal),
+        new("hr.my-posts", Hr, "Yazılarım", "pencil", "ik/yazilarim", 9, HrAccess.ModuleKey, HrAccess.BlogWrite, Tone: AppTone.Teal),
         new("hr.blog-admin", Hr, "Blog yönetimi", "file-text", "ik/blog-yonetimi", 170, HrAccess.ModuleKey, HrAccess.BlogManage),
         new("hr.gallery-admin", Hr, "Galeri yönetimi", "image", "ik/galeri-yonetimi", 180, HrAccess.ModuleKey, HrAccess.GalleryManage),
         new("hr.survey-admin", Hr, "Anket yönetimi", "clipboard-list", "ik/anket-yonetimi", 160, HrAccess.ModuleKey, HrAccess.SurveysManage),
@@ -296,6 +298,8 @@ public static class AppCatalog
         new("admin.roles", Admin, "Roller", "key", "yonetim/roller", 40, Permission: CoreAccess.ManageRoles, Tone: AppTone.Teal),
         new("admin.companies", Admin, "Şirketler", "landmark", "yonetim/sirketler", 50, Permission: CoreAccess.ManageCompanies),
         new("admin.settings", Admin, "Kuruluş ayarları", "wrench", "yonetim/ayarlar", 60, Permission: CoreAccess.ManageSettings, Tone: AppTone.Teal),
+        new("admin.holidays", Admin, "Resmî tatiller", "sun", "yonetim/resmi-tatiller", 62, Permission: CoreAccess.ManageHolidays),
+        new("admin.numbering", Admin, "Belge numaraları", "hash", "yonetim/belge-numaralari", 63, Permission: CoreAccess.ManageNumbering), // ADR-0049 dilim 2b
         new("admin.ai-access", Admin, "Yapay zekâ erişimi", "zap", "yonetim/yapay-zeka", 65, Permission: CoreAccess.ManageSettings),
         new("admin.audit", Admin, "Denetim kaydı", "history", "yonetim/denetim", 70, Permission: CoreAccess.ReadAudit),
         new("admin.import-log", Admin, "İşlem günlüğü", "history", "yonetim/gunluk", 72, AnyPermission: [CoreAccess.ReadImports, CoreAccess.RunImports]),

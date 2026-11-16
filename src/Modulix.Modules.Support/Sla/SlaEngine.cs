@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Calendar;
 using Modulix.Modules.Support.Domain;
 using Modulix.Modules.Support.Lifecycle;
 using Modulix.Modules.Support.Records;
@@ -22,8 +23,8 @@ public static class SlaSnapshots
     public static WorkCalendar CalendarOf(SlaSnapshot snapshot) => snapshot.Calendar.AlwaysOpen ? WorkCalendar.AlwaysOpen : new WorkCalendar(snapshot.Calendar);
 }
 
-/// <summary>Seçilen politika ve takvimi.</summary>
-internal sealed record SlaSelection(SlaPolicy Policy, SlaCalendar? Calendar);
+/// <summary>Seçilen politika ve takvimi; takvim firmanın tatil listesini uyguluyorsa ilgili dönemin tatil günleri (ADR-0049 dilim 6b).</summary>
+internal sealed record SlaSelection(SlaPolicy Policy, SlaCalendar? Calendar, IReadOnlyCollection<HolidayDay> TenantHolidays);
 
 /// <summary>
 /// SLA motoru (ADR-0024 dilim 2): talebin yaşam döngüsüne bağlı SLA örneklerini kayıt boru hattıyla aynı işlemde yönetir. Talep açılınca politika seçilir ve örnekler başlar;
@@ -190,18 +191,36 @@ internal static class SlaEngine
         var calendar = policy.CalendarId is { } calendarId
             ? await context.Data.Set<SlaCalendar>().AsNoTracking().FirstOrDefaultAsync(c => c.Id == calendarId, cancellationToken)
             : null;
-        return new SlaSelection(policy, calendar);
+        // Firmanın tatil listesi anlık görüntüye girer: liste sonradan değişse de açık örnek kendi görüntüsüyle yaşar. Dönem, hesaplayıcının
+        // tarayabildiği süreyi (yaklaşık üç yıl) kapsar; önizlemede geçmiş bir başlangıç için bir ay geriye de bakılır.
+        IReadOnlyCollection<HolidayDay> holidays = [];
+        if (calendar is { UseTenantHolidays: true, IsAlwaysOpen: false })
+        {
+            var today = DateOnly.FromDateTime(context.Time.GetUtcNow().UtcDateTime);
+            holidays = [.. (await context.Holidays.GetAsync(today.AddDays(-TenantHolidayDaysBack), today.AddDays(TenantHolidayDaysAhead), cancellationToken)).Values];
+        }
+
+        return new SlaSelection(policy, calendar, holidays);
     }
+
+    private const int TenantHolidayDaysBack = 31;
+    private const int TenantHolidayDaysAhead = 1100;
 
     public static int? TargetOf(SlaPolicy policy, string metric) => metric == SlaMetric.FirstResponse ? policy.FirstResponseMinutes : policy.ResolutionMinutes;
 
-    public static SlaSnapshot Snapshot(SlaPolicy policy, SlaCalendar? calendar, string metric)
+    public static SlaSnapshot Snapshot(SlaSelection selection, string metric) => Snapshot(selection.Policy, selection.Calendar, metric, selection.TenantHolidays);
+
+    public static SlaSnapshot Snapshot(SlaPolicy policy, SlaCalendar? calendar, string metric, IReadOnlyCollection<HolidayDay>? tenantHolidays = null)
     {
         var spec = CalendarSpec.TwentyFourSeven;
         if (calendar is not null)
         {
             var (parsed, _) = CalendarSpecParser.Parse(calendar.TimeZoneId, calendar.IsAlwaysOpen, calendar.WeeklyHours, calendar.Holidays);
             spec = parsed ?? spec;
+            if (calendar.UseTenantHolidays && tenantHolidays is { Count: > 0 })
+            {
+                spec = TenantHolidays.Apply(spec, tenantHolidays);
+            }
         }
 
         return new SlaSnapshot(
@@ -218,7 +237,7 @@ internal static class SlaEngine
             return null;
         }
 
-        var snapshot = Snapshot(selection.Policy, selection.Calendar, metric);
+        var snapshot = Snapshot(selection, metric);
         var instance = new SlaInstance
         {
             TicketId = ticket.Id,
@@ -382,7 +401,7 @@ internal static class SlaEngine
             }
 
             var oldSnapshot = SlaSnapshots.Parse(instance.Snapshot);
-            var snapshot = Snapshot(selection.Policy, selection.Calendar, instance.Metric);
+            var snapshot = Snapshot(selection, instance.Metric);
             instance.PolicyId = selection.Policy.Id;
             instance.PolicyRevision = selection.Policy.Revision;
             instance.PolicyName = selection.Policy.Name;

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Infrastructure.Email;
@@ -18,16 +19,23 @@ public sealed record QuoteLinkDelivery(string Status, string? Error, DateTimeOff
 /// alıcıya ulaştığını söylemez. Gönderen/SMTP yapılandırılmamışsa e-posta kuyrukta <c>Pending</c> bekler; hiçbir şey sahte "gönderildi" olmaz.
 /// Geliştirmede SMTP yerel Mailpit'tir, gerçek müşteriye e-posta gitmez.
 /// </summary>
-internal sealed class QuoteDelivery(IEmailQueue emails, ModulixDbContext platform, ITenantContextAccessor tenant)
+internal sealed class QuoteDelivery(IEmailQueue emails, ModulixDbContext platform, ITenantContextAccessor tenant, IRecipientLanguage languages)
 {
     public const string ReferencePrefix = "crm.quote-link:";
 
     public static string Reference(Guid linkId) => $"{ReferencePrefix}{linkId:N}";
 
-    /// <summary>Müşteri bağlantı e-postasını kuyruğa yazar. Başarısızlıkta istisna fırlatır (çağıran yakalar ve durumu <c>Failed</c> gösterir).</summary>
-    public void Enqueue(
-        Guid linkId, string to, string? recipientName, string sellerName, string quoteNumber, string quoteTitle, DateTimeOffset? validUntil, string url) =>
-        emails.Enqueue(QuoteEmails.ShareLink(to, recipientName, sellerName, quoteNumber, quoteTitle, validUntil, url) with { Reference = Reference(linkId) });
+    /// <summary>
+    /// Müşteri bağlantı e-postasını kuyruğa yazar. Müşterinin hesabı olmadığı için e-posta firmanın varsayılan dilindedir (ADR-0034 §6, dilim 18b).
+    /// Başarısızlıkta istisna fırlatır (çağıran yakalar ve durumu <c>Failed</c> gösterir).
+    /// </summary>
+    public async Task EnqueueAsync(
+        Guid linkId, string to, string? recipientName, string sellerName, string quoteNumber, string quoteTitle, DateTimeOffset? validUntil, string url,
+        CancellationToken cancellationToken)
+    {
+        LocalizedTexts t = await languages.ForExternalAsync(cancellationToken);
+        emails.Enqueue(QuoteEmails.ShareLink(t, to, recipientName, sellerName, quoteNumber, quoteTitle, validUntil, url) with { Reference = Reference(linkId) });
+    }
 
     /// <summary>Bağlantıların e-posta durumu; e-postası olmayan bağlantı sonuçta yoktur (gönderilmedi).</summary>
     public async Task<IReadOnlyDictionary<Guid, QuoteLinkDelivery>> GetAsync(IEnumerable<Guid> linkIds, CancellationToken cancellationToken)
@@ -77,29 +85,35 @@ internal sealed class QuoteDelivery(IEmailQueue emails, ModulixDbContext platfor
 /// <summary>Müşteriye giden teklif e-postası. Kullanıcı girdisi (ad, başlık, firma adı) HTML'e kodlanarak eklenir; konu tek satırdır.</summary>
 internal static class QuoteEmails
 {
-    public static EmailMessage ShareLink(string to, string? recipientName, string sellerName, string quoteNumber, string quoteTitle, DateTimeOffset? validUntil, string url)
+    public static EmailMessage ShareLink(
+        LocalizedTexts t, string to, string? recipientName, string sellerName, string quoteNumber, string quoteTitle, DateTimeOffset? validUntil, string url)
     {
-        var greeting = string.IsNullOrWhiteSpace(recipientName) ? "Merhaba," : $"Merhaba {recipientName.Trim()},";
+        var greeting = string.IsNullOrWhiteSpace(recipientName) ? t.Get("email.common.greeting-anonymous") : t.Get("email.common.greeting", recipientName.Trim());
         var title = OneLine(quoteTitle);
         var seller = OneLine(sellerName);
         var paragraphs = new List<string>
         {
-            $"{seller} sizin için \"{title}\" başlıklı {quoteNumber} numaralı teklifi hazırladı.",
-            "Teklifi incelemek, PDF olarak indirmek ve kabul ya da ret kararınızı iletmek için aşağıdaki bağlantıyı açın.",
+            t.Get("email.quote.share.intro", seller, title, quoteNumber),
+            t.Get("email.quote.share.instructions"),
         };
         if (validUntil is { } until)
         {
-            paragraphs.Add($"Teklifin geçerlilik süresi {until.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)} tarihinde sona erer.");
+            paragraphs.Add(t.Get("email.quote.share.valid-until", until.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)));
         }
 
-        var footer = "Bu bağlantı size özeldir; başkalarıyla paylaşmayın. Bu teklifi beklemiyorsanız e-postayı yok sayabilirsiniz.";
+        var footer = t.Get("email.quote.share.footer");
         var html = string.Concat(
             $"<p>{Encode(greeting)}</p>",
             string.Concat(paragraphs.Select(p => $"<p>{Encode(p)}</p>")),
-            $"<p><a href=\"{Encode(url)}\">Teklifi görüntüle</a></p>",
+            $"<p><a href=\"{Encode(url)}\">{Encode(t.Get("email.quote.share.action"))}</a></p>",
             $"<p style=\"color:#666\">{Encode(footer)}</p>");
-        var text = string.Join("\n\n", [greeting, .. paragraphs, $"Teklifi görüntüle: {url}", footer]);
-        return new EmailMessage(to, $"Teklif {quoteNumber} — {seller}", html) { ToName = string.IsNullOrWhiteSpace(recipientName) ? null : recipientName.Trim(), TextBody = text };
+        var text = string.Join("\n\n", [greeting, .. paragraphs, t.Get("email.quote.share.action-text", url), footer]);
+        return new EmailMessage(to, t.Get("email.quote.share.subject", quoteNumber, seller), html)
+        {
+            ToName = string.IsNullOrWhiteSpace(recipientName) ? null : recipientName.Trim(),
+            TextBody = text,
+            Language = t.Language,
+        };
     }
 
     private static string OneLine(string value) => string.Join(' ', value.Split(['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries)).Trim();

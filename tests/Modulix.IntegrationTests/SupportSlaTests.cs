@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Support;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
@@ -131,7 +130,7 @@ public class SupportSlaTests(ModulixApiFactory factory) : IClassFixture<ModulixA
 
     private async Task<SlaSchedulerRun> RunSchedulerAsync(Guid tenantId)
     {
-        var (run, skipped) = await factory.Services.GetRequiredService<SupportJobsRunner>().RunTenantAsync(tenantId, CancellationToken.None);
+        var (run, skipped) = await new SupportJobsRunner(factory.Services).RunTenantAsync(tenantId, CancellationToken.None);
         Assert.False(skipped);
         return run!;
     }
@@ -277,6 +276,62 @@ public class SupportSlaTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await foreign.PostAsJsonAsync("/api/support/sla/preview", new SlaPreviewRequest("Support", "Low", PartyId: s.PartyId))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await agent.PostAsJsonAsync("/api/support/sla/preview", new SlaPreviewRequest("Support", "Normal"))).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await foreign.GetAsync($"/api/support/sla-policies/{Guid.NewGuid()}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_calendar_applies_the_company_holiday_list_only_when_asked_and_only_the_own_tenants_list()
+    {
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        var other = await SetUpAsync();
+        using var foreign = await LoginAsync(other.Manager);
+
+        // Gelecek bir Cuma 17:00 (İstanbul); ertesi Pazartesi yalnızca s tenant'ının tatil listesinde (ADR-0049 dilim 6b).
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var friday = today.AddDays(14 + (((int)DayOfWeek.Friday - (int)today.DayOfWeek + 7) % 7));
+        var monday = friday.AddDays(3);
+        await AddTenantHolidayAsync(s.Tenant.Id, monday, "Bayram");
+        var start = new DateTimeOffset(friday.ToDateTime(new TimeOnly(17, 0)), TimeSpan.FromHours(3));
+
+        var withList = await CreateAsync<SlaCalendarDto>(manager, "sla-calendars", new SaveSlaCalendarRequest(Name: "Mesai + firma tatilleri", WeeklyHours: Weekdays()));
+        var withoutList = await CreateAsync<SlaCalendarDto>(manager, "sla-calendars",
+            new SaveSlaCalendarRequest(Name: "Yalnızca mesai", WeeklyHours: Weekdays(), UseTenantHolidays: false));
+        Assert.Equal((true, false), (withList.UseTenantHolidays, withoutList.UseTenantHolidays));
+        await PolicyAsync(manager, "Firma tatilli", firstResponse: null, resolution: 120, calendarId: withList.Id, priority: "Normal");
+        await PolicyAsync(manager, "Tatilsiz", firstResponse: null, resolution: 120, calendarId: withoutList.Id, priority: "High");
+
+        // Cuma 17:00 + 2 iş saati: firma listesini uygulayan takvimde Salı 10:00, uygulamayanda Pazartesi 10:00.
+        Assert.Equal(At(monday.AddDays(1), 10), await DueAtAsync(manager, "Normal", start));
+        Assert.Equal(At(monday, 10), await DueAtAsync(manager, "High", start));
+
+        // Seçenek sonradan kapatılınca hedef Pazartesi'ye döner.
+        var updated = await manager.PutAsJsonAsync($"/api/support/sla-calendars/{withList.Id}",
+            new SaveSlaCalendarRequest(withList.Version, withList.Name, withList.TimeZoneId, false, withList.WeeklyHours, withList.Holidays, true, UseTenantHolidays: false));
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        Assert.Equal(At(monday, 10), await DueAtAsync(manager, "Normal", start));
+
+        // Başka tenant'ın tatil listesi uygulanmaz: aynı takvim ve politika orada Pazartesi 10:00 verir.
+        var foreignCalendar = await CreateAsync<SlaCalendarDto>(foreign, "sla-calendars", new SaveSlaCalendarRequest(Name: "Mesai + firma tatilleri", WeeklyHours: Weekdays()));
+        await PolicyAsync(foreign, "Firma tatilli", firstResponse: null, resolution: 120, calendarId: foreignCalendar.Id, priority: "Normal");
+        Assert.Equal(At(monday, 10), await DueAtAsync(foreign, "Normal", start));
+
+        static DateTimeOffset At(DateOnly day, int hour) => new DateTimeOffset(day.ToDateTime(new TimeOnly(hour, 0)), TimeSpan.FromHours(3)).ToUniversalTime();
+
+        static async Task<DateTimeOffset> DueAtAsync(HttpClient client, string priority, DateTimeOffset startAt)
+        {
+            var response = await client.PostAsJsonAsync("/api/support/sla/preview", new SlaPreviewRequest("Support", priority, StartAt: startAt));
+            Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+            return Assert.Single((await response.Content.ReadFromJsonAsync<SlaPreviewDto>())!.Metrics).DueAt;
+        }
+    }
+
+    /// <summary>Firmanın tatil listesine gün ekler (Core, <c>core.holiday</c>); listenin kendi uçları <see cref="HolidayTests"/>'te sınanır.</summary>
+    private async Task AddTenantHolidayAsync(Guid tenantId, DateOnly date, string name)
+    {
+        using var scope = factory.OpenScope(tenantId);
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        db.Holidays.Add(new Modulix.Core.Calendar.Holiday(date, name, halfDay: false));
+        await db.SaveChangesAsync();
     }
 
     [Fact]
@@ -442,7 +497,7 @@ public class SupportSlaTests(ModulixApiFactory factory) : IClassFixture<ModulixA
 
         // Tekrar ve paralel çalıştırma: hiçbir eylem ya da kayıt çoğalmaz.
         Assert.Equal(new SlaSchedulerRun(0, 0), await RunSchedulerAsync(s.Tenant.Id));
-        var parallel = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => factory.Services.GetRequiredService<SupportJobsRunner>().RunTenantAsync(s.Tenant.Id, CancellationToken.None)));
+        var parallel = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => new SupportJobsRunner(factory.Services).RunTenantAsync(s.Tenant.Id, CancellationToken.None)));
         Assert.All(parallel, r => Assert.Equal(0, (r.Run?.Breaches ?? 0) + (r.Run?.Escalations ?? 0)));
         Assert.Equal(3, (await SlaAsync(lead, ticket.Id)).Single().Escalations.Count);
         Assert.Equal(2, await emails());

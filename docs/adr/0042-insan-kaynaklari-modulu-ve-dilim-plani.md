@@ -494,3 +494,132 @@ Bölüm 15'teki sınır üç bağdan geliyordu; üçü de koparıldı:
 | `dotnet test tests/Modulix.ArchitectureTests`, `tests/Modulix.Modules.Hr.Tests` | 91/91 ve 57/57 geçti |
 | `dotnet ef migrations has-pending-model-changes` | Değişiklik yok |
 | `HrSurveyTests` (+1 entegrasyon testi) | Veritabanında cevapta katılım yok, pusula başka yerde yok, kimlik v4, zaman açılış günü. Cevabın denetim satırı anonim; cevap kimliği, pusula ve metin denetim kaydının hiçbir yerinde yok; olay yok. Katılım tutulur, tekrar yanıt 409. Kimliği açık ankette bağ ve kişisel denetim sürer. Derleniyor; yerelde SQL Server olmadığı için **CI çalıştırır**. |
+
+## 25. Kayıt düzeyinde dosya izni (öncelik 4b, 14 Kasım 2026)
+
+Karar (kullanıcı, 14 Kasım 2026: "Core + masraf düzeltmesi"; blog yazar modeli sonraya).
+
+**Bulunan açık:** ADR-0040'ta dosya ekleme ve silme kaydı okuyabilmeye ve kayıt **türünün** güncelleme iznine bağlıydı. Masraf satırının kendisi ise yalnızca taslak beyanda ve beyanın sahibi ya da İK tarafından değişir. Fiş ve fatura bu kuralı atlatıyordu:
+- talep izni de olan onaylayan yönetici, başkasının gönderilmiş beyanından fiş silebiliyor ya da ekleyebiliyordu;
+- çalışan, onaylanmış hatta ödenmiş beyanının belgesini değiştirebiliyordu.
+
+**Çözüm:**
+- **Core:** kayıt düzeyinde yan yazma kuralı zaten vardı (`IRecordWriteGuard`, süreli belge için) ve dosya deposu tür izninden sonra ona soruyordu; yeni kod gerekmedi. Kuralın anlamı belgelendi (ADR-0040 K2, sözleşme yorumu): kaydın güncellemesini durum ya da kişiyle sınırlayan her depo dosya kuralını da vermelidir.
+- **İK:**
+  - `HrRecordStore` bu kancayı her İK deposu için uygular (`FileWriteDeniedAsync`; varsayılan kural yok, davranış değişmez).
+  - Masraf beyanı ve satırı satırın kuralını verir: yalnızca taslak beyanda, sahibi ya da İK. Gönderilmiş, onaylanmış ya da ödenmiş beyanın belgesi kimse tarafından eklenemez ya da silinemez (403).
+  - Okuma ve indirme kaydın görünürlüğünü izlemeye devam eder; onaylayan fişleri görür.
+  - Arayüz zaten yalnızca taslakta ve sahibine yükleme gösteriyordu.
+- **Diğer İK ekleri** (duyuru, blog, albüm, özlük belgesi): yazma zaten yönetim iznine bağlı ya da Core süreli belge kuralıyla korunuyor; değişiklik yok.
+
+**Kapsam dışı (bilerek):**
+- Blog yazar modeli (çalışanın kendi yazısını yazıp dosya eklemesi). Ayrı izin ve yayın akışı gerektiren bir ürün kararıdır.
+- Lojistik sefer masrafı ve teslim kanıtında aynı açık (onaylı masrafın belgesi değişebiliyor); ayrı iş olarak önerildi.
+
+### Test sonuçları (bölüm 25)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.ArchitectureTests` | 94/94 geçti |
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 57/57 geçti |
+| `HrExpenseTests` (+1 entegrasyon testi) | Kapsadıkları: taslakta sahibi ve İK ekler; gönderimden sonra sahibi, İK ve onaylayan ekleyemez ve silemez (403); onaylayan okur ve indirir; izinsiz kullanıcı ve başka tenant ulaşamaz. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır; ilk çalışmada kuralın kaydı okuyamadığını yakaladı). |
+
+## 26. Silinen kaydın dosya temizliği (öncelik 4c, 15 Kasım 2026)
+
+Öncelik listesinin (4) son maddesidir ve Core'da çözüldü: ADR-0040 K8. Silinen İK kaydının (duyuru, blog yazısı, albüm, masraf satırı) ekleri `record.deleted` olayıyla metadata'dan silinir ve denetime yazılır; içerik `files.cleanup` işiyle bekleme süresinden sonra silinir. İK'da modüle özel kod yoktur. Bu maddeyle bölüm 18'deki öncelik listesi tamamlandı; blog yazar modeli bilerek sonraya kaldı (bölüm 25).
+
+### Test sonuçları (bölüm 26)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.ArchitectureTests` | 111/111 geçti |
+| `dotnet test tests/Modulix.Core.Tests` | 1053/1053 geçti |
+| `FileCleanupTests` (2 entegrasyon testi, İK duyurusu üzerinden) | Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır; ilk çalışmada kuralın kaydı okuyamadığını yakaladı). |
+
+## 27. Çalışanın blog yazısı ve onay akışı (15 Kasım 2026)
+
+Karar (kullanıcı, 15 Kasım 2026: "Yaz, onaya gönder"). Bölüm 25'te bilerek sonraya bırakılan blog yazar modeli.
+
+**Akış:** taslak → onay bekliyor → yayında; yöneten geri çevirirse "geri çevrildi" (gerekçeli), yazar düzeltip yeniden gönderir.
+
+- **İzin:** yeni `hr.blog.write` ("Kendi blog yazısını yazar, ek ekler ve onaya gönderir; yayınlayamaz"). Kayıt türünün yazma izni artık budur. `hr.blog.manage` başkasının yazısını yönetmeyi ve yayını verir; yöneten rol iki izni birlikte taşır.
+  - Rol şablonları: "Çalışan (rehber)" ve "Yönetici (izin onayı)" yazma iznini alır; "İK uzmanı" ikisini de taşır.
+  - Geriye uyum: migration `HrBlogAuthorReview`, `hr.blog.manage` veren her role `hr.blog.write`'ı da ekler (`PermissionGrantSql`); bugünkü yöneticiler yazmaya devam eder.
+- **Veri:** `hr.BlogPosts`'a `ReviewStatus` (boş, `submitted`, `returned`), `ReviewNote` (en çok 1000 karakter) ve `SubmittedAt` eklendi (boş sütunlar, geriye uyumlu). Görünen durum `status` türetilir: `draft`, `submitted`, `returned`, `published`.
+- **Kurallar (sunucuda):**
+  - Yazar (yönetim izni yok) yazıyı yayınlayamaz (`isPublished` 422).
+  - Yazar yalnızca kendi yazısını, taslakken ya da geri çevrilmişken değiştirir ve siler. Onay bekleyen ve yayındaki yazı kilitlidir (409).
+  - Başkasının yazısı yazara görünmez (404).
+  - Ekler aynı kurala uyar (`IRecordWriteGuard`, ADR-0040 K2): kilitli yazının eki eklenmez ve silinmez (403).
+  - Yöneten her yazıyı değiştirir. Doğrudan "Yayında" işaretlemesi onay yerine geçer.
+- **Görünürlük:** yöneten hepsini görür; diğerleri yayındakileri ve kendi yazılarını. Okur akışı (`/ik/blog`) yine yalnızca yayındakileri listeler.
+- **Komutlar:** `GET/POST /api/hr/blog-posts/{id}/actions`.
+  - `submit`: yazar; taslak ya da geri çevrilen yazıda; gerekçeyi siler.
+  - `publish`: yöneten; onay bekleyen yazıda.
+  - `return`: yöneten; onay bekleyen yazıda; gerekçe zorunlu.
+  - Komutlar kayıt boru hattından geçer (denetim, olay).
+- **Süzgeçler:** `status`, `authorUserId`. **Sıralama:** `submittedAt` eklendi.
+- **Arayüz:**
+  - Yeni "Yazılarım" ekranı (`/ik/yazilarim`, `hr.blog.write`): kendi yazıları, durum sekmeleri, düzenleme, ekler, "Onaya gönder" ve geri çevirme gerekçesi.
+  - "Blog yönetimi"nde "Onay bekleyen" görünümü, durum rozeti ve açılan yazıda "Onayla ve yayınla" / "Geri çevir".
+  - Yazarın formunda "Yayında" kutusu yoktur.
+  - Yeni CSS sınıfı ya da token yok.
+
+**Kapsam dışı (bilerek):** onaya gönderme ve karar için bildirim (otomasyon kuralıyla ileride eklenebilir); yayındaki yazının düzeltme talebi (yöneten yayından alıp düzenleyebilir).
+
+### Test sonuçları (bölüm 27)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.ArchitectureTests` | 111/111 geçti |
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 64/64 geçti (rol şablonları ve paylaşılan sabitler genişletildi) |
+| `dotnet test tests/Modulix.Core.Tests` | 1053/1053 geçti |
+| `HrBlogAuthorTests` (4 yeni entegrasyon testi) | Mutlu yol (yaz, ek, gönder, geri çevir, düzelt, yeniden gönder, yayınla; okur görür), doğrulama ve kural (yazar yayınlayamaz, kilitli yazı ve ekleri, gerekçesiz geri çevirme, durum dışı ve bilinmeyen eylem, eski sürüm), tenant izolasyonu (404), yetki (okur yazamaz, yazar başkasının taslağını göremez ve değiştiremez, yazar karar veremez). Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır; ilk çalışmada kuralın kaydı okuyamadığını yakaladı). |
+| `Modulix.Web` derlemesi | Yerel SDK 10.0.115'teki bilinen Razor hataları dışında yeni hata yok (önce/sonra aynı 204 satır); Razor sayfaları CI'daki SDK ile derlenir |
+
+## 28. Blog onay bildirimleri (15 Kasım 2026)
+
+Bölüm 27'de kapsam dışı bırakılan bildirimler, İK'nın bildirim düzeniyle (bölüm 18) başlangıç kuralı şablonu olarak eklendi. Firma şablonu kullanıp yayınlayınca çalışır; kodda sabit bildirim yoktur.
+
+- **Otomasyon alanları:** `hr.blog-post.status` (seçim: taslak, onay bekliyor, geri çevrildi, yayında) ve `hr.blog-post.authorUserId` ("Bildirim gönder → Kime"ye bağlanabilir).
+- **Şablonlar** (durum geçişi tetikleyicisi, Core "Bildirim gönder"):
+  - `hr.blog-review-notify`: yazı onaya gönderilince bildirir. Alıcı kayıtta olmadığı için firma taslakta seçer (`ToComplete`); seçilmeden kural yayınlanamaz.
+  - `hr.blog-returned-notify`: yazı geri çevrilince yazara bildirir. Gerekçe bildirimde değil, yazıda görülür.
+  - `hr.blog-published-notify`: yazı yayınlanınca (onayla ya da doğrudan) yazara bildirir.
+- **Kuralın kimliği:** blog deposu okumada `hr.blog.read`, taslak ve onay bekleyen yazıyı görmek için `hr.blog.manage` ister. Otomasyon kayıt türünün izni `hr.blog.manage`'dir; ilk düzeltmede blog alanları `hr.blog.read` okuma iznini taşıyordu, bölüm 29'da bu kayıt türü düzeyine (`RecordReadPermission`) taşındı: her blog kuralı iki izinle çalışır; yoksa kural kaydı okuyamaz ve bildirim gitmez (ilk CI çalışmasında yakalandı).
+- **Yetki:** Core bildirimi alıcı kaydı kendi yetkisiyle göremiyorsa göndermez. Onay bildiriminin alıcısı olarak yönetim izni olmayan biri seçilirse onay bekleyen taslağı göremez ve bildirim almaz.
+
+### Test sonuçları (bölüm 28)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 65/65 geçti (şablon sayısı, bildirime bağlanabilen alanlar, alıcısı taslakta seçilen tek şablon, blog kurallarının kimliği okuma ve yönetim iznini taşır: alan izni geri alınınca kırılıyor) |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Core.Tests` | 111/111 / 1067/1067 geçti |
+| `HrAutomationTests` (1 yeni entegrasyon testi, 1 genişletilen) | **Bütün şablonlar** gerçek yayın doğrulamasından geçer (alıcı seçilerek). **Blog bildirimleri:** alıcı seçilmeden yayın reddedilir; onaya gönderilen yazı seçilen yönetene bildirilir; geri çevirme ve yayın yazara bildirilir. **Yetki:** yazıyı göremeyen alıcıya bildirim gitmez. **Tenant izolasyonu:** B firmasında bildirim yoktur. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır; ilk çalışmada kuralın kaydı okuyamadığını yakaladı). |
+
+## 29. İçerik kurallarının kayıt okuma izni (16 Kasım 2026)
+
+**Bulunan açık:** bölüm 28'de blog için yakalanan sorun duyuru, anket ve fotoğraf albümünde de vardı. Kural kaydı boru hattından okur. Boru hattı deponun okuma iznini ister:
+- duyuru: `hr.announcements.read`
+- anket: `hr.surveys.respond`
+- albüm: `hr.gallery.read`
+
+Kuralın kimliği ise yalnızca otomasyon kayıt türünün yönetim iznini (`.manage`) taşıyordu. Bu türlerde kurulan her kural kaydı okuyamıyor, "Kayıt kuralın kimliğiyle okunamadı." ile başarısız oluyordu. Alan kullanmayan kurallar da etkileniyordu.
+
+**Çözüm (Core, genel):**
+- `AutomationEntityDefinition.RecordReadPermission`: deponun okuma izni kayıt türünün izninden farklıysa beyan edilir.
+- `AutomationRuleIdentity` bu izni kuralın kimliğine ekler. Kural, taslağı da görmek için yönetim iznini ve depo için okuma iznini birlikte taşır.
+- Kural kataloğu kayıt türünü yalnızca iki izne de sahip kullanıcıya gösterir. Kural kurma, yayın ve çalışma aynı denetimden geçtiği için kimse sahip olmadığı izinle kural kuramaz.
+- Katalog beyanı izni modülün izinlerinde arar.
+- Diğer modüller değişmez (alan boş).
+
+**İK:** duyuru, anket, blog ve albüm `RecordReadPermission` beyan eder. Bölüm 28'deki blog alanı izinleri kaldırıldı; kayıt türü düzeyi bunu kapsar.
+
+### Test sonuçları (bölüm 29)
+
+| Komut | Sonuç |
+|---|---|
+| `dotnet test tests/Modulix.Core.Tests` | 1070/1070 geçti. `AutomationRecordReadPermissionTests` (3 yeni): alan kullanmayan kuralın kimliği iki izni taşır; izni olmayan kullanıcı kayıt türünü görmez; modülün olmayan izin beyanı reddedilir. |
+| `dotnet test tests/Modulix.Modules.Hr.Tests` | 68/68 geçti. Dört içerik türü için alansız kuralın kimliği okuma ve yönetim iznini birlikte taşır. |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Crm.Tests` | 111/111 / 311/311 geçti |
+| `HrAutomationTests` (1 yeni entegrasyon testi) | **Mutlu yol:** alan kullanmayan duyuru kuralı taslak duyuruyu okur ve bildirim yazar. **Tenant izolasyonu:** B firmasında bildirim yoktur. **Yetki:** okuma izni olmayan kural yöneticisi duyuru üzerinde kural kuramaz ya da yayınlayamaz. Derleniyor; yerelde SQL Server olmadığı için **çalıştırılamadı** (CI çalıştırır). |

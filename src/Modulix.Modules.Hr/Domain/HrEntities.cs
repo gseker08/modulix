@@ -239,8 +239,8 @@ public sealed class LeaveRequest : HrEntity
 }
 
 /// <summary>
-/// Resmî tatil ve idari izin günü (ADR-0042 dilim 2): izin gün sayısından düşülür. Firma kendi listesini girer; tarihler koda yazılmaz
-/// (dinî bayramlar her yıl değişir). Yarım gün tatil (arife) yarım gün düşer.
+/// Eski resmî tatil tablosu (ADR-0042 dilim 2). Liste Core'a taşındı (ADR-0049 dilim 6a, <c>core.Holidays</c>): satırlar taşıma migration'ında
+/// kopyalandı, artık okunmaz ve yazılmaz. Tablo geriye uyumluluk için (kesintisiz dağıtım) bir sonraki sürüme kadar durur, sonra kaldırılır.
 /// </summary>
 public sealed class Holiday : HrEntity
 {
@@ -884,13 +884,36 @@ public sealed class SurveyAnswer : HrEntity
 
 /// <summary>
 /// Kurum içi blog yazısı (ADR-0042 dilim 8). İletişim/İK ekibi yazar ve yayınlar; okurlar yalnızca yayındaki yazıları görür. Metin düz metindir
-/// (HTML yorumlanmaz); ekler ADR-0040 dosya deposundadır (kayda bağlı).
+/// (HTML yorumlanmaz); ekler ADR-0040 dosya deposundadır (kayda bağlı). Çalışan da kendi yazısını yazıp onaya gönderebilir (bölüm 27): taslak →
+/// onay bekliyor → yayında ya da geri çevrildi (düzeltilip yeniden gönderilir).
 /// </summary>
 public sealed class BlogPost : HrEntity
 {
     public const int TitleMaxLength = 200;
     public const int SummaryMaxLength = 500;
     public const int BodyMaxLength = 20_000;
+    public const int ReviewNoteMaxLength = 1000;
+
+    /// <summary>Yazının görünen durumu (türetilir: yayın bayrağı ve onay durumu).</summary>
+    public static class Statuses
+    {
+        public const string Draft = "draft";
+        public const string Submitted = "submitted";
+        public const string Returned = "returned";
+        public const string Published = "published";
+
+        public static IReadOnlyList<string> All { get; } = [Draft, Submitted, Returned, Published];
+    }
+
+    /// <summary>Onay durumu: boş (taslak ya da doğrudan yazılan), <see cref="Statuses.Submitted"/> ya da <see cref="Statuses.Returned"/>.</summary>
+    public string? ReviewStatus { get; internal set; }
+
+    /// <summary>Geri çevirme gerekçesi; yeniden gönderilince ya da yayınlanınca silinir.</summary>
+    public string? ReviewNote { get; internal set; }
+
+    public DateTimeOffset? SubmittedAt { get; internal set; }
+
+    public string Status => IsPublished ? Statuses.Published : ReviewStatus ?? Statuses.Draft;
 
     public string Title { get; internal set; } = string.Empty;
 

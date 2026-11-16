@@ -272,10 +272,9 @@
         _ => @<text></text>,
     };
 
-    private static string FileSize(long bytes) => bytes switch
-    {
-        < 1024 => $"{bytes} B",
-        < 1024 * 1024 => $"{bytes / 1024.0:N1} KB",
-        _ => $"{bytes / (1024.0 * 1024.0):N1} MB",
-    };
+    // Satır başında "< 1024 =>" deseni eski Razor derleyicisinde etiket sanılır (SDK 10.0.1xx); karşılaştırma ifadesiyle yazılır.
+    private static string FileSize(long bytes) =>
+        bytes < 1024 ? $"{bytes} B"
+        : bytes < 1024 * 1024 ? $"{bytes / 1024.0:N1} KB"
+        : $"{bytes / (1024.0 * 1024.0):N1} MB";
 }

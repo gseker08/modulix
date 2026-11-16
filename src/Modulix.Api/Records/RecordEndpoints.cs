@@ -1,8 +1,11 @@
 using System.Text.Json.Nodes;
 using Modulix.Api.Audit;
+using Modulix.Api.Localization;
 using Modulix.Api.Tenancy;
 using Modulix.Core.Audit;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Localization;
 using Modulix.Shared.Records;
 
 namespace Modulix.Api.Records;
@@ -87,48 +90,14 @@ public static class RecordEndpoints
     }
 
     /// <summary>Sayfa ve arama dışındaki sorgu parametreleri filtredir (ör. ?companyId=...); boş değerler yok sayılır.</summary>
-    internal static IReadOnlyDictionary<string, string>? FiltersFrom(HttpRequest http)
-    {
-        var filters = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (key, values) in http.Query)
-        {
-            if (key is not ("page" or "pageSize" or "search") && values.LastOrDefault() is { Length: > 0 } value)
-            {
-                filters[key] = value;
-            }
-        }
+    /// <summary>Uygulama <see cref="RecordRequests"/>'tedir (modül uç noktalarıyla ortak, ADR-0046); host içi çağrılar için bırakıldı.</summary>
+    internal static IReadOnlyDictionary<string, string>? FiltersFrom(HttpRequest http) => RecordRequests.FiltersFrom(http);
 
-        return filters.Count == 0 ? null : filters;
-    }
-
-    /// <summary>Güncelleme ve silme kaydın okunan sürümünü ister; sürümsüz istek son yazanın ezmesine yol açacağı için 428 alır.</summary>
-    internal static IResult VersionRequired() =>
-        Results.Problem(
-            statusCode: StatusCodes.Status428PreconditionRequired,
-            title: "Kaydın sürümü gerekli.",
-            detail: "Güncelleme ve silme isteğinde okuduğunuz kaydın version değeri gönderilmelidir.",
-            extensions: new Dictionary<string, object?> { ["code"] = "VersionRequired" });
+    /// <summary>Uygulama <see cref="RecordRequests"/>'tedir; host içi çağrılar için bırakıldı.</summary>
+    internal static IResult VersionRequired() => RecordRequests.VersionRequired();
 
     private static RecordResponse ToResponse(RecordData data) => new(data.EntityKey, data.Id, data.Version, data.Values);
 
-    internal static IResult ToProblem(RecordError error)
-    {
-        var extensions = new Dictionary<string, object?> { ["code"] = error.Code.ToString() };
-
-        return error.Code switch
-        {
-            RecordErrorCode.ValidationFailed => Results.ValidationProblem(
-                (error.FieldErrors ?? Array.Empty<RecordFieldError>())
-                    .GroupBy(e => e.Field)
-                    .ToDictionary(g => g.Key, g => g.Select(e => e.Message).ToArray()),
-                title: error.Message,
-                statusCode: StatusCodes.Status422UnprocessableEntity,
-                extensions: extensions),
-            RecordErrorCode.NotFound or RecordErrorCode.UnknownEntity =>
-                Results.Problem(statusCode: StatusCodes.Status404NotFound, title: error.Message, extensions: extensions),
-            RecordErrorCode.Conflict =>
-                Results.Problem(statusCode: StatusCodes.Status409Conflict, title: error.Message, extensions: extensions),
-            _ => Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: error.Message, extensions: extensions),
-        };
-    }
+    /// <summary>Uygulama <see cref="RecordProblems"/>'tedir (modül uç noktalarıyla ortak, ADR-0046); host içi çağrılar için bırakıldı.</summary>
+    internal static IResult ToProblem(RecordError error) => RecordProblems.ToProblem(error);
 }

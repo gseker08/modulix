@@ -1,11 +1,14 @@
 using System.Globalization;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 using Modulix.Infrastructure.Identity;
 using Modulix.Shared.Audit;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Files;
 using Modulix.Shared.Logistics;
 using Modulix.Shared.Lookups;
 using Modulix.Shared.Records;
@@ -19,7 +22,11 @@ namespace Modulix.IntegrationTests;
 /// gerekçeyle reddeder, karar verilmiş masraf kilitlenir ve silinmez, denetim kaydı), doğrulama (tutar, para birimi, KDV, tarih, kategoriye bağlı
 /// litre/kilometre/rücu kuralları, bilinmeyen tür ve sefer, iptal edilmiş sefer, gerekçesiz ret, çifte karar), tenant izolasyonu (başka tenant'ın
 /// masrafı görünmez, onaylanamaz, başka tenant'ın seferine masraf açılamaz) ve yetki (yazma izni olmayan giremez, onay izni olmayan onaylayamaz ve
-/// eylem listesinde görmez, okuma izni olmayan göremez).
+/// eylem listesinde görmez, okuma izni olmayan göremez). Makbuz ve fiş (bölüm 24): beklemede ve reddedilmişte eklenir ve silinir, onaylanmışta ve
+/// iptal edilmiş seferde 403; başka tenant 404; yalnızca okuyan 403. İptal edilmiş seferin masrafı (bölüm 25): düzenleme 409, karar komutları açık;
+/// başka tenant 404, okuyan 403. Gerekçeli onay ve iptal uyarısı (bölüm 26): iptal edilen seferin masrafını onaylamak gerekçe ister, iptal adımı bekleyen
+/// masraf sayısını masraf okuyana söyler; başka tenant 404, onay izni olmayan 403. Başka sefere aktarma (bölüm 28): iptal edilen seferin bekleyen
+/// masrafı açık sefere gerekçeyle taşınır; kurallar 409/422; başka tenant 404; masraf yazma izni olmayan 403.
 /// </summary>
 public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
@@ -269,7 +276,408 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
         Assert.DoesNotContain(number, await ResolveAsync(managerB));
     }
 
+    // --- iptal edilmiş seferin masrafı (ADR-0038 bölüm 25) ---
+
+    /// <summary>
+    /// Mutlu yol ve kural: açık seferin bekleyen masrafı düzenlenir; sefer iptal edilince beklemedeki ve reddedilmiş masraf düzenlenmez (409) ve
+    /// değişmez. Karar komutları açık kalır: bekleyen masraf reddedilerek kapatılır, reddedilen yeniden gönderilebilir.
+    /// </summary>
+    [Fact]
+    public async Task Expenses_of_a_cancelled_trip_are_not_edited_but_can_still_be_decided()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var manager = await LoginAsync(s.Manager);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var pending = await PostAsync(operations, Expenses, Toll(trip.Id));
+        var toReject = await PostAsync(operations, Expenses, Toll(trip.Id));
+        pending = await PutAsync(operations, $"{Expenses}/{pending.Id}", pending.Version, new JsonObject { ["amount"] = 1300 });
+        var rejected = await ActAsync(manager, toReject, "reject", "Fiş eksik");
+
+        Assert.Equal("cancelled", (await ActAsync(operations, trip, "cancel", "Müşteri vazgeçti", kind: "trips")).Values["status"]!.GetValue<string>());
+
+        foreach (var expense in new[] { pending, rejected })
+        {
+            var denied = await operations.PutAsJsonAsync($"{Expenses}/{expense.Id}", new RecordWriteRequest(new JsonObject { ["amount"] = 1 }, expense.Version));
+            Assert.Equal(HttpStatusCode.Conflict, denied.StatusCode);
+            Assert.Contains("İptal edilen seferin masrafı", (await denied.Content.ReadFromJsonAsync<ProblemDetails>())!.Title);
+        }
+
+        Assert.Equal(1300m, (await GetAsync(operations, $"{Expenses}/{pending.Id}")).Values["amount"]!.GetValue<decimal>());
+        Assert.Equal(1200m, (await GetAsync(operations, $"{Expenses}/{rejected.Id}")).Values["amount"]!.GetValue<decimal>());
+
+        // Karar komutları kapıdan geçer: bekleyen reddedilir, reddedilen yeniden gönderilir.
+        Assert.Equal("rejected", (await ActAsync(manager, pending, "reject", "Sefer iptal edildi")).Values["status"]!.GetValue<string>());
+        Assert.Equal("pending", (await ActAsync(operations, rejected, "resubmit")).Values["status"]!.GetValue<string>());
+    }
+
+    /// <summary>
+    /// Tenant izolasyonu ve yetki: iptal edilmiş seferin masrafında da sıra korunur; başka tenant 404 alır (kural iletisi kaydın varlığını sızdırmaz),
+    /// yalnızca okuyan 403 alır (izin kuraldan önce sorulur).
+    /// </summary>
+    [Fact]
+    public async Task On_a_cancelled_trip_other_tenants_get_not_found_and_readers_get_forbidden_before_the_rule()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var opsA = await LoginAsync(a.Operations);
+        using var opsB = await LoginAsync(b.Operations);
+        using var readerA = await LoginAsync(a.Reader);
+        var trip = await PostAsync(opsA, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(opsA, Expenses, Toll(trip.Id));
+        await ActAsync(opsA, trip, "cancel", "Müşteri vazgeçti", kind: "trips");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await opsB.PutAsJsonAsync($"{Expenses}/{expense.Id}",
+            new RecordWriteRequest(new JsonObject { ["amount"] = 1 }, expense.Version))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await readerA.PutAsJsonAsync($"{Expenses}/{expense.Id}",
+            new RecordWriteRequest(new JsonObject { ["amount"] = 1 }, expense.Version))).StatusCode);
+        Assert.Equal(1200m, (await GetAsync(opsA, $"{Expenses}/{expense.Id}")).Values["amount"]!.GetValue<decimal>());
+    }
+
+    // --- iptal edilen seferin masrafı: gerekçeli onay ve uyarı (ADR-0038 bölüm 26) ---
+
+    /// <summary>
+    /// Mutlu yol ve kural: açık seferde onay gerekçe istemez; sefer iptal edilirken bekleyen masraf sayısı uyarı olarak gelir. İptalden sonra masraf
+    /// kaydı "seferi iptal edildi" der, onay gerekçe ister (gerekçesiz 422, masraf beklemede kalır); gerekçeyle onaylanır ve gerekçe masrafta kalır.
+    /// Ret değişmez.
+    /// </summary>
+    [Fact]
+    public async Task Approving_an_expense_of_a_cancelled_trip_needs_a_reason_and_the_expense_says_its_trip_was_cancelled()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var manager = await LoginAsync(s.Manager);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var fuel = await PostAsync(operations, Expenses, Fuel(trip.Id));
+        var toll = await PostAsync(operations, Expenses, Toll(trip.Id));
+
+        Assert.False(fuel.Values["tripCancelled"]!.GetValue<bool>());
+        var before = await ActionAsync(manager, "expenses", fuel.Id, "approve");
+        Assert.False(before.RequiresReason);
+        Assert.Null(before.Warning);
+
+        // İptal adımı bekleyen masrafları söyler; iptal engellenmez.
+        var cancel = await ActionAsync(operations, "trips", trip.Id, "cancel");
+        Assert.True(cancel.Allowed);
+        Assert.Contains("2 bekleyen masrafı", cancel.Warning);
+        await ActAsync(operations, trip, "cancel", "Müşteri vazgeçti", kind: "trips");
+
+        // Masraf kaydı ve liste seferin iptal edildiğini söyler (kuyruktaki rozet buradan).
+        Assert.True((await GetAsync(manager, $"{Expenses}/{fuel.Id}")).Values["tripCancelled"]!.GetValue<bool>());
+        Assert.All((await manager.GetFromJsonAsync<RecordPageResponse>($"{Expenses}?status=pending"))!.Items,
+            e => Assert.True(e.Values["tripCancelled"]!.GetValue<bool>()));
+
+        var approve = await ActionAsync(manager, "expenses", fuel.Id, "approve");
+        Assert.True(approve.Allowed);
+        Assert.True(approve.RequiresReason);
+        Assert.Contains("gerekçe", approve.Warning);
+
+        var withoutReason = await manager.PostAsJsonAsync($"/api/logistics/expenses/{fuel.Id}/actions", new RunLogisticsActionRequest("approve", fuel.Version, "  "));
+        Assert.Contains("reason", (await ValidationProblemAsync(withoutReason)).Errors.Keys);
+        Assert.Equal("pending", (await GetAsync(manager, $"{Expenses}/{fuel.Id}")).Values["status"]!.GetValue<string>());
+
+        var approved = await ActAsync(manager, fuel, "approve", "Yakıt iptalden önce depoda alındı");
+        Assert.Equal("approved", approved.Values["status"]!.GetValue<string>());
+        Assert.Equal("Yakıt iptalden önce depoda alındı", approved.Values["statusReason"]!.GetValue<string>());
+        Assert.Equal("rejected", (await ActAsync(manager, toll, "reject", "Geçiş yapılmadı")).Values["status"]!.GetValue<string>());
+
+        var history = (await manager.GetFromJsonAsync<AuditPageResponse>($"{Expenses}/{fuel.Id}/history"))!;
+        Assert.Contains(history.Items, h => h.Changes.Any(c => c.Field == "status"));
+    }
+
+    /// <summary>
+    /// Tenant izolasyonu ve yetki: başka tenant iptal edilen seferin masrafını göremez, eylemlerini alamaz, gerekçeyle bile onaylayamaz (404); onay
+    /// izni olmayan gerekçeyle de onaylayamaz (403) ve onay eylemini görmez; seferi yöneten ama masrafları göremeyen kişiye iptal uyarısı masraf sayısını
+    /// söylemez.
+    /// </summary>
+    [Fact]
+    public async Task Cancelled_trip_expense_approval_is_hidden_from_other_tenants_and_from_users_without_the_permission()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var opsA = await LoginAsync(a.Operations);
+        using var dispatcherA = await LoginAsync(a.Dispatcher);
+        using var managerB = await LoginAsync(b.Manager);
+        var trip = await PostAsync(opsA, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(opsA, Expenses, Toll(trip.Id));
+
+        var dispatcherCancel = await ActionAsync(dispatcherA, "trips", trip.Id, "cancel");
+        Assert.True(dispatcherCancel.Allowed);
+        Assert.Null(dispatcherCancel.Warning);
+        await ActAsync(dispatcherA, trip, "cancel", "Araç arızalandı", kind: "trips");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await managerB.GetAsync($"/api/logistics/expenses/{expense.Id}/actions")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await managerB.PostAsJsonAsync($"/api/logistics/expenses/{expense.Id}/actions",
+            new RunLogisticsActionRequest("approve", expense.Version, "Yabancı"))).StatusCode);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await opsA.PostAsJsonAsync($"/api/logistics/expenses/{expense.Id}/actions",
+            new RunLogisticsActionRequest("approve", expense.Version, "Kendi masrafım"))).StatusCode);
+        Assert.DoesNotContain((await opsA.GetFromJsonAsync<List<LogisticsActionDto>>($"/api/logistics/expenses/{expense.Id}/actions"))!, x => x.Action == "approve");
+
+        Assert.Equal("pending", (await GetAsync(opsA, $"{Expenses}/{expense.Id}")).Values["status"]!.GetValue<string>());
+    }
+
+    private static async Task<LogisticsActionDto> ActionAsync(HttpClient client, string kind, Guid id, string action) =>
+        Assert.Single((await client.GetFromJsonAsync<List<LogisticsActionDto>>($"/api/logistics/{kind}/{id}/actions"))!, x => x.Action == action);
+
+    // --- iptal edilen seferin masrafını başka sefere aktarma (ADR-0038 bölüm 28) ---
+
+    /// <summary>
+    /// Mutlu yol: iptal edilen seferin bekleyen masrafı (makbuzuyla) açık bir sefere aktarılır. Durum beklemede kalır, gerekçe masrafta görünür,
+    /// masraf yeniden düzenlenebilir, makbuz onunla gider, açık seferde onay gerekçesiz yapılır; denetim kaydı sefer değişimini gösterir.
+    /// </summary>
+    [Fact]
+    public async Task A_pending_expense_of_a_cancelled_trip_moves_to_an_open_trip_with_its_receipt()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var manager = await LoginAsync(s.Manager);
+        var cancelled = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var target = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today.AddDays(1)) });
+        var fuel = await PostAsync(operations, Expenses, Fuel(cancelled.Id));
+        var receipt = await UploadAsync(operations, fuel.Id, "fis.png");
+        await ActAsync(operations, cancelled, "cancel", "Müşteri vazgeçti", kind: "trips");
+        fuel = await GetAsync(operations, $"{Expenses}/{fuel.Id}");
+
+        var moved = await TransferAsync(operations, fuel, target.Id, "  Yakıt depoda alındı, sevkiyat bu sefere atandı ");
+        Assert.Equal(target.Id.ToString(), moved.Values["tripId"]!.GetValue<string>());
+        Assert.False(moved.Values["tripCancelled"]!.GetValue<bool>());
+        Assert.Equal("pending", moved.Values["status"]!.GetValue<string>());
+        Assert.Equal("Yakıt depoda alındı, sevkiyat bu sefere atandı", moved.Values["statusReason"]!.GetValue<string>());
+        Assert.Equal(receipt.Id, Assert.Single(await ReceiptsAsync(operations, moved.Id)).Id);
+        Assert.Single((await operations.GetFromJsonAsync<RecordPageResponse>($"{Expenses}?tripId={target.Id}"))!.Items);
+        Assert.Empty((await operations.GetFromJsonAsync<RecordPageResponse>($"{Expenses}?tripId={cancelled.Id}"))!.Items);
+
+        // Açık seferde masraf yine düzenlenir ve gerekçesiz onaylanır.
+        moved = await PutAsync(operations, $"{Expenses}/{moved.Id}", moved.Version, new JsonObject { ["amount"] = 5200 });
+        Assert.False((await ActionAsync(manager, "expenses", moved.Id, "approve")).RequiresReason);
+        Assert.Equal("approved", (await ActAsync(manager, moved, "approve")).Values["status"]!.GetValue<string>());
+
+        var history = (await manager.GetFromJsonAsync<AuditPageResponse>($"{Expenses}/{fuel.Id}/history"))!;
+        Assert.Contains(history.Items, h => h.Changes.Any(c => c.Field == "tripId"));
+    }
+
+    /// <summary>
+    /// Kural ve doğrulama: gerekçe zorunlu; hedef iptal edilmiş, bilinmeyen ya da aynı sefer olamaz (422); açık seferdeki, reddedilmiş ya da
+    /// onaylanmış masraf aktarılmaz (409); eski sürüm 409. Hatalı denemeler masrafı değiştirmez.
+    /// </summary>
+    [Fact]
+    public async Task Only_a_pending_expense_of_a_cancelled_trip_moves_and_only_to_another_open_trip_with_a_reason()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var manager = await LoginAsync(s.Manager);
+        var open = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var cancelled = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var alsoCancelled = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var onOpenTrip = await PostAsync(operations, Expenses, Toll(open.Id));
+        var pending = await PostAsync(operations, Expenses, Toll(cancelled.Id));
+        var rejected = await ActAsync(manager, await PostAsync(operations, Expenses, Toll(cancelled.Id)), "reject", "Fiş eksik");
+        var approved = await ActAsync(manager, await PostAsync(operations, Expenses, Toll(cancelled.Id)), "approve");
+        await ActAsync(operations, cancelled, "cancel", "Müşteri vazgeçti", kind: "trips");
+        await ActAsync(operations, alsoCancelled, "cancel", "Araç arızalandı", kind: "trips");
+        pending = await GetAsync(operations, $"{Expenses}/{pending.Id}");
+
+        Assert.Contains("reason", (await ValidationProblemAsync(await PostTransferAsync(operations, pending, open.Id, "   "))).Errors.Keys);
+        Assert.Contains("tripId", (await ValidationProblemAsync(await PostTransferAsync(operations, pending, alsoCancelled.Id, "Gerekçe"))).Errors.Keys);
+        Assert.Contains("tripId", (await ValidationProblemAsync(await PostTransferAsync(operations, pending, Guid.NewGuid(), "Gerekçe"))).Errors.Keys);
+        Assert.Contains("tripId", (await ValidationProblemAsync(await PostTransferAsync(operations, pending, cancelled.Id, "Gerekçe"))).Errors.Keys);
+
+        Assert.Equal(HttpStatusCode.Conflict, (await PostTransferAsync(operations, onOpenTrip, open.Id, "Gerekçe")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await PostTransferAsync(operations, rejected, open.Id, "Gerekçe")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await PostTransferAsync(operations, approved, open.Id, "Gerekçe")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await operations.PostAsJsonAsync($"/api/logistics/expenses/{pending.Id}/transfer",
+            new TransferExpenseRequest(open.Id, pending.Version - 1, "Gerekçe"))).StatusCode);
+
+        var unchanged = await GetAsync(operations, $"{Expenses}/{pending.Id}");
+        Assert.Equal((cancelled.Id.ToString(), pending.Version), (unchanged.Values["tripId"]!.GetValue<string>(), unchanged.Version));
+    }
+
+    /// <summary>Tenant izolasyonu: başka tenant masrafı aktaramaz (404); masraf başka tenant'ın seferine aktarılamaz (sefer "bulunamadı").</summary>
+    [Fact]
+    public async Task Expenses_cannot_be_moved_across_tenants()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var opsA = await LoginAsync(a.Operations);
+        using var opsB = await LoginAsync(b.Operations);
+        var cancelled = await PostAsync(opsA, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var openA = await PostAsync(opsA, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var tripB = await PostAsync(opsB, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(opsA, Expenses, Toll(cancelled.Id));
+        await ActAsync(opsA, cancelled, "cancel", "Müşteri vazgeçti", kind: "trips");
+        expense = await GetAsync(opsA, $"{Expenses}/{expense.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await PostTransferAsync(opsB, expense, tripB.Id, "Yabancı")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostTransferAsync(opsB, expense, openA.Id, "Yabancı")).StatusCode);
+        Assert.Contains("tripId", (await ValidationProblemAsync(await PostTransferAsync(opsA, expense, tripB.Id, "Başka firmanın seferi"))).Errors.Keys);
+
+        Assert.Equal(cancelled.Id.ToString(), (await GetAsync(opsA, $"{Expenses}/{expense.Id}")).Values["tripId"]!.GetValue<string>());
+    }
+
+    /// <summary>Yetki: masraf yazma izni olmayan aktaramaz (yalnızca okuyan 403); masraf okuma izni olmayan (seferi yöneten bile) 403 alır.</summary>
+    [Fact]
+    public async Task Without_expense_write_permission_an_expense_cannot_be_moved()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var reader = await LoginAsync(s.Reader);
+        using var dispatcher = await LoginAsync(s.Dispatcher);
+        var cancelled = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var open = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(operations, Expenses, Toll(cancelled.Id));
+        await ActAsync(operations, cancelled, "cancel", "Müşteri vazgeçti", kind: "trips");
+        expense = await GetAsync(operations, $"{Expenses}/{expense.Id}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostTransferAsync(reader, expense, open.Id, "Okuyan")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostTransferAsync(dispatcher, expense, open.Id, "Seferci")).StatusCode);
+        Assert.Equal(cancelled.Id.ToString(), (await GetAsync(operations, $"{Expenses}/{expense.Id}")).Values["tripId"]!.GetValue<string>());
+    }
+
+    private static Task<HttpResponseMessage> PostTransferAsync(HttpClient client, RecordResponse expense, Guid tripId, string? reason) =>
+        client.PostAsJsonAsync($"/api/logistics/expenses/{expense.Id}/transfer", new TransferExpenseRequest(tripId, expense.Version, reason));
+
+    private static async Task<RecordResponse> TransferAsync(HttpClient client, RecordResponse expense, Guid tripId, string reason)
+    {
+        var response = await PostTransferAsync(client, expense, tripId, reason);
+        Assert.True(response.StatusCode == HttpStatusCode.OK, $"{(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        return (await response.Content.ReadFromJsonAsync<RecordResponse>())!;
+    }
+
+    // --- makbuz ve fiş: kaydın kuralı (ADR-0038 bölüm 24, ADR-0040 K2) ---
+
+    /// <summary>Mutlu yol: beklemedeki masrafa makbuz eklenir ve silinir; reddedilen masrafın belgesi düzeltilir (yeni fiş eklenir, eskisi silinir).</summary>
+    [Fact]
+    public async Task Receipts_are_added_and_removed_while_the_expense_is_pending_or_rejected()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var manager = await LoginAsync(s.Manager);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(operations, Expenses, Toll(trip.Id));
+
+        var wrong = await UploadAsync(operations, expense.Id, "yanlis-fis.png");
+        var extra = await UploadAsync(operations, expense.Id, "ek.png");
+        Assert.Equal(HttpStatusCode.NoContent, (await operations.DeleteAsync($"{Files}/{extra.Id}?version={extra.Version}")).StatusCode);
+        Assert.Equal(["yanlis-fis.png"], (await ReceiptsAsync(operations, expense.Id)).Select(f => f.FileName));
+
+        // Ret "fiş okunmuyor": giren doğru fişi ekler, yanlışını siler ve yeniden gönderir.
+        var rejected = await ActAsync(manager, expense, "reject", "Fiş okunmuyor");
+        await UploadAsync(operations, rejected.Id, "dogru-fis.png");
+        Assert.Equal(HttpStatusCode.NoContent, (await operations.DeleteAsync($"{Files}/{wrong.Id}?version={wrong.Version}")).StatusCode);
+        Assert.Equal(["dogru-fis.png"], (await ReceiptsAsync(manager, rejected.Id)).Select(f => f.FileName));
+        Assert.Equal("pending", (await ActAsync(operations, rejected, "resubmit")).Values["status"]!.GetValue<string>());
+    }
+
+    /// <summary>
+    /// Kural: onaylanmış masrafın ve iptal edilmiş seferdeki masrafın belgesi tür yazma izni olan kimse tarafından eklenemez ve silinemez (403);
+    /// okuma ve indirme sürer.
+    /// </summary>
+    [Fact]
+    public async Task Receipts_of_an_approved_expense_or_of_a_cancelled_trip_cannot_be_added_or_removed()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var manager = await LoginAsync(s.Manager);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(operations, Expenses, Toll(trip.Id));
+        var receipt = await UploadAsync(operations, expense.Id, "fis.png");
+
+        await ActAsync(manager, expense, "approve");
+        foreach (var client in new[] { operations, manager })
+        {
+            var denied = await PostFileAsync(client, expense.Id, "sonradan.png");
+            Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+            Assert.Contains("Onaylanmış masraf", (await denied.Content.ReadFromJsonAsync<ProblemDetails>())!.Title);
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.DeleteAsync($"{Files}/{receipt.Id}?version={receipt.Version}")).StatusCode);
+        }
+
+        Assert.Equal(["fis.png"], (await ReceiptsAsync(manager, expense.Id)).Select(f => f.FileName));
+        Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync($"{Files}/{receipt.Id}/content")).StatusCode);
+
+        // İptal edilen seferin beklemedeki masrafı: belge eklenmez, silinmez.
+        var cancelledTrip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var pending = await PostAsync(operations, Expenses, Toll(cancelledTrip.Id));
+        var pendingReceipt = await UploadAsync(operations, pending.Id, "bekleyen.png");
+        Assert.Equal("cancelled", (await ActAsync(operations, cancelledTrip, "cancel", "Müşteri vazgeçti", kind: "trips")).Values["status"]!.GetValue<string>());
+        var afterCancel = await PostFileAsync(operations, pending.Id, "iptal-sonrasi.png");
+        Assert.Equal(HttpStatusCode.Forbidden, afterCancel.StatusCode);
+        Assert.Contains("İptal edilen sefer", (await afterCancel.Content.ReadFromJsonAsync<ProblemDetails>())!.Title);
+        Assert.Equal(HttpStatusCode.Forbidden, (await operations.DeleteAsync($"{Files}/{pendingReceipt.Id}?version={pendingReceipt.Version}")).StatusCode);
+        Assert.Single(await ReceiptsAsync(operations, pending.Id));
+    }
+
+    /// <summary>Tenant izolasyonu: başka tenant'ın masrafına belge eklenemez; belgesi listelenmez, indirilmez, silinmez (404).</summary>
+    [Fact]
+    public async Task Another_tenant_cannot_list_download_add_or_remove_expense_receipts()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var opsA = await LoginAsync(a.Operations);
+        using var opsB = await LoginAsync(b.Operations);
+        var tripA = await PostAsync(opsA, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expenseA = await PostAsync(opsA, Expenses, Toll(tripA.Id));
+        var receiptA = await UploadAsync(opsA, expenseA.Id, "fis.png");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await PostFileAsync(opsB, expenseA.Id, "yabanci.png")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await opsB.GetAsync($"{Files}?entityKey={LogisticsAccess.TripExpenseEntityKey}&recordId={expenseA.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await opsB.GetAsync($"{Files}/{receiptA.Id}/content")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await opsB.DeleteAsync($"{Files}/{receiptA.Id}?version={receiptA.Version}")).StatusCode);
+
+        Assert.Equal(["fis.png"], (await ReceiptsAsync(opsA, expenseA.Id)).Select(f => f.FileName));
+    }
+
+    /// <summary>Yetki: yalnızca okuyan beklemedeki masrafın belgesini görür ama ekleyemez, silemez (403); masrafı okuyamayan ulaşamaz.</summary>
+    [Fact]
+    public async Task Without_expense_write_permission_receipts_cannot_be_added_or_removed_even_while_pending()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        using var reader = await LoginAsync(s.Reader);
+        using var outsider = await LoginAsync(s.Outsider);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(operations, Expenses, Toll(trip.Id));
+        var receipt = await UploadAsync(operations, expense.Id, "fis.png");
+
+        Assert.Single(await ReceiptsAsync(reader, expense.Id));
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostFileAsync(reader, expense.Id, "okuyan.png")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await reader.DeleteAsync($"{Files}/{receipt.Id}?version={receipt.Version}")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await PostFileAsync(outsider, expense.Id, "disaridan.png")).StatusCode);
+        Assert.NotEqual(HttpStatusCode.OK, (await outsider.GetAsync($"{Files}/{receipt.Id}/content")).StatusCode);
+        Assert.NotEqual(HttpStatusCode.NoContent, (await outsider.DeleteAsync($"{Files}/{receipt.Id}?version={receipt.Version}")).StatusCode);
+
+        Assert.Single(await ReceiptsAsync(operations, expense.Id));
+    }
+
     // --- yardımcılar ---
+
+    private const string Files = "/api/files";
+
+    private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D];
+
+    private static Task<HttpResponseMessage> PostFileAsync(HttpClient client, Guid expenseId, string fileName)
+    {
+        var file = new ByteArrayContent([.. Png, .. Encoding.ASCII.GetBytes(Guid.NewGuid().ToString())]);
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        var form = new MultipartFormDataContent
+        {
+            { new StringContent(LogisticsAccess.TripExpenseEntityKey), "entityKey" },
+            { new StringContent(expenseId.ToString()), "recordId" },
+            { file, "file", fileName },
+        };
+        return client.PostAsync(Files, form);
+    }
+
+    private static async Task<StoredFileDto> UploadAsync(HttpClient client, Guid expenseId, string fileName)
+    {
+        var response = await PostFileAsync(client, expenseId, fileName);
+        Assert.True(response.StatusCode == HttpStatusCode.Created, $"{(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        return (await response.Content.ReadFromJsonAsync<StoredFileDto>())!;
+    }
+
+    private static async Task<List<StoredFileDto>> ReceiptsAsync(HttpClient client, Guid expenseId) =>
+        (await client.GetFromJsonAsync<List<StoredFileDto>>($"{Files}?entityKey={LogisticsAccess.TripExpenseEntityKey}&recordId={expenseId}"))!;
 
     private static JsonObject Fuel(Guid tripId) => new()
     {
@@ -283,7 +691,7 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
         ["amount"] = 1200, ["currency"] = "TRY",
     };
 
-    private sealed record Setup(Guid TenantId, ModulixUser Operations, ModulixUser Manager, ModulixUser Reader, ModulixUser Outsider);
+    private sealed record Setup(Guid TenantId, ModulixUser Operations, ModulixUser Manager, ModulixUser Reader, ModulixUser Outsider, ModulixUser Dispatcher);
 
     private async Task<Setup> SetUpAsync()
     {
@@ -293,11 +701,13 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
         var manager = await factory.CreateUserAsync(tenant);
         var reader = await factory.CreateUserAsync(tenant);
         var outsider = await factory.CreateUserAsync(tenant);
+        var dispatcher = await factory.CreateUserAsync(tenant);
         await factory.CreateRoleAsync(tenant.Id, [TripsRead, TripsWrite, ExpensesRead, ExpensesWrite], Scope.All, operations);
         await factory.CreateRoleAsync(tenant.Id, [TripsRead, TripsWrite, ExpensesRead, ExpensesWrite, ExpensesApprove], Scope.All, manager);
         await factory.CreateRoleAsync(tenant.Id, [ExpensesRead], Scope.All, reader);
         await factory.CreateRoleAsync(tenant.Id, [TripsRead], Scope.All, outsider);
-        return new Setup(tenant.Id, operations, manager, reader, outsider);
+        await factory.CreateRoleAsync(tenant.Id, [TripsRead, TripsWrite], Scope.All, dispatcher); // seferi yönetir, masrafları göremez
+        return new Setup(tenant.Id, operations, manager, reader, outsider, dispatcher);
     }
 
     private static async Task<RecordResponse> ActAsync(HttpClient client, RecordResponse record, string action, string? reason = null, string kind = "expenses")

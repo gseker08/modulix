@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Modulix.Core.Contracts.Diagnostics;
 using Modulix.Infrastructure.Automation;
 
 namespace Modulix.Api.Automation;
@@ -8,8 +9,10 @@ namespace Modulix.Api.Automation;
 /// durdurma anahtarıdır). Kural yeteneği beyan eden bir modülü açık her tenant ayrı çalışır; biri başarısız olursa diğerleri etkilenmez.
 /// Saklama süresi dolan bitmiş çalışmalar <c>Automation:RetentionIntervalMinutes</c> aralığıyla temizlenir (<see cref="AutomationRetention"/>).
 /// </summary>
-public sealed class AutomationWorker(AutomationRunner runner, IOptions<AutomationOptions> options, ILogger<AutomationWorker> logger) : BackgroundService
+public sealed class AutomationWorker(AutomationRunner runner, IOptions<AutomationOptions> options, IJobMetrics metrics, ILogger<AutomationWorker> logger) : BackgroundService
 {
+    public const string JobName = "automation";
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!options.Value.WorkerEnabled)
@@ -50,6 +53,7 @@ public sealed class AutomationWorker(AutomationRunner runner, IOptions<Automatio
                     }
                     catch (Exception exception)
                     {
+                        metrics.TenantFailed(JobName);
                         logger.LogWarning(exception, "Tenant {TenantId} otomasyon turu çalıştırılamadı.", tenantId);
                     }
                 }
@@ -58,6 +62,8 @@ public sealed class AutomationWorker(AutomationRunner runner, IOptions<Automatio
                 {
                     nextRetention = DateTimeOffset.UtcNow + retentionInterval;
                 }
+
+                metrics.TurnCompleted(JobName);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -65,6 +71,7 @@ public sealed class AutomationWorker(AutomationRunner runner, IOptions<Automatio
             }
             catch (Exception exception)
             {
+                metrics.TurnFailed(JobName);
                 logger.LogError(exception, "Otomasyon tenant listesi alınamadı.");
             }
 

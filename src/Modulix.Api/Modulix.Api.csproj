@@ -14,6 +14,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Modulix.Core.Contracts\Modulix.Core.Contracts.csproj" />
+    <ProjectReference Include="..\Modulix.Core.Hosting\Modulix.Core.Hosting.csproj" />
     <ProjectReference Include="..\Modulix.Core\Modulix.Core.csproj" />
     <ProjectReference Include="..\Modulix.Infrastructure\Modulix.Infrastructure.csproj" />
     <ProjectReference Include="..\Modulix.Modules.Crm\Modulix.Modules.Crm.csproj" />
@@ -34,5 +35,12 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.*" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Gözlemlenebilirlik (A2): OTLP adresi verilirse istek izleri ve metrikler dışa aktarılır. -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.*" />
   </ItemGroup>
 </Project>

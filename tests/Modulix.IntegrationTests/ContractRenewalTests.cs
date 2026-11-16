@@ -244,7 +244,7 @@ public class ContractRenewalTests(ModulixApiFactory factory) : IClassFixture<Mod
 
         // Sözleşme modülü kapalı tenant için tur çalışmaz.
         var closed = await factory.CreateTenantAsync();
-        Assert.Null((await factory.Services.GetRequiredService<ContractJobsRunner>().RunTenantAsync(closed.Id, CancellationToken.None)).Run);
+        Assert.Null((await new ContractJobsRunner(factory.Services).RunTenantAsync(closed.Id, CancellationToken.None)).Run);
     }
 
     [Fact]
@@ -343,13 +343,13 @@ public class ContractRenewalTests(ModulixApiFactory factory) : IClassFixture<Mod
 
     private async Task<ContractSchedulerRun> RunAsync(Guid tenantId)
     {
-        var (run, skipped) = await factory.Services.GetRequiredService<ContractJobsRunner>().RunTenantAsync(tenantId, CancellationToken.None);
+        var (run, skipped) = await new ContractJobsRunner(factory.Services).RunTenantAsync(tenantId, CancellationToken.None);
         Assert.False(skipped);
         return run!;
     }
 
     private async Task<(ContractSchedulerRun? Run, bool Skipped)> RunWithLockStateAsync(Guid tenantId) =>
-        await factory.Services.GetRequiredService<ContractJobsRunner>().RunTenantAsync(tenantId, CancellationToken.None);
+        await new ContractJobsRunner(factory.Services).RunTenantAsync(tenantId, CancellationToken.None);
 
     private static async Task<List<ActivityDto>> ActivitiesAsync(HttpClient client) =>
         [.. (await client.GetFromJsonAsync<PagedResult<ActivityDto>>("/api/crm/activities?pageSize=200"))!.Items];

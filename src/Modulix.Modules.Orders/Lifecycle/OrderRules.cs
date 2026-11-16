@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 namespace Modulix.Modules.Orders.Lifecycle;
 
 // Sipariş durum sabitleri ve saf kurallar (ADR-0023). Kurallar sunucuda uygulanır; arayüz yalnızca aynı kuralları gösterir.
@@ -112,17 +110,4 @@ public static class OrderRules
                 OrderStatus.Approved => "Onaylanmış siparişin ticari alanları değiştirilemez; değişiklik talebi açın.",
                 _ => "Sonuçlanmış siparişin ticari alanları değiştirilemez.",
             });
-
-    /// <summary>Yeni sipariş numarası: SP-yyyyMMdd-XXXXXX (karışmayan harf/rakam alfabesi).</summary>
-    public static string NewNumber(DateTimeOffset createdAt)
-    {
-        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        Span<char> suffix = stackalloc char[6];
-        for (var i = 0; i < suffix.Length; i++)
-        {
-            suffix[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
-        }
-
-        return $"SP-{createdAt:yyyyMMdd}-{new string(suffix)}";
-    }
 }

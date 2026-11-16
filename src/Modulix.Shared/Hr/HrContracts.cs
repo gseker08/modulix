@@ -31,6 +31,19 @@ public static class HrAccess
     public const string SurveysManage = "hr.surveys.manage";
     public const string BlogRead = "hr.blog.read";
     public const string BlogManage = "hr.blog.manage";
+    public const string BlogWrite = "hr.blog.write";
+
+    /// <summary>Blog yazısının durum etiketi ve rozet sınıfı (sunucudaki <c>BlogPost.Statuses</c>; ADR-0042 bölüm 27).</summary>
+    public static (string Label, string Badge) BlogStatus(string? status) => status switch
+    {
+        "published" => ("Yayında", "status-customer"),
+        "submitted" => ("Onay bekliyor", "status-prospect"),
+        "returned" => ("Geri çevrildi", "stage-lost"),
+        _ => ("Taslak", "status-inactive"),
+    };
+
+    /// <summary>Yazar yazısını (ve eklerini) değiştirebilir mi: yalnızca taslakken ve geri çevrilmişken.</summary>
+    public static bool BlogEditableByAuthor(string? status) => status is null or "draft" or "returned";
     public const string GalleryRead = "hr.gallery.read";
     public const string GalleryManage = "hr.gallery.manage";
 
@@ -38,7 +51,6 @@ public static class HrAccess
     public const string EmployeePositionEntityKey = "hr.employee-position";
     public const string LeaveRequestEntityKey = "hr.leave-request";
     public const string LeaveBalanceEntityKey = "hr.leave-balance";
-    public const string HolidayEntityKey = "hr.holiday";
     public const string LeaveTypeList = "hr.leave-type";
     public const string LeaveRequestEmployeeLookup = "hr.leave-request.employee";
     public const string LeaveBalanceEmployeeLookup = "hr.leave-balance.employee";

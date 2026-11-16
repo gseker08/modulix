@@ -143,12 +143,19 @@ internal sealed class TripRecordStore(LogisticsStoreContext context) : Logistics
 
         if (isNew)
         {
-            entity.Number = await NextNumberAsync(cancellationToken);
+            entity.Number = await Context.Numbers.NextAsync(LogisticsModule.TripNumberSeries, LastNumberAsync, cancellationToken);
         }
     }
 
     protected override Task BeforeDeleteAsync(Trip entity, CancellationToken cancellationToken) =>
         throw new RecordConflictException("Sefer silinmez; gerekirse iptal edin.");
+
+    /// <summary>
+    /// Seferin belgeleri (CMR, irsaliye, yol belgeleri) sefer kapanana kadar eklenir ve silinir; kayıt yalnızca planlanırken düzenlense de belge yolda da
+    /// eklenir. Sefer tamamlanınca ya da iptal edilince dosyalar donar (ADR-0038 bölüm 27).
+    /// </summary>
+    protected override Task<string?> FileWriteDeniedAsync(Trip entity, CancellationToken cancellationToken) =>
+        Task.FromResult(TripFiles.Denied(entity.Status));
 
     private async Task CheckVehicleAsync(string field, Guid vehicleId, bool towed, List<RecordFieldError> errors, CancellationToken cancellationToken)
     {
@@ -171,16 +178,15 @@ internal sealed class TripRecordStore(LogisticsStoreContext context) : Logistics
     }
 
     /// <summary>
-    /// Sonraki numara: yılın en büyük sırası + 1 (SF-2026-00001). Aynı anda açılan iki sefer aynı numarayı alırsa benzersizlik dizini ikincisini
-    /// reddeder; belge serisi (Ç8.1) gelince numara oraya taşınır.
+    /// Yılın en büyük sefer sırası: ortak belge serisi (ADR-0049) bu yıl ilk kez kullanılırken sayacın başlangıcıdır; seri gelmeden önce açılmış
+    /// seferlerin numarası böylece yinelenmez. Sayaç açıldıktan sonra çağrılmaz.
     /// </summary>
-    private async Task<string> NextNumberAsync(CancellationToken cancellationToken)
+    private async Task<long> LastNumberAsync(int year, CancellationToken cancellationToken)
     {
-        var prefix = $"{NumberPrefix}-{DateTime.UtcNow.Year.ToString(CultureInfo.InvariantCulture)}-";
+        var prefix = $"{NumberPrefix}-{year.ToString("D4", CultureInfo.InvariantCulture)}-";
         var last = await Context.Data.Set<Trip>().AsNoTracking().Where(t => t.Number.StartsWith(prefix))
             .OrderByDescending(t => t.Number).Select(t => t.Number).FirstOrDefaultAsync(cancellationToken);
-        var next = last is not null && int.TryParse(last[prefix.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n + 1 : 1;
-        return prefix + next.ToString("D5", CultureInfo.InvariantCulture);
+        return last is not null && long.TryParse(last[prefix.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : 0;
     }
 }
 
@@ -303,6 +309,21 @@ internal sealed class TripStopRecordStore(LogisticsStoreContext context) : Logis
             throw new RecordConflictException("Sevkiyat durağı elle kaldırılmaz; sevkiyatı seferden çıkarın.");
         }
     }
+
+    /// <summary>Durağın belgeleri seferin kuralına uyar: sefer kapanınca donar (ADR-0038 bölüm 27).</summary>
+    protected override async Task<string?> FileWriteDeniedAsync(TripStop entity, CancellationToken cancellationToken)
+    {
+        var status = await Context.Data.Set<Trip>().AsNoTracking().Where(t => t.Id == entity.TripId).Select(t => t.Status).SingleOrDefaultAsync(cancellationToken);
+        return TripFiles.Denied(status);
+    }
+}
+
+/// <summary>Sefer ve durak dosyalarının ortak kuralı (ADR-0038 bölüm 27).</summary>
+internal static class TripFiles
+{
+    public static string? Denied(string? tripStatus) => tripStatus is null or Trip.Statuses.Completed or Trip.Statuses.Cancelled
+        ? "Sefer kapandığı için belgeleri donmuştur; dosya eklenemez ya da silinemez."
+        : null;
 }
 
 /// <summary>Firmanın "Taşıyıcı" ilişki rolünde olup olmadığı (taşeron sürücü ve taşeron sefer).</summary>

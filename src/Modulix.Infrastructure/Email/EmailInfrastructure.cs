@@ -37,6 +37,7 @@ public sealed class QueuedEmail
     public const int BodyMaxLength = 500_000;
     public const int LastErrorMaxLength = 2000;
     public const int ReferenceMaxLength = 100;
+    public const int LanguageMaxLength = 5;
 
     private QueuedEmail()
     {
@@ -55,6 +56,7 @@ public sealed class QueuedEmail
         HtmlBody = ValidateBody(message.HtmlBody, nameof(message.HtmlBody), required: true)!;
         TextBody = ValidateBody(message.TextBody, nameof(message.TextBody), required: false);
         Reference = ValidateReference(message.Reference);
+        Language = ValidateLanguage(message.Language);
         Status = EmailStatus.Pending;
         CreatedAt = now;
         NextAttemptAt = now;
@@ -76,6 +78,9 @@ public sealed class QueuedEmail
 
     /// <summary>Çağıranın gönderimi izlemek için verdiği anahtar (alıcıya görünmez).</summary>
     public string? Reference { get; private set; }
+
+    /// <summary>İçeriğin yazıldığı dil (ADR-0034 §6); kuyruğa yazılırken saklanır, gönderimde değişmez. Eski satırlarda boştur.</summary>
+    public string? Language { get; private set; }
 
     public EmailStatus Status { get; private set; }
 
@@ -155,6 +160,22 @@ public sealed class QueuedEmail
         return trimmed;
     }
 
+    private static string? ValidateLanguage(string? language)
+    {
+        if (string.IsNullOrWhiteSpace(language))
+        {
+            return null;
+        }
+
+        var trimmed = language.Trim().ToLowerInvariant();
+        if (trimmed.Length > LanguageMaxLength || !trimmed.All(char.IsAsciiLetterLower))
+        {
+            throw new ArgumentException($"Geçersiz dil kodu: '{language}'.", nameof(language));
+        }
+
+        return trimmed;
+    }
+
     private static string? ValidateName(string? name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -214,6 +235,7 @@ internal sealed class QueuedEmailConfiguration : IEntityTypeConfiguration<Queued
         builder.Property(e => e.HtmlBody).IsRequired();
         builder.Property(e => e.LastError).HasMaxLength(QueuedEmail.LastErrorMaxLength);
         builder.Property(e => e.Reference).HasMaxLength(QueuedEmail.ReferenceMaxLength);
+        builder.Property(e => e.Language).HasMaxLength(QueuedEmail.LanguageMaxLength).IsUnicode(false);
         builder.HasIndex(e => new { e.Status, e.NextAttemptAt });
         builder.HasIndex(e => new { e.TenantId, e.CreatedAt });
         builder.HasIndex(e => new { e.TenantId, e.Reference });
@@ -323,6 +345,12 @@ internal sealed class EfEmailQueue(
     }
 }
 
+/// <summary>E-posta kuyruğunun bir ölçümü; <see cref="OldestPending"/> boşsa bekleyen yoktur.</summary>
+public sealed record EmailQueueSnapshot(int Pending, DateTimeOffset? OldestPending, DateTimeOffset MeasuredAt)
+{
+    public TimeSpan OldestPendingAge => OldestPending is { } at ? MeasuredAt - at : TimeSpan.Zero;
+}
+
 /// <summary>
 /// Bekleyen e-postaları gönderir. Birden fazla uygulama örneği aynı anda çalışabilir: her e-posta koşullu bir
 /// UPDATE ile tek bir işleyiciye alınır, böylece iki kez gönderilmez.
@@ -336,6 +364,19 @@ public sealed class EmailDispatcher(
 {
     /// <summary>Alınan e-postanın başka işleyiciye geçmeden önce gönderilmesi gereken süre; SMTP zaman aşımından uzun olmalı.</summary>
     public static readonly TimeSpan Lease = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Kuyruğun durumu (gözlemleme, A2): bekleyen e-posta sayısı ve en eski bekleyenin oluşturulma zamanı. Ayarlar eksik
+    /// olsa da ölçülür; e-posta tam da o durumda birikir. (Status, NextAttemptAt) indeksini kullanır.
+    /// </summary>
+    public async Task<EmailQueueSnapshot> MeasureAsync(CancellationToken cancellationToken)
+    {
+        var pending = db.EmailMessages.AsNoTracking().Where(e => e.Status == EmailStatus.Pending);
+        return new EmailQueueSnapshot(
+            await pending.CountAsync(cancellationToken),
+            await pending.MinAsync(e => (DateTimeOffset?)e.CreatedAt, cancellationToken),
+            time.GetUtcNow());
+    }
 
     /// <summary>Zamanı gelmiş en fazla <see cref="EmailOptions.BatchSize"/> e-postayı dener; denenen sayıyı döner.</summary>
     public async Task<int> DispatchPendingAsync(CancellationToken cancellationToken)

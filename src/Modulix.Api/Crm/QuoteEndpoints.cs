@@ -3,13 +3,12 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Tenancy;
-using Modulix.Core.Records;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Api.Access;
 using Modulix.Api.Records;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Contracts.Sales;
-using Modulix.Core.Settings;
+using Modulix.Core.Contracts.Settings;
 using Modulix.Modules.Crm;
 using Modulix.Modules.Crm.Quotes;
 using Modulix.Shared.Crm;
@@ -186,7 +185,7 @@ internal static class QuoteEndpoints
     /// Çıkış denetim kaydına yazılır (kim, kaç kayıt, hangi süzgeç). Hücre başındaki formül karakterleri etkisizleştirilir.
     /// </summary>
     private static async Task<IResult> ExportAsync(
-        HttpRequest http, string? search, IRecordPipeline pipeline, ITenantContextAccessor tenant, IAuditWriter audit, IUnitOfWork unitOfWork, CancellationToken ct)
+        HttpRequest http, string? search, IRecordPipeline pipeline, IRecordExportAudit exportAudit, CancellationToken ct)
     {
         var filters = RecordEndpoints.FiltersFrom(http) ?? new Dictionary<string, string>();
         var items = new List<RecordData>();
@@ -205,13 +204,7 @@ internal static class QuoteEndpoints
             }
         }
 
-        if (tenant.Current is { } current)
-        {
-            audit.Add(new AuditEntry(current.TenantId, current.UserId, CrmModule.Entities.Quote, Guid.Empty, AuditAction.Exported,
-                new JsonObject { ["count"] = items.Count, ["filters"] = string.Join('&', filters.Select(f => $"{f.Key}={f.Value}")) },
-                ExecutionSource.Api, null));
-            await unitOfWork.SaveChangesAsync(ct);
-        }
+        await exportAudit.RecordAsync(CrmModule.Entities.Quote, items.Count, filters, null, ct);
 
         string[] columns =
         [
@@ -222,7 +215,7 @@ internal static class QuoteEndpoints
         csv.AppendLine(string.Join(',', columns));
         foreach (var item in items)
         {
-            csv.AppendLine(string.Join(',', columns.Select(c => LeadEndpoints.Csv(item.Values[c]?.ToString()))));
+            csv.AppendLine(string.Join(',', columns.Select(c => CsvText.Escape(item.Values[c]?.ToString()))));
         }
 
         return Results.File(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray(), "text/csv; charset=utf-8", "teklifler.csv");
@@ -240,7 +233,7 @@ internal sealed class QuotePolicyProvider(IServiceProvider services) : IQuotePol
 {
     public async Task<QuotePolicySettings> GetAsync(CancellationToken cancellationToken)
     {
-        var settings = services.GetRequiredService<ITenantSettings>();
+        var settings = services.GetRequiredService<ITenantSettingReader>();
         decimal? Decimal(string? text) =>
             decimal.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var v) && v >= 0 ? v : null;
 

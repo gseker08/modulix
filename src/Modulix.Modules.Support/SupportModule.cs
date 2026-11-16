@@ -1,9 +1,12 @@
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Hosting;
+using Modulix.Modules.Support.Endpoints;
 using Modulix.Modules.Support.Lifecycle;
 using Modulix.Modules.Support.Records;
 
@@ -14,7 +17,7 @@ namespace Modulix.Modules.Support;
 /// Sektörden bağımsızdır; müşteri ve kişiler ortak kayıttır (ADR-0006), CRM tablolarına bağlanmaz, bu yüzden CRM satın alınmadan da
 /// kullanılır. Diğer modüllerin kayıtlarına yalnızca isteğe bağlı, güvenli referanslarla bağlanır.
 /// </summary>
-public sealed class SupportModule : IModule
+public sealed class SupportModule : IModule, IModuleEndpoints, IModulePublicEndpoints
 {
     public const string ModuleKey = "support";
 
@@ -300,7 +303,7 @@ public sealed class SupportModule : IModule
         },
         new(Entities.SlaCalendar, "SLA takvimi", Permissions.SlaManage, new Dictionary<string, string>
         {
-            ["name"] = "Ad", ["timeZoneId"] = "Saat dilimi", ["isAlwaysOpen"] = "7/24", ["weeklyHours"] = "Çalışma saatleri", ["holidays"] = "Tatiller", ["isActive"] = "Etkin",
+            ["name"] = "Ad", ["timeZoneId"] = "Saat dilimi", ["isAlwaysOpen"] = "7/24", ["weeklyHours"] = "Çalışma saatleri", ["holidays"] = "Tatiller", ["useTenantHolidays"] = "Firmanın tatil listesi", ["isActive"] = "Etkin",
         }, "name")
         {
             UserFields = ["createdBy", "updatedBy"],
@@ -389,14 +392,32 @@ public sealed class SupportModule : IModule
             [Entities.Ticket],
             [Permissions.TicketsRead, Permissions.TicketsWrite]),
         EventSubscription.For<SupportSchedulerAnchor>(
-            "support.scheduler",
+            SupportJobs.Identity,
             [DomainEventTypes.RecordDeleted],
             [Entities.Ticket],
             [Permissions.TicketsRead, Permissions.TicketsWrite, Permissions.TicketsAssign, Permissions.TicketsClose]),
     ];
 
+    /// <summary>
+    /// Zamanlanmış iş (ADR-0046): host'taki tek zamanlayıcı 5 dakikada bir, destek modülü yazılabilir olan her tenant için SLA turunu çalıştırır.
+    /// Yapılandırma <c>Jobs:support.jobs</c>; eski <c>SupportJobs</c> bölümü okunmaya devam eder.
+    /// </summary>
+    IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
+    [
+        ModuleJobDefinition.For<SupportJobs>(SupportJobs.JobKey, TimeSpan.FromSeconds(300), SupportJobs.Identity) with { LegacySection = "SupportJobs" },
+    ];
+
+    /// <summary>Destek uç noktaları (<c>/api/support</c>) modüldedir (ADR-0046); grup host tarafından açılır.</summary>
+    public void MapEndpoints(IEndpointRouteBuilder routes) => SupportEndpoints.MapEndpoints(routes);
+
+    /// <summary>Herkese açık memnuniyet anketi (<c>/api/public/support-survey/{tenant}</c>): bağlantı belirteci, hız sınırı ve gövde sınırıyla korunur.</summary>
+    public void MapPublicEndpoints(IEndpointRouteBuilder routes) => SupportChannelEndpoints.MapPublic(routes);
+
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<ISupportPolicyProvider, SupportPolicyProvider>();
+        services.AddSupportSurveyRateLimit();
+        services.AddScoped<SupportJobs>();
         services.AddScoped<SupportStoreContext>();
         services.AddScoped<TicketWorkflowGate>();
         services.AddScoped<SupportReader>();

@@ -1,14 +1,14 @@
 @* Açılmış izin talebinin özeti ve eylemleri (ADR-0042 dilim 2). Talep değiştirilmez; durum yalnızca eylemlerle değişir (onay, ret, iptal). *@
 @inject CrmLookups Lookups
 
-<section class="record-form sectioned" aria-label="İzin talebi">
+<section class="record-form sectioned" aria-label="@Texts.Get("hr.leave-card.title")">
     <div class="form-toolbar">
         <div>
-            <h2>İzin talebi</h2>
+            <h2>@Texts.Get("hr.leave-card.title")</h2>
             <p>@WarehouseLabels.Text(Request, "employeeName") · @Lookups.Label(HrAccess.LeaveTypeList, WarehouseLabels.Text(Request, "leaveTypeKey"))</p>
         </div>
         <div class="form-toolbar-actions">
-            <button type="button" class="btn btn-outline-secondary" @onclick="Closed">Kapat</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Closed">@Texts.Get("common.close")</button>
         </div>
     </div>
 
@@ -16,21 +16,21 @@
 
     <div class="summary-card">
         <dl class="summary-facts">
-            <div><dt>Tarih</dt><dd>@HrLabels.Range(Request)</dd></div>
-            <div><dt>Süre</dt><dd>@HrLabels.Days(HrLabels.Decimal(Request, "days"))</dd></div>
-            <div><dt>Durum</dt><dd><span class="badge @HrLabels.LeaveStatusBadge(Status)">@HrLabels.LeaveStatus(Status)</span></dd></div>
-            <div><dt>Onaylayan</dt><dd>@(WarehouseLabels.Id(Request, "approverUserId") is { } approver ? Lookups.MemberName(approver) : "İK")</dd></div>
+            <div><dt>@Texts.Get("hr.leave.col.date")</dt><dd>@HrLabels.Range(Request)</dd></div>
+            <div><dt>@Texts.Get("hr.leave.col.days")</dt><dd>@HrLabels.Days(HrLabels.Decimal(Request, "days"))</dd></div>
+            <div><dt>@Texts.Get("common.field.status")</dt><dd><span class="badge @HrLabels.LeaveStatusBadge(Status)">@HrLabels.LeaveStatus(Status)</span></dd></div>
+            <div><dt>@Texts.Get("hr.leave.col.approver")</dt><dd>@(WarehouseLabels.Id(Request, "approverUserId") is { } approver ? Lookups.MemberName(approver) : Texts.Get("hr.leave.hr"))</dd></div>
             @if (WarehouseLabels.Id(Request, "decidedByUserId") is { } decidedBy)
             {
-                <div><dt>Karar veren</dt><dd>@Lookups.MemberName(decidedBy)</dd></div>
+                <div><dt>@Texts.Get("hr.leave-card.decided-by")</dt><dd>@Lookups.MemberName(decidedBy)</dd></div>
             }
             @if (WarehouseLabels.Text(Request, "decisionReason") is { Length: > 0 } decisionReason)
             {
-                <div><dt>Gerekçe</dt><dd>@decisionReason</dd></div>
+                <div><dt>@Texts.Get("hr.leave-card.reason")</dt><dd>@decisionReason</dd></div>
             }
             @if (WarehouseLabels.Text(Request, "description") is { Length: > 0 } description)
             {
-                <div><dt>Açıklama</dt><dd>@description</dd></div>
+                <div><dt>@Texts.Get("common.field.description")</dt><dd>@description</dd></div>
             }
         </dl>
     </div>

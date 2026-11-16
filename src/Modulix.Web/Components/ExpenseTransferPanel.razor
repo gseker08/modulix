@@ -1,0 +1,85 @@
+@* İptal edilen seferin beklemedeki masrafını başka sefere aktarma (ADR-0038 bölüm 28). Ör. depoda alınan yakıt, sevkiyat başka sefere atanınca o
+   seferde kullanılır. Yalnızca masraf yazma ve sefer okuma izni olana, seferi iptal edilmiş beklemedeki masrafta görünür; hedef sefer ve gerekçe
+   istenir. Kuralları sunucu uygular (/api/logistics/expenses/{id}/transfer): iptal edilen hedef, beklemede olmayan masraf ve eski sürüm reddedilir.
+   Sayfa içi küçük eylem formu olduğu için sekmesizdir. *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject ToastService Toasts
+
+@if (Visible)
+{
+    @if (!open)
+    {
+        <div class="list-toolbar">
+            <button type="button" class="btn btn-tonal" @onclick="Start"><AppIcon Name="map-pin" Size="16" /> Başka sefere aktar</button>
+        </div>
+    }
+    else
+    {
+        <form class="record-form" novalidate aria-label="Başka sefere aktar" @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+            @if (message is not null)
+            {
+                <div class="alert alert-danger" role="alert">@message</div>
+            }
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label required" for="transfer-trip">Hedef sefer</label>
+                    <LookupPicker Id="transfer-trip" LookupKey="@LogisticsAccess.ExpenseTripLookup" @bind-Value="tripId" Required="true"
+                                  Placeholder="Sefer numarasıyla arayın…" Invalid="@(errors?.ContainsKey("tripId") == true)" />
+                    <FieldError Field="tripId" Errors="errors" />
+                </div>
+                <div class="col-md-7">
+                    <label class="form-label required" for="transfer-reason">Gerekçe</label>
+                    <input id="transfer-reason" class="form-control" maxlength="500" required aria-required="true"
+                           placeholder="ör. yakıt depoda alındı, sevkiyat bu sefere atandı" @bind="reason" @bind:event="oninput" />
+                    <FieldError Field="reason" Errors="errors" />
+                </div>
+            </div>
+            <div class="list-toolbar">
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => open = false">Vazgeç</button>
+                <button type="submit" class="btn btn-tonal" disabled="@(busy || tripId is null || string.IsNullOrWhiteSpace(reason))" aria-busy="@(busy ? "true" : null)">Aktar</button>
+            </div>
+        </form>
+    }
+}
+
+@code {
+    private bool open;
+    private bool busy;
+    private Guid? tripId;
+    private string? reason;
+    private string? message;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    [Parameter, EditorRequired] public RecordResponse Expense { get; set; } = default!;
+
+    /// <summary>Aktarma başarılı: masrafın yeni hali (yeni sefer, aynı durum).</summary>
+    [Parameter] public EventCallback<RecordResponse> Changed { get; set; }
+
+    private bool Visible =>
+        WarehouseLabels.Flag(Expense, "tripCancelled") && WarehouseLabels.Text(Expense, "status") == "pending"
+        && Session.Can(LogisticsAccess.ExpensesWrite) && Session.Can(LogisticsAccess.TripsRead);
+
+    private void Start()
+    {
+        (open, tripId, reason, message, errors) = (true, null, null, null, null);
+    }
+
+    private async Task SubmitAsync()
+    {
+        busy = true;
+        (message, errors) = (null, null);
+        var result = await Api.PostAsync<RecordResponse>($"/api/logistics/expenses/{Expense.Id}/transfer", new TransferExpenseRequest(tripId!.Value, Expense.Version, reason));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            message = result.FieldErrors.Count > 0 ? null : result.Error;
+            return;
+        }
+
+        open = false;
+        Toasts.Success("Masraf başka sefere aktarıldı.");
+        await Changed.InvokeAsync(result.Value!);
+    }
+}

@@ -130,6 +130,65 @@ public class ImportRunTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
         Assert.Equal("+905321112233", fixedLead.NormalizedPhone);
     }
 
+    /// <summary>
+    /// Rapor dosya deposunda şifreli durur, başka bir uygulama örneği (ayrı bellek, aynı veritabanı ve depo) de açabilir; süresi dolunca
+    /// temizlik işi depodan siler ve indirme "süresi doldu" yanıtı verir.
+    /// </summary>
+    [Fact]
+    public async Task Error_report_is_encrypted_shared_across_nodes_and_removed_when_it_expires()
+    {
+        var (client, tenant, _) = await ImporterAsync();
+        using var _c = client;
+        var result = await ApplyAsync(client, "Konu;Soyad;Telefon\r\nİyi;Kaya;\r\n;Demir;+905321112233\r\n");
+
+        var path = BlobPath(tenant.Id, ImportErrorReports.Key(result.Run.Id));
+        var stored = await File.ReadAllBytesAsync(path);
+        Assert.DoesNotContain("Demir", Encoding.UTF8.GetString(stored), StringComparison.Ordinal);
+        Assert.DoesNotContain("905321112233", Encoding.UTF8.GetString(stored), StringComparison.Ordinal);
+
+        await using (var otherNode = factory.WithWebHostBuilder(_ => { }))
+        {
+            var report = await otherNode.Services.GetRequiredService<ImportErrorReports>().FindAsync(tenant.Id, result.Run.Id, CancellationToken.None);
+            Assert.NotNull(report);
+            Assert.Contains(";Demir;", Encoding.UTF8.GetString(report.Value.Content), StringComparison.Ordinal);
+        }
+
+        using (var scope = factory.OpenScope(tenant.Id))
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+            Assert.NotNull((await db.ImportRuns.AsNoTracking().SingleAsync(r => r.Id == result.Run.Id)).ErrorReportExpiresAt);
+            await db.ImportRuns.Where(r => r.Id == result.Run.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.ErrorReportExpiresAt, DateTimeOffset.UtcNow.AddMinutes(-1)));
+        }
+
+        Assert.Equal(1, await factory.Services.GetRequiredService<ImportReportCleanup>().RunTenantAsync(tenant.Id, CancellationToken.None));
+
+        Assert.False(File.Exists(path));
+        Assert.Equal(HttpStatusCode.Gone, (await client.GetAsync($"/api/imports/{result.Run.Id}/error-report")).StatusCode);
+        using var after = factory.OpenScope(tenant.Id);
+        Assert.Null((await after.ServiceProvider.GetRequiredService<ModulixDbContext>().ImportRuns.AsNoTracking().SingleAsync(r => r.Id == result.Run.Id)).ErrorReportExpiresAt);
+        Assert.Equal(0, await factory.Services.GetRequiredService<ImportReportCleanup>().RunTenantAsync(tenant.Id, CancellationToken.None));
+    }
+
+    /// <summary>Şifre tenant'a bağlıdır: A'nın rapor dosyası B'nin deposuna kopyalansa da B'de açılamaz.</summary>
+    [Fact]
+    public async Task Error_report_copied_into_another_tenant_cannot_be_opened_there()
+    {
+        var (client, tenantA, _) = await ImporterAsync();
+        using var _c = client;
+        var tenantB = await TenantAsync();
+        var result = await ApplyAsync(client, "Konu;Soyad\r\nA;Kaya\r\n;Demir\r\n");
+
+        var key = ImportErrorReports.Key(result.Run.Id);
+        var copy = BlobPath(tenantB.Id, key);
+        Directory.CreateDirectory(Path.GetDirectoryName(copy)!);
+        File.Copy(BlobPath(tenantA.Id, key), copy);
+
+        var reports = factory.Services.GetRequiredService<ImportErrorReports>();
+        Assert.Null(await reports.FindAsync(tenantB.Id, result.Run.Id, CancellationToken.None));
+        Assert.NotNull(await reports.FindAsync(tenantA.Id, result.Run.Id, CancellationToken.None));
+    }
+
     [Fact]
     public async Task File_level_problems_fail_the_run_without_touching_rows()
     {
@@ -506,6 +565,9 @@ public class ImportRunTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
 
         return detail;
     }
+
+    // Yerel disk adaptörünün yerleşimi: <kök>/<tenant>/<anahtarın ilk iki hanesi>/<anahtar>.
+    private string BlobPath(Guid tenantId, string key) => Path.Combine(factory.BlobRoot, tenantId.ToString("N"), key[..2], key);
 
     private async Task<Tenant> TenantAsync()
     {

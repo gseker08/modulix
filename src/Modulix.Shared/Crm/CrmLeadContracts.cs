@@ -123,7 +123,8 @@ public sealed record LeadDto(
     List<string>? ServiceScope = null,
     string? IndustryName = null,
     string? LegacyIndustry = null,
-    Guid? CampaignId = null);
+    Guid? CampaignId = null,
+    int Score = 0);
 
 /// <summary>
 /// Manuel kayıt/güncelleme. Konu zorunludur; talep sahibini tanıtan en az bir bilgi (ad, firma adı, e-posta, telefon ya da mevcut

@@ -1,9 +1,12 @@
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Hosting;
+using Modulix.Modules.Orders.Endpoints;
 using Modulix.Modules.Orders.Lifecycle;
 using Modulix.Modules.Orders.Records;
 
@@ -14,9 +17,26 @@ namespace Modulix.Modules.Orders;
 /// Sektörden bağımsızdır; müşteri ve kişiler ortak kayıttır (ADR-0006), CRM tablolarına bağlanmaz. Teklifi yalnızca
 /// <c>Modulix.Core.Contracts</c> üzerindeki <c>IAcceptedQuoteSource</c> ile okur. Sipariş tutarı tahsilat ya da gelir değildir.
 /// </summary>
-public sealed class OrdersModule : IModule
+public sealed class OrdersModule : IModule, IModuleEndpoints
 {
     public const string ModuleKey = "orders";
+
+    /// <summary>
+    /// Sipariş, teslimat ve operasyon işi numaraları ortak belge serisinden verilir (ADR-0049 dilim 3a): <c>önek-yıl-sıra</c>. Önceki kayıtlar rastgele
+    /// sonekli numarasını korur. Operasyon işinin öneki <c>IS</c>'tir (eski <c>OP</c> fırsat numarasıyla karışıyordu).
+    /// </summary>
+    public const string OrderNumberSeries = "orders.order";
+
+    public const string DeliveryNumberSeries = "orders.delivery";
+
+    public const string JobNumberSeries = "orders.job";
+
+    IReadOnlyList<Modulix.Core.Contracts.Numbering.NumberSeriesDefinition> IModule.NumberSeries { get; } =
+    [
+        new(OrderNumberSeries, "Sipariş", "SP"),
+        new(DeliveryNumberSeries, "Teslimat", "TS"),
+        new(JobNumberSeries, "Operasyon işi", "IS"),
+    ];
 
     public static class Permissions
     {
@@ -332,14 +352,28 @@ public sealed class OrdersModule : IModule
     IReadOnlyList<EventSubscription> IModule.EventSubscriptions { get; } =
     [
         EventSubscription.For<OrdersSchedulerAnchor>(
-            "orders.scheduler",
+            OrderJobs.Identity,
             [DomainEventTypes.RecordDeleted],
             [Entities.Order],
             [Permissions.OrdersRead, Permissions.HandoversWrite, Permissions.JobsManage]),
     ];
 
+    /// <summary>
+    /// Zamanlanmış iş (ADR-0046): host'taki tek zamanlayıcı 15 dakikada bir, sipariş modülü yazılabilir olan her tenant için çalıştırır.
+    /// Yapılandırma <c>Jobs:orders.jobs</c>; eski <c>OrderJobs</c> bölümü okunmaya devam eder.
+    /// </summary>
+    IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
+    [
+        ModuleJobDefinition.For<OrderJobs>(OrderJobs.JobKey, TimeSpan.FromSeconds(900), OrderJobs.Identity) with { LegacySection = "OrderJobs" },
+    ];
+
+    /// <summary>Sipariş uç noktaları (<c>/api/orders</c>) modüldedir (ADR-0046); grup host tarafından açılır.</summary>
+    public void MapEndpoints(IEndpointRouteBuilder routes) => OrdersEndpoints.MapEndpoints(routes);
+
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<OrderJobs>();
+        services.AddScoped<IOrderPolicyProvider, OrderPolicyProvider>();
         services.AddScoped<OrdersStoreContext>();
         services.AddScoped<OrderWorkflowGate>();
         services.AddScoped<OrderReader>();

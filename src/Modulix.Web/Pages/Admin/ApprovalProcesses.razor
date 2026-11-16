@@ -107,6 +107,11 @@
                         <input id="process-currency" class="form-control" maxlength="3" placeholder="TRY" @bind="currency" />
                         <small class="text-muted">@Texts.Get("admin.approvalProcesses.currencyHelp")</small>
                     </div>
+                    <div class="mb-3 form-check">
+                        <input id="process-working-hours" class="form-check-input" type="checkbox" @bind="dueInWorkingHours" />
+                        <label class="form-check-label" for="process-working-hours">@Texts.Get("admin.approvalProcesses.dueInWorkingHours")</label>
+                        <small class="d-block text-muted">@Texts.Get("admin.approvalProcesses.dueInWorkingHoursHelp")</small>
+                    </div>
                 </FormSection>
                 <FormSection Title="@Texts.Get("admin.automationRun.steps")" Icon="layers">
                     @foreach (var step in steps)
@@ -223,6 +228,7 @@
     private string name = string.Empty;
     private string? description;
     private string? currency;
+    private bool dueInWorkingHours;
     private string? message;
     private string? formError;
     private bool editing;
@@ -354,6 +360,7 @@
         name = definition?.Name ?? string.Empty;
         description = definition?.Description;
         currency = definition?.Currency;
+        dueInWorkingHours = definition?.DueInWorkingHours ?? false;
         target = definition?.TargetEntityKey;
         gated = [.. definition?.GatedCommands ?? []];
         steps = definition is null
@@ -396,7 +403,8 @@
             [.. steps.Select(s => new ApprovalStepDefinitionDto(s.Name, s.Order, s.Id("user"), s.Id("role"), s.MinAmount, s.DueHours, s.EscalationId("user"), s.EscalationId("role")))],
             editVersion,
             string.IsNullOrEmpty(target) ? null : target,
-            [.. gated.Where(g => TargetCommands().Any(c => c.Key == g))]);
+            [.. gated.Where(g => TargetCommands().Any(c => c.Key == g))],
+            dueInWorkingHours);
         var saved = editId is { } id
             ? await Api.PutAsync<ApprovalDefinitionDto>($"/api/approvals/definitions/{id}", request)
             : await Api.PostAsync<ApprovalDefinitionDto>("/api/approvals/definitions", request);

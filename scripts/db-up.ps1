@@ -16,7 +16,7 @@ $env:DOTNET_NOLOGO = '1'
 
 $ApiProject    = 'src/Modulix.Api/Modulix.Api.csproj'
 $UserSecretsId = 'modulix-api'
-$PasswordKeys  = @('MSSQL_SA_PASSWORD', 'MODULIX_APP_PASSWORD', 'MODULIX_MIGRATOR_PASSWORD')
+$PasswordKeys  = @('MSSQL_SA_PASSWORD', 'MODULIX_APP_PASSWORD', 'MODULIX_MIGRATOR_PASSWORD', 'S3_SECRET_KEY')
 
 function Invoke-Checked {
     param([string] $Exe, [string[]] $Arguments)
@@ -104,7 +104,7 @@ $port = $envValues['MSSQL_PORT']
 # --- 2/6 SQL Server ------------------------------------------------------------
 
 Write-Step '2/6 SQL Server baslatiliyor (ilk seferde imaj inecek, birkac dakika surebilir)'
-Invoke-Checked docker @('compose', 'up', '-d', '--wait', 'sqlserver', 'mailpit')
+Invoke-Checked docker @('compose', 'up', '-d', '--wait', 'sqlserver', 'mailpit', 's3')
 
 # --- 3/6 Veritabani, semalar, kullanicilar -------------------------------------
 
@@ -132,6 +132,11 @@ $migratorConnection = "Server=$server;Database=Modulix;User Id=modulix_migrator;
 
 Invoke-Checked dotnet @('user-secrets', 'set', 'ConnectionStrings:Modulix', $appConnection, '--project', $ApiProject)
 Invoke-Checked dotnet @('user-secrets', 'set', 'ConnectionStrings:ModulixMigrations', $migratorConnection, '--project', $ApiProject)
+
+# Yerel S3 deposu (compose 's3'): S3 dosya adaptorunun entegrasyon testleri bu ayarlari okur. Uygulamanin kendisi yerel diski kullanmaya devam eder.
+Invoke-Checked dotnet @('user-secrets', 'set', 'TestStorage:S3:ServiceUrl', 'http://127.0.0.1:9000', '--project', $ApiProject)
+Invoke-Checked dotnet @('user-secrets', 'set', 'TestStorage:S3:AccessKey', 'modulix', '--project', $ApiProject)
+Invoke-Checked dotnet @('user-secrets', 'set', 'TestStorage:S3:SecretKey', $envValues['S3_SECRET_KEY'], '--project', $ApiProject)
 
 # --- 5/6 Migration -------------------------------------------------------------
 

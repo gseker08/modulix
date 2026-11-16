@@ -308,6 +308,15 @@ internal static class Field
             (e, v) => set(e, (int?)v));
 
     /// <summary>Sayaç: okunur; yalnızca iş akışı yazar (genel uçlardan gelen değer yok sayılır).</summary>
+    /// <summary>İşaretli tam sayı, verilen aralıkta (ör. puan kuralında -100..100).</summary>
+    public static RecordField<T> Integer<T>(string name, int min, int max, Func<T, int> get, Action<T, int> set) =>
+        new(name, required: false, nullable: true, node =>
+                node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var number) && number >= min && number <= max
+                    ? ParsedValue.Of(number)
+                    : ParsedValue.Fail($"{min} ile {max} arasında bir tam sayı girin."),
+            e => JsonValue.Create(get(e)),
+            (e, v) => { if (v is int number) { set(e, number); } });
+
     public static RecordField<T> Count<T>(string name, Func<T, int> get, Action<T, int> set) =>
         new(name, required: false, nullable: true, node =>
                 node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var count) && count >= 0

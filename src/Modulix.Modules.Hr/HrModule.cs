@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Credentials;
@@ -5,7 +6,9 @@ using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Hr.Domain;
+using Modulix.Modules.Hr.Endpoints;
 using Modulix.Modules.Hr.Records;
 
 namespace Modulix.Modules.Hr;
@@ -15,7 +18,7 @@ namespace Modulix.Modules.Hr;
 /// Dilim 1: çalışan kartı, rehber, organizasyon şeması. İzin, masraf, zimmet, işe giriş/çıkış ve kurum içi iletişim (duyuru, anket, blog,
 /// galeri) sonraki dilimlerdedir (ADR-0042 bölüm 5).
 /// </summary>
-public sealed class HrModule : IModule
+public sealed class HrModule : IModule, IModuleEndpoints
 {
     public const string ModuleKey = "hr";
 
@@ -46,6 +49,7 @@ public sealed class HrModule : IModule
         public const string SurveysAnswers = "hr.surveys.answers";
         public const string BlogRead = "hr.blog.read";
         public const string BlogManage = "hr.blog.manage";
+        public const string BlogWrite = "hr.blog.write";
         public const string GalleryRead = "hr.gallery.read";
         public const string GalleryManage = "hr.gallery.manage";
     }
@@ -55,7 +59,6 @@ public sealed class HrModule : IModule
         public const string Employee = "hr.employee";
         public const string LeaveRequest = "hr.leave-request";
         public const string LeaveBalance = "hr.leave-balance";
-        public const string Holiday = "hr.holiday";
         public const string ExpenseClaim = "hr.expense-claim";
         public const string ExpenseLine = "hr.expense-line";
         public const string Asset = "hr.asset";
@@ -123,6 +126,9 @@ public sealed class HrModule : IModule
 
     public string Key => ModuleKey;
 
+    /// <summary>Modüle özel uç noktalar (ADR-0046); genel kayıt uçları host'ta <c>OwnedRecords</c>'tan üretilir.</summary>
+    public void MapEndpoints(IEndpointRouteBuilder routes) => HrEndpoints.MapEndpoints(routes);
+
     public string DisplayName => "İnsan Kaynakları";
 
     IReadOnlyList<PermissionDefinition> IModule.Permissions { get; } =
@@ -149,7 +155,8 @@ public sealed class HrModule : IModule
         new(Permissions.SurveysManage, "Anket hazırlar, yanıta açar, kapatır ve özet sonuçları görür", "Anketler"),
         new(Permissions.SurveysAnswers, "Tek tek cevap kayıtlarını görür (kimliği gizli anketler hariç); varsayılan rollerde yoktur", "Anketler"),
         new(Permissions.BlogRead, "Yayındaki blog yazılarını ve eklerini okur", "Blog"),
-        new(Permissions.BlogManage, "Blog yazısı yazar, yayınlar, ek ekler ve kaldırır", "Blog"),
+        new(Permissions.BlogWrite, "Kendi blog yazısını yazar, ek ekler ve onaya gönderir; yayınlayamaz", "Blog"),
+        new(Permissions.BlogManage, "Bütün blog yazılarını yazar, onaylar, geri çevirir, yayınlar, ek ekler ve kaldırır (yazma izniyle birlikte)", "Blog"),
         new(Permissions.GalleryRead, "Yayındaki fotoğraf albümlerini görür", "Galeri"),
         new(Permissions.GalleryManage, "Albüm açar, fotoğraf ekler ve kaldırır, albümü yayınlar", "Galeri"),
     ];
@@ -328,10 +335,6 @@ public sealed class HrModule : IModule
         {
             UserFields = ["authorUserId"],
         },
-        new(Entities.Holiday, "Resmî tatil", Permissions.LeavesRead, new Dictionary<string, string>
-        {
-            ["date"] = "Tarih", ["name"] = "Ad", ["halfDay"] = "Yarım gün",
-        }, "name"),
     ];
 
     IReadOnlyList<SensitiveFields> IModule.SensitiveFields { get; } =
@@ -507,7 +510,7 @@ public sealed class HrModule : IModule
                 Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.ExpensesManage,
                 Permissions.AssetsRead, Permissions.AssetsManage, Permissions.ChecklistsRead, Permissions.ChecklistsManage,
                 Permissions.AnnouncementsRead, Permissions.AnnouncementsManage, Permissions.SurveysRespond, Permissions.SurveysManage,
-                Permissions.BlogRead, Permissions.BlogManage, Permissions.GalleryRead, Permissions.GalleryManage,
+                Permissions.BlogRead, Permissions.BlogWrite, Permissions.BlogManage, Permissions.GalleryRead, Permissions.GalleryManage,
             ]),
         new(
             "hr.asset-keeper",
@@ -524,7 +527,7 @@ public sealed class HrModule : IModule
             "Çalışan (rehber)",
             "Rehberi ve organizasyon şemasını görüntüler, kendi izin hakkını görür ve kendi adına izin talebi açar; özlük bilgilerini göremez.",
             [Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.AssetsRead,
-                Permissions.ChecklistsRead, Permissions.AnnouncementsRead, Permissions.SurveysRespond, Permissions.BlogRead, Permissions.GalleryRead])
+                Permissions.ChecklistsRead, Permissions.AnnouncementsRead, Permissions.SurveysRespond, Permissions.BlogRead, Permissions.BlogWrite, Permissions.GalleryRead])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
         },
@@ -535,7 +538,7 @@ public sealed class HrModule : IModule
             [
                 Permissions.EmployeesRead, Permissions.LeavesRead, Permissions.LeavesRequest, Permissions.LeavesApprove,
                 Permissions.ExpensesRead, Permissions.ExpensesRequest, Permissions.ExpensesApprove, Permissions.AssetsRead,
-                Permissions.ChecklistsRead, Permissions.AnnouncementsRead, Permissions.SurveysRespond, Permissions.BlogRead, Permissions.GalleryRead,
+                Permissions.ChecklistsRead, Permissions.AnnouncementsRead, Permissions.SurveysRespond, Permissions.BlogRead, Permissions.BlogWrite, Permissions.GalleryRead,
             ])
         {
             Scope = Core.Contracts.Authorization.RecordScope.Own,
@@ -549,7 +552,6 @@ public sealed class HrModule : IModule
         services.AddScoped<IRecordStore, EmployeeRecordStore>();
         services.AddScoped<IRecordStore, LeaveRequestRecordStore>();
         services.AddScoped<IRecordStore, LeaveBalanceRecordStore>();
-        services.AddScoped<IRecordStore, HolidayRecordStore>();
         services.AddScoped<ILeaveWorkflow, LeaveWorkflow>();
         services.AddScoped<IRecordStore, ExpenseClaimRecordStore>();
         services.AddScoped<IRecordStore, ExpenseLineRecordStore>();
@@ -570,6 +572,7 @@ public sealed class HrModule : IModule
         services.AddScoped<IRecordStore, SurveyResponseRecordStore>();
         services.AddScoped<IRecordStore, SurveyAnswerRecordStore>();
         services.AddScoped<ISurveyService, SurveyService>();
+        services.AddScoped<IBlogReview, BlogReview>();
         services.AddScoped<IRecordStore, BlogPostRecordStore>();
         services.AddScoped<IRecordStore, PhotoAlbumRecordStore>();
         services.AddScoped<IRecordStore, EmployeePositionRecordStore>();

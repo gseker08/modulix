@@ -6,12 +6,12 @@
 
 @if (actions is { Count: > 0 })
 {
-    <section class="list-toolbar" aria-label="İş akışı eylemleri">
+    <section class="list-toolbar" aria-label="@Texts.Get("hr.actions.label")">
         @if (pending is { } asking)
         {
-            <label class="visually-hidden" for="leave-action-reason">Gerekçe</label>
-            <input id="leave-action-reason" class="form-control" maxlength="500" placeholder="@(asking.Action == "pay" ? "Ödeme referansı (isteğe bağlı)" : $"{asking.Label} gerekçesi")" @bind="reason" @bind:event="oninput" />
-            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => pending = null">Vazgeç</button>
+            <label class="visually-hidden" for="leave-action-reason">@Texts.Get("hr.leave-card.reason")</label>
+            <input id="leave-action-reason" class="form-control" maxlength="500" placeholder="@(asking.Action == "pay" ? Texts.Get("hr.actions.payment-reference") : Texts.Get("hr.actions.reason-for", asking.Label))" @bind="reason" @bind:event="oninput" />
+            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => pending = null">@Texts.Get("common.dismiss")</button>
             <button type="button" class="btn btn-danger" disabled="@(busy || string.IsNullOrWhiteSpace(reason))" aria-busy="@(busy ? "true" : null)" @onclick="() => RunAsync(asking)">@asking.Label</button>
         }
         else

@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Support;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Identity;
@@ -125,7 +124,7 @@ public class SupportRoutingTests(ModulixApiFactory factory) : IClassFixture<Modu
 
     private async Task<SlaSchedulerRun> RunSchedulerAsync(Guid tenantId)
     {
-        var (run, skipped) = await factory.Services.GetRequiredService<SupportJobsRunner>().RunTenantAsync(tenantId, CancellationToken.None);
+        var (run, skipped) = await new SupportJobsRunner(factory.Services).RunTenantAsync(tenantId, CancellationToken.None);
         Assert.False(skipped);
         return run!;
     }
@@ -565,7 +564,7 @@ public class SupportRoutingTests(ModulixApiFactory factory) : IClassFixture<Modu
 
         // Tekrar ve paralel çalıştırma kapanışı çoğaltmaz.
         Assert.Equal(0, (await RunSchedulerAsync(s.Tenant.Id)).AutoClosed);
-        var parallel = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => factory.Services.GetRequiredService<SupportJobsRunner>().RunTenantAsync(s.Tenant.Id, CancellationToken.None)));
+        var parallel = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => new SupportJobsRunner(factory.Services).RunTenantAsync(s.Tenant.Id, CancellationToken.None)));
         Assert.All(parallel, r => Assert.Equal(0, r.Run?.AutoClosed ?? 0));
         Assert.Equal(1, (await HistoryAsync(lead, stale.Id)).Count(h => h.Kind == "AutoClosed"));
 

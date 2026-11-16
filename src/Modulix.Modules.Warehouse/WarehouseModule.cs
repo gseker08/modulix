@@ -1,8 +1,11 @@
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Hosting;
 using Modulix.Modules.Warehouse.Domain;
+using Modulix.Modules.Warehouse.Endpoints;
 using Modulix.Modules.Warehouse.Records;
 
 namespace Modulix.Modules.Warehouse;
@@ -12,7 +15,7 @@ namespace Modulix.Modules.Warehouse;
 /// kaydeder (anahtar, izinler, rol önerisi); varlıklar, ayarlar, seçim listeleri ve formlar kullanıcılarıyla birlikte dilimlerle
 /// gelir (tesis ve lokasyon: dilim 2). Gümrük uzantısı (<c>warehouse.customs.*</c> izinleri) dilim 4'ten itibaren eklenir.
 /// </summary>
-public sealed class WarehouseModule : IModule
+public sealed class WarehouseModule : IModule, IModuleEndpoints
 {
     public const string ModuleKey = "warehouse";
 
@@ -94,6 +97,9 @@ public sealed class WarehouseModule : IModule
     }
 
     public string Key => ModuleKey;
+
+    /// <summary>Modüle özel uç noktalar (ADR-0046); genel kayıt uçları host'ta <c>OwnedRecords</c>'tan üretilir.</summary>
+    public void MapEndpoints(IEndpointRouteBuilder routes) => WarehouseDashboardEndpoints.MapEndpoints(routes);
 
     public string DisplayName => "Depo";
 

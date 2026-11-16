@@ -3,6 +3,7 @@
     <Project Path="src/Modulix.AI/Modulix.AI.csproj" />
     <Project Path="src/Modulix.Api/Modulix.Api.csproj" />
     <Project Path="src/Modulix.Core.Contracts/Modulix.Core.Contracts.csproj" />
+    <Project Path="src/Modulix.Core.Hosting/Modulix.Core.Hosting.csproj" />
     <Project Path="src/Modulix.Core/Modulix.Core.csproj" />
     <Project Path="src/Modulix.Infrastructure/Modulix.Infrastructure.csproj" />
     <Project Path="src/Modulix.Modules.Crm/Modulix.Modules.Crm.csproj" />

@@ -29,6 +29,17 @@ public sealed class CrmModule : IModule
 {
     public const string ModuleKey = "crm";
 
+    /// <summary>
+    /// Teklif numarası ortak belge serisinden verilir (ADR-0049 dilim 3a): <c>TK-yıl-sıra</c>; revizyonlar ailenin numarasını taşır. Önceki kayıtlar
+    /// rastgele sonekli numarasını korur. Fırsat ve müşteri adayı belge değildir, sıralı seriye geçmedi.
+    /// </summary>
+    public const string QuoteNumberSeries = "crm.quote";
+
+    IReadOnlyList<Modulix.Core.Contracts.Numbering.NumberSeriesDefinition> IModule.NumberSeries { get; } =
+    [
+        new(QuoteNumberSeries, "Teklif", "TK"),
+    ];
+
     public static class Permissions
     {
         public const string CompaniesRead = "crm.companies.read";
@@ -82,6 +93,9 @@ public sealed class CrmModule : IModule
 
         /// <summary>Lead toplama formlarını/entegrasyonlarını yönetir (sır yenileme dahil). Hiçbir hazır role verilmez.</summary>
         public const string LeadFormsManage = "crm.lead-forms.manage";
+
+        /// <summary>Müşteri adayı puan kurallarını tanımlar (ADR-0050). Hiçbir hazır role verilmez.</summary>
+        public const string LeadScoringManage = "crm.lead-scoring.manage";
 
         // Ürün/hizmet kataloğu (ADR-0018). Maliyeti görme ayrı izindir; hiçbir hazır role verilmez.
         public const string ProductsRead = "crm.products.read";
@@ -144,6 +158,7 @@ public sealed class CrmModule : IModule
         public const string ActivityParticipant = "crm.activity-participant";
         public const string Lead = "crm.lead";
         public const string LeadForm = "crm.lead-form";
+        public const string LeadScoreRule = "crm.lead-score-rule";
         public const string ProductCategory = "crm.product-category";
         public const string MeasureUnit = "crm.measure-unit";
         public const string Product = "crm.product";
@@ -273,6 +288,7 @@ public sealed class CrmModule : IModule
         new(Permissions.LeadsConvert, "Nitelikli müşteri adayını fırsata dönüştürür", "Müşteri adayları"),
         new(Permissions.LeadsExport, "Müşteri adayı listesini dışa aktarır", "Müşteri adayları"),
         new(Permissions.LeadFormsManage, "Müşteri adayı toplama formlarını ve entegrasyon sırlarını yönetir", "Müşteri adayı formları"),
+        new(Permissions.LeadScoringManage, "Müşteri adayı puan kurallarını tanımlar ve değiştirir", "Müşteri adayı puanı"),
         new(Permissions.ProductsRead, "Ürün, hizmet, kategori ve birimleri görüntüler", "Ürün kataloğu"),
         new(Permissions.ProductsWrite, "Ürün, hizmet, kategori ve birim ekler, düzenler", "Ürün kataloğu"),
         new(Permissions.ProductCostsRead, "Ürün maliyetini görür ve düzenler", "Ürün maliyeti"),
@@ -981,6 +997,11 @@ public sealed class CrmModule : IModule
         {
             UserFields = ["defaultOwnerId"],
         },
+        new(Entities.LeadScoreRule, "Müşteri adayı puan kuralı (CRM)", Permissions.LeadScoringManage, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["description"] = "Açıklama", ["isActive"] = "Etkin", ["field"] = "Alan", ["operator"] = "Karşılaştırma",
+            ["value"] = "Değer", ["points"] = "Puan",
+        }, "name"),
         new(Entities.Lead, "Müşteri adayı (CRM)", Permissions.LeadsRead, new Dictionary<string, string>
         {
             ["leadNumber"] = "Müşteri adayı no", ["subject"] = "Konu", ["description"] = "Açıklama", ["status"] = "Durum", ["statusReason"] = "Durum gerekçesi",
@@ -994,7 +1015,7 @@ public sealed class CrmModule : IModule
             ["ownerId"] = "Sorumlu", ["assignedAt"] = "Atanma", ["firstContactAt"] = "İlk temas", ["followUpAt"] = "Takip tarihi",
             ["qualifiedAt"] = "Nitelendirilme", ["disqualifiedAt"] = "Elenme", ["disqualificationReason"] = "Eleme nedeni",
             ["convertedAt"] = "Dönüşüm", ["convertedBy"] = "Dönüştüren", ["convertedCompanyId"] = "Dönüşüm firması",
-            ["convertedContactId"] = "Dönüşüm kişisi", ["convertedOpportunityId"] = "Dönüşüm fırsatı",
+            ["convertedContactId"] = "Dönüşüm kişisi", ["convertedOpportunityId"] = "Dönüşüm fırsatı", ["score"] = "Puan",
         }, "subject")
         {
             UserFields = ["ownerId", "convertedBy"],
@@ -1029,6 +1050,15 @@ public sealed class CrmModule : IModule
     /// Aktivite tamamlanınca Lead'in ilk temasını işler (yalnızca Lead aktiviteleri; sistem adına, audit'li). Abone idempotenttir:
     /// aynı olay tekrar gelse de ilk temas yalnızca daha erken bir temas bulunursa değişir.
     /// </summary>
+    /// <summary>
+    /// Zamanlanmış iş (ADR-0046): host'taki tek zamanlayıcı 5 dakikada bir, CRM modülü yazılabilir olan her tenant için teklif süre dolumu turunu çalıştırır.
+    /// Yapılandırma <c>Jobs:crm.quote-expiry</c>; eski <c>QuoteExpiry</c> bölümü okunmaya devam eder.
+    /// </summary>
+    IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
+    [
+        ModuleJobDefinition.For<QuoteExpiryJob>(QuoteExpiryJob.JobKey, TimeSpan.FromSeconds(300), QuoteExpiryJob.Identity) with { LegacySection = "QuoteExpiry" },
+    ];
+
     IReadOnlyList<EventSubscription> IModule.EventSubscriptions { get; } =
     [
         // Herkese açık Lead toplama ucunun sistem kimliği: olay işlemez, yalnızca "crm.lead-intake" kimliğinin izinlerini tanımlar
@@ -1058,7 +1088,7 @@ public sealed class CrmModule : IModule
             [Entities.Activity],
             [Permissions.ActivitiesRead, Permissions.ActivitiesWrite]),
         EventSubscription.For<QuoteExpiryAnchor>(
-            "crm.quote-expiry",
+            QuoteExpiryJob.Identity,
             [DomainEventTypes.RecordDeleted],
             [Entities.Quote],
             [Permissions.QuotesRead, Permissions.QuotesRecordDecision, Permissions.CompaniesRead, Permissions.OpportunitiesRead, Permissions.ActivitiesRead, Permissions.ActivitiesWrite]),
@@ -1133,6 +1163,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<IQuoteReport, QuoteReport>();
         services.AddScoped<QuoteMarkers>();
         services.AddScoped<IQuoteExpiry, QuoteExpiry>();
+        services.AddScoped<QuoteExpiryJob>();
         services.AddScoped<IAcceptedQuoteSource, AcceptedQuoteSource>();
         services.AddScoped<IQuoteOpportunitySync, QuoteOpportunitySync>();
         services.AddScoped<QuoteLifecycleSubscriber>();
@@ -1183,6 +1214,7 @@ public sealed class CrmModule : IModule
         services.AddScoped<IActivityWorkflow, ActivityWorkflow>();
         services.AddScoped<IRecordStore, LeadRecordStore>();
         services.AddScoped<IRecordStore, LeadFormRecordStore>();
+        services.AddScoped<IRecordStore, LeadScoreRuleRecordStore>();
         services.AddScoped<ILeadIntake, LeadIntake>();
         services.AddScoped<ILeadFormAdmin, LeadFormAdmin>();
         services.AddScoped<LeadIntakeAnchor>();

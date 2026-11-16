@@ -10,9 +10,11 @@ using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Communication;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Customs;
+using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Sectors;
+using Modulix.Core.Contracts.Settings;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
 using Modulix.Core.Customs;
@@ -74,6 +76,7 @@ public static class PersistenceSetup
         ArgumentException.ThrowIfNullOrWhiteSpace(migrationsConnectionString);
 
         services.AddMemoryCache();
+        services.AddSingleton<AccessCache>();
         services.AddSingleton(new ModulixDatabaseOptions(appConnectionString, migrationsConnectionString));
 
         // Tek bağlam (ADR-0020): platform tabloları ve bütün tenant'ların iş verisi aynı veritabanında. Interceptor isteğin aktif
@@ -83,7 +86,10 @@ public static class PersistenceSetup
         {
             var tenantAccessor = serviceProvider.GetService<ITenantContextAccessor>();
             options.UseModulixSqlServer(appConnectionString)
-                .AddInterceptors(new TenantSessionContextInterceptor(tenantAccessor));
+                .AddInterceptors(
+                    new TenantSessionContextInterceptor(tenantAccessor),
+                    new AccessCacheInvalidator(serviceProvider.GetRequiredService<AccessCache>()),
+                    DatabaseCommandDiagnostics.Instance);
         });
 
         services.AddScoped<IMembershipDirectory, MembershipDirectory>();
@@ -92,10 +98,14 @@ public static class PersistenceSetup
         services.AddScoped<ITenantDataTransfer, TenantDataTransfer>();
         services.AddScoped<IModuleData, ModuleData>();
         services.AddScoped<ITransactionLock, SqlTransactionLock>();
+        services.AddScoped<Modulix.Core.Contracts.Numbering.IDocumentNumbers, Modulix.Infrastructure.Numbering.DocumentNumbers>();
+        services.AddScoped<Modulix.Core.Numbering.INumberSeriesAdmin, Modulix.Infrastructure.Numbering.NumberSeriesAdmin>();
 
         // Modül hakları ve izinler; ModuleCatalog'u host kaydeder (AddModulixModules).
         services.AddScoped<IModuleEntitlements, ModuleEntitlements>();
         services.AddScoped<IModuleLicense, ModuleLicense>();
+        // Uç nokta süzgeçlerinin (Core.Hosting) yazılabilirlik sorusu; aynı kapsamdaki IModuleLicense örneğini verir.
+        services.AddScoped<IModuleWriteAccess>(provider => provider.GetRequiredService<IModuleLicense>());
         services.AddScoped<IEntitlementResolver, Modulix.Infrastructure.Platform.EntitlementResolver>();
         services.AddScoped<IPlanAdministration, Modulix.Infrastructure.Platform.PlanAdministration>();
         services.AddScoped<ILicenseApplier, Modulix.Infrastructure.Platform.LicenseApplier>();
@@ -186,10 +196,22 @@ public static class PersistenceSetup
         services.AddScoped<FormLayoutService>();
         services.AddScoped<IFormLayoutService>(sp => sp.GetRequiredService<FormLayoutService>());
         services.AddScoped<Modulix.Core.Views.IGridViewService, Modulix.Infrastructure.Views.GridViewService>();
-        services.AddSingleton<Modulix.Core.Files.IBlobStorage, Modulix.Infrastructure.Files.LocalBlobStorage>();
+        // Depo türü Storage:Provider ile seçilir: yerel disk ya da S3 uyumlu nesne deposu (mimari değerlendirme A4).
+        services.AddSingleton<Modulix.Core.Files.IBlobStorage>(sp =>
+        {
+            Microsoft.Extensions.Options.IOptions<Modulix.Core.Files.FileStorageOptions> storage = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Modulix.Core.Files.FileStorageOptions>>();
+            return storage.Value.Provider == Modulix.Core.Files.BlobStorageProvider.S3
+                ? new Modulix.Infrastructure.Files.S3BlobStorage(storage)
+                : new Modulix.Infrastructure.Files.LocalBlobStorage(storage);
+        });
         services.AddScoped<Modulix.Infrastructure.Files.FileStore>();
         services.AddScoped<Modulix.Core.Contracts.Files.IFileStore>(sp => sp.GetRequiredService<Modulix.Infrastructure.Files.FileStore>());
         services.AddScoped<Modulix.Core.Contracts.Files.IFileLimits>(sp => sp.GetRequiredService<Modulix.Infrastructure.Files.FileStore>());
+
+        // Dosya yaşam döngüsü temizliği (ADR-0040 dilim 3): silinen kaydın dosyaları ve yetim içerik.
+        services.AddScoped<Modulix.Infrastructure.Files.FileCleanup>();
+        services.AddScoped<Modulix.Core.Contracts.Files.IRecordFileCleanup>(sp => sp.GetRequiredService<Modulix.Infrastructure.Files.FileCleanup>());
+        services.AddScoped<Modulix.Core.Files.IOrphanBlobSweeper>(sp => sp.GetRequiredService<Modulix.Infrastructure.Files.FileCleanup>());
         services.AddScoped<IFormLayoutProvider>(sp => sp.GetRequiredService<FormLayoutService>());
         services.AddScoped<ICurrentAccess, CurrentAccess>();
 
@@ -210,6 +232,8 @@ public static class PersistenceSetup
         // Denetim kaydı okuma (Y5).
         services.AddScoped<IAuditLog, AuditLog>();
         services.AddScoped<ITenantSettings, TenantSettings>();
+        // Modüllerin ayar okuma sözleşmesi (ADR-0046); aynı kapsamdaki ITenantSettings örneğini verir.
+        services.AddScoped<ITenantSettingReader>(provider => provider.GetRequiredService<ITenantSettings>());
         services.AddScoped<ITenantClock, TenantClock>();
         services.AddScoped<ITenantLogo, TenantLogoStore>();
         services.AddScoped<TenantDisplayNames>();

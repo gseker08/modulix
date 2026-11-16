@@ -124,6 +124,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("DueInWorkingHours")
+                        .HasColumnType("bit");
+
                     b.Property<string>("GatedCommands")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -240,6 +243,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("DueInWorkingHours")
+                        .HasColumnType("bit");
 
                     b.Property<Guid>("RequesterId")
                         .HasColumnType("uniqueidentifier");
@@ -796,6 +802,43 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("AutomationScanCursors", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Calendar.Holiday", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("HalfDay")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("Holidays", "core");
                 });
 
             modelBuilder.Entity("Modulix.Core.Communication.CommunicationLinkToken", b =>
@@ -2219,6 +2262,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<DateTimeOffset?>("ErrorReportExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<int>("FailedCount")
                         .HasColumnType("int");
 
@@ -2280,6 +2326,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "CreatedAt");
+
+                    b.HasIndex("TenantId", "ErrorReportExpiresAt")
+                        .HasFilter("[ErrorReportExpiresAt] IS NOT NULL");
 
                     b.HasIndex("TenantId", "EntityKey", "CreatedAt");
 
@@ -2448,6 +2497,77 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "UserId", "ReadAt", "CreatedAt");
 
                     b.ToTable("Notifications", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Numbering.NumberCounter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("LastValue")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Period")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SeriesKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "SeriesKey", "Period")
+                        .IsUnique();
+
+                    b.ToTable("NumberCounters", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Numbering.NumberSeriesSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("Digits")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Prefix")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("Reset")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SeriesKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "SeriesKey")
+                        .IsUnique();
+
+                    b.ToTable("NumberSeriesSettings", "core");
                 });
 
             modelBuilder.Entity("Modulix.Core.Organization.Branch", b =>
@@ -3791,6 +3911,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<string>("HtmlBody")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(5)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(5)");
 
                     b.Property<string>("LastError")
                         .HasMaxLength(2000)
@@ -7148,6 +7273,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<int>("Score")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("ServiceScope")
                         .HasMaxLength(1020)
                         .HasColumnType("nvarchar(1020)");
@@ -7231,6 +7361,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "NormalizedPhone");
 
+                    b.HasIndex("TenantId", "Score");
+
                     b.HasIndex("TenantId", "ExternalSource", "ExternalSubmissionId")
                         .IsUnique()
                         .HasFilter("[ExternalSource] IS NOT NULL AND [ExternalSubmissionId] IS NOT NULL");
@@ -7243,7 +7375,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "Status", "FirstReceivedAt", "Id")
                         .IsDescending(false, false, true, false);
 
-                    b.ToTable("Leads", "crm");
+                    b.ToTable("Leads", "crm", t =>
+                        {
+                            t.HasCheckConstraint("CK_Leads_Score", "[Score] BETWEEN 0 AND 100");
+                        });
                 });
 
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.LeadForm", b =>
@@ -7307,6 +7442,70 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("LeadForms", "crm");
+                });
+
+            modelBuilder.Entity("Modulix.Modules.Crm.Domain.LeadScoreRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CustomFields")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Field")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Operator")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Value")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "IsActive");
+
+                    b.ToTable("LeadScoreRules", "crm", t =>
+                        {
+                            t.HasCheckConstraint("CK_LeadScoreRules_Points", "[Points] BETWEEN -100 AND 100 AND [Points] <> 0");
+                        });
                 });
 
             modelBuilder.Entity("Modulix.Modules.Crm.Domain.Location", b =>
@@ -9755,6 +9954,17 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasColumnType("bit");
 
                     b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ReviewStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Summary")
@@ -14199,6 +14409,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("UseTenantHolidays")
+                        .HasColumnType("bit");
 
                     b.Property<long>("Version")
                         .IsConcurrencyToken()

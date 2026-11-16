@@ -14,8 +14,13 @@ internal sealed class CrmStoreContext(
     ICurrentAccess permissions, IEnumerable<IActivityLinkTarget> linkTargets, LeadWorkflowGate? leadGate = null,
     ActivityWorkflowGate? activityGate = null, IRecordCommandContext? command = null, OpportunityWorkflowGate? opportunityGate = null,
     IOpportunityPolicyProvider? policy = null, IActivityCodeCatalog? activityCodes = null, IIndustryCatalog? industries = null,
-    IServiceProvider? services = null, CampaignLinkTrust? campaignTrust = null, TimeProvider? time = null)
+    IServiceProvider? services = null, CampaignLinkTrust? campaignTrust = null, TimeProvider? time = null,
+    Modulix.Core.Contracts.Numbering.IDocumentNumbers? numbers = null)
 {
+    /// <summary>Ortak belge numaralama (ADR-0049 dilim 3a): teklif numarası. Host her zaman verir; yalnızca servissiz kurulumda (birim testi) yoktur.</summary>
+    public Modulix.Core.Contracts.Numbering.IDocumentNumbers Numbers =>
+        numbers ?? throw new InvalidOperationException("Belge numaralama servisi kayıtlı değil.");
+
     /// <summary>
     /// Kampanya bağının (müşteri adayı/fırsat <c>campaignId</c>) sunucu doğrulaması: kampanya Pazarlama modülünün kaydıdır, CRM onun tablosunu görmez;
     /// kayıt boru hattından <b>çağıranın yetkisi ve veri kapsamıyla</b> okunur. Kayıt yoksa, okunamıyorsa, modül kapalıysa ya da yetki yoksa aynı sonuç

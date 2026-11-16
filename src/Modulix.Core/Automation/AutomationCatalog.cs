@@ -111,7 +111,8 @@ public sealed class AutomationCatalogService(
         string moduleKey, AutomationEntityDefinition entity, IReadOnlySet<string> permissions, CancellationToken cancellationToken)
     {
         if (!await access.IsModuleEnabledAsync(moduleKey, cancellationToken)
-            || (entity.ReadPermission is { } read && !permissions.Contains(read)))
+            || (entity.ReadPermission is { } read && !permissions.Contains(read))
+            || (entity.RecordReadPermission is { } recordRead && !permissions.Contains(recordRead)))
         {
             return null;
         }

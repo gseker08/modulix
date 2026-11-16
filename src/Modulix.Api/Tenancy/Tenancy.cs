@@ -1,12 +1,15 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Api.Localization;
 using Modulix.Api.Platform;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
 using Modulix.Core.Settings;
+using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
 using Modulix.Shared.Auth;
@@ -54,7 +57,7 @@ public static class TenantProblems
 public sealed class TenantContextMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(
-        HttpContext context, HttpTenantContextAccessor accessor, IMembershipDirectory directory, ModulixDbContext db)
+        HttpContext context, HttpTenantContextAccessor accessor, IMembershipDirectory directory, ModulixDbContext db, AccessCache cache)
     {
         var principal = context.User;
         if (principal.Identity?.IsAuthenticated == true
@@ -66,6 +69,11 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
             {
                 accessor.Current = new TenantContext(membership.TenantId, userId, membership.MembershipId);
 
+                // Tenant artık bu istek boyunca değişmez: bağlantı bir kez açılır ve istek sonuna kadar açık kalır. Açılışta interceptor
+                // tenant'ı oturuma salt okunur yazar; sonraki sorgular aynı bağlantıyı kullanır, her sorguda ayrı bir
+                // sp_set_session_context turu olmaz. Bağlam scope sonunda kapanır; havuz oturum değerini temizler.
+                await db.Database.OpenConnectionAsync(context.RequestAborted);
+
                 // Destek oturumunda her API isteği, işlenmeden önce okuma günlüğüne yazılır (ADR-0028, Y1.3); yazılamazsa istek durur.
                 if (membership.IsSupport && context.Request.Path.StartsWithSegments("/api"))
                 {
@@ -76,12 +84,18 @@ public sealed class TenantContextMiddleware(RequestDelegate next)
                 // ITenantSettings tenant DbContext'ine bağlıdır (ADR-0020); yalnızca aktif tenant kurulduktan SONRA çözülür.
                 var settings = context.RequestServices.GetRequiredService<ITenantSettings>();
 
-                // Firma iki adımlı doğrulamayı zorunlu kılıyorsa kapalı olan kişi önce kurulumu yapar (Y7b).
-                if (await settings.GetValueAsync(CoreModule.SettingKeys.RequireTwoFactor, context.RequestAborted) == CoreModule.SettingValues.Yes
+                // Firma iki adımlı doğrulamayı zorunlu kılıyorsa kapalı olan kişi önce kurulumu yapar (Y7b). Firma ayarı kısa süre
+                // önbellekte tutulur (ADR-0048); kişinin kendi durumu yalnızca ayar açıkken ve her istekte sorulur.
+                var requireTwoFactor = await cache.GetOrLoadAsync("require-two-factor", membership.TenantId, Guid.Empty, db,
+                    () => settings.GetValueAsync(CoreModule.SettingKeys.RequireTwoFactor, context.RequestAborted));
+                if (requireTwoFactor == CoreModule.SettingValues.Yes
                     && !await db.Users.AnyAsync(u => u.Id == userId && u.TwoFactorEnabled, context.RequestAborted))
                 {
                     accessor.Current = null;
                     accessor.TwoFactorRequiredTenantId = membership.TenantId;
+
+                    // Bağlam yok: tenant'ı oturuma yazılmış bağlantı bırakılır; sonraki sorgular tenant'sız yeni bağlantı açar.
+                    await db.Database.CloseConnectionAsync();
                 }
             }
         }
@@ -123,22 +137,30 @@ public sealed class CompanyContextMiddleware(RequestDelegate next)
     }
 }
 
+/// <summary>
+/// Aktif ve doğrulanmış tenant var mı; yoksa 403 yanıtı. Host içi süzgeç (<see cref="RequireTenantFilter"/>) ve modül uç
+/// noktalarının süzgeçleri (<c>Modulix.Core.Hosting</c>, ADR-0046) aynı kuralı buradan okur.
+/// </summary>
+public sealed class HttpActiveTenantGuard(HttpTenantContextAccessor tenant) : IActiveTenantGuard
+{
+    public IResult? Check() =>
+        tenant.Current is not null
+            ? null
+            : tenant.TwoFactorRequiredTenantId is not null
+                ? LocalizedProblems.Problem(
+                    StatusCodes.Status403Forbidden,
+                    ServerMessages.Access.TwoFactorRequiredTitle,
+                    ServerMessages.Access.TwoFactorRequiredDetail,
+                    new Dictionary<string, object?> { ["code"] = TenantProblems.TwoFactorRequired })
+                : LocalizedProblems.Problem(
+                    StatusCodes.Status403Forbidden, ServerMessages.Record.NoActiveTenant, ServerMessages.Access.NoActiveTenantDetail);
+}
+
 /// <summary>Aktif ve doğrulanmış tenant yoksa isteği 403 ile durdurur.</summary>
-public sealed class RequireTenantFilter(HttpTenantContextAccessor tenant) : IEndpointFilter
+public sealed class RequireTenantFilter(IActiveTenantGuard guard) : IEndpointFilter
 {
     public ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) =>
-        tenant.Current is not null
-            ? next(context)
-            : ValueTask.FromResult<object?>(tenant.TwoFactorRequiredTenantId is not null
-                ? Results.Problem(
-                    statusCode: StatusCodes.Status403Forbidden,
-                    title: "Bu firma iki adımlı doğrulama istiyor.",
-                    detail: "Devam etmeden önce Hesabım sayfasından iki adımlı doğrulamayı açın.",
-                    extensions: new Dictionary<string, object?> { ["code"] = TenantProblems.TwoFactorRequired })
-                : Results.Problem(
-                    statusCode: StatusCodes.Status403Forbidden,
-                    title: "Aktif tenant yok.",
-                    detail: "Bir tenant seçin. Üyeliğiniz kaldırıldıysa bu tenant'a artık erişemezsiniz."));
+        guard.Check() is { } problem ? ValueTask.FromResult<object?>(problem) : next(context);
 }
 
 public static class TenancySetup
@@ -147,6 +169,7 @@ public static class TenancySetup
     {
         services.AddScoped<HttpTenantContextAccessor>();
         services.AddScoped<ITenantContextAccessor>(sp => sp.GetRequiredService<HttpTenantContextAccessor>());
+        services.AddScoped<IActiveTenantGuard, HttpActiveTenantGuard>();
         services.AddScoped<HttpCompanyContextAccessor>();
         services.AddScoped<ICompanyContextAccessor>(sp => sp.GetRequiredService<HttpCompanyContextAccessor>());
         services.AddSingleton<ITenantScopeFactory, TenantScopeFactory>();

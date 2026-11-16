@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
@@ -26,7 +27,8 @@ public sealed class AssignmentEmailSubscriber(
     ModuleCatalog catalog,
     INotificationRecipients recipients,
     ITenantMembers members,
-    IEmailQueue emails) : IEventSubscriber
+    IEmailQueue emails,
+    IRecipientLanguage languages) : IEventSubscriber
 {
     public async Task HandleAsync(EventEnvelope envelope, CancellationToken cancellationToken)
     {
@@ -53,42 +55,54 @@ public sealed class AssignmentEmailSubscriber(
         var path = catalog.Modules.SelectMany(m => m.OwnedRecords).FirstOrDefault(t => t.EntityKey == envelope.EntityKey)?.Path;
         var link = path is null ? null : recipients.Link(path.Replace("{id}", envelope.RecordId.ToString(), StringComparison.Ordinal));
 
+        var texts = await languages.ForUserAsync(recipient.UserId, cancellationToken);
         emails.Enqueue(Message(
+            texts,
             recipient,
-            entity?.DisplayName ?? envelope.EntityKey,
-            string.IsNullOrEmpty(title) ? "(adsız kayıt)" : title,
-            await ActorNameAsync(envelope.UserId, cancellationToken),
+            entity is null ? envelope.EntityKey : MetadataTexts.Text(texts.Bundle, MetadataTexts.EntityKey(entity.EntityKey), entity.DisplayName),
+            string.IsNullOrEmpty(title) ? texts.Get("email.assignment.untitled") : title,
+            await ActorNameAsync(texts, envelope.UserId, cancellationToken),
             link));
     }
 
-    private async Task<string> ActorNameAsync(Guid userId, CancellationToken cancellationToken)
+    private async Task<string> ActorNameAsync(LocalizedTexts texts, Guid userId, CancellationToken cancellationToken)
     {
         if (userId == Guid.Empty)
         {
-            return "Modülix (otomatik işlem)";
+            return texts.Get("email.common.automation");
         }
 
-        return (await members.ListActiveAsync(cancellationToken)).FirstOrDefault(m => m.UserId == userId)?.DisplayName ?? "Bir kullanıcı";
+        return (await members.ListActiveAsync(cancellationToken)).FirstOrDefault(m => m.UserId == userId)?.DisplayName ?? texts.Get("email.common.someone");
     }
 
-    private static EmailMessage Message(NotificationRecipient recipient, string entityName, string title, string assignedBy, string? link)
+    // Metinler alıcının dilinde sözlükten gelir (email.assignment.*, ADR-0034 §6); HTML gövdede yer tutuculara kodlanmış değer verilir.
+    private static EmailMessage Message(
+        LocalizedTexts t, NotificationRecipient recipient, string entityName, string title, string assignedBy, string? link)
     {
+        var greeting = t.Get("email.common.greeting", recipient.DisplayName);
+        var action = t.Get("email.assignment.action");
+        var footer = t.Get("email.assignment.footer");
         var html = string.Concat(
-            $"<p>Merhaba {Encode(recipient.DisplayName)},</p>",
-            $"<p>{Encode(assignedBy)}, size bir kayıt atadı: <strong>{Encode(title)}</strong> ({Encode(entityName)}).</p>",
-            link is null ? string.Empty : $"<p><a href=\"{Encode(link)}\">Kaydı aç</a></p>",
-            "<p style=\"color:#666\">Kaydın sorumlusu artık sizsiniz. Bu e-posta bilgi amaçlıdır.</p>");
+            $"<p>{Encode(greeting)}</p>",
+            $"<p>{t.Get("email.assignment.body-html", Encode(assignedBy), Encode(title), Encode(entityName))}</p>",
+            link is null ? string.Empty : $"<p><a href=\"{Encode(link)}\">{Encode(action)}</a></p>",
+            $"<p style=\"color:#666\">{Encode(footer)}</p>");
         var text = string.Join(
             "\n\n",
             new[]
             {
-                $"Merhaba {recipient.DisplayName},",
-                $"{assignedBy}, size bir kayıt atadı: {title} ({entityName}).",
-                link is null ? null : $"Kaydı aç: {link}",
-                "Kaydın sorumlusu artık sizsiniz. Bu e-posta bilgi amaçlıdır.",
+                greeting,
+                t.Get("email.assignment.body", assignedBy, title, entityName),
+                link is null ? null : $"{action}: {link}",
+                footer,
             }.OfType<string>());
 
-        return new EmailMessage(recipient.Email, "Size bir kayıt atandı", html) { ToName = recipient.DisplayName, TextBody = text };
+        return new EmailMessage(recipient.Email, t.Get("email.assignment.subject"), html)
+        {
+            ToName = recipient.DisplayName,
+            TextBody = text,
+            Language = t.Language,
+        };
     }
 
     private static string Encode(string value) => WebUtility.HtmlEncode(value);

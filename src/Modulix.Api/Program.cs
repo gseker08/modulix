@@ -1,9 +1,11 @@
+using Modulix.Api;
 using Modulix.Api.Access;
 using Modulix.Api.Account;
 using Modulix.Api.Audit;
 using Modulix.Api.Imports;
 using Modulix.Api.Approvals;
 using Modulix.Api.Notifications;
+using Modulix.Api.Observability;
 using Modulix.Api.Automation;
 using Modulix.Api.Reports;
 using Modulix.Api.Auth;
@@ -17,13 +19,12 @@ using Modulix.Api.Email;
 using Modulix.Api.Events;
 using Modulix.Api.Lookups;
 using Modulix.Api.Localization;
-using Modulix.Api.Marketing;
 using Modulix.Api.Organization;
 using Modulix.Api.Platform;
 using Modulix.Api.Records;
 using Modulix.Api.Settings;
+using Modulix.Api.Numbering;
 using Modulix.Api.Customs;
-using Modulix.Api.Warehouse;
 using Modulix.Api.Sectors;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
@@ -42,10 +43,6 @@ using Modulix.Modules.Logistics;
 using Modulix.Modules.Contracts;
 using Modulix.Modules.Orders;
 using Modulix.Api.Contracts;
-using Modulix.Api.Orders;
-using Modulix.Api.Logistics;
-using Modulix.Api.Hr;
-using Modulix.Api.Support;
 using Modulix.Modules.Marketing;
 using Modulix.Modules.Warehouse;
 using Modulix.Modules.Fleet;
@@ -65,6 +62,9 @@ if (args.Contains("migrate", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
+// Log satırlarında TraceId, tenant ve kullanıcı; OTLP adresi verilirse OpenTelemetry izleri ve metrikleri (A2).
+builder.AddModulixObservability();
+
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddModulixPersistence(
@@ -76,6 +76,7 @@ builder.Services.AddSingleton(builder.Configuration.GetSection("Customization:Li
 builder.Services.AddModulixDataProtection(builder.Configuration);
 builder.Services.AddModulixAuth();
 builder.Services.AddModulixTenancy();
+builder.Services.AddModulixServerLocalization();
 
 builder.Services.AddModulixModules(ModulixModules.Create());
 builder.Services.AddScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, Modulix.Api.Contracts.HostFollowUpActivities>();
@@ -89,27 +90,23 @@ builder.Services.AddScoped<Modulix.Modules.Crm.Opportunities.IOpportunityPolicyP
 builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modulix.Api.Crm.QuotePolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Crm.Reporting.ISalesReportingPolicyProvider, Modulix.Api.Crm.SalesReportingPolicyProvider>();
 builder.Services.AddScoped<Modulix.Modules.Contracts.Lifecycle.IContractPolicyProvider, Modulix.Api.Contracts.ContractPolicyProvider>();
-builder.Services.AddScoped<Modulix.Modules.Orders.Lifecycle.IOrderPolicyProvider, Modulix.Api.Orders.OrderPolicyProvider>();
-builder.Services.AddScoped<Modulix.Modules.Logistics.Lifecycle.ILogisticsPolicyProvider, Modulix.Api.Logistics.LogisticsPolicyProvider>();
-builder.Services.AddScoped<Modulix.Modules.Support.Lifecycle.ISupportPolicyProvider, Modulix.Api.Support.SupportPolicyProvider>();
-builder.Services.AddScoped<Modulix.Modules.Marketing.Runs.IMarketingPolicyProvider, Modulix.Api.Marketing.MarketingPolicyProvider>();
 builder.Services.Configure<Modulix.Api.Communication.CommunicationCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Communication.CommunicationCleanupOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Imports.ImportErrorReports>();
+builder.Services.Configure<Modulix.Api.Imports.ImportReportCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Imports.ImportReportCleanupOptions.SectionName));
+builder.Services.AddSingleton<Modulix.Api.Imports.ImportReportCleanup>();
+builder.Services.AddHostedService<Modulix.Api.Imports.ImportReportCleanupWorker>();
 builder.Services.AddSingleton<Modulix.Api.Imports.ImportRunner>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Modulix.Api.Imports.ImportRunner>());
 builder.Services.AddScoped<Modulix.Api.Imports.ImportContext>();
 builder.Services.AddScoped<Modulix.Api.Imports.ImportRollback>();
 builder.Services.AddSingleton<Modulix.Api.Communication.CommunicationCleanupRunner>();
 builder.Services.AddHostedService<Modulix.Api.Communication.CommunicationCleanupWorker>();
+builder.Services.Configure<Modulix.Api.Files.FileCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Files.FileCleanupOptions.SectionName));
+builder.Services.AddSingleton<Modulix.Api.Files.FileCleanupRunner>();
+builder.Services.AddHostedService<Modulix.Api.Files.FileCleanupWorker>();
 builder.Services.Configure<Modulix.Api.Reports.ReportJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Reports.ReportJobsOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Reports.ReportScheduleRunner>();
 builder.Services.AddHostedService<Modulix.Api.Reports.ReportScheduleWorker>();
-builder.Services.Configure<Modulix.Api.Marketing.MarketingSendOptions>(builder.Configuration.GetSection(Modulix.Api.Marketing.MarketingSendOptions.SectionName));
-builder.Services.AddSingleton<Modulix.Api.Marketing.MarketingSendRunner>();
-builder.Services.AddHostedService<Modulix.Api.Marketing.MarketingSendWorker>();
-builder.Services.Configure<Modulix.Api.Support.SupportJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Support.SupportJobsOptions.SectionName));
-builder.Services.AddSingleton<Modulix.Api.Support.SupportJobsRunner>();
-builder.Services.AddHostedService<Modulix.Api.Support.SupportJobsWorker>();
 builder.Services.Configure<Modulix.Infrastructure.Automation.AutomationOptions>(builder.Configuration.GetSection(Modulix.Infrastructure.Automation.AutomationOptions.SectionName));
 builder.Services.Configure<Modulix.Core.Files.FileStorageOptions>(builder.Configuration.GetSection(Modulix.Core.Files.FileStorageOptions.SectionName));
 builder.Services.AddHostedService<Modulix.Api.Automation.AutomationWorker>();
@@ -129,21 +126,16 @@ builder.Services.AddModulixEvents();
 builder.Services.AddModulixHardening(builder.Configuration);
 builder.Services.AddLeadIntakeRateLimit(builder.Configuration);
 builder.Services.AddQuotePublicRateLimit(builder.Configuration);
-builder.Services.AddSupportSurveyRateLimit(builder.Configuration);
+builder.Services.AddScoped<IPublicTenantScopes, Modulix.Api.PublicTenantScopes>();
 builder.Services.AddCommunicationPublicRateLimit(builder.Configuration);
 builder.Services.AddContractSignatureRateLimit(builder.Configuration);
 builder.Services.AddHostedService<EventDispatchWorker>();
 builder.Services.Configure<Modulix.Api.Platform.PlatformOptions>(builder.Configuration.GetSection(Modulix.Api.Platform.PlatformOptions.SectionName));
 builder.Services.Configure<Modulix.Infrastructure.Modules.LicenseOptions>(builder.Configuration.GetSection(Modulix.Infrastructure.Modules.LicenseOptions.SectionName));
-builder.Services.Configure<Modulix.Api.Crm.QuoteExpiryOptions>(builder.Configuration.GetSection(Modulix.Api.Crm.QuoteExpiryOptions.SectionName));
-builder.Services.AddSingleton<Modulix.Api.Crm.QuoteExpiryRunner>();
-builder.Services.AddHostedService<Modulix.Api.Crm.QuoteExpiryWorker>();
-builder.Services.Configure<Modulix.Api.Contracts.ContractJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Contracts.ContractJobsOptions.SectionName));
-builder.Services.AddSingleton<Modulix.Api.Contracts.ContractJobsRunner>();
-builder.Services.AddHostedService<Modulix.Api.Contracts.ContractJobsWorker>();
-builder.Services.Configure<Modulix.Api.Orders.OrderJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Orders.OrderJobsOptions.SectionName));
-builder.Services.AddSingleton<Modulix.Api.Orders.OrderJobsRunner>();
-builder.Services.AddHostedService<Modulix.Api.Orders.OrderJobsWorker>();
+
+// Modüllerin zamanlanmış işleri tek zamanlayıcıdan çalışır (ADR-0046); işler modül kaydından (IModule.Jobs) okunur.
+builder.Services.AddSingleton<Modulix.Api.Jobs.ModuleJobRunner>();
+builder.Services.AddHostedService<Modulix.Api.Jobs.ModuleJobsWorker>();
 
 // Kullanıcı yönetimi: davet sınırı "Users" bölümünde; e-postadaki bağlantıların kökü App:PublicUrl (üretimde zorunlu).
 builder.Services.Configure<UserAdministrationOptions>(builder.Configuration.GetSection(UserAdministrationOptions.SectionName));
@@ -152,9 +144,10 @@ builder.Services.Configure<PublicLinkOptions>(builder.Configuration.GetSection(P
 // Hesap güvenliği (Y7a): "Şifremi unuttum" sınırları "Account" bölümünde.
 builder.Services.Configure<AccountOptions>(builder.Configuration.GetSection(AccountOptions.SectionName));
 // Sağlık uçları: /health/live yalnızca sürecin ayakta olduğunu söyler (yeniden başlatma kararı, bağımlılık denetlenmez);
-// /health/ready trafik alabilir mi sorusudur (veritabanı); /health bütün denetimleri (olay birikimi dahil) gösterir.
+// /health/ready trafik alabilir mi sorusudur (veritabanı, dosya deposu); /health bütün denetimleri (olay birikimi dahil) gösterir.
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ModulixDbContext>("database", tags: [ReadyTag])
+    .AddCheck<Modulix.Api.Files.BlobStorageHealthCheck>("storage", tags: [ReadyTag])
     .AddCheck<EventHealthCheck>("events");
 
 var app = builder.Build();
@@ -240,6 +233,7 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseMiddleware<TenantContextMiddleware>();
 app.UseMiddleware<CompanyContextMiddleware>();
+app.UseMiddleware<Modulix.Api.Observability.RequestLogScopeMiddleware>();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
@@ -270,19 +264,13 @@ app.MapSectorEndpoints();
 app.MapGtipEndpoints();
 app.MapRegimeProfileEndpoints();
 app.MapRegimeCheckEndpoints();
-app.MapWarehouseDashboardEndpoints();
+app.MapModuleEndpoints();
 app.MapRuleEndpoints();
 app.MapRecordEndpoints();
 app.MapCrmEndpoints();
 app.MapContractsEndpoints();
-app.MapOrdersEndpoints();
-app.MapLogisticsEndpoints();
-app.MapHrEndpoints();
-app.MapSupportEndpoints();
-app.MapMarketingEndpoints();
 app.MapLeadIntakeEndpoints();
 app.MapQuotePublicEndpoints();
-app.MapSupportSurveyPublicEndpoints();
 app.MapCommunicationPublicEndpoints();
 app.MapContractSignatureWebhook();
 app.MapPlatformEndpoints();
@@ -295,6 +283,7 @@ app.MapPlatformTeamEndpoints();
 app.MapAuditEndpoints();
 app.MapImportEndpoints();
 app.MapSettingsEndpoints();
+app.MapNumberingEndpoints();
 app.MapTextEndpoints();
 
 // Bilinmeyen API adresi 404 döner; diğer adresler arayüzün sayfalarıdır.

@@ -1,15 +1,15 @@
-using System.Text.RegularExpressions;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Options;
 using Modulix.Core.Files;
 
 namespace Modulix.Infrastructure.Files;
 
 /// <summary>
-/// Yerel disk adaptörü (ADR-0040 K4). Yol: <c>{kök}/{tenantId:N}/{anahtar[0..2]}/{anahtar}</c>. Anahtar rastgele ve biçimi sabittir
-/// (64 küçük onaltılık karakter); başka biçim reddedilir, böylece anahtardan yol çıkışı (<c>..</c>, ayırıcı) olamaz. Yazma önce geçici dosyaya yapılır,
-/// sonra yerine taşınır: yarım dosya görünmez ve var olan anahtar ezilmez.
+/// Yerel disk adaptörü (ADR-0040 K4). Yol: <c>{kök}/{tenantId:N}/{anahtar[0..2]}/{anahtar}</c>; anahtar biçimi <see cref="BlobKeys"/> ile denetlenir.
+/// Yazma önce geçici dosyaya yapılır, sonra yerine taşınır: yarım dosya görünmez ve var olan anahtar ezilmez.
+/// Yalnızca tek düğümlü dağıtım içindir; çok düğümde <see cref="S3BlobStorage"/> kullanılır.
 /// </summary>
-internal sealed partial class LocalBlobStorage(IOptions<FileStorageOptions> options) : IBlobStorage
+internal sealed class LocalBlobStorage(IOptions<FileStorageOptions> options) : IBlobStorage
 {
     private const string TempMarker = ".part-";
 
@@ -79,6 +79,29 @@ internal sealed partial class LocalBlobStorage(IOptions<FileStorageOptions> opti
         return Task.FromResult(count);
     }
 
+    public async IAsyncEnumerable<StoredBlob> ListAsync(Guid tenantId, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var source = TenantDirectory(tenantId);
+        if (!Directory.Exists(source))
+        {
+            yield break;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var name = Path.GetFileName(file);
+            if (name.Contains(TempMarker, StringComparison.Ordinal) || !BlobKeys.IsValid(name))
+            {
+                continue;
+            }
+
+            yield return new StoredBlob(name, new DateTimeOffset(File.GetLastWriteTimeUtc(file), TimeSpan.Zero));
+        }
+
+        await Task.CompletedTask;
+    }
+
     public Task<int> DeleteTenantAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         var source = TenantDirectory(tenantId);
@@ -92,24 +115,18 @@ internal sealed partial class LocalBlobStorage(IOptions<FileStorageOptions> opti
         return Task.FromResult(count);
     }
 
-    private string TenantDirectory(Guid tenantId)
+    public Task CheckAsync(CancellationToken cancellationToken)
     {
-        if (tenantId == Guid.Empty)
-        {
-            throw new ArgumentException("Tenant kimliği boş olamaz.", nameof(tenantId));
-        }
-
-        return Path.Combine(_root, tenantId.ToString("N"));
+        Directory.CreateDirectory(_root);
+        return Task.CompletedTask;
     }
+
+    private string TenantDirectory(Guid tenantId) => Path.Combine(_root, BlobKeys.TenantSegment(tenantId));
 
     private string PathFor(Guid tenantId, string key)
     {
-        if (!KeyPattern().IsMatch(key))
-        {
-            throw new ArgumentException("Geçersiz depolama anahtarı.", nameof(key));
-        }
-
-        return Path.Combine(TenantDirectory(tenantId), key[..2], key);
+        (string shard, string name) = BlobKeys.Locate(key);
+        return Path.Combine(TenantDirectory(tenantId), shard, name);
     }
 
     private static void TryDelete(string path)
@@ -126,7 +143,4 @@ internal sealed partial class LocalBlobStorage(IOptions<FileStorageOptions> opti
         {
         }
     }
-
-    [GeneratedRegex("^[0-9a-f]{64}$")]
-    private static partial Regex KeyPattern();
 }

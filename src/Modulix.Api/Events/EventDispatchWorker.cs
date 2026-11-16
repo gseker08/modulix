@@ -18,8 +18,11 @@ public sealed class EventDispatchWorker(
     IServiceScopeFactory scopes,
     IOptions<EventOptions> options,
     TimeProvider time,
+    Modulix.Core.Contracts.Diagnostics.IJobMetrics metrics,
     ILogger<EventDispatchWorker> logger) : BackgroundService
 {
+    public const string JobName = "events.dispatch";
+
     private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(1);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -55,6 +58,7 @@ public sealed class EventDispatchWorker(
                     catch (Exception exception)
                     {
                         // Bir tenant'ın turunda hata olursa diğerleri etkilenmez; bir sonraki turda tekrar denenir.
+                        metrics.TenantFailed(JobName);
                         logger.LogWarning(exception, "Tenant {TenantId} olayları bu turda işlenemedi.", tenantId);
                     }
                 }
@@ -66,6 +70,8 @@ public sealed class EventDispatchWorker(
                     await dispatcher.CleanupAsync(stoppingToken);
                     lastCleanup = time.GetUtcNow();
                 }
+
+                metrics.TurnCompleted(JobName);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -74,6 +80,7 @@ public sealed class EventDispatchWorker(
             catch (Exception exception)
             {
                 // Ör. veritabanına ulaşılamadı; bir sonraki turda tekrar denenir.
+                metrics.TurnFailed(JobName);
                 logger.LogError(exception, "Olaylar işlenemedi.");
             }
 

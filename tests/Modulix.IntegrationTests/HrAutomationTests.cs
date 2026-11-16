@@ -1,9 +1,12 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Api.Tenancy;
+using Modulix.Core.Automation;
+using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Infrastructure.Automation;
 using Modulix.Infrastructure.Events;
@@ -20,8 +23,8 @@ using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0042 bölüm 18: İK otomasyonu. Mutlu yol (görev atanınca sorumluya bildirim, son güne bir gün kala hatırlatma, çalışan ayrılınca işten çıkış
-/// süreci), doğrulama (bütün şablonlar gerçek yayın doğrulamasından geçer; açık süreç varken ikinci süreç açılmaz), tenant izolasyonu (kural yalnızca
+/// ADR-0042 bölüm 18 ve 28: İK otomasyonu. Mutlu yol (görev atanınca sorumluya bildirim, son güne bir gün kala hatırlatma, çalışan ayrılınca işten çıkış
+/// süreci, blog yazısı onaya gelince seçilen yönetene ve karar verilince yazara bildirim), doğrulama (bütün şablonlar gerçek yayın doğrulamasından geçer; açık süreç varken ikinci süreç açılmaz), tenant izolasyonu (kural yalnızca
 /// kendi firmasında çalışır) ve yetki (süreç yönetimi izni olmayan şablonu kullanamaz). Gerçek veritabanı, olay dağıtımı ve kural çalıştırıcısıyla.
 /// </summary>
 public class HrAutomationTests(CrmAutomationFixture fixture) : IClassFixture<CrmAutomationFixture>
@@ -50,6 +53,12 @@ public class HrAutomationTests(CrmAutomationFixture fixture) : IClassFixture<Crm
         foreach (var template in HrAutomationTemplates.All)
         {
             var rule = await UseAsync(admin, template.Key);
+            if (template.ToComplete.Count > 0)
+            {
+                // Alıcısı kayıtta olmayan şablon (blog onayı): firma taslakta alıcıyı seçer.
+                await ChooseRecipientAsync(admin, rule, s.Admin.Id);
+            }
+
             var publish = await admin.PostAsJsonAsync($"/api/automation/rules/{rule}/publish", new PublishAutomationRuleRequest(false, null));
             Assert.True(publish.StatusCode == HttpStatusCode.OK, $"{template.Key}: {await publish.Content.ReadAsStringAsync()}");
         }
@@ -81,6 +90,54 @@ public class HrAutomationTests(CrmAutomationFixture fixture) : IClassFixture<Crm
         Assert.Equal(2, (await staff.GetFromJsonAsync<NotificationPageDto>("/api/notifications"))!.Items.Count);
         await DeliverAndRunAsync(b.TenantId);
         Assert.Empty((await staffB.GetFromJsonAsync<NotificationPageDto>("/api/notifications"))!.Items);
+    }
+
+    [Fact]
+    public async Task Blog_review_notifies_the_chosen_reviewer_and_the_author_only_when_they_can_see_the_post_and_only_in_their_own_tenant()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var admin = await LoginAsync(a.Admin);
+        var author = await fixture.Factory.CreateUserAsync(a.Tenant);
+        var bystander = await fixture.Factory.CreateUserAsync(a.Tenant);
+        await fixture.Factory.CreateRoleAsync(a.TenantId, [BlogRead, BlogWrite], Scope.Own, author, bystander);
+        using var writer = await LoginAsync(author);
+        using var other = await LoginAsync(bystander);
+
+        // Onay bildirimi alıcısı taslakta seçilmeden yayınlanamaz; yöneten seçilir.
+        var review = await UseAsync(admin, HrAutomationTemplates.BlogAwaitingReview);
+        var early = await admin.PostAsJsonAsync($"/api/automation/rules/{review}/publish", new PublishAutomationRuleRequest(true, null));
+        Assert.False(early.IsSuccessStatusCode, await early.Content.ReadAsStringAsync());
+        await ChooseRecipientAsync(admin, review, a.Admin.Id);
+        Assert.True((await admin.PostAsJsonAsync($"/api/automation/rules/{review}/publish", new PublishAutomationRuleRequest(true, null))).IsSuccessStatusCode);
+        await PublishAsync(admin, HrAutomationTemplates.BlogReturned);
+        await PublishAsync(admin, HrAutomationTemplates.BlogPublished);
+
+        // Yetki: yazıyı göremeyen kişi alıcı seçilirse bildirim gönderilmez (ikinci kural, çalışan alıcı).
+        var blind = await UseAsync(admin, HrAutomationTemplates.BlogAwaitingReview);
+        await ChooseRecipientAsync(admin, blind, bystander.Id);
+        Assert.True((await admin.PostAsJsonAsync($"/api/automation/rules/{blind}/publish", new PublishAutomationRuleRequest(true, null))).IsSuccessStatusCode);
+
+        var post = await PostAsync(writer, "/api/records/hr.blog-post", new JsonObject { ["title"] = "Bahar şenliği", ["body"] = "Metin" });
+        post = await BlogActAsync(writer, post, "submit");
+        await DeliverAndRunAsync(a.TenantId);
+        Assert.Contains("Onay bekleyen blog yazısı: Bahar şenliği", await InboxAsync(admin));
+        Assert.Empty(await InboxAsync(other));
+
+        post = await BlogActAsync(admin, post, "return", "Fotoğraf ekleyin.");
+        await DeliverAndRunAsync(a.TenantId);
+        Assert.Equal(["Yazınız düzeltme için geri çevrildi: Bahar şenliği"], await InboxAsync(writer));
+
+        post = await BlogActAsync(writer, await GetAsync(writer, $"/api/records/hr.blog-post/{post.Id}"), "submit");
+        await BlogActAsync(admin, post, "publish");
+        await DeliverAndRunAsync(a.TenantId);
+        Assert.Contains("Yazınız yayınlandı: Bahar şenliği", await InboxAsync(writer));
+        Assert.Equal(2, (await InboxAsync(writer)).Count);
+
+        // B firmasında kural yok: bildirim yok.
+        await DeliverAndRunAsync(b.TenantId);
+        using var adminB = await LoginAsync(b.Admin);
+        Assert.Empty(await InboxAsync(adminB));
     }
 
     [Fact]
@@ -129,6 +186,48 @@ public class HrAutomationTests(CrmAutomationFixture fixture) : IClassFixture<Crm
             (await client.PostAsync($"/api/automation/templates/{HrAutomationTemplates.OffboardingOnTermination}/use", null)).StatusCode);
     }
 
+    [Fact]
+    public async Task A_rule_on_announcements_reads_draft_records_even_without_fields_and_needs_both_permissions_to_be_built()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        using var admin = await LoginAsync(a.Admin);
+
+        // Alan kullanmayan kural (sabit ileti): kimliği kayıt türünün yönetim iznini ve deponun okuma iznini birlikte taşır (bölüm 29).
+        var definition = new AutomationDefinition(
+            new RecordCreatedTrigger(),
+            null,
+            [new AutomationActionStep("bildir", HrAutomation.NotifyAction, new JsonObject { ["recipientId"] = a.Admin.Id.ToString(), ["title"] = "Yeni duyuru hazırlandı" })]);
+        var create = await admin.PostAsJsonAsync("/api/automation/rules", new CreateAutomationRuleRequest(
+            "hr", "hr.announcement", "Duyuru bildirimi", null, 100, false, null, null, JsonSerializer.SerializeToElement(definition, AutomationJson.Options)));
+        Assert.True(create.StatusCode == HttpStatusCode.Created, await create.Content.ReadAsStringAsync());
+        var rule = (await create.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!.Rule.Id;
+        Assert.True((await admin.PostAsJsonAsync($"/api/automation/rules/{rule}/publish", new PublishAutomationRuleRequest(true, null))).IsSuccessStatusCode);
+
+        // Yayında olmayan (taslak) duyuru: kural kaydı okur ve bildirim yazar; B firmasında kural yok.
+        await PostAsync(admin, "/api/records/hr.announcement", new JsonObject { ["title"] = "Taslak duyuru", ["body"] = "Metin" });
+        await DeliverAndRunAsync(a.TenantId);
+        Assert.Contains("Yeni duyuru hazırlandı", await InboxAsync(admin));
+        await DeliverAndRunAsync(b.TenantId);
+        using var adminB = await LoginAsync(b.Admin);
+        Assert.Empty(await InboxAsync(adminB));
+
+        // Yetki: yönetim izni olup okuma izni olmayan kural yöneticisi duyuru üzerinde kural kuramaz.
+        var ruleManager = await fixture.Factory.CreateUserAsync(a.Tenant);
+        await fixture.Factory.CreateRoleAsync(a.TenantId,
+            [Modulix.Core.Modules.CoreModule.Permissions.ReadAutomation, Modulix.Core.Modules.CoreModule.Permissions.ManageAutomation, AnnouncementsManage],
+            Scope.All, ruleManager);
+        using var manager = await LoginAsync(ruleManager);
+        var denied = await manager.PostAsJsonAsync("/api/automation/rules", new CreateAutomationRuleRequest(
+            "hr", "hr.announcement", "Yetkisiz", null, 100, false, null, null, JsonSerializer.SerializeToElement(definition, AutomationJson.Options)));
+        if (denied.IsSuccessStatusCode)
+        {
+            // Taslak açılabilse de yayın reddedilir: kural, kuranın sahip olmadığı izinle çalışamaz.
+            var draft = (await denied.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!.Rule.Id;
+            Assert.False((await manager.PostAsJsonAsync($"/api/automation/rules/{draft}/publish", new PublishAutomationRuleRequest(true, null))).IsSuccessStatusCode);
+        }
+    }
+
     // --- yardımcılar ---
 
     private sealed record Setup(Modulix.Core.Platform.Tenant Tenant, Guid TenantId, ModulixUser Admin, ModulixUser Staff, Guid StaffEmployee);
@@ -164,6 +263,29 @@ public class HrAutomationTests(CrmAutomationFixture fixture) : IClassFixture<Crm
         var rule = await UseAsync(client, templateKey);
         var publish = await client.PostAsJsonAsync($"/api/automation/rules/{rule}/publish", new PublishAutomationRuleRequest(true, null));
         Assert.True(publish.IsSuccessStatusCode, await publish.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>Firmanın taslakta yaptığı iş: bildirim adımının alıcısını seçip taslağı kaydeder.</summary>
+    private static async Task ChooseRecipientAsync(HttpClient client, Guid ruleId, Guid recipient)
+    {
+        var rule = (await client.GetFromJsonAsync<AutomationRuleDetailDto>($"/api/automation/rules/{ruleId}"))!;
+        var draft = rule.Draft!;
+        var definition = draft.Definition.Deserialize<AutomationDefinition>(AutomationJson.Options)!;
+        definition.Actions[0].Parameters["recipientId"] = recipient.ToString();
+        var update = await client.PutAsJsonAsync($"/api/automation/rules/{ruleId}", new UpdateAutomationRuleRequest(
+            draft.Name, draft.Description, draft.Priority, draft.StopProcessing, draft.ActiveFrom, draft.ActiveUntil,
+            JsonSerializer.SerializeToElement(definition, AutomationJson.Options), rule.Rule.Version));
+        Assert.True(update.IsSuccessStatusCode, await update.Content.ReadAsStringAsync());
+    }
+
+    private static async Task<List<string>> InboxAsync(HttpClient client) =>
+        [.. (await client.GetFromJsonAsync<NotificationPageDto>("/api/notifications"))!.Items.Select(n => n.Title)];
+
+    private static async Task<RecordResponse> BlogActAsync(HttpClient client, RecordResponse post, string action, string? reason = null)
+    {
+        var response = await client.PostAsJsonAsync($"/api/hr/blog-posts/{post.Id}/actions", new RunHrActionRequest(action, post.Version, reason));
+        Assert.True(response.StatusCode == HttpStatusCode.OK, $"{action}: {await response.Content.ReadAsStringAsync()}");
+        return (await response.Content.ReadFromJsonAsync<RecordResponse>())!;
     }
 
     private static async Task<Guid> TemplateAsync(HttpClient client, string kind, params (string Title, string Role, int Offset)[] steps)

@@ -1,15 +1,18 @@
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Modulix.Api.Tenancy;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Files;
 using Modulix.Core.Imports;
 using Modulix.Core.Reporting;
 using Modulix.Core.Platform;
@@ -18,18 +21,85 @@ using Modulix.Infrastructure.Platform;
 
 namespace Modulix.Api.Imports;
 
-/// <summary>Hata raporu: dosya satırları kişisel veri taşıyabildiği için yalnızca bellekte ve kısa süreli tutulur, veritabanına yazılmaz (ADR-0033).</summary>
-public sealed class ImportErrorReports(IMemoryCache cache)
+/// <summary>
+/// Hata raporu (ADR-0033; 15.11.2026'dan beri K4 değişikliği): dosya satırları kişisel veri taşıyabildiği için veritabanına yazılmaz,
+/// kısa süreli ve şifreli olarak dosya deposunda (<see cref="IBlobStorage"/>) durur. Böylece rapor, koşuyu işleyen düğümden başka bir
+/// düğümden de indirilebilir. Şifre Data Protection anahtar halkasıyla (bütün örnekler paylaşır) tenant'a bağlı amaçla yapılır ve
+/// süre sınırlıdır: depodan silinmeyi kaçıran rapor da <see cref="Lifetime"/> sonunda açılamaz. Temizlik <see cref="ImportReportCleanup"/>'tadır.
+/// </summary>
+public sealed class ImportErrorReports(IBlobStorage blobs, IDataProtectionProvider protection, TimeProvider time, ILogger<ImportErrorReports> logger)
 {
-    private static readonly TimeSpan Lifetime = TimeSpan.FromHours(1);
+    public static readonly TimeSpan Lifetime = TimeSpan.FromHours(1);
 
-    public void Put(Guid tenantId, Guid runId, string fileName, byte[] content) =>
-        cache.Set(Key(tenantId, runId), (fileName, content), Lifetime);
+    private const string Purpose = "Modulix.Imports.ErrorReport.v1";
 
-    public (string FileName, byte[] Content)? Find(Guid tenantId, Guid runId) =>
-        cache.TryGetValue(Key(tenantId, runId), out (string FileName, byte[] Content) report) ? report : null;
+    /// <summary>Raporun silineceği an; rapor yazılmadan önce koşuya işlenir (<see cref="ImportRun.MarkErrorReport"/>).</summary>
+    public DateTimeOffset NewExpiry() => time.GetUtcNow() + Lifetime;
 
-    private static string Key(Guid tenantId, Guid runId) => $"import-report:{tenantId:N}:{runId:N}";
+    /// <summary>Raporu şifreleyip yazar. Depo hatası koşuyu bozmaz: satırlar alınmıştır; rapor yalnızca indirilemez.</summary>
+    public async Task<bool> PutAsync(Guid tenantId, Guid runId, string fileName, byte[] content, DateTimeOffset expiresAt, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var sealedReport = Protector(tenantId).Protect(Pack(fileName, content), expiresAt);
+            using var stream = new MemoryStream(sealedReport, writable: false);
+            await blobs.PutAsync(tenantId, Key(runId), stream, cancellationToken);
+            return true;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(exception, "İçe aktarma {RunId} hata raporu dosya deposuna yazılamadı.", runId);
+            return false;
+        }
+    }
+
+    /// <summary>Raporu açar; yoksa, süresi dolduysa ya da başka tenant'ın anahtarıyla şifrelendiyse <c>null</c>.</summary>
+    public async Task<(string FileName, byte[] Content)?> FindAsync(Guid tenantId, Guid runId, CancellationToken cancellationToken)
+    {
+        await using var stream = await blobs.OpenReadAsync(tenantId, Key(runId), cancellationToken);
+        if (stream is null)
+        {
+            return null;
+        }
+
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer, cancellationToken);
+        try
+        {
+            return Unpack(Protector(tenantId).Unprotect(buffer.ToArray(), out _));
+        }
+        catch (CryptographicException)
+        {
+            return null;
+        }
+    }
+
+    public Task DeleteAsync(Guid tenantId, Guid runId, CancellationToken cancellationToken) =>
+        blobs.DeleteAsync(tenantId, Key(runId), cancellationToken);
+
+    /// <summary>Depo anahtarı koşudan türetilir (64 haneli onaltılık; dosya anahtarlarıyla aynı biçim), ayrıca saklanmaz.</summary>
+    public static string Key(Guid runId) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{Purpose}:{runId:N}"))).ToLowerInvariant();
+
+    private ITimeLimitedDataProtector Protector(Guid tenantId) =>
+        protection.CreateProtector(Purpose, tenantId.ToString("N")).ToTimeLimitedDataProtector();
+
+    // Biçim: 4 bayt ad uzunluğu (little-endian) + UTF-8 ad + içerik.
+    private static byte[] Pack(string fileName, byte[] content)
+    {
+        var name = Encoding.UTF8.GetBytes(fileName);
+        var packed = new byte[4 + name.Length + content.Length];
+        BinaryPrimitives.WriteInt32LittleEndian(packed, name.Length);
+        name.CopyTo(packed, 4);
+        content.CopyTo(packed, 4 + name.Length);
+        return packed;
+    }
+
+    private static (string FileName, byte[] Content) Unpack(byte[] packed)
+    {
+        var length = BinaryPrimitives.ReadInt32LittleEndian(packed);
+        return (Encoding.UTF8.GetString(packed, 4, length), packed[(4 + length)..]);
+    }
 }
 
 /// <summary>
@@ -286,8 +356,7 @@ public sealed class ImportRunner(
 
         if (failed is { } failure)
         {
-            var name = ReportCsv.FileSlug(Path.GetFileNameWithoutExtension(job.FileName)) + "-hatalar.csv";
-            reports.Put(job.Tenant.TenantId, run.Id, name, ImportErrorReport.Build(job.File, [failure]));
+            await StoreReportAsync(job, [failure]);
             run.Complete(0, 0, 0, 1, $"Hepsi ya da hiç: {failure.Row.RowNo}. satır alınamadığı için hiçbir kayıt yazılmadı; satırı düzeltip kuru çalışmayı yineleyin.", time.GetUtcNow());
         }
         else
@@ -367,12 +436,28 @@ public sealed class ImportRunner(
         // Rapor, koşu bitmiş görünmeden hazır olmalı: ekran bitişi görür görmez indirebilir.
         if (failedRows.Count > 0)
         {
-            var name = ReportCsv.FileSlug(Path.GetFileNameWithoutExtension(job.FileName)) + "-hatalar.csv";
-            reports.Put(job.Tenant.TenantId, run.Id, name, ImportErrorReport.Build(job.File, failedRows));
+            await StoreReportAsync(job, failedRows);
         }
 
         run.Complete(created, 0, 0, failedRows.Count, Summary(job.Mode, created, failedRows.Count), time.GetUtcNow());
         await issues.SaveAsync(db);
+    }
+
+    /// <summary>
+    /// Hata raporunu depoya yazar. Koşu önce işaretlenip kaydedilir, sonra rapor yazılır: arada süreç çökerse temizlik işi raporu yine bulur
+    /// (depoda işaretsiz rapor kalmaz). Yazılamazsa işaret kaldırılır; indirme isteği "rapor yok" yanıtı alır.
+    /// </summary>
+    private async Task StoreReportAsync(ImportJob job, IReadOnlyList<(ImportFileRow Row, string Error)> failedRows)
+    {
+        var (run, db) = (job.Run, job.Db);
+        var name = ReportCsv.FileSlug(Path.GetFileNameWithoutExtension(job.FileName)) + "-hatalar.csv";
+        var expiresAt = reports.NewExpiry();
+        run.MarkErrorReport(expiresAt);
+        await db.SaveChangesAsync(CancellationToken.None);
+        if (!await reports.PutAsync(job.Tenant.TenantId, run.Id, name, ImportErrorReport.Build(job.File, failedRows), expiresAt, CancellationToken.None))
+        {
+            run.ClearErrorReport();
+        }
     }
 
     // Beklenmedik hata: bağlam bozulmuş olabilir, koşu yeni kapsamda kapatılır.

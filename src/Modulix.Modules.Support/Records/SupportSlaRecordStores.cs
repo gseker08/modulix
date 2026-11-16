@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Calendar;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Support.Domain;
@@ -27,6 +28,7 @@ internal sealed class SlaCalendarRecordStore(SupportStoreContext context) : Supp
         Field.Flag<SlaCalendar>("isAlwaysOpen", c => c.IsAlwaysOpen, (c, v) => c.IsAlwaysOpen = v),
         Field.Text<SlaCalendar>("weeklyHours", SlaCalendar.WeeklyMaxLength, c => c.WeeklyHours, (c, v) => c.WeeklyHours = v),
         Field.Text<SlaCalendar>("holidays", SlaCalendar.HolidaysMaxLength, c => c.Holidays, (c, v) => c.Holidays = v),
+        Field.Flag<SlaCalendar>("useTenantHolidays", c => c.UseTenantHolidays, (c, v) => c.UseTenantHolidays = v),
         Field.Flag<SlaCalendar>("isActive", c => c.IsActive, (c, v) => c.IsActive = v),
         Field.Id<SlaCalendar>("createdBy", c => c.CreatedBy, (c, v) => c.CreatedBy = v).AsSystem(),
         Field.Id<SlaCalendar>("updatedBy", c => c.UpdatedBy, (c, v) => c.UpdatedBy = v).AsSystem(),

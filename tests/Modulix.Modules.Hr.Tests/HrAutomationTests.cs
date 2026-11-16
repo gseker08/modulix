@@ -22,8 +22,27 @@ public partial class HrAutomationTests
         Assert.NotNull(Catalog.FindAutomationAction(HrAutomation.StartChecklist));
         Assert.Equal(HrAutomationTemplates.All.Select(t => t.Key),
             Catalog.AutomationTemplates.Where(t => t.ModuleKey == HrModule.ModuleKey).Select(t => t.Template.Key));
-        Assert.Equal(7, HrAutomationTemplates.All.Count);
+        Assert.Equal(10, HrAutomationTemplates.All.Count);
         Assert.All(HrAutomationTemplates.All, t => Assert.StartsWith(HrModule.ModuleKey + ".", t.Key));
+
+        // Yalnızca blog onay bildiriminin alıcısı kayıtta yoktur; firma taslakta seçer (bölüm 28).
+        var blank = Assert.Single(HrAutomationTemplates.All, t => t.ToComplete.Count > 0);
+        Assert.Equal(HrAutomationTemplates.BlogAwaitingReview, blank.Key);
+        Assert.Equal("recipientId", Assert.Single(blank.ToComplete).Parameter);
+    }
+
+    [Theory]
+    [InlineData(HrModule.Entities.Announcement, HrModule.Permissions.AnnouncementsRead, HrModule.Permissions.AnnouncementsManage)]
+    [InlineData(HrModule.Entities.Survey, HrModule.Permissions.SurveysRespond, HrModule.Permissions.SurveysManage)]
+    [InlineData(HrModule.Entities.BlogPost, HrModule.Permissions.BlogRead, HrModule.Permissions.BlogManage)]
+    [InlineData(HrModule.Entities.PhotoAlbum, HrModule.Permissions.GalleryRead, HrModule.Permissions.GalleryManage)]
+    public void Content_rules_run_with_both_the_read_and_the_manage_permission_even_without_fields(string entityKey, string read, string manage)
+    {
+        // İçerik deposu okumada okuma, taslak için yönetim izni ister; alan kullanmayan kuralın kimliği de ikisini taşımalı (bölüm 28 ve 29).
+        var bare = new AutomationDefinition(new RecordCreatedTrigger(), null, []);
+        var identity = AutomationRuleIdentity.Permissions(entityKey, bare, Catalog);
+        Assert.Contains(read, identity);
+        Assert.Contains(manage, identity);
     }
 
     [Fact]
@@ -58,6 +77,7 @@ public partial class HrAutomationTests
         [
             "hr.employee.userId", "hr.leave-request.employeeUserId", "hr.leave-request.approverUserId", "hr.expense-claim.employeeUserId",
             "hr.expense-claim.approverUserId", "hr.asset-assignment.employeeUserId", "hr.checklist-task.assigneeUserId", "hr.checklist-task.employeeUserId",
+            "hr.blog-post.authorUserId",
         ];
         var recipients = Declared.Fields.Where(f => f.LookupKey == HrAutomation.NotifyRecipientLookup).Select(f => f.Key).ToList();
 

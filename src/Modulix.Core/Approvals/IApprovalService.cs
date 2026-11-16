@@ -11,7 +11,7 @@ public sealed class ApprovalForbiddenException(string message) : Exception(messa
 
 public sealed record ApprovalDefinitionInput(
     string Name, string? Description, string? Currency, IReadOnlyList<ApprovalStepDefinition> Steps, string? TargetEntityKey = null,
-    IReadOnlyList<string>? GatedCommands = null);
+    IReadOnlyList<string>? GatedCommands = null, bool DueInWorkingHours = false);
 
 /// <summary>Süreç bir kayıt türüne bağlıysa <see cref="RecordId"/> zorunludur; tutar ve para birimi kayıttan okunur, girilen değer yok sayılır.</summary>
 public sealed record ApprovalRequestInput(Guid DefinitionId, string Title, string? Description, decimal? Amount, string? Currency, Guid? RecordId = null);

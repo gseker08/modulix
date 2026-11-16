@@ -4,6 +4,8 @@ using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Approvals;
 using Modulix.Core.Contracts.Approvals;
+using Modulix.Core.Contracts.Calendar;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -27,6 +29,8 @@ internal sealed class ApprovalService(
     INotificationRecipients recipients,
     IRecordPipeline pipeline,
     ModuleCatalog modules,
+    ITenantWorkCalendar workCalendar,
+    IRecipientLanguage languages,
     TimeProvider time) : IApprovalService, IApprovalStatusReader, IApprovalGate
 {
     private const int TrendDays = 14;
@@ -34,6 +38,9 @@ internal sealed class ApprovalService(
     private const int EscalationBatch = 200;
     private const string EscalationSource = "core.approval-escalation";
     private const string InvalidationSource = "core.approvals";
+
+    // İş saatiyle sayılan süre için yüklenen tatil aralığı (gün): en uzun adım süresi (MaxWorkingDueHours) bir yıllık mesaiyi aşmaz.
+    private const int WorkCalendarDays = 400;
 
     // Kişinin karar verebildiği kimlikler; Users kendisi ve o an vekili olduğu kişilerdir.
     private sealed record Me(List<Guid> Users, List<Guid> Roles);
@@ -56,7 +63,8 @@ internal sealed class ApprovalService(
         RequireTarget(input.TargetEntityKey, input.GatedCommands);
         ApprovalDefinition definition = Guarded(() =>
             ApprovalDefinition.Create(
-                input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey, input.GatedCommands));
+                input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey, input.GatedCommands,
+                input.DueInWorkingHours));
         db.ApprovalDefinitions.Add(definition);
         Audit(tenant, CoreModule.AuditedEntityKeys.ApprovalDefinition, definition.Id, AuditAction.Created, null, Snapshot(definition));
         await SaveAsync(cancellationToken);
@@ -82,7 +90,9 @@ internal sealed class ApprovalService(
         JsonObject before = Snapshot(definition);
         Guarded(() =>
         {
-            definition.Update(input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey, input.GatedCommands);
+            definition.Update(
+                input.Name, input.Description, input.Currency, input.Steps, tenant.UserId, time.GetUtcNow(), input.TargetEntityKey, input.GatedCommands,
+                input.DueInWorkingHours);
             return definition;
         });
         Audit(tenant, CoreModule.AuditedEntityKeys.ApprovalDefinition, id, AuditAction.Updated, before, Snapshot(definition));
@@ -295,8 +305,9 @@ internal sealed class ApprovalService(
             throw new ApprovalException("Bu süreç bir kayda bağlanmaz.");
         }
 
+        WorkCalendar? calendar = await DueCalendarAsync(definition.DueInWorkingHours, cancellationToken);
         (ApprovalRequest request, List<ApprovalRequestStep> steps) = Guarded(() =>
-            ApprovalRequest.Open(definition, title, input.Description, amount, currency, requesterId, now, target, sourceKey));
+            ApprovalRequest.Open(definition, title, input.Description, amount, currency, requesterId, now, target, sourceKey, calendar));
 
         // Süreç açılışta sahipsiz kalmasın: her adımda talep sahibinden başka etkin bir onaycı olmalı (dört göz).
         foreach (ApprovalRequestStep step in steps)
@@ -356,11 +367,12 @@ internal sealed class ApprovalService(
 
         JsonObject before = Snapshot(request);
         DateTimeOffset now = time.GetUtcNow();
+        WorkCalendar? calendar = approve ? await DueCalendarAsync(request.DueInWorkingHours, cancellationToken) : null;
         Guarded(() =>
         {
             if (approve)
             {
-                request.Approve(step, steps, tenant.UserId, comment, now, onBehalfOf);
+                request.Approve(step, steps, tenant.UserId, comment, now, onBehalfOf, calendar);
             }
             else
             {
@@ -499,7 +511,8 @@ internal sealed class ApprovalService(
                         userId, "approval.overdue", $"{request.DefinitionName} sürecinde adımın süresi geçti", CenterPath(request), $"approval:{step.Id}:overdue"), cancellationToken);
                     if (await recipients.FindAsync(userId, cancellationToken) is { } person)
                     {
-                        Send(person, $"Süresi geçti: {request.Title}", $"<strong>{Encode(request.Title)}</strong> talebinin <strong>{Encode(step.Name)}</strong> adımının süresi geçti, kararınız bekleniyor.", recipients.Link(CenterPath(request)), request);
+                        await SendAsync(person, t => (t.Get("email.approval.overdue.subject", request.Title), t.Get("email.approval.overdue.body-html", Encode(request.Title), Encode(step.Name))),
+                            recipients.Link(CenterPath(request)), request, cancellationToken);
                     }
                 }
             }
@@ -794,7 +807,20 @@ internal sealed class ApprovalService(
         ["revision"] = definition.Revision,
         ["steps"] = string.Join(" → ", definition.Steps.Select(s => s.Name)),
         ["gatedCommands"] = definition.Commands.Count == 0 ? null : string.Join(", ", definition.Commands.Select(c => CommandName(definition.TargetEntityKey, c))),
+        ["dueInWorkingHours"] = definition.DueInWorkingHours,
     };
+
+    // Süre iş saatiyle sayılıyorsa firmanın iş takvimi (mesai + tatil; ADR-0049 dilim 6d); değilse null (takvim saati).
+    private async Task<WorkCalendar?> DueCalendarAsync(bool dueInWorkingHours, CancellationToken cancellationToken)
+    {
+        if (!dueInWorkingHours)
+        {
+            return null;
+        }
+
+        DateOnly today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
+        return new WorkCalendar(await workCalendar.GetAsync(today.AddDays(-1), today.AddDays(WorkCalendarDays), cancellationToken));
+    }
 
     private static JsonObject Snapshot(ApprovalRequest request) => new()
     {
@@ -982,7 +1008,8 @@ internal sealed class ApprovalService(
                     userId, "approval.waiting", $"{request.DefinitionName} sürecinde kararınız bekleniyor", CenterPath(request), $"approval:{step.Id}:waiting"), cancellationToken);
                 if (await recipients.FindAsync(userId, cancellationToken) is { } person)
                 {
-                    Send(person, $"Onayınız bekleniyor: {request.Title}", $"<strong>{Encode(request.DefinitionName)}</strong> sürecinde <strong>{Encode(request.Title)}</strong> talebi kararınızı bekliyor (adım: {Encode(step.Name)}).", link, request);
+                    await SendAsync(person, t => (t.Get("email.approval.waiting.subject", request.Title),
+                        t.Get("email.approval.waiting.body-html", Encode(request.DefinitionName), Encode(request.Title), Encode(step.Name))), link, request, cancellationToken);
                 }
             }
         }
@@ -997,15 +1024,20 @@ internal sealed class ApprovalService(
             request.RequesterId, "approval.result", $"{request.DefinitionName} talebiniz {outcome}", CenterPath(request), $"approval:{request.Id}:result"), cancellationToken);
         if (await recipients.FindAsync(request.RequesterId, cancellationToken) is { } person)
         {
-            string result = request.Status == ApprovalRequestStatus.Approved ? "onaylandı" : "reddedildi";
-            Send(person, $"Talebiniz {result}: {request.Title}", $"<strong>{Encode(request.Title)}</strong> talebiniz {result}.", recipients.Link($"onaylar?talep={request.Id}"), request);
+            string result = request.Status == ApprovalRequestStatus.Approved ? "approved" : "rejected";
+            await SendAsync(person, t => (t.Get($"email.approval.{result}.subject", request.Title), t.Get($"email.approval.{result}.body-html", Encode(request.Title))),
+                recipients.Link($"onaylar?talep={request.Id}"), request, cancellationToken);
         }
     }
 
-    private void Send(NotificationRecipient person, string subject, string html, string? link, ApprovalRequest request)
+    // E-posta alıcının dilinde yazılır (ADR-0034 §6, dilim 18b); HTML'e giren kullanıcı girdisi çağıranda kodlanır.
+    private async Task SendAsync(
+        NotificationRecipient person, Func<LocalizedTexts, (string Subject, string Html)> content, string? link, ApprovalRequest request, CancellationToken cancellationToken)
     {
-        string body = link is null ? $"<p>{html}</p>" : $"<p>{html}</p><p><a href=\"{Encode(link)}\">Onay merkezinde aç</a></p>";
-        emails.Enqueue(new EmailMessage(person.Email, subject, body) { ToName = person.DisplayName, Reference = $"core.approval:{request.Id}" });
+        LocalizedTexts t = await languages.ForUserAsync(person.UserId, cancellationToken);
+        (string subject, string html) = content(t);
+        string body = link is null ? $"<p>{html}</p>" : $"<p>{html}</p><p><a href=\"{Encode(link)}\">{Encode(t.Get("email.approval.open"))}</a></p>";
+        emails.Enqueue(new EmailMessage(person.Email, subject, body) { ToName = person.DisplayName, Reference = $"core.approval:{request.Id}", Language = t.Language });
     }
 
     private static string Encode(string text) => WebUtility.HtmlEncode(text);

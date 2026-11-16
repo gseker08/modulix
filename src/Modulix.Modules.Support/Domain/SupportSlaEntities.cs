@@ -23,6 +23,12 @@ public sealed class SlaCalendar : SupportEntity
     /// <summary>Tatiller JSON'u: <c>[{"date":"2026-10-29","name":"…","start":null,"end":null}]</c>; start/end verilirse yarım gün.</summary>
     public string? Holidays { get; internal set; }
 
+    /// <summary>
+    /// Firmanın resmî tatil listesi (Core, ADR-0049 dilim 6b) de uygulanır mı? Takvimin kendi tatili aynı günde önceliklidir. Yeni takvimde açıktır; bu seçenek gelmeden
+    /// önce açılmış takvimlerde kapalı başlar (migration), böylece mevcut SLA hedefleri değişmez.
+    /// </summary>
+    public bool UseTenantHolidays { get; internal set; } = true;
+
     public bool IsActive { get; internal set; } = true;
 
     public Guid? CreatedBy { get; internal set; }

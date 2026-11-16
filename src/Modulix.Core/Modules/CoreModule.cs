@@ -25,6 +25,12 @@ public sealed class CoreModule : IModule
         /// <summary>Kuruluş ve modül ayarlarını yazar; okumak için izin gerekmez.</summary>
         public const string ManageSettings = "core.settings.manage";
 
+        /// <summary>Firmanın resmî tatil listesini yazar (ADR-0049 dilim 6a); okumak için izin gerekmez.</summary>
+        public const string ManageHolidays = "core.holidays.manage";
+
+        /// <summary>Belge serilerini yapılandırır ve sayacı ileri alır (ADR-0049 dilim 2a).</summary>
+        public const string ManageNumbering = "core.numbering.manage";
+
         public const string ReadAudit = "core.audit.read";
 
         /// <summary>Özelleştirme (Y9): özel alanlar, listeler ve sektör profili.</summary>
@@ -109,6 +115,8 @@ public sealed class CoreModule : IModule
         new(Permissions.ManageUsers, "Kullanıcıları ve kullanıcıların rollerini yönetir", "Kullanıcılar"),
         new(Permissions.ManageRoles, "Rolleri ve izinlerini yönetir", "Roller"),
         new(Permissions.ManageSettings, "Kuruluş ve modül ayarlarını değiştirir", "Kuruluş ayarları"),
+        new(Permissions.ManageHolidays, "Firmanın resmî tatil listesini düzenler", "Resmî tatiller"),
+        new(Permissions.ManageNumbering, "Belge numarası serilerini yapılandırır ve sayacı ileri alır", "Belge numaraları"),
         new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
         new(Permissions.ManageCustomization, "Özel alanları ve listeleri düzenler", "Özelleştirme"),
         new(Permissions.ManageCompanies, "İşletici şirketleri ve kullanıcıların şirket görevlerini yönetir", "Şirketler"),
@@ -152,6 +160,15 @@ public sealed class CoreModule : IModule
         {
             MatchRules = [new("email", "email")],
         },
+        new(Modulix.Core.Contracts.Calendar.CalendarEntities.Holiday, "Resmî tatil", Permissions.ManageHolidays,
+        [
+            new("date", "Tarih", ImportFieldType.Date, Required: true),
+            new("name", "Ad", Required: true),
+            new("halfDay", "Yarım gün", ImportFieldType.YesNo),
+        ])
+        {
+            MatchRules = [new("date", null, Exact: true)],
+        },
     ];
 
     /// <summary>Çekirdeğin olay abonelikleri (ADR-0007).</summary>
@@ -171,6 +188,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>Kayda bağlı onayın bütünlüğü (ADR-0027 Dilim 4c): korunan alan değişince bekleyen talep geçersizleşir.</summary>
         public const string Approvals = "core.approvals";
+
+        /// <summary>Silinen kaydın dosyaları (ADR-0040 dilim 3): bütün kayıt türlerinin silinme olayında kaydın dosyaları silinir.</summary>
+        public const string FileCleanup = "core.file-cleanup";
     }
 
     /// <summary>Denetim kayıt türleri (Y5). Yönetim kayıtlarının değerleri her denetim okuruna açıktır.</summary>
@@ -215,6 +235,9 @@ public sealed class CoreModule : IModule
 
         /// <summary>Onay süreci tanımı (ADR-0027 Dilim 4a); kaydın kimliği tanımın kimliğidir.</summary>
         public const string ApprovalDefinition = "core.approval-definition";
+
+        /// <summary>Belge serisi yapılandırması (ADR-0049 dilim 2a); kaydın kimliği firmanın seri ayarı satırıdır. Sayacı ileri alma da yazılır.</summary>
+        public const string NumberSeries = "core.number-series";
 
         /// <summary>Onay talebi (ADR-0027 Dilim 4a); kaydın kimliği talebin kimliğidir. Karar, not ve atama değişikliği yazılır.</summary>
         public const string ApprovalRequest = "core.approval-request";
@@ -278,6 +301,11 @@ public sealed class CoreModule : IModule
         public const string Language = "core.regional.language";
         public const string RequireTwoFactor = "core.security.require-two-factor";
 
+        /// <summary>Firmanın çalışma günleri ve mesai saatleri (ADR-0049 dilim 6c); seçenekler <see cref="Contracts.Calendar.WorkWeek"/>'tedir.</summary>
+        public const string WorkDays = "core.calendar.work-days";
+
+        public const string WorkHours = "core.calendar.work-hours";
+
         /// <summary>Acil durdurma (ADR-0027): "Hayır" ise firmanın hiçbir kuralı çalışmaz; kuyruktaki çalışmalar iptal edilir.</summary>
         public const string AutomationEnabled = "core.automation.enabled";
 
@@ -297,6 +325,7 @@ public sealed class CoreModule : IModule
 
     private const string ProfileGroup = "Kuruluş profili";
     private const string RegionalGroup = "Bölgesel ayarlar";
+    private const string CalendarGroup = "Çalışma takvimi";
     private const string SecurityGroup = "Güvenlik";
     private const string AutomationGroup = "Otomasyon";
     private const string AiGroup = "Yapay zekâ";
@@ -332,6 +361,17 @@ public sealed class CoreModule : IModule
         new(SettingKeys.Format, "Tarih ve sayı biçimi", RegionalGroup, SettingType.Choice, RegionalOptions.DefaultFormat)
         {
             Options = RegionalOptions.Formats,
+        },
+        new(SettingKeys.WorkDays, "Çalışma günleri", CalendarGroup, SettingType.Choice, Contracts.Calendar.WorkWeek.DefaultDays)
+        {
+            Description = "İzin gün sayısı bu günlere göre hesaplanır; çalışılmayan günler ve Yönetim > Resmî tatiller listesindeki günler düşülür. "
+                + "Açılmış izin taleplerinin gün sayısı değişmez.",
+            Options = [.. Contracts.Calendar.WorkWeek.DayOptions.Select(o => new SettingOption(o.Value, o.Label))],
+        },
+        new(SettingKeys.WorkHours, "Mesai saatleri", CalendarGroup, SettingType.Choice, Contracts.Calendar.WorkWeek.DefaultHours)
+        {
+            Description = "Firmanın iş takvimini kullanan hesaplar (ör. iş saatiyle ölçülen süreler) bu saatleri kullanır. Saatler firmanın saat dilimindedir.",
+            Options = [.. Contracts.Calendar.WorkWeek.HourOptions.Select(o => new SettingOption(o.Value, o.Label))],
         },
         new(SettingKeys.Language, "Arayüz dili", RegionalGroup, SettingType.Choice, LanguageOptions.Default)
         {
@@ -463,6 +503,10 @@ public sealed class CoreModule : IModule
 
     IReadOnlyList<AuditedEntity> IModule.AuditedEntities { get; } =
     [
+        new(Modulix.Core.Contracts.Calendar.CalendarEntities.Holiday, "Resmî tatil", null, new Dictionary<string, string>
+        {
+            ["date"] = "Tarih", ["name"] = "Ad", ["halfDay"] = "Yarım gün",
+        }, "name"),
         new(CredentialEntities.Credential, "Süreli belge", null, new Dictionary<string, string>
         {
             ["ownerEntityKey"] = "Sahip kayıt türü", ["ownerId"] = "Sahip kayıt", ["typeKey"] = "Belge türü", ["documentNo"] = "Belge no",
@@ -612,8 +656,18 @@ public sealed class CoreModule : IModule
         new(AuditedEntityKeys.ApprovalDefinition, "Onay süreci", null, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["description"] = "Açıklama", ["currency"] = "Para birimi", ["isActive"] = "Açık", ["revision"] = "Sürüm", ["steps"] = "Adımlar",
-            ["target"] = "Kayıt türü", ["gatedCommands"] = "Onaysız yapılamaz",
+            ["target"] = "Kayıt türü", ["gatedCommands"] = "Onaysız yapılamaz", ["dueInWorkingHours"] = "Süre iş saatiyle",
         }, "name"),
+        new(AuditedEntityKeys.NumberSeries, "Belge serisi", null, new Dictionary<string, string>
+        {
+            ["series"] = "Seri", ["prefix"] = "Önek", ["digits"] = "Basamak", ["reset"] = "Sıfırlama", ["nextNumber"] = "Sıradaki numara",
+        }, "series")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["reset"] = new Dictionary<string, string> { ["Never"] = "Sıfırlanmaz", ["Yearly"] = "Her yıl" },
+            },
+        },
         new(AuditedEntityKeys.ApprovalRequest, "Onay talebi", null, new Dictionary<string, string>
         {
             ["title"] = "Başlık", ["process"] = "Süreç", ["amount"] = "Tutar", ["currency"] = "Para birimi", ["status"] = "Durum",
@@ -788,6 +842,8 @@ public sealed class CoreModule : IModule
             Subscriptions.Approvals, [DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
         EventSubscription.For<AutomationEventSubscriber>(
             Subscriptions.Automation, [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
+        EventSubscription.For<Files.FileCleanupSubscriber>(
+            Subscriptions.FileCleanup, [DomainEventTypes.RecordDeleted], [], []) with { Ordered = false },
     ];
 
     /// <summary>
@@ -807,6 +863,7 @@ public sealed class CoreModule : IModule
         services.AddScoped<AssignmentEmailSubscriber>();
         services.AddScoped<AutomationEventSubscriber>();
         services.AddScoped<ApprovalRecordSubscriber>();
+        services.AddScoped<Files.FileCleanupSubscriber>();
 
         // "Onaya gönder" aksiyonu ve yayındaki süreç adı denetimi (Dilim 4c-2).
         services.AddScoped<Modulix.Core.Approvals.RequestApprovalAction>();

@@ -12,7 +12,7 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Events;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
-using Modulix.Core.Settings;
+using Modulix.Core.Contracts.Settings;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
 using Modulix.Modules.Crm;
@@ -135,8 +135,8 @@ internal static class QuoteSharingEndpoints
                 {
                     var quote = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Quote, id), ct);
                     var dto = CrmEndpoints.ToDto<QuoteDto>(quote.Value!);
-                    delivery.Enqueue(result.Value.Link.Id, request.RecipientEmail!.Trim(), request.RecipientName, (await documents.SellerNameAsync(ct)),
-                        dto.QuoteNumber, dto.Title, dto.ValidUntil, $"{PublicUrl.Resolve(http)}/{path}");
+                    await delivery.EnqueueAsync(result.Value.Link.Id, request.RecipientEmail!.Trim(), request.RecipientName, (await documents.SellerNameAsync(ct)),
+                        dto.QuoteNumber, dto.Title, dto.ValidUntil, $"{PublicUrl.Resolve(http)}/{path}", ct);
                     state = (await delivery.GetAsync([result.Value.Link.Id], ct)).GetValueOrDefault(result.Value.Link.Id)
                         ?? new QuoteLinkDelivery(QuoteDeliveryStatus.Pending, null, null);
                 }
@@ -379,7 +379,7 @@ internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvid
 
     private async Task<QuoteSellerInfo> SellerAsync(CancellationToken cancellationToken)
     {
-        var settings = services.GetRequiredService<ITenantSettings>();
+        var settings = services.GetRequiredService<ITenantSettingReader>();
         var name = (await settings.GetValueAsync(CoreModule.SettingKeys.DisplayName, cancellationToken)).Trim();
         if (name.Length == 0)
         {

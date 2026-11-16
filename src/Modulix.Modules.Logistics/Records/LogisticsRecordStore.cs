@@ -12,7 +12,7 @@ namespace Modulix.Modules.Logistics.Records;
 /// alan listesini, filtreleri, sıralamayı ve aramayı verir. Kaydetmez: boru hattı kaydı, audit'i ve olayı tek seferde yazar.
 /// Tenant filtresi ve RLS <see cref="IModuleData"/> üzerinden uygulanır.
 /// </summary>
-internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext context) : IRecordStore
+internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext context) : IRecordStore, IRecordWriteGuard
     where TEntity : LogisticsEntity, new()
 {
     private static readonly IReadOnlyDictionary<string, RecordFilter<TEntity>> NoFilters = new Dictionary<string, RecordFilter<TEntity>>();
@@ -23,6 +23,15 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
 
     /// <summary>Lisans kontrolü modül düzeyindedir: modül tenant için açıksa tüm kayıtları kullanılabilir.</summary>
     public string FeatureKey => EntityKey;
+
+    /// <summary>
+    /// Kayıt düzeyinde yan yazma kuralı (ADR-0040 K2, ADR-0038 bölüm 24): kayda dosya eklemek ve silmek, tür izninden sonra kaydın kendi kuralına da
+    /// uymalıdır. Kural <see cref="FileWriteDeniedAsync"/>'tedir; kayıt bulunamazsa karar okuma denetimine kalır.
+    /// </summary>
+    public async Task<string?> WriteDeniedAsync(Guid id, CancellationToken cancellationToken) =>
+        await Data.Set<TEntity>().AsNoTracking().SingleOrDefaultAsync(e => e.Id == id, cancellationToken) is { } entity
+            ? await FileWriteDeniedAsync(entity, cancellationToken)
+            : null;
 
     protected abstract string ReadPermission { get; }
 
@@ -85,7 +94,13 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
     public async Task<RecordData?> FindAsync(Guid id, CancellationToken cancellationToken)
     {
         var entity = await Data.Set<TEntity>().AsNoTracking().SingleOrDefaultAsync(e => e.Id == id, cancellationToken);
-        return entity is null ? null : ToData(entity);
+        if (entity is null)
+        {
+            return null;
+        }
+
+        await PrepareAsync([entity], cancellationToken);
+        return ToData(entity);
     }
 
     public async Task<RecordPage> QueryAsync(RecordQuery query, CancellationToken cancellationToken)
@@ -105,6 +120,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
 
         var total = await source.CountAsync(cancellationToken);
         var items = await Order(source, sort).ThenBy(e => e.Id).Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToListAsync(cancellationToken);
+        await PrepareAsync(items, cancellationToken);
         return new RecordPage([.. items.Select(ToData)], query.Page, query.PageSize, total);
     }
 
@@ -126,6 +142,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
 
         await ApplyAsync(entity, values, isNew: true, cancellationToken);
         Data.Set<TEntity>().Add(entity);
+        await PrepareAsync([entity], cancellationToken);
         return ToData(entity);
     }
 
@@ -143,6 +160,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
         }
 
         EnsureVersion(entity, expectedVersion);
+        await PrepareAsync([entity], cancellationToken);
         var before = ToData(entity).Values;
         await ApplyAsync(entity, values, isNew: false, cancellationToken);
         if (!JsonNode.DeepEquals(before, ToData(entity).Values))
@@ -171,6 +189,18 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
         Data.Set<TEntity>().Remove(entity);
         return true;
     }
+
+    /// <summary>
+    /// Bu kayda dosya eklenemez/silinemezse nedeni (403). Varsayılan: kural yok (tür güncelleme izni yeter). Kaydı yalnızca belirli durumda
+    /// değiştirilebilen ya da değişmeyen depolar (ör. onaylanmış masraf, teslim kanıtı) aynı kuralı burada da verir; yoksa dosya kaydın kuralını atlatır.
+    /// </summary>
+    protected virtual Task<string?> FileWriteDeniedAsync(TEntity entity, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
+
+    /// <summary>
+    /// Kayıtlar dışarı verilmeden önce, hesaplanan alanların ihtiyaç duyduğu bağlı veriyi toplu yükler (ör. masrafın seferi iptal edildi mi). Liste
+    /// sayfası için tek sorgu atılır; varsayılan bir şey yapmaz.
+    /// </summary>
+    protected virtual Task PrepareAsync(IReadOnlyCollection<TEntity> entities, CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>Kayıt silinmeden önce (bağlı kayıtları denetlemek ya da kaldırmak için).</summary>
     protected virtual Task BeforeDeleteAsync(TEntity entity, CancellationToken cancellationToken) => Task.CompletedTask;
