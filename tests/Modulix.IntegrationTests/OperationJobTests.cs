@@ -35,7 +35,7 @@ public class OperationJobTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.Equal(2, jobs.Count);
         var delivery = jobs.Single(j => j.Kind == "Delivery");
         var service = jobs.Single(j => j.Kind == "Service");
-        Assert.StartsWith("OP-", delivery.Number);
+        Assert.Matches(@"^IS-\d{4}-\d{5}$", delivery.Number);
         Assert.Equal(("kind:Product", "Planned", "High", s.Ops.Id, "Handover"), (delivery.GroupKey, delivery.Status, delivery.Priority, delivery.ResponsibleUserId, delivery.Source));
         Assert.Equal((new DateOnly(2026, 12, 1), new DateOnly(2026, 12, 15), "Gebze depo"), (delivery.PlannedStartDate, delivery.PlannedEndDate, delivery.Location));
         Assert.Equal("kind:Service", service.GroupKey);

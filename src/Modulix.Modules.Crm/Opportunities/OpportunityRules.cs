@@ -131,15 +131,6 @@ public static class OpportunityRules
 
     // ---- Numara
 
-    public static string NewNumber(DateTimeOffset createdAt)
-    {
-        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        Span<char> suffix = stackalloc char[6];
-        for (var i = 0; i < suffix.Length; i++)
-        {
-            suffix[i] = alphabet[System.Security.Cryptography.RandomNumberGenerator.GetInt32(alphabet.Length)];
-        }
-
-        return $"OP-{createdAt:yyyyMMdd}-{new string(suffix)}";
-    }
+    /// <summary>OP-yyyyMMdd-XXXXXX (ortak yardımcı, ADR-0049 dilim 3a); fırsat belge değildir, sıralı seriye geçmedi.</summary>
+    public static string NewNumber(DateTimeOffset createdAt) => Modulix.Core.Contracts.Numbering.RandomDocumentNumber.New("OP", createdAt);
 }

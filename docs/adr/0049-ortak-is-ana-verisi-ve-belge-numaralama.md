@@ -42,7 +42,25 @@ Bu üç kavram Core'a alınır; modüller sözleşme üzerinden kullanır. Dilim
 - **Dilim 2b (teslim edildi):** Yönetim > Belge numaraları ekranı (`/yonetim/belge-numaralari`, `core.numbering.manage`). Seri listesi (modül, sıradaki numara, sıfırlama, firmaya özel mi), çekmecede önek/basamak/sıfırlama ve canlı ön izleme, "Varsayılana dön", bu dönemde numara verildiyse onaylı "Sayacı ileri al". Kurallar 2a'daki sunucu uçlarındadır; ekran yalnızca onları çağırır, çakışmada (409) güncel hâli yükler.
 - **Dilim 2c (ertelendi, 16.11.2026):** şirket başına seri. Bugün kullanan belge yok: hiçbir kayıt türü `ICompanyScoped` değil, tek seri olan sefer şirketler arası ortak (`ICompanyShared`). Kullanılmayan altyapı ve migration yazılmaz; ilk şirkete ait belge (fatura, şirket bazlı teklif vb.) geldiğinde o belgeyle birlikte tasarlanır. O gün için beklenen biçim: seri beyanında "şirket başına" seçeneği, sayaç ve ayar satırında isteğe bağlı `CompanyId` (şirketi belgenin `CompanyId`'si belirler, oturumun aktif şirketi değil), yönetim ekranında şirket seçimi.
 
-### Dilim 3: mevcut üreticilerin geçişi (ürün kararı ister)
+### Dilim 3: mevcut üreticilerin geçişi
+
+Kodda dört değil sekiz kopya üretici vardı (teklif `TK`, sipariş `SP`, teslimat `TS`, operasyon işi `OP`, sözleşme `SZ`, destek talebi `TK`, fırsat `OP`, müşteri adayı `LD`). 16.11.2026 kararları:
+
+- **Sıralı seriye geçenler (3a):** teklif, sipariş, teslimat, operasyon işi, sözleşme. Varsayılan biçim seferle aynı: `önek-yıl-sıra`, 5 basamak, yıllık sıfırlama; firma Yönetim > Belge numaraları'ndan değiştirir.
+- **Önek çakışmaları:** operasyon işi `IS` oldu (eski `OP` fırsatla karışıyordu). Destek talebi geçtiğinde `DT` olacak (bugün teklifle aynı `TK`).
+- **Destek talebi (3b, sonra):** gelen e-posta konudaki `[TK-…]` numarasıyla talebe bağlanıyor; rastgele sonek bunu tahmin edilemez kılıyor ve ayrıştırıcı öneki sabit arıyor. Geçişten önce gönderen denetimi incelenecek ve ayrıştırıcı firmanın önekini tanıyacak.
+- **Fırsat ve müşteri adayı:** belge değil, iç takip kaydı; toplu içe aktarmayla çok sayıda açılıyor. Şimdilik rastgele kalıyor.
+- **Geçmeyenler:** üç üretici tek ortak yardımcıya indi (`Core.Contracts.Numbering.RandomDocumentNumber`); davranışları değişmedi.
+
+#### Dilim 3a: beş belge ortak seride (teslim edildi)
+
+- **Seriler:** `crm.quote` (TK), `orders.order` (SP), `orders.delivery` (TS), `orders.job` (IS), `contracts.contract` (SZ); modüller `IModule.NumberSeries` ile beyan eder.
+- **Eski kayıtlar** numarasını korur (`TK-20261101-AB12CD` gibi); veri taşıma ve migration yok. Eski numaralar rastgele olduğundan tohum verilmez, her seri 1'den başlar. Eski ve yeni biçim çakışamaz (yeni biçimde yıl 4, eskide tarih 8 hanedir).
+- **Numara ne zaman alınır:** doğrulamadan sonra, kayıt eklenmeden hemen önce (`CreatedAsync`); reddedilen istek sıra harcamaz. CRM depo tabanına bunun için beklemeli `CreatedAsync` kancası eklendi.
+- **Teklif revizyonu** ailenin numarasını taşır, seriden sıra almaz; çoğaltma yeni ailedir ve yeni numara alır.
+- **Yönetim listesi:** firmada açık olmayan modülün serisi listelenmez ve yapılandırılamaz (404).
+
+Aşağıdaki özgün not tarihçe için duruyor:
 
 Teklif, sipariş, operasyon işi ve destek kaydı numaraları bugün rastgele soneklidir. Sıralı seriye geçiş kullanıcının gördüğü numara biçimini değiştirir; eski kayıtlar numarasını korur. Geçilmeyecekse dört kopya üretici en azından tek ortak yardımcıya indirilir.
 

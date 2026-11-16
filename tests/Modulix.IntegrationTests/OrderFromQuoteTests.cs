@@ -35,7 +35,7 @@ public class OrderFromQuoteTests(ModulixApiFactory factory) : IClassFixture<Modu
         var order = await CreateAsync(admin, accepted.Id, new CreateOrderFromQuoteRequest(
             PlannedStartDate: new DateOnly(2026, 12, 1), PlannedDeliveryDate: new DateOnly(2026, 12, 15), DeliveryAddress: "Depo 3, Gebze", Location: "Gebze"));
 
-        Assert.StartsWith("SP-", order.Number);
+        Assert.Matches(@"^SP-\d{4}-\d{5}$", order.Number);
         Assert.Equal((accepted.Title, "Full", "Manual"), (order.Title, order.ConversionMode, order.AcceptanceMethod));
         Assert.Equal(("Draft", "NotStarted", "NotStarted"), (order.Status, order.HandoverStatus, order.FulfillmentStatus));
         Assert.Equal((accepted.Id, accepted.QuoteNumber, accepted.RevisionNo), (order.SourceQuoteId, order.SourceQuoteNumber, order.SourceQuoteRevisionNo));

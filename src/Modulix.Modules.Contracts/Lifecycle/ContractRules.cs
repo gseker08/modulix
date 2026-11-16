@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 namespace Modulix.Modules.Contracts.Lifecycle;
 
 // Saf kurallar (ADR-0022): veritabanı ve HTTP bilmez; birim testleriyle doğrulanır. Durum anahtarları API'de ve arayüzde aynen kullanılır.
@@ -232,19 +230,6 @@ public static class ContractRules
     /// <summary>Son bildirim tarihi: bitiş − bildirim süresi. Belirsiz süreli ya da bitişsiz sözleşmede yoktur.</summary>
     public static DateOnly? NoticeDeadline(DateOnly? end, int? noticePeriodDays, bool isIndefinite) =>
         !isIndefinite && end is { } e && noticePeriodDays is { } days ? e.AddDays(-days) : null;
-
-    /// <summary>Yeni sözleşme numarası: SZ-yyyyMMdd-XXXXXX (karışmayan harf/rakam alfabesi).</summary>
-    public static string NewNumber(DateTimeOffset createdAt)
-    {
-        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        Span<char> suffix = stackalloc char[6];
-        for (var i = 0; i < suffix.Length; i++)
-        {
-            suffix[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
-        }
-
-        return $"SZ-{createdAt:yyyyMMdd}-{new string(suffix)}";
-    }
 }
 
 /// <summary>Sürümün niçin dondurulduğu.</summary>

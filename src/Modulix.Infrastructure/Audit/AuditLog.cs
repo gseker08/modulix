@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Audit;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -23,7 +24,9 @@ internal sealed class AuditLog(
     IModuleEntitlements entitlements,
     MembershipPermissions membershipPermissions,
     IChoiceLists choiceLists,
-    IAuditWriter audit) : IAuditLog
+    IAuditWriter audit,
+    IRequestLanguage language,
+    ITextCatalog texts) : IAuditLog
 {
     public const int MaxPageSize = 100;
 
@@ -32,6 +35,26 @@ internal sealed class AuditLog(
 
     /// <summary>Kullanıcısız işlemler (ör. örnek veri, arka plan işi).</summary>
     public const string SystemName = "Sistem";
+
+    private const string UnknownPersonName = "Bilinmeyen kişi";
+
+    private IReadOnlyDictionary<string, string>? bundle;
+
+    // Okurun dilindeki metinler (ADR-0034, dilim 18c): kayıt türü, alan ve kodda tanımlı seçenek adları ile denetim ekranının sabit adları.
+    // Firmanın kendi verisi (özel alan adları, seçim listesi değerleri, kişi ve kayıt adları) çevrilmez.
+    private async ValueTask<IReadOnlyDictionary<string, string>> TextsAsync(CancellationToken cancellationToken) =>
+        bundle ??= texts.Bundle(await language.GetAsync(cancellationToken));
+
+    private static string Text(IReadOnlyDictionary<string, string> bundle, string key, string source) =>
+        MetadataTexts.Text(bundle, key, source);
+
+    private static string NameOf(IReadOnlyDictionary<string, string> bundle, AuditUser? user, Guid userId) =>
+        user?.Name ?? (userId == Guid.Empty
+            ? Text(bundle, "audit.system", SystemName)
+            : Text(bundle, "audit.unknown-person", UnknownPersonName));
+
+    private static AuditedEntity? Localize(AuditedEntity? entity, IReadOnlyDictionary<string, string> bundle) =>
+        entity is null ? null : MetadataTexts.Localize(entity, bundle);
 
     public async Task<AuditLogPage> QueryAsync(AuditQuery query, CancellationToken cancellationToken)
     {
@@ -54,8 +77,9 @@ internal sealed class AuditLog(
     {
         var ids = await db.AuditLog.AsNoTracking().Select(a => a.UserId).Distinct().ToListAsync(cancellationToken);
         var users = await LoadUsersAsync(RequireTenant(), ids, cancellationToken);
+        var bundle = await TextsAsync(cancellationToken);
         return [.. ids
-            .Select(id => new AuditActor(id, users.GetValueOrDefault(id)?.Name ?? (id == Guid.Empty ? SystemName : "Bilinmeyen kişi")))
+            .Select(id => new AuditActor(id, NameOf(bundle, users.GetValueOrDefault(id), id)))
             .OrderBy(a => a.Name, StringComparer.CurrentCulture)];
     }
 
@@ -131,11 +155,12 @@ internal sealed class AuditLog(
             .Select(g => new { UserId = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
         var users = await LoadUsersAsync(RequireTenant(), [.. counts.Select(c => c.UserId)], cancellationToken);
-        string NameOf(Guid id) => users.GetValueOrDefault(id)?.Name ?? (id == Guid.Empty ? SystemName : "Bilinmeyen kişi");
+        var bundle = await TextsAsync(cancellationToken);
+        string Name(Guid id) => NameOf(bundle, users.GetValueOrDefault(id), id);
 
         var ordered = descending
-            ? counts.OrderByDescending(c => NameOf(c.UserId), StringComparer.CurrentCulture).ThenBy(c => c.UserId)
-            : counts.OrderBy(c => NameOf(c.UserId), StringComparer.CurrentCulture).ThenBy(c => c.UserId);
+            ? counts.OrderByDescending(c => Name(c.UserId), StringComparer.CurrentCulture).ThenBy(c => c.UserId)
+            : counts.OrderBy(c => Name(c.UserId), StringComparer.CurrentCulture).ThenBy(c => c.UserId);
 
         var skip = (page - 1) * pageSize;
         List<AuditLogEntry> entries = [];
@@ -219,10 +244,17 @@ internal sealed class AuditLog(
 
         var custom = await CustomFieldsAsync(entries, cancellationToken);
         var lists = await ChoiceListsAsync(entries, cancellationToken);
+        var bundle = await TextsAsync(cancellationToken);
+
+        // Tür başına bir kez: önce kodda tanımlı adlar okurun diline çevrilir, sonra firmanın özel alanları ve listeleri eklenir.
+        var described = entries.Select(e => e.EntityKey).Distinct(StringComparer.Ordinal).ToDictionary(
+            key => key,
+            key => WithChoiceLists(WithCustomFields(Localize(catalog.FindAuditedEntity(key), bundle), custom), lists),
+            StringComparer.Ordinal);
         var parsed = entries
             .Select(e => (
                 Entry: e,
-                Entity: WithChoiceLists(WithCustomFields(catalog.FindAuditedEntity(e.EntityKey), custom), lists),
+                Entity: described[e.EntityKey],
                 Changes: Parse(e.Changes)))
             .ToList();
 
@@ -263,8 +295,8 @@ internal sealed class AuditLog(
         {
             null => null,
             JsonArray array => string.Join(", ", array.Select(item => Format(entity, field, item)).Where(v => v is not null)),
-            JsonValue v when v.GetValueKind() == JsonValueKind.True => "Evet",
-            JsonValue v when v.GetValueKind() == JsonValueKind.False => "Hayır",
+            JsonValue v when v.GetValueKind() == JsonValueKind.True => Text(bundle, "common.yes", "Evet"),
+            JsonValue v when v.GetValueKind() == JsonValueKind.False => Text(bundle, "common.no", "Hayır"),
             JsonValue v when v.GetValueKind() == JsonValueKind.String => FormatText(entity, field, v.GetValue<string>()),
             _ => value.ToJsonString(),
         };
@@ -283,12 +315,12 @@ internal sealed class AuditLog(
 
             if (entity.UserFields.Contains(field) && Guid.TryParse(text, out var userId))
             {
-                return users.GetValueOrDefault(userId)?.Name ?? "Bilinmeyen kişi";
+                return users.GetValueOrDefault(userId)?.Name ?? Text(bundle, "audit.unknown-person", UnknownPersonName);
             }
 
             if (entity.References.TryGetValue(field, out var target) && Guid.TryParse(text, out var id))
             {
-                return Title(target, id) ?? "Bağlı kayıt";
+                return Title(target, id) ?? Text(bundle, "audit.linked-record", "Bağlı kayıt");
             }
 
             return text;
@@ -330,7 +362,7 @@ internal sealed class AuditLog(
                 entry.Id,
                 entry.OccurredAt,
                 entry.UserId,
-                user?.Name ?? (entry.UserId == Guid.Empty ? SystemName : "Bilinmeyen kişi"),
+                NameOf(bundle, user, entry.UserId),
                 user?.Email,
                 entry.EntityKey,
                 entity?.DisplayName ?? entry.EntityKey,
@@ -428,11 +460,12 @@ internal sealed class AuditLog(
             .Select(m => m.UserId)
             .ToListAsync(cancellationToken)).ToHashSet();
 
+        var bundle = await TextsAsync(cancellationToken);
         return accounts.ToDictionary(
             a => a.Id,
             a => members.Contains(a.Id) || !a.IsPlatformAdministrator
                 ? new AuditUser(a.DisplayName, a.Email)
-                : new AuditUser(PlatformAdministratorName, null));
+                : new AuditUser(Text(bundle, "audit.platform-administrator", PlatformAdministratorName), null));
     }
 
     /// <summary>

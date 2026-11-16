@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 namespace Modulix.Modules.Support.Lifecycle;
 
 // Talep durum sabitleri ve saf kurallar (ADR-0024). Kurallar sunucuda uygulanır; arayüz yalnızca aynı kuralları gösterir.
@@ -375,15 +373,5 @@ public static class FirstResponseRules
 public static class TicketNumbers
 {
     /// <summary>Yeni talep numarası: TK-yyyyMMdd-XXXXXX (karışmayan harf/rakam alfabesi).</summary>
-    public static string New(DateTimeOffset createdAt)
-    {
-        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        Span<char> suffix = stackalloc char[6];
-        for (var i = 0; i < suffix.Length; i++)
-        {
-            suffix[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
-        }
-
-        return $"TK-{createdAt:yyyyMMdd}-{new string(suffix)}";
-    }
+    public static string New(DateTimeOffset createdAt) => Modulix.Core.Contracts.Numbering.RandomDocumentNumber.New("TK", createdAt);
 }
