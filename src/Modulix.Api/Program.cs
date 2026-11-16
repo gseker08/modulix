@@ -141,9 +141,6 @@ builder.Services.AddContractSignatureRateLimit(builder.Configuration);
 builder.Services.AddHostedService<EventDispatchWorker>();
 builder.Services.Configure<Modulix.Api.Platform.PlatformOptions>(builder.Configuration.GetSection(Modulix.Api.Platform.PlatformOptions.SectionName));
 builder.Services.Configure<Modulix.Infrastructure.Modules.LicenseOptions>(builder.Configuration.GetSection(Modulix.Infrastructure.Modules.LicenseOptions.SectionName));
-builder.Services.Configure<Modulix.Api.Contracts.ContractJobsOptions>(builder.Configuration.GetSection(Modulix.Api.Contracts.ContractJobsOptions.SectionName));
-builder.Services.AddSingleton<Modulix.Api.Contracts.ContractJobsRunner>();
-builder.Services.AddHostedService<Modulix.Api.Contracts.ContractJobsWorker>();
 
 // Modüllerin zamanlanmış işleri tek zamanlayıcıdan çalışır (ADR-0046); işler modül kaydından (IModule.Jobs) okunur.
 builder.Services.AddSingleton<Modulix.Api.Jobs.ModuleJobRunner>();
