@@ -1859,7 +1859,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("FormLayouts", "meta");
                 });
 
-            modelBuilder.Entity("Modulix.Core.Customs.GtipCatalogEntry", b =>
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Customs.GtipCatalogEntry", b =>
                 {
                     b.Property<Guid>("VersionId")
                         .HasColumnType("uniqueidentifier");
@@ -1883,7 +1883,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("GtipCatalogEntries", "platform");
                 });
 
-            modelBuilder.Entity("Modulix.Core.Customs.GtipCatalogVersion", b =>
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Customs.GtipCatalogVersion", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
@@ -1917,7 +1917,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("GtipCatalogVersions", "platform");
                 });
 
-            modelBuilder.Entity("Modulix.Core.Customs.RegimeProfile", b =>
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Customs.RegimeProfile", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
@@ -1946,7 +1946,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("RegimeProfiles", "platform");
                 });
 
-            modelBuilder.Entity("Modulix.Core.Customs.RegimeProfileVersion", b =>
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Customs.RegimeProfileVersion", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
@@ -16495,18 +16495,18 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Modulix.Core.Customs.GtipCatalogEntry", b =>
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Customs.GtipCatalogEntry", b =>
                 {
-                    b.HasOne("Modulix.Core.Customs.GtipCatalogVersion", null)
+                    b.HasOne("Modulix.Modules.Warehouse.Customs.GtipCatalogVersion", null)
                         .WithMany()
                         .HasForeignKey("VersionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Modulix.Core.Customs.RegimeProfileVersion", b =>
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Customs.RegimeProfileVersion", b =>
                 {
-                    b.HasOne("Modulix.Core.Customs.RegimeProfile", null)
+                    b.HasOne("Modulix.Modules.Warehouse.Customs.RegimeProfile", null)
                         .WithMany()
                         .HasForeignKey("ProfileId")
                         .OnDelete(DeleteBehavior.Restrict)

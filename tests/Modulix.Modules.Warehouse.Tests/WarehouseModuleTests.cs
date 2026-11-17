@@ -145,7 +145,7 @@ public class WarehouseModuleTests
     [InlineData("12345678901234", "12345678901234")]
     public void Gtip_is_normalized_to_digits_and_keeps_leading_zeros(string input, string expected)
     {
-        var (value, error) = Modulix.Core.Contracts.Customs.GtipRules.Normalize(input);
+        var (value, error) = Modulix.Modules.Warehouse.Contracts.Customs.GtipRules.Normalize(input);
 
         Assert.Null(error);
         Assert.Equal(expected, value);
@@ -158,7 +158,7 @@ public class WarehouseModuleTests
     [InlineData("8471-30")]
     public void Gtip_with_wrong_characters_or_length_is_rejected(string input)
     {
-        var (value, error) = Modulix.Core.Contracts.Customs.GtipRules.Normalize(input);
+        var (value, error) = Modulix.Modules.Warehouse.Contracts.Customs.GtipRules.Normalize(input);
 
         Assert.Null(value);
         Assert.NotNull(error);
@@ -170,6 +170,6 @@ public class WarehouseModuleTests
     [InlineData("   ")]
     public void Empty_gtip_means_not_set_and_is_not_an_error(string? input)
     {
-        Assert.Equal((null, null), Modulix.Core.Contracts.Customs.GtipRules.Normalize(input));
+        Assert.Equal((null, null), Modulix.Modules.Warehouse.Contracts.Customs.GtipRules.Normalize(input));
     }
 }

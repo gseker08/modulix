@@ -4,10 +4,14 @@ namespace Modulix.ArchitectureTests;
 /// Ç0.3 boru hattı atlama kapısı: modüller kendi tablolarına yalnızca kayıt deposu katmanından (<c>Records</c> klasörü,
 /// <c>IRecordStore</c> uygulamaları) erişir ve hiçbir yerde kaydetmez. Böylece her yazım kayıt boru hattının izin, kapsam,
 /// hassas alan, denetim kaydı ve olay adımlarından geçer.
+/// Tek istisna modülün tenant'sız başvuru tablolarıdır (ADR-0046 bölüm 6): platform yönetim servisi <c>IPlatformReferenceStore</c> ile kaydeder.
+/// O dosya <c>IModuleData</c>'ya dokunamaz ve depo tenant yollarında (kayıt depoları, uç noktalar) kullanılamaz.
 /// </summary>
 public class ModuleDataAccessRulesTests
 {
     private const string RecordsFolder = "Records";
+    private const string EndpointsFolder = "Endpoints";
+    private const string ReferenceStore = "IPlatformReferenceStore";
 
     public static TheoryData<string> ModuleProjectNames()
     {
@@ -38,7 +42,14 @@ public class ModuleDataAccessRulesTests
                 problems.Add($"{relative}: IModuleData yalnızca {RecordsFolder} klasöründeki kayıt depolarında kullanılır.");
             }
 
-            if (text.Contains("SaveChanges", StringComparison.Ordinal))
+            var referenceWriter = text.Contains(ReferenceStore, StringComparison.Ordinal);
+            if (referenceWriter && (relative.StartsWith(RecordsFolder + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                    || relative.StartsWith(EndpointsFolder + Path.DirectorySeparatorChar, StringComparison.Ordinal)))
+            {
+                problems.Add($"{relative}: {ReferenceStore} yalnızca platform yönetim servisinde kullanılır; tenant yolunda (kayıt deposu, uç nokta) kullanılmaz.");
+            }
+
+            if (text.Contains("SaveChanges", StringComparison.Ordinal) && !(referenceWriter && !text.Contains("IModuleData", StringComparison.Ordinal)))
             {
                 problems.Add($"{relative}: modül kaydetmez; kayıt boru hattı kayıt, denetim ve olayı birlikte yazar.");
             }
