@@ -248,6 +248,9 @@ public sealed class CoreModule : IModule
         /// <summary>Kayıtlı rapor (ADR-0035, dilim 3); kaydın kimliği raporun kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
         public const string Report = "core.report";
 
+        /// <summary>Kullanıcı panosu (CRM epik E2); kaydın kimliği panonun kimliğidir. Bileşenlerin okunabilir özeti yazılır.</summary>
+        public const string Dashboard = "core.dashboard";
+
         /// <summary>Zamanlanmış rapor (ADR-0035, dilim 4); kaydın kimliği zamanlamanın kimliğidir.</summary>
         public const string ReportSchedule = "core.report-schedule";
 
@@ -407,7 +410,9 @@ public sealed class CoreModule : IModule
 
     /// <summary>
     /// Süreli belge türü (ADR-0038 K3, Y9b): hazır değerler örnektir; tenant kendi türlerini ekler, yeni türde kategori seçilir. Kategori
-    /// belgenin hangi kayda eklenebileceğini belirler (araç, sürücü, firma, tesis, çalışan; sahip türünü modül bildirir).
+    /// belgenin hangi kayda eklenebileceğini belirler (araç, sürücü, firma, tesis, çalışan; sahip türünü modül bildirir). Core yalnızca sektörden
+    /// bağımsız belgeleri tanımlar; araç belgeleri Filo'dan, sürücü belgeleri Lojistik'ten, antrepo yer türü Depo'dan katkı olarak gelir
+    /// (<see cref="IModule.ChoiceValueContributions"/>, H2).
     /// </summary>
     IReadOnlyList<ChoiceListDefinition> IModule.ChoiceLists { get; } =
     [
@@ -425,16 +430,6 @@ public sealed class CoreModule : IModule
                 new(CredentialCategories.Employee, "Özlük belgesi"),
             ],
             [
-                new("Inspection", "Araç muayenesi", CredentialCategories.Vehicle),
-                new("TrafficInsurance", "Trafik sigortası", CredentialCategories.Vehicle),
-                new("Casco", "Kasko", CredentialCategories.Vehicle),
-                new("ExhaustEmission", "Egzoz emisyon ölçümü", CredentialCategories.Vehicle),
-                new("TachographCalibration", "Takograf kalibrasyonu", CredentialCategories.Vehicle),
-                new("DrivingLicense", "Sürücü belgesi (ehliyet)", CredentialCategories.Driver),
-                new("Src", "SRC belgesi", CredentialCategories.Driver),
-                new("Psychotechnical", "Psikoteknik belgesi", CredentialCategories.Driver),
-                new("AdrCertificate", "ADR sertifikası", CredentialCategories.Driver),
-                new("TachographCard", "Takograf sürücü kartı", CredentialCategories.Driver),
                 new("AuthorizationCertificate", "Yetki belgesi", CredentialCategories.Party),
                 new("PowerOfAttorney", "Vekâletname", CredentialCategories.Party),
                 new("OperatingPermit", "Faaliyet izni", CredentialCategories.Facility),
@@ -461,7 +456,6 @@ public sealed class CoreModule : IModule
             [
                 new("Depot", "Depo", PlaceKindCategories.Site),
                 new("Factory", "Fabrika", PlaceKindCategories.Site),
-                new("BondedWarehouse", "Antrepo", PlaceKindCategories.Site),
                 new("Port", "Liman", PlaceKindCategories.Port),
                 new("BorderGate", "Sınır kapısı", PlaceKindCategories.Border),
                 new("CustomsOffice", "Gümrük müdürlüğü", PlaceKindCategories.Customs),
@@ -698,6 +692,10 @@ public sealed class CoreModule : IModule
                 ["visibility"] = new Dictionary<string, string> { ["Private"] = "Özel", ["Users"] = "Seçilen kullanıcılar", ["Tenant"] = "Firma" },
             },
         },
+        new(AuditedEntityKeys.Dashboard, "Pano", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["widgets"] = "Bileşenler",
+        }, "name"),
         new(AuditedEntityKeys.AuditArchive, "Denetim kaydı arşivi", null, new Dictionary<string, string>
         {
             ["period"] = "Dönem", ["rows"] = "Satır sayısı", ["bytes"] = "Boyut (bayt)", ["sha256"] = "SHA-256 özeti",

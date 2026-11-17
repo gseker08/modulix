@@ -249,6 +249,12 @@ public sealed class WarehouseModule : IModule, IModuleEndpoints
         new(Entities.Lot, "Parti"),
     ];
 
+    /// <summary>Antrepo, Core'un ortak yer türü listesine bu modülden eklenir (H2): sektör sözlüğü Core'da değil, sahibi modüldedir.</summary>
+    IReadOnlyList<ChoiceValueContribution> IModule.ChoiceValueContributions { get; } =
+    [
+        new(Place.KindList, [new("BondedWarehouse", "Antrepo", PlaceKindCategories.Site)]),
+    ];
+
     /// <summary>
     /// Alan türü (Y9b): hazır değerler örnektir; tenant kendi türlerini ekler. Kod türün adına bakmaz, <see cref="ZoneKindCategories">kategorisine</see>
     /// bakar (gümrük denetimli / serbest); yeni türde kategori seçilir (K18).

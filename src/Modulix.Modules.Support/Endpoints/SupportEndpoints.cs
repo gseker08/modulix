@@ -176,6 +176,7 @@ internal sealed class SupportPolicyProvider(IServiceProvider services) : ISuppor
             int.TryParse(await settings.GetValueAsync(SupportModule.SettingKeys.AutoCloseDays, cancellationToken), out var autoClose) ? Math.Clamp(autoClose, 0, 999) : 0,
             string.Equals(await settings.GetValueAsync(SupportModule.SettingKeys.SurveyEnabled, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
             int.TryParse(await settings.GetValueAsync(SupportModule.SettingKeys.SurveyValidDays, cancellationToken), out var surveyDays) ? Math.Clamp(surveyDays, 1, 90) : SurveyRules.DefaultValidDays,
-            string.Equals(await settings.GetValueAsync(SupportModule.SettingKeys.AcknowledgementEnabled, cancellationToken), "true", StringComparison.OrdinalIgnoreCase));
+            string.Equals(await settings.GetValueAsync(SupportModule.SettingKeys.AcknowledgementEnabled, cancellationToken), "true", StringComparison.OrdinalIgnoreCase),
+            int.TryParse(await settings.GetValueAsync(SupportModule.SettingKeys.SurveyReminderDays, cancellationToken), out var reminderDays) ? Math.Clamp(reminderDays, 0, SurveyRules.MaxReminderDays) : 0);
     }
 }

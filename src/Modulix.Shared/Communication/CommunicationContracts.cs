@@ -94,4 +94,4 @@ public sealed record PublicTopicRequest(string Token, string TopicKey, bool Subs
 /// <param name="Topics">Açık konular; yalnızca durum "subscribed" iken dolu olabilir.</param>
 public sealed record PublicCommunicationView(
     string Channel, string MaskedAddress, string State, bool CanUnsubscribe, bool CanResubscribe, string? Message, string TenantName, DateTimeOffset ExpiresAt,
-    IReadOnlyList<PublicTopicDto>? Topics = null);
+    IReadOnlyList<PublicTopicDto>? Topics = null, string Language = "tr");

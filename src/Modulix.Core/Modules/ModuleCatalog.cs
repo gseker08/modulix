@@ -229,6 +229,8 @@ public sealed partial class ModuleCatalog
             throw new InvalidOperationException($"Katalogda '{CoreModule.ModuleKey}' modülü yok.");
         }
 
+        AddChoiceValueContributions();
+
         // Atama e-postası modüllerin sorumlu atanan kayıt türlerine gider (ADR-0007); yeni modül ek iş yapmadan katılır.
         // Sorumlu atanan tür yoksa abonelik de yoktur (boş liste "bütün türler" demektir).
         if (subscriptions.TryGetValue(CoreModule.Subscriptions.AssignmentEmail, out var assignment))
@@ -338,9 +340,9 @@ public sealed partial class ModuleCatalog
     public (string ModuleKey, ChoiceListDefinition List)? FindChoiceList(string listKey) =>
         choiceLists.TryGetValue(listKey, out var list) ? list : null;
 
-    /// <summary>Seçim listeleri, modül ve tanım sırasıyla.</summary>
+    /// <summary>Seçim listeleri (başka modüllerin katkı değerleri eklenmiş), modül ve tanım sırasıyla.</summary>
     public IEnumerable<(string ModuleKey, ChoiceListDefinition List)> ChoiceLists =>
-        Modules.SelectMany(m => m.ChoiceLists.Select(l => (m.Key, l)));
+        Modules.SelectMany(m => m.ChoiceLists.Select(l => choiceLists[l.Key]));
 
     /// <summary>Lookup tanımı ve modülü (ADR-0016); tanımlı değilse null.</summary>
     public (string ModuleKey, LookupDefinition Lookup)? FindLookup(string key) => lookups.TryGetValue(key, out var lookup) ? lookup : null;
@@ -421,6 +423,39 @@ public sealed partial class ModuleCatalog
 
     // Anahtarlar modülün; değer anahtarı harfle başlar (kayıtta ve süzgeçte metin olarak durur). Kategori varsa her
     // değer bilinen bir kategoriye bağlıdır ve her kategoride en az bir hazır değer vardır.
+    /// <summary>
+    /// Modüllerin başka modül listesine eklediği hazır değerler (H2) listenin tanımına modül sırasıyla eklenir. Hedef liste tanımlı olmalı, liste
+    /// modülün kendi listesi olmamalı, değer anahtarı listede tekil ve geçerli, kategorisi listenin kategorisi olmalıdır.
+    /// </summary>
+    private void AddChoiceValueContributions()
+    {
+        foreach (var module in this.modules.Values)
+        {
+            foreach (var contribution in module.ChoiceValueContributions)
+            {
+                if (!choiceLists.TryGetValue(contribution.ListKey, out var target) || target.ModuleKey == module.Key || contribution.Values.Count == 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Geçersiz seçim listesi katkısı: '{contribution.ListKey}' ({module.Key}). Liste başka bir modülde tanımlı olmalı ve en az bir değer verilmeli.");
+                }
+
+                var merged = target.List with { Values = [.. target.List.Values, .. contribution.Values] };
+                try
+                {
+                    ValidateChoiceList(target.ModuleKey, merged);
+                }
+                catch (InvalidOperationException)
+                {
+                    throw new InvalidOperationException(
+                        $"Geçersiz seçim listesi katkısı: '{contribution.ListKey}' ({module.Key}). Değer anahtarı listede tekil ve geçerli, kategorisi listenin kategorisi olmalı.");
+                }
+
+                choiceLists[contribution.ListKey] = (target.ModuleKey, merged);
+            }
+        }
+    }
+
+    // Bir kategorinin bütün hazır değerleri katkıyla gelebilir (ör. araç belgeleri Filo'dan); bu yüzden kategori başına hazır değer aranmaz.
     private static void ValidateChoiceList(string moduleKey, ChoiceListDefinition list)
     {
         var prefix = moduleKey + ".";
@@ -436,8 +471,7 @@ public sealed partial class ModuleCatalog
             || categories.Count != list.Categories.Count
             || (categories.Count == 0
                 ? list.Values.Any(v => v.Category is not null)
-                : list.Values.Any(v => v.Category is null || !categories.Contains(v.Category))
-                    || categories.Any(c => list.Values.All(v => v.Category != c))))
+                : list.Values.Any(v => v.Category is null || !categories.Contains(v.Category))))
         {
             throw new InvalidOperationException($"Geçersiz seçim listesi tanımı: '{list.Key}' ({moduleKey}).");
         }

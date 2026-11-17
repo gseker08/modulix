@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modulix.Core\Modulix.Core.csproj" />
+    <ProjectReference Include="..\..\src\Modulix.Core.Hosting\Modulix.Core.Hosting.csproj" />
   </ItemGroup>
 
 </Project>

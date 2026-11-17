@@ -3,7 +3,7 @@
 @inject ApiClient Api
 @inject NavigationManager Navigation
 
-<PageTitle>İletişim tercihleri · Modulix</PageTitle>
+<PageTitle>@Texts.Get("communication.public.title") · Modulix</PageTitle>
 
 @* Oturumsuz tercih merkezi (ADR-0025 dilim 6). Belirteç adresin # parçasındadır (#t=...): sunucuya, günlüklere ve Referer başlığına gitmez; API çağrılarında gövdede taşınır.
    Sayfa açılışta hiçbir değişiklik yapmaz: abonelikten çıkış yalnızca düğmeye basılınca olur (bağlantıyı önceden açan güvenlik tarayıcıları kimseyi çıkaramaz). Adres maskelidir. *@
@@ -15,14 +15,14 @@
 else if (invalid)
 {
     <div class="alert alert-warning" role="alert">
-        <h1 class="h5">Bağlantı geçersiz</h1>
-        <p class="mb-0">Bu bağlantı geçersiz ya da kaldırılmış. Lütfen size ulaşan firmayla iletişime geçin.</p>
+        <h1 class="h5">@Texts.Get("crm.public-quote.invalid")</h1>
+        <p class="mb-0">@Texts.Get("communication.public.invalid-text")</p>
     </div>
 }
 else if (view is not null)
 {
     <article class="public-quote" aria-labelledby="pref-heading">
-        <h1 id="pref-heading" class="h4">İletişim tercihleriniz</h1>
+        <h1 id="pref-heading" class="h4">@Texts.Get("communication.public.heading")</h1>
         <p class="text-muted"><strong>@view.TenantName</strong> · @ChannelText(view.Channel) · @view.MaskedAddress</p>
 
         <Notice Text="@problem" Failed="true" />
@@ -34,11 +34,11 @@ else if (view is not null)
         @switch (view.State)
         {
             case "subscribed":
-                <p>Bu adrese @view.TenantName tarafından pazarlama iletileri gönderilebilir.</p>
+                <p>@Texts.Get("communication.public.subscribed", view.TenantName)</p>
                 @if (view.Topics is { Count: > 0 })
                 {
                     <fieldset class="mb-3" disabled="@busy">
-                        <legend class="h6">Hangi konularda ileti almak istersiniz?</legend>
+                        <legend class="h6">@Texts.Get("communication.public.topics")</legend>
                         @foreach (var topic in view.Topics)
                         {
                             <div class="form-check">
@@ -47,20 +47,20 @@ else if (view is not null)
                                 <label class="form-check-label" for="topic-@topic.Key">@topic.Name</label>
                             </div>
                         }
-                        <p class="small text-muted mb-0">Bir konunun işaretini kaldırmak o konudaki iletileri durdurur. Tümünü durdurmak için aşağıdaki düğmeyi kullanın.</p>
+                        <p class="small text-muted mb-0">@Texts.Get("communication.public.topics-help")</p>
                     </fieldset>
                 }
                 <div class="form-actions">
-                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="UnsubscribeAsync">Abonelikten çık</button>
+                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="UnsubscribeAsync">@Texts.Get("communication.public.unsubscribe")</button>
                 </div>
                 break;
             case "unsubscribed":
-                <p>Abonelikten çıktınız. Bu adrese pazarlama iletisi gönderilmez.</p>
+                <p>@Texts.Get("communication.public.unsubscribed")</p>
                 @if (view.CanResubscribe)
                 {
-                    <p class="small text-muted">Yanlışlıkla çıktıysanız aboneliği yeniden açabilirsiniz.</p>
+                    <p class="small text-muted">@Texts.Get("communication.public.resubscribe-help")</p>
                     <div class="form-actions">
-                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ResubscribeAsync">Aboneliği yeniden aç</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="ResubscribeAsync">@Texts.Get("communication.public.resubscribe")</button>
                     </div>
                 }
                 break;
@@ -69,13 +69,13 @@ else if (view is not null)
                 @if (view.CanUnsubscribe)
                 {
                     <div class="form-actions">
-                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="UnsubscribeAsync">İletişim istemiyorum</button>
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="UnsubscribeAsync">@Texts.Get("communication.public.opt-out")</button>
                     </div>
                 }
                 break;
         }
 
-        <p class="small text-muted mt-3">Bu tercih yalnızca pazarlama iletilerini etkiler; hesap, sipariş ve hizmet bildirimleri gönderilmeye devam edebilir.</p>
+        <p class="small text-muted mt-3">@Texts.Get("communication.public.scope-note")</p>
     </article>
 }
 
@@ -92,6 +92,8 @@ else if (view is not null)
 
     protected override async Task OnInitializedAsync()
     {
+        // Sayfa önce tarayıcının diliyle açılır; görünüm gelince alıcının diline geçer (ADR-0034 §6).
+        await PublicTexts.ApplyAsync(Api, null);
         token = Modulix.Web.Pages.Crm.PublicQuote.TokenFromFragment(Navigation.Uri);
         if (token.Length == 0)
         {
@@ -101,19 +103,23 @@ else if (view is not null)
         }
 
         var result = await Api.PostAsync<PublicCommunicationView>($"/api/public/communication/{Uri.EscapeDataString(Tenant)}/view", new PublicCommunicationTokenRequest(token));
+        if (result.Value is { } loaded)
+        {
+            await PublicTexts.ApplyAsync(Api, loaded.Language);
+        }
+
         loading = false;
         view = result.Value;
         invalid = view is null;
     }
 
-    private Task UnsubscribeAsync() => ActAsync("unsubscribe", "Tercihiniz kaydedildi.");
+    private Task UnsubscribeAsync() => ActAsync("unsubscribe");
 
-    private Task ResubscribeAsync() => ActAsync("resubscribe", "Tercihiniz kaydedildi.");
+    private Task ResubscribeAsync() => ActAsync("resubscribe");
 
-    private Task SetTopicAsync(PublicTopicDto topic, bool subscribed) =>
-        ActAsync("topic", "Tercihiniz kaydedildi.", new PublicTopicRequest(token, topic.Key, subscribed));
+    private Task SetTopicAsync(PublicTopicDto topic, bool subscribed) => ActAsync("topic", new PublicTopicRequest(token, topic.Key, subscribed));
 
-    private async Task ActAsync(string action, string success, object? body = null)
+    private async Task ActAsync(string action, object? body = null)
     {
         if (busy) { return; }
         busy = true;
@@ -125,19 +131,19 @@ else if (view is not null)
         if (result.Value is { } updated)
         {
             view = updated;
-            done = success;
+            done = Texts.Get("communication.public.saved");
             return;
         }
 
-        problem = result.Error ?? "İşlem yapılamadı.";
+        problem = result.Error ?? Texts.Get("communication.public.failed");
     }
 
     private static string ChannelText(string channel) => channel switch
     {
-        "Email" => "E-posta",
+        "Email" => Texts.Get("common.field.email"),
         "Sms" => "SMS",
         "WhatsApp" => "WhatsApp",
-        "Phone" => "Telefon",
+        "Phone" => Texts.Get("common.field.phone"),
         _ => channel,
     };
 }
