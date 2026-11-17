@@ -591,6 +591,19 @@ public sealed class LogisticsModule : IModule, IModuleEndpoints
         new(Entities.Driver, CredentialCategories.Driver, "Sürücü", Permissions.DriversRead),
     ];
 
+    /// <summary>Sürücü belgelerinin hazır türleri Core'un süreli belge türü listesine eklenir (H2): sektör sözlüğü Core'da değil, sürücünün sahibi modüldedir.</summary>
+    IReadOnlyList<ChoiceValueContribution> IModule.ChoiceValueContributions { get; } =
+    [
+        new(CredentialEntities.TypeList,
+        [
+            new("DrivingLicense", "Sürücü belgesi (ehliyet)", CredentialCategories.Driver),
+            new("Src", "SRC belgesi", CredentialCategories.Driver),
+            new("Psychotechnical", "Psikoteknik belgesi", CredentialCategories.Driver),
+            new("AdrCertificate", "ADR sertifikası", CredentialCategories.Driver),
+            new("TachographCard", "Takograf sürücü kartı", CredentialCategories.Driver),
+        ]),
+    ];
+
     /// <summary>Sürücü formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>
     IReadOnlyList<FormDefinition> IModule.Forms => LogisticsForms.All;
 
