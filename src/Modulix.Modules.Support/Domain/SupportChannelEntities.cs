@@ -1,6 +1,6 @@
 namespace Modulix.Modules.Support.Domain;
 
-// Kanal, ek ve memnuniyet (ADR-0024, dilim 4). Ek içeriği genel dosya deposu (Ç4) gelene kadar veritabanında, sınırlı boyutla durur.
+// Kanal, ek ve memnuniyet (ADR-0024, dilim 4). Ek içeriği ortak dosya deposunda modüle ait dosya olarak durur (ADR-0040 K9); üst veri ve erişim kuralı buradadır.
 
 /// <summary>
 /// Mesaja bağlı ek. Görünürlük mesajdan gelir: iç nota bağlı ek iç not iznine bağlıdır. İçerik değiştirilmez ve silinmez; dosya türü uzantı ile
@@ -29,6 +29,13 @@ public sealed class TicketAttachment : SupportEntity
     /// <summary><see cref="Lifecycle.AttachmentScan"/>. Bugün her ek <c>NotScanned</c>'dir: kötü amaçlı yazılım taraması yoktur.</summary>
     public string ScanStatus { get; internal set; } = Lifecycle.AttachmentScan.NotScanned;
 
+    /// <summary>
+    /// İçeriğin ortak dosya deposundaki kimliği (ADR-0040 K9, modüle ait dosya). Doluysa içerik depodadır; boşsa henüz taşınmamış eski ektir ve
+    /// içerik <see cref="Content"/> sütunundadır (zamanlanmış iş taşır).
+    /// </summary>
+    public Guid? FileId { get; internal set; }
+
+    /// <summary>Eski saklama yeri: yalnızca depoya taşınmamış eklerde doludur. Yeni ekte boştur; sütun sonraki sürümde düşürülür.</summary>
     public byte[] Content { get; internal set; } = [];
 
     public Guid? CreatedBy { get; internal set; }

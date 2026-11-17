@@ -14,7 +14,7 @@ using Modulix.Modules.Support.Sla;
 namespace Modulix.Modules.Support.Lifecycle;
 
 /// <summary>Tur özeti: yeni işaretlenen ihlal sayısı ve uygulanan eskalasyon eylemi sayısı.</summary>
-public sealed record SlaSchedulerRun(int Breaches, int Escalations, int AutoClosed = 0, int SurveyReminders = 0);
+public sealed record SlaSchedulerRun(int Breaches, int Escalations, int AutoClosed = 0, int SurveyReminders = 0, int AttachmentsMoved = 0);
 
 /// <summary>
 /// SLA zamanlanmış işi (ADR-0024 dilim 2). Host, işi tenant başına bir kez çalıştırır (tenant başına oturum kilidi); aynı turun tekrar ya da paralel çalışması da güvenlidir:
@@ -36,7 +36,9 @@ internal sealed class SlaScheduler(
     IRecipientLanguage languages,
     SurveyIssuer surveys,
     INotificationRecipients? recipients = null,
-    ISupportPolicyProvider? policy = null) : ISlaScheduler
+    ISupportPolicyProvider? policy = null,
+    Modulix.Core.Contracts.Files.IModuleFiles? files = null,
+    Modulix.Core.Contracts.Files.IFileLimits? limits = null) : ISlaScheduler
 {
     private const int BatchSize = 200;
 
@@ -47,7 +49,43 @@ internal sealed class SlaScheduler(
         var escalations = await EscalateAsync(now, cancellationToken);
         var closed = await AutoCloseAsync(now, cancellationToken);
         var reminders = await RemindSurveysAsync(now, cancellationToken);
-        return new SlaSchedulerRun(breaches, escalations, closed, reminders);
+        var moved = await MoveAttachmentsAsync(cancellationToken);
+        return new SlaSchedulerRun(breaches, escalations, closed, reminders, moved);
+    }
+
+    /// <summary>Bir turda depoya taşınan eski ek sayısı (içerik belleğe alındığı için küçük tutulur: en çok 10 × 5 MB).</summary>
+    private const int AttachmentMoveBatch = 10;
+
+    /// <summary>
+    /// Eski eklerin taşınması (ADR-0024 §4.14): içeriği hâlâ satırda duran ekler (<see cref="TicketAttachment.FileId"/> boş) ortak dosya deposuna modüle ait dosya
+    /// olarak yazılır ve satıra dosya kimliği işlenir. Eski içerik sütunu bu sürümde <b>silinmez</b> (bir önceki sürüm onu okur); sütun sonraki sürümde düşürülür.
+    /// Tur yarıda kalırsa içerik yetim kalır ve dosya temizliği siler; satır taşınmamış kalır ve sonraki turda yeniden denenir. Taşınacak ek kalmayınca adım boştur.
+    /// </summary>
+    private async Task<int> MoveAttachmentsAsync(CancellationToken cancellationToken)
+    {
+        if (files is null || limits is null)
+        {
+            return 0;
+        }
+
+        var max = limits.MaxFileBytes;
+        var pending = await data.Set<TicketAttachment>().Where(a => a.FileId == null && a.SizeBytes <= max)
+            .OrderBy(a => a.CreatedAt).ThenBy(a => a.Id).Take(AttachmentMoveBatch).ToListAsync(cancellationToken);
+        var moved = 0;
+        foreach (var attachment in pending)
+        {
+            if (attachment.Content.Length == 0)
+            {
+                continue;
+            }
+
+            var stored = await files.AddAsync(new RecordRef(SupportModule.Entities.Ticket, attachment.TicketId), attachment.FileName, attachment.ContentType, attachment.Content, cancellationToken);
+            attachment.FileId = stored.Id;
+            attachment.Touch();
+            moved++;
+        }
+
+        return moved;
     }
 
     /// <summary>

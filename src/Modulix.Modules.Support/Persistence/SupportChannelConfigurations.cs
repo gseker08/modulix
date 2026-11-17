@@ -14,6 +14,8 @@ internal sealed class TicketAttachmentConfiguration : IEntityTypeConfiguration<T
         builder.Property(a => a.Sha256).HasMaxLength(TicketAttachment.HashLength).IsRequired();
         builder.Property(a => a.ScanStatus).HasMaxLength(SupportTicket.StatusMaxLength).IsRequired();
         builder.Property(a => a.Content).HasColumnType("varbinary(max)").IsRequired();
+        // Taşınmamış eski ekler iş tarafından bu dizinle bulunur; taşıma bitince dizin boş kalır.
+        builder.HasIndex(a => new { a.TenantId, a.CreatedAt }).HasFilter("[FileId] IS NULL").HasDatabaseName("IX_Attachments_NotMoved");
 
         builder.HasIndex(a => new { a.TenantId, a.TicketId });
         builder.HasIndex(a => new { a.TenantId, a.MessageId });

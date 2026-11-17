@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Files;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Support.Domain;
 using Modulix.Modules.Support.Records;
@@ -28,7 +29,8 @@ public interface ITicketAttachments
     Task<RecordResult<TicketAttachmentFile>> GetAsync(Guid ticketId, Guid attachmentId, CancellationToken cancellationToken);
 }
 
-internal sealed class TicketAttachments(IRecordPipeline pipeline, TicketWorkflowGate gate, ICurrentAccess access, SupportStoreContext context) : ITicketAttachments
+internal sealed class TicketAttachments(
+    IRecordPipeline pipeline, TicketWorkflowGate gate, ICurrentAccess access, SupportStoreContext context, IModuleFiles files, IFileLimits limits) : ITicketAttachments
 {
     private const string Key = SupportModule.Entities.Ticket;
 
@@ -79,6 +81,11 @@ internal sealed class TicketAttachments(IRecordPipeline pipeline, TicketWorkflow
             return Invalid("file", error);
         }
 
+        if (content.Length > limits.MaxFileBytes)
+        {
+            return Invalid("file", "Dosya, depolama için ayarlanan boyut sınırını aşıyor.");
+        }
+
         var perMessage = await context.Data.Set<TicketAttachment>().CountAsync(a => a.MessageId == messageId, cancellationToken);
         if (perMessage >= AttachmentRules.MaxPerMessage)
         {
@@ -97,8 +104,10 @@ internal sealed class TicketAttachments(IRecordPipeline pipeline, TicketWorkflow
         }
 
         TicketAttachment? created = null;
-        Func<SupportStoreContext, SupportTicket, CancellationToken, Task> effect = (ctx, t, ct) =>
+        Func<SupportStoreContext, SupportTicket, CancellationToken, Task> effect = async (ctx, t, ct) =>
         {
+            // İçerik ortak depoya modüle ait dosya olarak yazılır (ADR-0040 K9); üst verisi bu güncellemeyle aynı işlemde kesinleşir.
+            var stored = await files.AddAsync(new RecordRef(Key, t.Id), name!, contentType!, content, ct);
             created = new TicketAttachment
             {
                 TicketId = t.Id,
@@ -107,11 +116,10 @@ internal sealed class TicketAttachments(IRecordPipeline pipeline, TicketWorkflow
                 ContentType = contentType!,
                 SizeBytes = content.Length,
                 Sha256 = hash,
-                Content = content,
+                FileId = stored.Id,
                 CreatedBy = ctx.CurrentUserId,
             };
             ctx.Data.Set<TicketAttachment>().Add(created);
-            return Task.CompletedTask;
         };
 
         var kind = isInternal ? TicketEventKinds.InternalAttachmentAdded : TicketEventKinds.AttachmentAdded;
@@ -141,9 +149,27 @@ internal sealed class TicketAttachments(IRecordPipeline pipeline, TicketWorkflow
                          join m in context.Data.Set<TicketMessage>().AsNoTracking() on a.MessageId equals m.Id
                          where a.Id == attachmentId && a.TicketId == ticketId && (includeInternal || m.Visibility == MessageVisibility.Public)
                          select new { Attachment = a, m.Visibility }).FirstOrDefaultAsync(cancellationToken);
-        return row is null
-            ? RecordResult<TicketAttachmentFile>.Fail(RecordErrorCode.NotFound, "Ek bulunamadı.")
-            : RecordResult<TicketAttachmentFile>.Ok(new TicketAttachmentFile(ToItem(row.Attachment, row.Visibility == MessageVisibility.Internal), row.Attachment.Content));
+        if (row is null)
+        {
+            return RecordResult<TicketAttachmentFile>.Fail(RecordErrorCode.NotFound, "Ek bulunamadı.");
+        }
+
+        // Görünürlük yukarıda denetlendi (talep kapsamı + iç not izni); depo erişim denetimi yapmaz. Taşınmamış eski ekin içeriği hâlâ satırdadır.
+        var bytes = row.Attachment.Content;
+        if (row.Attachment.FileId is { } fileId)
+        {
+            await using var stored = await files.OpenAsync(fileId, Key, cancellationToken);
+            if (stored is null)
+            {
+                return RecordResult<TicketAttachmentFile>.Fail(RecordErrorCode.NotFound, "Ek içeriği bulunamadı.");
+            }
+
+            using var buffer = new MemoryStream();
+            await stored.Content.CopyToAsync(buffer, cancellationToken);
+            bytes = buffer.ToArray();
+        }
+
+        return RecordResult<TicketAttachmentFile>.Ok(new TicketAttachmentFile(ToItem(row.Attachment, row.Visibility == MessageVisibility.Internal), bytes));
     }
 
     private async Task<IReadOnlyList<TicketAttachmentItem>> QueryAsync(Guid ticketId, bool includeInternal, CancellationToken cancellationToken)

@@ -951,5 +951,103 @@ public class SupportChannelTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         Assert.Equal(HttpStatusCode.NotFound, (await otherLead.GetAsync($"/api/support/tickets/{mine.Id}/surveys")).StatusCode);
     }
 
+    // ---- Ekler ortak dosya deposunda (ADR-0024 §4.14, ADR-0040 K9)
+
+    private static Task<byte[]> DownloadAsync(HttpClient client, Guid ticketId, Guid attachmentId) =>
+        client.GetByteArrayAsync($"/api/support/tickets/{ticketId}/attachments/{attachmentId}/file");
+
+    private async Task<(Guid? FileId, int ContentBytes)> StorageOfAsync(Guid tenantId, Guid attachmentId)
+    {
+        var fileId = await factory.ScalarAsync<string>(tenantId, "SELECT CONVERT(nvarchar(36), FileId) FROM support.Attachments WHERE Id = @id", ("@id", attachmentId));
+        var bytes = await factory.ScalarAsync<int>(tenantId, "SELECT CAST(DATALENGTH(Content) AS int) FROM support.Attachments WHERE Id = @id", ("@id", attachmentId));
+        return (fileId is null ? null : Guid.Parse(fileId), bytes);
+    }
+
+    /// <summary>Eki, taşımadan önceki haline çevirir: içerik satırda, dosya kimliği boş.</summary>
+    private Task MakeLegacyAsync(Guid tenantId, Guid attachmentId, byte[] content) =>
+        SqlAsync(tenantId, "UPDATE support.Attachments SET FileId = NULL, Content = {1} WHERE Id = {0}", attachmentId, content);
+
+    [Fact]
+    public async Task New_attachments_are_stored_in_the_file_store_as_module_owned_files_that_generic_file_endpoints_never_expose()
+    {
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        using var lead = await LoginAsync(s.Lead);
+        using var viewer = await LoginAsync(s.Viewer);
+        var ticket = await TicketAsync(lead, s);
+        var reply = await MessageAsync(lead, ticket.Id, "reply", "Ek gönderiyorum.");
+        var note = await MessageAsync(lead, ticket.Id, "note", "İç değerlendirme ektedir.");
+        var secret = Encoding.ASCII.GetBytes("%PDF-1.4\nic not eki\n%%EOF");
+
+        var open = await UploadOkAsync(lead, ticket.Id, reply.Id, "yanit.pdf", Pdf);
+        var hidden = await UploadOkAsync(lead, ticket.Id, note.Id, "ic-not.pdf", secret);
+
+        // İçerik satırda değil depodadır; indirme aynı baytları verir.
+        var (fileId, contentBytes) = await StorageOfAsync(s.Tenant.Id, hidden.Id);
+        Assert.NotNull(fileId);
+        Assert.Equal(0, contentBytes);
+        Assert.Equal(Pdf, await DownloadAsync(lead, ticket.Id, open.Id));
+        Assert.Equal(secret, await DownloadAsync(lead, ticket.Id, hidden.Id));
+
+        // Yetki: iç not izni olmayan kullanıcı iç not ekini destek uçlarından göremez ve indiremez (kural değişmedi).
+        Assert.Equal(open.Id, Assert.Single(await AttachmentsAsync(viewer, ticket.Id)).Id);
+        Assert.Equal(HttpStatusCode.NotFound, (await viewer.GetAsync($"/api/support/tickets/{ticket.Id}/attachments/{hidden.Id}/file")).StatusCode);
+
+        // Genel dosya uçları talebin eklerini hiç göstermez: ne talebi okuyabilen kullanıcıya ne tam yetkili yöneticiye.
+        foreach (var client in new[] { viewer, manager })
+        {
+            Assert.Empty((await client.GetFromJsonAsync<List<Modulix.Shared.Files.StoredFileDto>>($"/api/files?entityKey=support.ticket&recordId={ticket.Id}"))!);
+            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/files/{fileId}/content")).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync($"/api/files/{fileId}?version=1")).StatusCode);
+        }
+
+        // Doğrulama kuralları değişmedi: aynı içerik aynı mesaja ikinci kez eklenemez, geçersiz tür reddedilir.
+        Assert.Equal(HttpStatusCode.Conflict, (await UploadAsync(lead, ticket.Id, reply.Id, "kopya.pdf", Pdf)).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await UploadAsync(lead, ticket.Id, reply.Id, "betik.exe", Pdf)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Legacy_attachments_stay_downloadable_and_the_job_moves_them_to_the_file_store_once_per_tenant()
+    {
+        var s = await SetUpAsync();
+        var other = await SetUpAsync();
+        using var lead = await LoginAsync(s.Lead);
+        using var otherLead = await LoginAsync(other.Lead);
+
+        async Task<(TicketDto Ticket, AttachmentDto Attachment)> LegacyAsync(HttpClient client, Setup setup)
+        {
+            var ticket = await TicketAsync(client, setup);
+            var reply = await MessageAsync(client, ticket.Id, "reply", "Eski ek.");
+            var attachment = await UploadOkAsync(client, ticket.Id, reply.Id, "eski.pdf", Pdf);
+            await MakeLegacyAsync(setup.Tenant.Id, attachment.Id, Pdf);
+            return (ticket, attachment);
+        }
+
+        var mine = await LegacyAsync(lead, s);
+        var foreign = await LegacyAsync(otherLead, other);
+
+        // Taşınmamış ek satırdaki içerikten indirilmeye devam eder.
+        Assert.Equal((null, Pdf.Length), await StorageOfAsync(s.Tenant.Id, mine.Attachment.Id));
+        Assert.Equal(Pdf, await DownloadAsync(lead, mine.Ticket.Id, mine.Attachment.Id));
+
+        // İş yalnızca kendi tenant'ının eklerini taşır; eski içerik bu sürümde silinmez (önceki sürüm onu okur).
+        Assert.Equal(1, (await RunJobsAsync(s.Tenant.Id)).AttachmentsMoved);
+        var (fileId, contentBytes) = await StorageOfAsync(s.Tenant.Id, mine.Attachment.Id);
+        Assert.NotNull(fileId);
+        Assert.Equal(Pdf.Length, contentBytes);
+        Assert.Equal(Pdf, await DownloadAsync(lead, mine.Ticket.Id, mine.Attachment.Id));
+        Assert.Null((await StorageOfAsync(other.Tenant.Id, foreign.Attachment.Id)).FileId);
+
+        // Tekrar çalıştırma ikinci kez taşımaz.
+        Assert.Equal(0, (await RunJobsAsync(s.Tenant.Id)).AttachmentsMoved);
+        Assert.Equal(fileId, (await StorageOfAsync(s.Tenant.Id, mine.Attachment.Id)).FileId);
+
+        // Tenant izolasyonu: öteki firma bu eki ne destek ucundan ne genel dosya ucundan indirebilir; kendi turu kendi ekini taşır.
+        Assert.Equal(HttpStatusCode.NotFound, (await otherLead.GetAsync($"/api/support/tickets/{mine.Ticket.Id}/attachments/{mine.Attachment.Id}/file")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await otherLead.GetAsync($"/api/files/{fileId}/content")).StatusCode);
+        Assert.Equal(1, (await RunJobsAsync(other.Tenant.Id)).AttachmentsMoved);
+        Assert.Equal(Pdf, await DownloadAsync(otherLead, foreign.Ticket.Id, foreign.Attachment.Id));
+    }
+
     private sealed record RecordPage(int TotalCount);
 }

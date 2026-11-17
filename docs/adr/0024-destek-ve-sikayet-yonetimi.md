@@ -222,6 +222,15 @@ Renk tek gösterge değildir (durum/öncelik metinli rozet), düğmeler klavye e
 - **Şema:** `support.Surveys` tablosuna iki boş geçilebilir sütun ve süzgeçli tekil dizin (`UX_Surveys_ReminderToken`); geriye uyumlu.
 - **Sınırlar:** en çok bir hatırlatma; talep ekranındaki anket panelinde hatırlatma zamanı gösterilmez (API `reminderQueuedAt` döner); genel adres (`App:PublicUrl`) ayarlı değilse hatırlatma yazılmaz.
 
+### 4.14 Ekler ortak dosya deposunda (17 Kasım 2026; uygulandı)
+
+- **Ne değişti:** ek içeriği artık `support.Attachments.Content` sütununa değil ortak dosya deposuna, **modüle ait dosya** olarak yazılır (ADR-0040 K9, `IModuleFiles`); satır dosya kimliğini (`FileId`) tutar. Üst veri, doğrulama ve erişim kuralı Destek'te kalır ve değişmedi: tür uzantı + imzayla doğrulanır, 5 MB sınırı, mesaj ve talep başına ek sınırı, aynı mesaja aynı içerik bir kez; iç nota bağlı ek yalnızca iç not izniyle görünür; ek silinmez.
+- **Genel dosya uçları ekleri göstermez:** `/api/files` talebin eklerini listelemez, indirmez ve silmez (tam yetkili kullanıcı için de). İndirme yalnızca destek ucundandır ve önce talep kapsamı ile iç not izni denetlenir.
+- **İşlem:** dosyanın üst verisi, ek satırı ve talep güncellemesi aynı işlemde kesinleşir; işlem geri alınırsa içerik yetim kalır ve dosya temizliği siler.
+- **Eski ekler:** `FileId` boş olan ek taşınmamıştır; içeriği satırdan okunmaya devam eder. Destek zamanlanmış işi (`support.jobs`) her turda tenant başına en çok 10 eski eki depoya yazar ve `FileId` işler (`AttachmentsMoved`). Eski içerik bu sürümde **silinmez**: bir önceki sürüm onu okur. `Content` sütunu, taşıma bitince ayrı bir sürümde düşürülür.
+- **Şema:** boş geçilebilir `FileId` sütunu ve taşınmamış ekler için süzgeçli dizin; geriye uyumlu.
+- **Sınırlar:** depolama sınırı (`Storage:MaxFileBytes`) 5 MB'ın altına çekilirse daha büyük ek yüklenemez ve daha büyük eski ek taşınmaz. Taşıma bitene kadar eski eklerin içeriği veritabanında durur; taşınan ekin içeriği sütun düşene kadar iki yerde durur. İçerik taraması yine yoktur (`NotScanned`).
+
 ## 5. Migration ve geri dönüş yaklaşımı
 
 - Yeni **tek zincir** migration'lar: `SupportManagement` (5 tablo, RLS politikasına `TenantIsolationSql.AddTable`, `modulix_app_role` için idempotent `GRANT`) ve `SupportCustomerName` (tek sütun). Mevcut tablolara dokunulmaz; geriye uyumlu ve kesintisizdir. `docker/sqlserver/init.sql` yeni şemayı ve yetkiyi içerir.
@@ -247,7 +256,7 @@ Renk tek gösterge değildir (durum/öncelik metinli rozet), düğmeler klavye e
 - Zamanlayıcı bir turda en çok 200 ihlal ve 400 çalışan örnek işler (kalanı sonraki turda).
 - `Reassign` yalnızca kural kuyruk ve/veya kullanıcı verir; yalnızca kuyruk verilirse sorumlu korunur. Eskalasyonda ek olarak aktivite açılmaz (yalnızca e-posta ve tarihçe).
 - Eskalasyon e-postası kuyruğa alınır; iç kullanıcıya gider, teslim durumu e-posta kuyruğundan izlenir.
-- Genel dosya deposu, gerçek gelen e-posta alıcısı (IMAP/webhook), müşteri portalı, dosya tarama ve uygulama içi bildirim merkezi yoktur. Ekler geçici olarak veritabanında durur (5 MB sınırı); büyük hacimde genel depoya taşınması gerekir.
+- Gerçek gelen e-posta alıcısı (IMAP/webhook), müşteri portalı, dosya tarama ve uygulama içi bildirim merkezi yoktur. Ek içeriği ortak dosya deposundadır (bölüm 4.14; 5 MB sınırı sürer).
 - Gelen kanal girişi bir adaptör sözleşmesidir: gönderen adresinden müşteri (Party) eşleştirilmez; otomatik yanıtlar saklanmaz (yalnızca yok sayılır); kanal adaptörü gönderen doğrulamasını (SPF/DKIM) yapmaz, sunucu yalnızca başvuran adresiyle eşleşmeyi arar. Otomatik "alındı" yanıtı firma ayarıyla üretilir (bölüm 4.12).
 - Anket bağlantısı `App:PublicUrl` ister; ayarsızsa anket oluşur ama e-postası yazılmaz. Anket yalnızca e-posta kanalıyla dağıtılır (SMS/portal yok); yanıtsız anket için tek hatırlatma firma ayarıyla yazılır (bölüm 4.13). Düşük puan yalnızca tarihçe olayıdır (otomatik görev/bildirim açılmaz).
 - Toplu işlem atomik değildir; yalnızca atama, devir, kapatma ve iptal desteklenir (toplu öncelik/çözüm yok). Dışa aktarma en çok 5000 satırdır.
@@ -272,7 +281,7 @@ Renk tek gösterge değildir (durum/öncelik metinli rozet), düğmeler klavye e
 | Bağımlılık | Durum | Etki |
 |---|---|---|
 | SMTP / gelen e-posta (IMAP/webhook) kurulumu | Kurulmadı | Dilim 4 yalnızca adaptör sözleşmesini (`/api/support/inbound`) sunar; gerçek bir alıcı kurulana kadar gelen e-posta kendiliğinden talebe dönüşmez |
-| Genel dosya deposu (Ç4) ve içerik tarama | Yok | Ekler geçici olarak veritabanında (5 MB sınırı, imza doğrulaması); içerik taraması yok, ek `NotScanned` işaretlidir |
+| İçerik tarama | Yok | Ekler ortak dosya deposunda (bölüm 4.14; 5 MB sınırı, imza doğrulaması); içerik taraması yok, ek `NotScanned` işaretlidir |
 | Müşteri portalı | Yok | Portal talebi kurulmaz; anket yalnızca e-postadaki özel bağlantıyla yanıtlanır |
 | Hukuki/KVKK saklama süreleri | Doğrulanmadı | Talep ve mesaj saklama/anonimleştirme politikası ayrı karar gerektirir |
 | E-posta teslim durumu | Kuyruk durumu mevcut, teslim/bounce yok | `Queued` müşteriye ulaştı demek değildir; arayüz bunu söyler |
@@ -371,4 +380,4 @@ Tam entegrasyon paketi (`dotnet test tests/Modulix.IntegrationTests -c Release`,
 
 ## 10. Kalan işler (epic tamamlanmış sayılmaz)
 
-Altı dilimin hepsi uygulandı; epic\'in istek metnindeki şu kalemleri **yapılmadı** ya da kısmen yapıldı: finans iade/tazmin ve lojistik sevkiyat bağları (hedef kayıt türleri oluşunca), kapalı modülde salt okunur talep gösterimi, müşteri portalı; ayrıca: "sonraki müşteri mesajına yanıt" SLA sayacı, kanban (isteğe bağlı), ekip/iş birimi kapsamı testi, kayıtlı görünümler, mesaj düzenleme/geri alma politikası, KVKK saklama politikası, gerçek gelen e-posta alıcısı (IMAP/webhook) ve gönderenden müşteri eşleştirme, dosya taraması ve genel depo, portal. Hiçbiri yapılmış ya da çalışıyormuş gibi sunulmaz.
+Altı dilimin hepsi uygulandı; epic\'in istek metnindeki şu kalemleri **yapılmadı** ya da kısmen yapıldı: finans iade/tazmin ve lojistik sevkiyat bağları (hedef kayıt türleri oluşunca), kapalı modülde salt okunur talep gösterimi, müşteri portalı; ayrıca: "sonraki müşteri mesajına yanıt" SLA sayacı, kanban (isteğe bağlı), ekip/iş birimi kapsamı testi, kayıtlı görünümler, mesaj düzenleme/geri alma politikası, KVKK saklama politikası, gerçek gelen e-posta alıcısı (IMAP/webhook) ve gönderenden müşteri eşleştirme, dosya taraması, eski ek içerik sütununun düşürülmesi (bölüm 4.14), portal. Hiçbiri yapılmış ya da çalışıyormuş gibi sunulmaz.
