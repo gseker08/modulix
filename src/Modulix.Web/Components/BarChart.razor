@@ -2,7 +2,7 @@
 @{
     var max = Slices.Count == 0 ? 0 : Slices.Max(s => s.Value);
 }
-<div class="bar-chart" role="img" aria-label="@(Title ?? Texts.Get("chart.bar"))">
+<div class="bar-chart @(WideValues ? "bar-chart-wide" : null)" role="img" aria-label="@(Title ?? Texts.Get("chart.bar"))">
     @for (var i = 0; i < Slices.Count; i++)
     {
         // Değeri olan çubuk görünür kalsın diye en az %2; sıfır değer çubuksuz kalır.
@@ -22,4 +22,7 @@
 
     /// <summary>Değer etiketinin sayı biçimi; ondalıklı değerlerde (ortalama, tutar) "N2" verilir.</summary>
     [Parameter] public string ValueFormat { get; set; } = "N0";
+
+    /// <summary>Değer sütununu genişletir (tutar gibi uzun değerler taşmasın).</summary>
+    [Parameter] public bool WideValues { get; set; }
 }

@@ -1,0 +1,91 @@
+@page "/raporlar/panolar"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+@inject ToastService Toasts
+
+<PageTitle>@Texts.Get("reports.dashboards.title") · Modulix</PageTitle>
+
+@* Kullanıcının panoları (ADR-0054). Pano yalnızca sahibine görünür; liste kısa ve kişiseldir (en fazla 20), sayfalama ve görünüm yoktur.
+   Kurallar sunucudadır (/api/dashboards; okuma core.reports.read, yazma core.reports.manage). *@
+<AuthGate Permission="@ReportAccess.Read">
+    <a class="back-link" href="raporlar">← @Texts.Get("nav.app.reports")</a>
+
+    <PageHeader Title="@Texts.Get("reports.dashboards.title")" Icon="dashboard" Subtitle="@Texts.Get("reports.dashboards.subtitle")" />
+
+    <Notice Text="@message" Failed="true" />
+
+    @if (Session.Can(ReportAccess.Manage))
+    {
+        <form class="inline-form" novalidate @onsubmit="CreateAsync" @onsubmit:preventDefault>
+            <div>
+                <label class="form-label" for="dashboard-name">@Texts.Get("reports.dashboards.name")</label>
+                <input id="dashboard-name" class="form-control" maxlength="120" @bind="name" @bind:event="oninput" />
+                <FieldError Field="name" Errors="errors" />
+            </div>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("reports.dashboards.create")</button>
+        </form>
+    }
+
+    @if (dashboards is null)
+    {
+        @if (message is null)
+        {
+            <LoadingState Kind="LoadingKind.Cards" Rows="3" />
+        }
+    }
+    else if (dashboards.Count == 0)
+    {
+        <EmptyState Icon="dashboard" Title="@Texts.Get("reports.dashboards.empty")" Text="@Texts.Get("reports.dashboards.emptyHelp")" />
+    }
+    else
+    {
+        <div class="tiles">
+            @foreach (var dashboard in dashboards)
+            {
+                <a class="tile" href="raporlar/panolar/@dashboard.Id">
+                    <strong>@dashboard.Name</strong>
+                    <span>@Texts.Get("reports.dashboards.widgetCount", dashboard.WidgetCount) · @Texts.Get("reports.dashboards.updated", CrmLabels.Time(dashboard.UpdatedAt))</span>
+                </a>
+            }
+        </div>
+    }
+</AuthGate>
+
+@code {
+    private List<DashboardSummaryDto>? dashboards;
+    private string name = string.Empty;
+    private string? message;
+    private bool busy;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(ReportAccess.Read))
+        {
+            return;
+        }
+
+        var result = await Api.GetAsync<List<DashboardSummaryDto>>("/api/dashboards");
+        dashboards = result.Value;
+        message = result.Error;
+    }
+
+    private async Task CreateAsync()
+    {
+        busy = true;
+        var result = await Api.PostAsync<DashboardDetailDto>("/api/dashboards", new SaveDashboardRequest(name));
+        busy = false;
+        errors = result.FieldErrors;
+        if (result.Value is { } created)
+        {
+            Toasts.Success(Texts.Get("reports.dashboards.created"));
+            Navigation.NavigateTo($"raporlar/panolar/{created.Summary.Id}?duzenle=1");
+        }
+        else
+        {
+            message = result.FieldErrors.Count > 0 ? null : result.Error;
+        }
+    }
+}
