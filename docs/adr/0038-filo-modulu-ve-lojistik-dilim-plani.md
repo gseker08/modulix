@@ -732,3 +732,20 @@ Karar (kullanıcı, 15 Kasım 2026: "İkisi de"; bölüm 28'den sonra ayrı PR).
 | `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` / `tests/Modulix.Core.Tests` | 111/111 / 36/36 / 1053/1053. Lojistik şablon testleri: on bir şablon sırayla kayıtlı; durum geçişi tetikleyicisi kaydın beyan edilmiş `status` alanına ve seçeneklerinden birine bağlı; her şablon alıcı seçilince doğrulamadan geçer |
 | `... --filter "AutomationTemplate"` (yerel SQL Server) | 10/10 (1 yeni). **Mutlu yol:** şablondan taslak, alıcı seçilip yayın; sefer API'den iptal edilir, outbox'taki gerçek güncelleme olayı otomasyon işleyicisine teslim edilir, alıcının kutusuna sefer numarası ve iptal gerekçesiyle bildirim düşer. **Kural:** iptal edilmeyen seferin güncellemesi kural çalıştırmaz. Mevcut testler: alıcısız yayın reddi (doğrulama), başka firmada kural açılmaz (tenant), yönetme/okuma izni olmayan şablonu kullanamaz (yetki); yeni şablon "her şablon yayın doğrulamasından geçer" testine de girer. Tetikleyici "tamamlandı"ya çevrilince yeni test kırılıyor |
 
+## 30. Sefer iptalinde bekleyen masrafların reddi: firma ayarı (17 Kasım 2026)
+
+Karar (kullanıcı, 17 Kasım 2026: "otomatik ret", ardından "Firma ayarı"). Bölüm 26'da otomatik ret herkes için reddedilmişti (gerçek harcamayı sessizce reddeder; iptal edenin onay izni olmayabilir). Bu karar varsayılan olarak korunur; bekleyen masrafı çoğunlukla tahmini girilen ve iptalde kendiliğinden kapanmasını isteyen firma için ayar eklendi.
+
+- **Ayar** `logistics.trips.cancel-pending-expenses` ("Sefer iptali: bekleyen masraflar", Lojistik grubu): `keep` "Beklemede kalsın" (varsayılan; bölüm 26, 28 ve 29'daki akış aynen) ya da `reject` "Reddedilsin". Ayarı Core ayarlar ekranı çizer; yönetim izni (`core.settings.manage`) ister. Modül Core'un ayar servisini görmez: değer `ILogisticsPolicyProvider` üzerinden okunur (diğer lojistik ayarları gibi).
+- **İptal:** "Reddedilsin" iken sefer iptali, sevkiyatları planlamaya döndürdüğü işlemde seferin **bekleyen** masraflarını reddeder; gerekçe "Sefer iptal edildi: <iptal gerekçesi>" masrafın `statusReason`'ına yazılır. Her ret boru hattından geçer (sürüm, denetim kaydı, olay); biri başarısız olursa iptal de geri alınır. Onaylanmış ve önceden reddedilmiş masraf değişmez.
+- **Yetki:** karar firmanındır, iptal edenin değil. Kapı sefer yazma izniyle açılır; seferi yöneten ama masraf onay ya da okuma izni olmayan kişinin iptali de masrafları reddeder (bölüm 26'daki itiraz ayarı açan firmanın bilerek kabul ettiği sonuçtur). Sefer yazma izni olmayan iptal edemez, hiçbir şey değişmez.
+- **Uyarı:** iptal adımındaki uyarı ayara göre değişir ("… masraflar reddedilir" / "… beklemede kalır"); sayı yine yalnızca masraf okuyana söylenir.
+- **Gerçek harcama:** otomatik reddedilen masraf düzenlenmez (bölüm 25) ama yeniden onaya gönderilir; beklemeye dönünce başka sefere aktarılır (bölüm 28) ya da gerekçeyle onaylanır (bölüm 26).
+- Arayüz ve migration değişikliği yok.
+
+**Kapsam dışı (bilerek):** iptalde yalnızca belirli masraf türlerini (ör. tahmini harcırah) reddetmek; reddedilen masrafların toplu yeniden gönderimi.
+
+### Test sonuçları (bölüm 30)
+
+| Komut | Sonuç |
+| --- | --- |

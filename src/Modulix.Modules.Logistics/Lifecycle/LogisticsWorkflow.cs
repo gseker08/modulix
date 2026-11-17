@@ -100,7 +100,7 @@ public static class LogisticsTransitions
 
 internal sealed class LogisticsWorkflow(
     IRecordPipeline pipeline, LogisticsWorkflowGate gate, ICurrentAccess access, ITripPlanner planner, LogisticsStoreContext context,
-    IApprovalGate approvalGate) : ILogisticsWorkflow
+    IApprovalGate approvalGate, ILogisticsPolicyProvider? policy = null) : ILogisticsWorkflow
 {
     /// <summary>Talepten sevkiyata kopyalanan alanlar (yük, güzergâh, taraflar).</summary>
     private static readonly string[] CargoKeys =
@@ -263,7 +263,9 @@ internal sealed class LogisticsWorkflow(
         {
             var pending = await context.Data.Set<TripExpense>().CountAsync(e => e.TripId == id && e.Status == TripExpense.Statuses.Pending, cancellationToken);
             return pending == 0 ? null
-                : $"Bu seferin {pending} bekleyen masrafı var. Sefer iptal edilince masraflar beklemede kalır ve düzenlenemez; onaylayan onaylar ya da reddeder.";
+                : await RejectsPendingExpensesAsync(cancellationToken)
+                    ? $"Bu seferin {pending} bekleyen masrafı var. Firma ayarı gereği sefer iptal edilince masraflar \"Sefer iptal edildi\" gerekçesiyle reddedilir."
+                    : $"Bu seferin {pending} bekleyen masrafı var. Sefer iptal edilince masraflar beklemede kalır ve düzenlenemez; onaylayan onaylar ya da reddeder.";
         }
 
         return entityKey == LogisticsModule.Entities.TripExpense && action == LogisticsActions.Approve && await ExpenseTripCancelledAsync(id, cancellationToken)
@@ -308,7 +310,8 @@ internal sealed class LogisticsWorkflow(
 
     /// <summary>
     /// Sefer eylemleri. Plan onayı ve sefere çıkış uygunluk denetiminden geçer: engel varsa 409 (bulgular iletide); onayda uyarılar seferin notuna
-    /// yazılır. İptal tek işlemde seferdeki planlanmış sevkiyatları "Planlama bekliyor"a döndürür ve seferden ayırır (duraklar geçmiş olarak kalır).
+    /// yazılır. İptal tek işlemde seferdeki planlanmış sevkiyatları "Planlama bekliyor"a döndürür ve seferden ayırır (duraklar geçmiş olarak kalır);
+    /// firma ayarı "Reddedilsin" ise bekleyen masrafları da reddeder.
     /// </summary>
     private async Task<RecordResult<RecordData>> RunTripAsync(
         Guid id, LogisticsTransitions.Transition transition, long version, string? reason, CancellationToken cancellationToken)
@@ -364,8 +367,49 @@ internal sealed class LogisticsWorkflow(
                 }
             }
 
+            if (await RejectsPendingExpensesAsync(ct) && await RejectPendingExpensesAsync(id, reason, ct) is { } failed)
+            {
+                return failed;
+            }
+
             return await TransitionAsync(LogisticsModule.Entities.Trip, id, transition, version, reason, linkedId: null, ct);
         }, cancellationToken);
+    }
+
+    private async Task<bool> RejectsPendingExpensesAsync(CancellationToken cancellationToken) =>
+        policy is not null && await policy.RejectPendingExpensesOnCancelAsync(cancellationToken);
+
+    /// <summary>
+    /// Firma ayarı "Reddedilsin" ise (ADR-0038 bölüm 30) seferin bekleyen masrafları iptalle aynı işlemde reddedilir. Karar firmanın ayarıdır, iptal
+    /// edenin değil: kapı sefer yazma izniyle açılır, iptal eden masraf onay ya da okuma iznine sahip olmasa da masraflar reddedilir. Her ret boru
+    /// hattından geçer (sürüm, denetim kaydı, olay); biri başarısız olursa iptal de geri alınır. Reddedilmiş ve onaylanmış masraf değişmez.
+    /// </summary>
+    private async Task<RecordResult<RecordData>?> RejectPendingExpensesAsync(Guid tripId, string? reason, CancellationToken cancellationToken)
+    {
+        var expenseReason = reason is null ? "Sefer iptal edildi." : $"Sefer iptal edildi: {reason}";
+        if (expenseReason.Length > TripExpense.ReasonMaxLength)
+        {
+            expenseReason = expenseReason[..(TripExpense.ReasonMaxLength - 1)] + "…";
+        }
+
+        var pending = await context.Data.Set<TripExpense>().AsNoTracking()
+            .Where(e => e.TripId == tripId && e.Status == TripExpense.Statuses.Pending).Select(e => new { e.Id, e.Version }).ToListAsync(cancellationToken);
+        foreach (var expense in pending)
+        {
+            RecordResult<RecordData> rejected;
+            using (gate.Open(LogisticsModule.Permissions.TripsWrite, TripExpense.Statuses.Rejected, expenseReason))
+            {
+                rejected = await pipeline.UpdateAsync(new RecordCommand(
+                    LogisticsModule.Entities.TripExpense, expense.Id, new JsonObject { ["status"] = TripExpense.Statuses.Rejected }, expense.Version), cancellationToken);
+            }
+
+            if (!rejected.IsSuccess)
+            {
+                return rejected;
+            }
+        }
+
+        return null;
     }
 
     private static string StatusOf(RecordData record) => record.Values["status"]?.GetValue<string>() ?? string.Empty;

@@ -65,6 +65,11 @@ public class LogisticsShipmentModuleTests
         Assert.Equal(LogisticsModule.CredentialCheckModes.Warn, setting.DefaultValue);
         Assert.Equal([LogisticsModule.CredentialCheckModes.Warn, LogisticsModule.CredentialCheckModes.Block], setting.Options.Select(o => o.Value));
 
+        // İptalde bekleyen masrafların reddi firma ayarıdır; varsayılan beklemede kalmaktır (ADR-0038 bölüm 26 ve 30).
+        var cancelExpenses = Module.Settings.Single(x => x.Key == LogisticsModule.SettingKeys.CancelPendingExpenses);
+        Assert.Equal(LogisticsModule.CancelPendingExpenseModes.Keep, cancelExpenses.DefaultValue);
+        Assert.Equal([LogisticsModule.CancelPendingExpenseModes.Keep, LogisticsModule.CancelPendingExpenseModes.Reject], cancelExpenses.Options.Select(o => o.Value));
+
         // Sefer yetkisi iki rol şablonunda da var.
         Assert.All(Module.RoleTemplates, t => Assert.Contains(LogisticsModule.Permissions.TripsWrite, t.Permissions));
     }
