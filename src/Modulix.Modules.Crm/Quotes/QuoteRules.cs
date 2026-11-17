@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Localization;
+
 namespace Modulix.Modules.Crm.Quotes;
 
 /// <summary>Teklifin ticari durumları. İç onay ve gönderim durumundan bağımsızdır.</summary>
@@ -74,11 +76,11 @@ public static class QuoteAction
 }
 
 /// <summary>Bir eylemin neden yapılamadığını açıklayan sonuç (kullanıcıya gösterilir).</summary>
-public readonly record struct QuoteRuleResult(bool Allowed, string? Code = null, string? Message = null)
+public readonly record struct QuoteRuleResult(bool Allowed, string? Code = null, ServerMessage? Message = null)
 {
     public static QuoteRuleResult Ok { get; } = new(true);
 
-    public static QuoteRuleResult Deny(string code, string message) => new(false, code, message);
+    public static QuoteRuleResult Deny(string code, ServerMessage message) => new(false, code, message);
 }
 
 /// <summary>
@@ -95,48 +97,48 @@ public static class QuoteRules
             case QuoteAction.SubmitForApproval:
                 if (status != QuoteStatus.Draft)
                 {
-                    return QuoteRuleResult.Deny("not-draft", "Yalnızca taslak teklif onaya gönderilebilir.");
+                    return QuoteRuleResult.Deny("not-draft", CrmMessages.Quote.SubmitDraftOnly);
                 }
 
                 if (!hasLines)
                 {
-                    return QuoteRuleResult.Deny("no-lines", "Onaya göndermek için en az bir kalem gerekir.");
+                    return QuoteRuleResult.Deny("no-lines", CrmMessages.Quote.SubmitNeedsLines);
                 }
 
                 return approval is QuoteApprovalStatus.Pending
-                    ? QuoteRuleResult.Deny("already-pending", "Teklif zaten onay bekliyor.")
+                    ? QuoteRuleResult.Deny("already-pending", CrmMessages.Quote.AlreadyPending)
                     : QuoteRuleResult.Ok;
 
             case QuoteAction.WithdrawApproval:
                 return status == QuoteStatus.Draft && approval == QuoteApprovalStatus.Pending
                     ? QuoteRuleResult.Ok
-                    : QuoteRuleResult.Deny("not-pending", "Geri çekilecek bekleyen onay yok.");
+                    : QuoteRuleResult.Deny("not-pending", CrmMessages.Quote.NothingToWithdraw);
 
             case QuoteAction.Approve or QuoteAction.RejectApproval or QuoteAction.RequestChanges:
                 return status == QuoteStatus.Draft && approval == QuoteApprovalStatus.Pending
                     ? QuoteRuleResult.Ok
-                    : QuoteRuleResult.Deny("not-pending", "Teklif onay beklemiyor.");
+                    : QuoteRuleResult.Deny("not-pending", CrmMessages.Quote.NotPending);
 
             case QuoteAction.Present:
                 if (status != QuoteStatus.Draft)
                 {
-                    return QuoteRuleResult.Deny("not-draft", "Yalnızca taslak teklif müşteriye sunulabilir.");
+                    return QuoteRuleResult.Deny("not-draft", CrmMessages.Quote.PresentDraftOnly);
                 }
 
                 if (!hasLines)
                 {
-                    return QuoteRuleResult.Deny("no-lines", "Sunmak için en az bir kalem gerekir.");
+                    return QuoteRuleResult.Deny("no-lines", CrmMessages.Quote.PresentNeedsLines);
                 }
 
                 if (expired)
                 {
-                    return QuoteRuleResult.Deny("expired", "Geçerlilik tarihi geçmiş teklif sunulamaz; tarihi güncelleyin.");
+                    return QuoteRuleResult.Deny("expired", CrmMessages.Quote.PresentExpired);
                 }
 
                 // Onay gerekiyorsa tamamlanmadan sunum sunucuda engellenir.
                 return approval is QuoteApprovalStatus.NotRequired or QuoteApprovalStatus.Approved
                     ? QuoteRuleResult.Ok
-                    : QuoteRuleResult.Deny("approval-required", "İç onay tamamlanmadan teklif müşteriye sunulamaz.");
+                    : QuoteRuleResult.Deny("approval-required", CrmMessages.Quote.ApprovalRequired);
 
             case QuoteAction.Accept or QuoteAction.Reject:
                 if (status != QuoteStatus.Presented)
@@ -145,28 +147,28 @@ public static class QuoteRules
                 }
 
                 return expired
-                    ? QuoteRuleResult.Deny("expired", "Teklifin geçerlilik süresi dolmuş.")
+                    ? QuoteRuleResult.Deny("expired", CrmMessages.Quote.Expired)
                     : QuoteRuleResult.Ok;
 
             case QuoteAction.Share:
                 if (status != QuoteStatus.Presented)
                 {
                     return QuoteRuleResult.Deny(StatusCode(status), status == QuoteStatus.Draft
-                        ? "Taslak teklif paylaşılamaz; önce müşteriye sunun."
+                        ? CrmMessages.Quote.ShareDraft
                         : StatusMessage(status));
                 }
 
                 return expired
-                    ? QuoteRuleResult.Deny("expired", "Teklifin geçerlilik süresi dolmuş; paylaşım bağlantısı üretilemez.")
+                    ? QuoteRuleResult.Deny("expired", CrmMessages.Quote.ShareExpired)
                     : QuoteRuleResult.Ok;
 
             case QuoteAction.Cancel:
                 return status is QuoteStatus.Draft or QuoteStatus.Presented
                     ? QuoteRuleResult.Ok
-                    : QuoteRuleResult.Deny(StatusCode(status), "Bu durumdaki teklif iptal edilemez.");
+                    : QuoteRuleResult.Deny(StatusCode(status), CrmMessages.Quote.CancelNotAllowed);
 
             default:
-                return QuoteRuleResult.Deny("unknown-action", "Bilinmeyen eylem.");
+                return QuoteRuleResult.Deny("unknown-action", CrmMessages.Quote.UnknownAction);
         }
     }
 
@@ -183,14 +185,14 @@ public static class QuoteRules
         _ => "not-presented",
     };
 
-    private static string StatusMessage(string status) => status switch
+    private static ServerMessage StatusMessage(string status) => status switch
     {
-        QuoteStatus.Accepted => "Teklif daha önce kabul edilmiş.",
-        QuoteStatus.Rejected => "Teklif daha önce reddedilmiş.",
-        QuoteStatus.Cancelled => "Teklif iptal edilmiş.",
-        QuoteStatus.Superseded => "Bu sürüm yeni bir revizyonla geçersizleşmiş.",
-        QuoteStatus.Expired => "Teklifin geçerlilik süresi dolmuş.",
-        _ => "Teklif henüz müşteriye sunulmamış.",
+        QuoteStatus.Accepted => CrmMessages.Quote.AlreadyAccepted,
+        QuoteStatus.Rejected => CrmMessages.Quote.AlreadyRejected,
+        QuoteStatus.Cancelled => CrmMessages.Quote.Cancelled,
+        QuoteStatus.Superseded => CrmMessages.Quote.Superseded,
+        QuoteStatus.Expired => CrmMessages.Quote.Expired,
+        _ => CrmMessages.Quote.NotPresented,
     };
 }
 
@@ -201,11 +203,11 @@ public static class QuoteRevisionRules
     /// Yeni revizyon açılabilir mi? Kabul edilmiş sürümün yeniden yazılması ya da iptal/geçersiz sürümden devam edilmesi
     /// ayrı bir ticari süreçtir; revizyon yalnızca sunulmuş, reddedilmiş ya da süresi dolmuş sürümden açılır. Engel varsa nedeni döner.
     /// </summary>
-    public static string? CanRevise(string status) => status switch
+    public static ServerMessage? CanRevise(string status) => status switch
     {
         QuoteStatus.Presented or QuoteStatus.Rejected or QuoteStatus.Expired => null,
-        QuoteStatus.Draft => "Taslak teklif zaten düzenlenebilir; revizyon gerekmez.",
-        QuoteStatus.Accepted => "Kabul edilmiş teklif yeniden yazılamaz; sonraki ticari değişiklik ayrı süreçtir.",
-        _ => "Bu durumdaki tekliften revizyon açılamaz.",
+        QuoteStatus.Draft => CrmMessages.Quote.ReviseDraft,
+        QuoteStatus.Accepted => CrmMessages.Quote.ReviseAccepted,
+        _ => CrmMessages.Quote.ReviseNotAllowed,
     };
 }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Opportunities;
@@ -39,7 +40,7 @@ internal sealed class QuoteOpportunitySync(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(CrmModule.Permissions.OpportunitiesWrite))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{CrmModule.Permissions.OpportunitiesWrite}' izni gerekir.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(CrmModule.Permissions.OpportunitiesWrite));
         }
 
         Quote? quote = null;
@@ -48,17 +49,17 @@ internal sealed class QuoteOpportunitySync(
             // Teklif de çağıranın kapsamında olmalı (boru hattı denetler) ve bu fırsata bağlı, müşteriye sunulmuş ya da kabul edilmiş olmalı.
             if (!(await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Quote, id), cancellationToken)).IsSuccess || await reader.QuoteAsync(id, cancellationToken) is not { } found)
             {
-                return Invalid("Teklif bulunamadı.", "quoteId");
+                return Invalid(CrmMessages.Quote.NotFound, "quoteId");
             }
 
             if (found.OpportunityId != opportunityId)
             {
-                return Invalid("Teklif bu fırsata bağlı değil.", "quoteId");
+                return Invalid(CrmMessages.Quote.NotLinkedToOpportunity, "quoteId");
             }
 
             if (found.Status is not (QuoteStatus.Presented or QuoteStatus.Accepted))
             {
-                return Invalid("Yalnızca müşteriye sunulmuş ya da kabul edilmiş teklif esas teklif olabilir.", "quoteId");
+                return Invalid(CrmMessages.Quote.PrimaryNeedsPresented, "quoteId");
             }
 
             quote = found;
@@ -131,6 +132,6 @@ internal sealed class QuoteOpportunitySync(
     private static string? Text(RecordData record, string name) =>
         record.Values[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
 
-    private static RecordResult<RecordData> Invalid(string message, string field) =>
+    private static RecordResult<RecordData> Invalid(ServerMessage message, string field) =>
         RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

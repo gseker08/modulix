@@ -94,8 +94,8 @@ internal sealed class QuoteReport(IRecordPipeline pipeline, TimeProvider time, Q
     {
         if (query.To < query.From)
         {
-            return RecordResult<QuoteReportResult>.Fail(RecordErrorCode.ValidationFailed, "Bitiş tarihi başlangıçtan önce olamaz.",
-                [new RecordFieldError("to", "Bitiş tarihi başlangıçtan önce olamaz.")]);
+            return RecordResult<QuoteReportResult>.Fail(RecordErrorCode.ValidationFailed, CrmMessages.Field.EndBeforeStart,
+                [new RecordFieldError("to", CrmMessages.Field.EndBeforeStart)]);
         }
 
         var owner = query.OwnerId is { } id ? new Dictionary<string, string> { ["ownerId"] = id.ToString() } : [];
@@ -163,13 +163,13 @@ internal sealed class QuoteReport(IRecordPipeline pipeline, TimeProvider time, Q
     {
         if (!await access.HasPermissionAsync(CrmModule.Permissions.QuoteCostsRead, cancellationToken))
         {
-            return RecordResult<QuoteMarginReportResult>.Fail(RecordErrorCode.PermissionDenied, $"Bu rapor için '{CrmModule.Permissions.QuoteCostsRead}' izni gerekir.");
+            return RecordResult<QuoteMarginReportResult>.Fail(RecordErrorCode.PermissionDenied, CrmMessages.Quote.ReportPermission(CrmModule.Permissions.QuoteCostsRead));
         }
 
         if (query.To < query.From)
         {
-            return RecordResult<QuoteMarginReportResult>.Fail(RecordErrorCode.ValidationFailed, "Bitiş tarihi başlangıçtan önce olamaz.",
-                [new RecordFieldError("to", "Bitiş tarihi başlangıçtan önce olamaz.")]);
+            return RecordResult<QuoteMarginReportResult>.Fail(RecordErrorCode.ValidationFailed, CrmMessages.Field.EndBeforeStart,
+                [new RecordFieldError("to", CrmMessages.Field.EndBeforeStart)]);
         }
 
         var owner = query.OwnerId is { } id ? new Dictionary<string, string> { ["ownerId"] = id.ToString() } : [];

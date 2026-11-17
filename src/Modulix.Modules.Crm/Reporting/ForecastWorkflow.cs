@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Modules.Crm.Domain;
@@ -154,23 +155,23 @@ internal sealed class ForecastWorkflow(
         var scopeType = request.ScopeType ?? TargetScope.Tenant;
         if (!TargetScope.All.Contains(scopeType))
         {
-            return Invalid("scopeType", $"Şunlardan biri olmalıdır: {string.Join(", ", TargetScope.All)}.");
+            return Invalid("scopeType", CrmMessages.Field.OneOf(string.Join(", ", TargetScope.All)));
         }
 
         if (scopeType == TargetScope.User && (request.ScopeUserId is not { } user || !await members.IsActiveMemberAsync(user, cancellationToken)))
         {
-            return Invalid("scopeUserId", "Kullanıcı tahmininde kullanıcı zorunludur ve bu kuruluşun etkin üyesi olmalıdır.");
+            return Invalid("scopeUserId", CrmMessages.Planning.UserForecastUser);
         }
 
         if (scopeType == TargetScope.Tenant && request.ScopeUserId is not null)
         {
-            return Invalid("scopeUserId", "Tenant tahmininde kullanıcı verilmez.");
+            return Invalid("scopeUserId", CrmMessages.Planning.TenantForecastNoUser);
         }
 
         var currency = (request.Currency ?? policy.DefaultCurrency).Trim().ToUpperInvariant();
         if (currency.Length != 3 || !currency.All(char.IsAsciiLetter))
         {
-            return Invalid("currency", "Üç harfli para birimi kodu girin (ör. TRY).");
+            return Invalid("currency", CrmMessages.Field.Currency);
         }
 
         var today = ReportPeriods.Today(time.GetUtcNow(), policy.TimeZone);
@@ -185,7 +186,7 @@ internal sealed class ForecastWorkflow(
 
         if (await planning.SlotExistsAsync(period.Start, period.LastDay, scopeType, scopeUserId, currency, cancellationToken))
         {
-            return Conflict("Bu dönem, kapsam ve para birimi için tahmin zaten var; kilitliyse gerekçeyle yeniden açın.");
+            return Conflict(CrmMessages.Planning.ForecastExists);
         }
 
         var rows = await ReadOpenAsync(period, scopeUserId, cancellationToken);
@@ -247,7 +248,7 @@ internal sealed class ForecastWorkflow(
         var h = header.Value!;
         if (h.Status != ForecastStatus.Draft)
         {
-            return Conflict("Yalnızca taslak tahmin yenilenir.");
+            return Conflict(CrmMessages.Planning.RefreshDraftOnly);
         }
 
         var guard = await GuardAsync(h.ScopeType, h.ScopeUserId, requireAmounts: true, cancellationToken);
@@ -303,7 +304,7 @@ internal sealed class ForecastWorkflow(
     {
         if (kind is null || !ForecastAdjustmentKind.All.Contains(kind))
         {
-            return Invalid("kind", $"Şunlardan biri olmalıdır: {string.Join(", ", ForecastAdjustmentKind.All)}.");
+            return Invalid("kind", CrmMessages.Field.OneOf(string.Join(", ", ForecastAdjustmentKind.All)));
         }
 
         if (ForecastRules.ValidateReason(reason) is { } reasonError)
@@ -327,7 +328,7 @@ internal sealed class ForecastWorkflow(
         var current = await planning.FindItemAsync(itemId, id, cancellationToken);
         if (current is null || !await IsVisibleAsync(current.OpportunityId, cancellationToken))
         {
-            return RecordResult<ForecastDetail>.Fail(RecordErrorCode.NotFound, "Tahmin satırı bulunamadı.");
+            return RecordResult<ForecastDetail>.Fail(RecordErrorCode.NotFound, CrmMessages.Planning.LineNotFound);
         }
 
         var text = reason!.Trim();
@@ -343,12 +344,12 @@ internal sealed class ForecastWorkflow(
                 case ForecastAdjustmentKind.Category:
                     if (value is null || !ForecastCategory.All.Contains(value))
                     {
-                        throw Fail("value", $"Kategori şunlardan biri olmalıdır: {string.Join(", ", ForecastCategory.All)}.");
+                        throw Fail("value", CrmMessages.Planning.CategoryOneOf(string.Join(", ", ForecastCategory.All)));
                     }
 
                     if (item.Category == value)
                     {
-                        throw new RecordConflictException("Kategori zaten bu değerde.");
+                        throw new RecordConflictException(CrmMessages.Planning.CategoryUnchanged);
                     }
 
                     (from, to, item.Category) = (item.Category, value, value);
@@ -357,18 +358,18 @@ internal sealed class ForecastWorkflow(
                 case ForecastAdjustmentKind.Amount:
                     if (item.BaseAmount is null)
                     {
-                        throw Fail("value", "Tutarı ya da kuru olmayan satırın tutarı düzeltilemez; önce fırsat tutarını/kuru tamamlayıp yenileyin.");
+                        throw Fail("value", CrmMessages.Planning.AmountNotAdjustable);
                     }
 
                     var delta = ParseDecimal(value);
                     if (delta is null && !string.IsNullOrWhiteSpace(value))
                     {
-                        throw Fail("value", "Düzeltme, en fazla iki ondalıklı bir sayı (delta) olmalıdır; boş bırakmak düzeltmeyi kaldırır.");
+                        throw Fail("value", CrmMessages.Planning.AdjustmentFormat);
                     }
 
                     if (delta is { } shift && (Math.Abs(shift) > 999_999_999_999m || item.BaseAmount + shift < 0))
                     {
-                        throw Fail("value", "Düzeltme sonrası nihai tutar negatif olamaz.");
+                        throw Fail("value", CrmMessages.Planning.AdjustedNegative);
                     }
 
                     var next = delta is null or 0m ? null : delta;
@@ -379,7 +380,7 @@ internal sealed class ForecastWorkflow(
                     int? percent = string.IsNullOrWhiteSpace(value) ? null : int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var p) ? p : -1;
                     if (percent is < 0 or > 100)
                     {
-                        throw Fail("value", "Olasılık 0-100 arası tam sayı olmalıdır; boş bırakmak düzeltmeyi kaldırır.");
+                        throw Fail("value", CrmMessages.Planning.ProbabilityFormat);
                     }
 
                     (from, to, item.ProbabilityOverride) = (item.ProbabilityOverride?.ToString(CultureInfo.InvariantCulture), percent?.ToString(CultureInfo.InvariantCulture), percent);
@@ -399,7 +400,7 @@ internal sealed class ForecastWorkflow(
         var text = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
         if (text is { Length: > ForecastSubmission.NoteMaxLength })
         {
-            return Invalid("note", $"Not en fazla {ForecastSubmission.NoteMaxLength} karakter olabilir.");
+            return Invalid("note", CrmMessages.Planning.NoteMaxLength(ForecastSubmission.NoteMaxLength));
         }
 
         return await WriteAsync(id, version, [CrmModule.Permissions.ForecastsWrite], "noted", (sub, _, _) =>
@@ -496,12 +497,12 @@ internal sealed class ForecastWorkflow(
         var source = header.Value!;
         if (source.Status != ForecastStatus.Locked)
         {
-            return Conflict("Yalnızca kilitli tahmin yeniden açılır.");
+            return Conflict(CrmMessages.Planning.ReopenLockedOnly);
         }
 
         if (!await access.HasPermissionAsync(CrmModule.Permissions.ForecastsReopen, cancellationToken))
         {
-            return RecordResult<ForecastDetail>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{CrmModule.Permissions.ForecastsReopen}' izni gerekir.");
+            return RecordResult<ForecastDetail>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(CrmModule.Permissions.ForecastsReopen));
         }
 
         var guard = await GuardAsync(source.ScopeType, source.ScopeUserId, requireAmounts: true, cancellationToken);
@@ -513,7 +514,7 @@ internal sealed class ForecastWorkflow(
         var siblings = await planning.VersionsAsync(source.PeriodStart, source.PeriodEnd, source.ScopeType, source.ScopeUserId, source.ReportingCurrency, cancellationToken);
         if (siblings.Any(s => s.Status != ForecastStatus.Locked))
         {
-            return Conflict("Bu dönem için zaten açık bir sürüm var; önce onu kilitleyin ya da silin.");
+            return Conflict(CrmMessages.Planning.OpenVersionExists);
         }
 
         var text = reason!.Trim();
@@ -645,13 +646,13 @@ internal sealed class ForecastWorkflow(
     {
         if (!ForecastRules.CanTransition(sub.Status, to))
         {
-            throw new RecordConflictException($"Tahmin '{sub.Status}' durumundan '{to}' durumuna geçirilemez.");
+            throw new RecordConflictException(CrmMessages.Planning.StatusTransition(sub.Status, to));
         }
 
         sub.Status = to;
     }
 
-    private static RecordValidationException Fail(string field, string message) => new([new RecordFieldError(field, message)]);
+    private static RecordValidationException Fail(string field, ServerMessage message) => new([new RecordFieldError(field, message)]);
 
     // ---- Anlık görüntü
 
@@ -947,12 +948,12 @@ internal sealed class ForecastWorkflow(
     {
         if (requireAmounts && !await access.HasPermissionAsync(CrmModule.Permissions.OpportunityAmountsRead, cancellationToken))
         {
-            return RecordResult<ForecastDetail>.Fail(RecordErrorCode.PermissionDenied, $"Tahmin için '{CrmModule.Permissions.OpportunityAmountsRead}' izni gerekir.");
+            return RecordResult<ForecastDetail>.Fail(RecordErrorCode.PermissionDenied, CrmMessages.Planning.ForecastPermission(CrmModule.Permissions.OpportunityAmountsRead));
         }
 
         if (!await access.HasPermissionAsync(CrmModule.Permissions.OpportunitiesRead, cancellationToken))
         {
-            return RecordResult<ForecastDetail>.Fail(RecordErrorCode.PermissionDenied, $"Tahmin için '{CrmModule.Permissions.OpportunitiesRead}' izni gerekir.");
+            return RecordResult<ForecastDetail>.Fail(RecordErrorCode.PermissionDenied, CrmMessages.Planning.ForecastPermission(CrmModule.Permissions.OpportunitiesRead));
         }
 
         var owners = await recordAccess.GetOwnersAsync(CrmModule.Entities.Opportunity, cancellationToken);
@@ -1004,12 +1005,12 @@ internal sealed class ForecastWorkflow(
 
     private static RecordResult<T> Forward<T>(RecordError error) => RecordResult<T>.Fail(error);
 
-    private static RecordResult<T> Invalid<T>(string field, string message) =>
+    private static RecordResult<T> Invalid<T>(string field, ServerMessage message) =>
         RecordResult<T>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 
-    private static RecordResult<ForecastDetail> Invalid(string field, string message) => Invalid<ForecastDetail>(field, message);
+    private static RecordResult<ForecastDetail> Invalid(string field, ServerMessage message) => Invalid<ForecastDetail>(field, message);
 
-    private static RecordResult<T> Conflict<T>(string message) => RecordResult<T>.Fail(RecordErrorCode.Conflict, message);
+    private static RecordResult<T> Conflict<T>(ServerMessage message) => RecordResult<T>.Fail(RecordErrorCode.Conflict, message);
 
-    private static RecordResult<ForecastDetail> Conflict(string message) => Conflict<ForecastDetail>(message);
+    private static RecordResult<ForecastDetail> Conflict(ServerMessage message) => Conflict<ForecastDetail>(message);
 }

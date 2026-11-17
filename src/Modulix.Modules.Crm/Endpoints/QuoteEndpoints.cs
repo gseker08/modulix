@@ -159,7 +159,7 @@ internal static class QuoteEndpoints
     private static async Task<IResult> HandoverAsync(Guid id, IAcceptedQuoteSource source, CancellationToken ct) =>
         await source.GetAsync(id, ct) is { } accepted
             ? Results.Ok(JsonSerializer.Deserialize<AcceptedQuoteDto>(JsonSerializer.Serialize(accepted, JsonSerializerOptions.Web), JsonSerializerOptions.Web))
-            : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Kabul edilmiş teklif bulunamadı.");
+            : LocalizedProblems.Problem(StatusCodes.Status404NotFound, CrmMessages.Quote.AcceptedNotFound);
 
     private static async Task<IResult> ReportAsync(DateOnly? from, DateOnly? to, Guid? ownerId, IQuoteReport report, TimeProvider time, CancellationToken ct)
     {

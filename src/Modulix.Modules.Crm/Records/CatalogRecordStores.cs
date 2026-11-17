@@ -45,7 +45,7 @@ internal sealed class ProductCategoryRecordStore(CrmStoreContext context) : CrmR
         {
             if (id == entity.Id || depth > MaxDepth)
             {
-                throw new RecordValidationException([new RecordFieldError("parentId", "Kategori kendi altına taşınamaz (döngü).")]);
+                throw new RecordValidationException([new RecordFieldError("parentId", CrmMessages.Pricing.CategoryCycle)]);
             }
 
             current = await Context.Data.Set<ProductCategory>().AsNoTracking().Where(c => c.Id == id).Select(c => c.ParentId).SingleOrDefaultAsync(cancellationToken);
@@ -57,7 +57,7 @@ internal sealed class ProductCategoryRecordStore(CrmStoreContext context) : CrmR
         if (await Context.Data.Set<ProductCategory>().AnyAsync(c => c.ParentId == entity.Id, cancellationToken)
             || await Context.Data.Set<Product>().AnyAsync(p => p.CategoryId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Alt kategorisi ya da ürünü olan kategori silinemez; pasifleştirin.");
+            throw new RecordConflictException(CrmMessages.Pricing.CategoryInUse);
         }
     }
 }
@@ -118,12 +118,12 @@ internal sealed class MeasureUnitRecordStore(CrmStoreContext context) : CrmRecor
         entity.Code = entity.Code.Trim();
         if (entity.FactorToBase <= 0)
         {
-            errors.Add(new RecordFieldError("factorToBase", "Dönüşüm katsayısı sıfırdan büyük olmalıdır."));
+            errors.Add(new RecordFieldError("factorToBase", CrmMessages.Pricing.UnitFactorPositive));
         }
 
         if (await Context.Data.Set<MeasureUnit>().AnyAsync(u => u.Id != entity.Id && u.Code == entity.Code, cancellationToken))
         {
-            errors.Add(new RecordFieldError("code", "Bu birim kodu zaten kullanılıyor."));
+            errors.Add(new RecordFieldError("code", CrmMessages.Pricing.UnitCodeTaken));
         }
 
         var stored = await Context.Data.Set<MeasureUnit>().AsNoTracking().Where(u => u.Id == entity.Id)
@@ -131,7 +131,7 @@ internal sealed class MeasureUnitRecordStore(CrmStoreContext context) : CrmRecor
         if (stored is not null && (stored.GroupKey != entity.GroupKey || stored.FactorToBase != entity.FactorToBase)
             && await Context.Data.Set<Product>().AnyAsync(p => p.BaseUnitId == entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("factorToBase", "Ürünlerde kullanılan birimin grubu ve katsayısı değiştirilemez; yeni birim tanımlayın."));
+            errors.Add(new RecordFieldError("factorToBase", CrmMessages.Pricing.UnitInUseLocked));
         }
 
         if (errors.Count > 0)
@@ -144,7 +144,7 @@ internal sealed class MeasureUnitRecordStore(CrmStoreContext context) : CrmRecor
     {
         if (await Context.Data.Set<Product>().AnyAsync(p => p.BaseUnitId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Ürünlerde kullanılan birim silinemez.");
+            throw new RecordConflictException(CrmMessages.Pricing.UnitInUse);
         }
     }
 }
@@ -241,17 +241,17 @@ internal sealed class ProductRecordStore(CrmStoreContext context) : CrmRecordSto
 
         if (entity.SaleStart is { } start && entity.SaleEnd is { } end && end < start)
         {
-            errors.Add(new RecordFieldError("saleEnd", "Satış bitişi başlangıçtan önce olamaz."));
+            errors.Add(new RecordFieldError("saleEnd", CrmMessages.Pricing.SaleEndBeforeStart));
         }
 
         if (entity.QuantityPrecision is < 0 or > 4)
         {
-            errors.Add(new RecordFieldError("quantityPrecision", "Miktar hassasiyeti 0 ile 4 arasında olmalıdır."));
+            errors.Add(new RecordFieldError("quantityPrecision", CrmMessages.Pricing.QuantityPrecision));
         }
 
         if (entity.ChargeType == CatalogRules.ChargeRecurring && entity.RecurringPeriod is null)
         {
-            errors.Add(new RecordFieldError("recurringPeriod", "Dönemsel ücret için dönem seçin."));
+            errors.Add(new RecordFieldError("recurringPeriod", CrmMessages.Pricing.RecurringPeriodRequired));
         }
         else if (entity.ChargeType == CatalogRules.ChargeOneTime)
         {
@@ -260,19 +260,19 @@ internal sealed class ProductRecordStore(CrmStoreContext context) : CrmRecordSto
 
         if (entity.Kind == CatalogRules.KindProduct && entity.ServiceDurationMinutes is not null)
         {
-            errors.Add(new RecordFieldError("serviceDurationMinutes", "Hizmet süresi yalnızca hizmet kartında girilir."));
+            errors.Add(new RecordFieldError("serviceDurationMinutes", CrmMessages.Pricing.ServiceDurationServiceOnly));
         }
 
         if (await Context.Data.Set<Product>().AnyAsync(p => p.Id != entity.Id && p.Code == entity.Code, cancellationToken))
         {
-            errors.Add(new RecordFieldError("code", "Bu ürün kodu bu kuruluşta zaten kullanılıyor."));
+            errors.Add(new RecordFieldError("code", CrmMessages.Pricing.ProductCodeTaken));
         }
 
         // Yaşam döngüsü: kayıttaki (veritabanındaki) durumdan yeni duruma geçiş izinli olmalı.
         string? stored = await Context.Data.Set<Product>().AsNoTracking().Where(p => p.Id == entity.Id).Select(p => p.Status).SingleOrDefaultAsync(cancellationToken);
         if (stored is not null && !CatalogRules.CanTransition(stored, entity.Status))
         {
-            errors.Add(new RecordFieldError("status", $"'{stored}' durumundan '{entity.Status}' durumuna geçilemez."));
+            errors.Add(new RecordFieldError("status", CrmMessages.Pricing.StatusTransition(stored, entity.Status)));
         }
 
         if (errors.Count > 0)
@@ -284,5 +284,5 @@ internal sealed class ProductRecordStore(CrmStoreContext context) : CrmRecordSto
     protected override Task BeforeDeleteAsync(Product entity, CancellationToken cancellationToken) =>
         entity.Status == CatalogRules.StatusDraft
             ? Task.CompletedTask
-            : throw new RecordConflictException("Taslak dışındaki ürün silinmez; pasifleştirin ya da satıştan kaldırın.");
+            : throw new RecordConflictException(CrmMessages.Pricing.ProductDeleteDraftOnly);
 }

@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Localization;
+
 namespace Modulix.Modules.Crm.Reporting;
 
 /// <summary>Tahmin kategorileri birbirini dışlar. "Kazanıldı" kategori değil gerçek sonuçtur (gerçekleşen satış).</summary>
@@ -128,11 +130,11 @@ public static class ForecastRules
         return new ForecastScenarios(realized, commit, bestCase, pipeline, weighted, realized + commit, realized + commit + bestCase, realized + weighted);
     }
 
-    public static string? ValidateReason(string? reason)
+    public static ServerMessage? ValidateReason(string? reason)
     {
         var text = reason?.Trim();
-        return string.IsNullOrEmpty(text) ? "Gerekçe zorunludur."
-            : text.Length > ReasonMaxLength ? $"Gerekçe en fazla {ReasonMaxLength} karakter olabilir."
+        return string.IsNullOrEmpty(text) ? CrmMessages.Planning.ReasonRequired
+            : text.Length > ReasonMaxLength ? CrmMessages.Planning.ReasonMaxLength(ReasonMaxLength)
             : null;
     }
 }

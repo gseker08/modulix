@@ -180,7 +180,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
         var duplicateOf = FieldNamed("duplicateOfId").Parse(values["duplicateOfId"]).Value as Guid?;
         if (revisionOf is not null && duplicateOf is not null)
         {
-            throw new RecordValidationException([new RecordFieldError("revisionOfId", "Revizyon ve çoğaltma birlikte verilemez.")]);
+            throw new RecordValidationException([new RecordFieldError("revisionOfId", CrmMessages.Quote.RevisionAndCopy)]);
         }
 
         if ((revisionOf ?? duplicateOf) is { } sourceId)
@@ -188,7 +188,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
             var name = revisionOf is not null ? "revisionOfId" : "duplicateOfId";
             if (await CanSeeAsync(sourceId, cancellationToken) is not { } source)
             {
-                throw new RecordValidationException([new RecordFieldError(name, "Teklif bulunamadı.")]);
+                throw new RecordValidationException([new RecordFieldError(name, CrmMessages.Quote.NotFound)]);
             }
 
             if (revisionOf is not null)
@@ -200,11 +200,11 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
                 }
                 else if (source.RevisionNo != latest)
                 {
-                    errors.Add(new RecordFieldError(name, "Yalnızca ailenin son revizyonundan yeni revizyon açılır."));
+                    errors.Add(new RecordFieldError(name, CrmMessages.Quote.ReviseLatestOnly));
                 }
                 else if (await Context.Data.Set<Quote>().AnyAsync(q => q.FamilyId == source.FamilyId && q.Status == QuoteStatus.Draft, cancellationToken))
                 {
-                    errors.Add(new RecordFieldError(name, "Bu ailede zaten açık bir taslak revizyon var."));
+                    errors.Add(new RecordFieldError(name, CrmMessages.Quote.DraftRevisionExists));
                 }
                 else
                 {
@@ -272,7 +272,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
         // Sunulmuş ya da sonuçlanmış sürümün ticari içeriği yerinde değişmez; değişiklik için yeni revizyon açılır.
         if (!workflow && !isNew && entity.Status != QuoteStatus.Draft && values.Any(kv => !IsNonCommercial(kv.Key)))
         {
-            throw new RecordValidationException([new RecordFieldError("status", "Taslak olmayan teklif değiştirilemez; yeni revizyon açın.")]);
+            throw new RecordValidationException([new RecordFieldError("status", CrmMessages.Quote.NotDraftLocked)]);
         }
 
         if (!workflow)
@@ -283,7 +283,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
                 var changed = original is null || original.DocumentDiscountKind != entity.DocumentDiscountKind || original.DocumentDiscountValue != entity.DocumentDiscountValue;
                 if (wantsDiscount && changed && !await Context.Permissions.HasPermissionAsync(CrmModule.Permissions.QuotesDiscount, cancellationToken))
                 {
-                    errors.Add(new RecordFieldError("documentDiscountValue", "İndirim uygulama yetkiniz yok."));
+                    errors.Add(new RecordFieldError("documentDiscountValue", CrmMessages.Quote.DiscountDenied));
                 }
             }
 
@@ -299,12 +299,12 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
 
             if ((entity.ExchangeRate is null) != (entity.ExchangeRateDate is null || entity.ReportingCurrency is null))
             {
-                errors.Add(new RecordFieldError("exchangeRate", "Kur, raporlama para birimi ve kur tarihi birlikte verilmelidir."));
+                errors.Add(new RecordFieldError("exchangeRate", CrmMessages.Quote.ExchangeRateTogether));
             }
 
             if (entity.ReportingCurrency is not null && entity.ReportingCurrency == entity.Currency)
             {
-                errors.Add(new RecordFieldError("reportingCurrency", "Raporlama para birimi teklif para biriminden farklı olmalıdır."));
+                errors.Add(new RecordFieldError("reportingCurrency", CrmMessages.Quote.ReportingCurrencyDifferent));
             }
 
             entity.UpdatedBy = Context.CurrentUserId;
@@ -364,7 +364,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
     {
         if (entity.Status != QuoteStatus.Draft)
         {
-            throw new RecordConflictException("Yalnızca taslak teklif silinebilir; diğerleri iptal edilir.");
+            throw new RecordConflictException(CrmMessages.Quote.DeleteDraftOnly);
         }
 
         var lines = await Context.Data.Set<QuoteLine>().Where(l => l.QuoteId == entity.Id).ToListAsync(cancellationToken);
@@ -394,7 +394,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
                 || await Context.Data.Set<CompanyContact>().AnyAsync(l => l.CompanyId == entity.CompanyId && l.ContactId == contactId, cancellationToken));
             if (!linked)
             {
-                errors.Add(new RecordFieldError("contactId", "Seçilen kişi bu firmayla ilişkili değil."));
+                errors.Add(new RecordFieldError("contactId", CrmMessages.Quote.ContactNotOfCompany));
             }
         }
 
@@ -404,7 +404,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
                 .Where(o => o.Id == opportunityId).Select(o => (Guid?)o.CompanyId).SingleOrDefaultAsync(cancellationToken);
             if (opportunityCompany != entity.CompanyId)
             {
-                errors.Add(new RecordFieldError("opportunityId", "Fırsat bu firmaya ait değil."));
+                errors.Add(new RecordFieldError("opportunityId", CrmMessages.Quote.OpportunityNotOfCompany));
             }
         }
 
@@ -413,7 +413,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
             var list = await Context.Data.Set<PriceList>().AsNoTracking().Where(l => l.Id == listId).Select(l => new { l.Currency }).SingleOrDefaultAsync(cancellationToken);
             if (list is not null && !string.Equals(list.Currency, entity.Currency, StringComparison.Ordinal))
             {
-                errors.Add(new RecordFieldError("priceListId", $"Fiyat listesi para birimi ({list.Currency}) teklifin para biriminden farklı."));
+                errors.Add(new RecordFieldError("priceListId", CrmMessages.Quote.PriceListCurrency(list.Currency)));
             }
         }
     }
@@ -539,7 +539,7 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
         var quoteId = FieldNamed("quoteId").Parse(values["quoteId"]).Value as Guid?;
         if (quoteId is null || await LoadQuoteAsync(quoteId.Value, cancellationToken) is not { } parent)
         {
-            throw new RecordValidationException([new RecordFieldError("quoteId", "Teklif bulunamadı.")]);
+            throw new RecordValidationException([new RecordFieldError("quoteId", CrmMessages.Quote.NotFound)]);
         }
 
         creating = true;
@@ -557,14 +557,14 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
         quote = null;
         if (parent is null)
         {
-            throw new RecordValidationException([new RecordFieldError("quoteId", "Teklif bulunamadı.")]);
+            throw new RecordValidationException([new RecordFieldError("quoteId", CrmMessages.Quote.NotFound)]);
         }
 
         if (!gate.IsOpen)
         {
             if (parent.Status != QuoteStatus.Draft)
             {
-                throw new RecordValidationException([new RecordFieldError("quoteId", "Taslak olmayan teklifin kalemi değiştirilemez; yeni revizyon açın.")]);
+                throw new RecordValidationException([new RecordFieldError("quoteId", CrmMessages.Quote.LineLocked)]);
             }
 
             await ApplyPricingAndGuardsAsync(entity, values, parent, isNew, cancellationToken);
@@ -583,10 +583,10 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
     protected override async Task BeforeDeleteAsync(QuoteLine entity, CancellationToken cancellationToken)
     {
         var parent = await LoadQuoteAsync(entity.QuoteId, cancellationToken)
-            ?? throw new RecordValidationException([new RecordFieldError("quoteId", "Teklif bulunamadı.")]);
+            ?? throw new RecordValidationException([new RecordFieldError("quoteId", CrmMessages.Quote.NotFound)]);
         if (parent.Status != QuoteStatus.Draft)
         {
-            throw new RecordConflictException("Taslak olmayan teklifin kalemi silinemez; yeni revizyon açın.");
+            throw new RecordConflictException(CrmMessages.Quote.LineDeleteLocked);
         }
 
         // Paket ana kalemi silinince bileşenleri de gider; toplam kalan kalemlerden yeniden hesaplanır.
@@ -646,7 +646,7 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
             : original.DiscountKind != entity.DiscountKind || original.DiscountValue != entity.DiscountValue;
         if (discountChanged && !await Context.Permissions.HasPermissionAsync(CrmModule.Permissions.QuotesDiscount, cancellationToken))
         {
-            errors.Add(new RecordFieldError("discountValue", "İndirim uygulama yetkiniz yok."));
+            errors.Add(new RecordFieldError("discountValue", CrmMessages.Quote.DiscountDenied));
         }
 
         if (entity.ProductId is { } productId)
@@ -654,11 +654,11 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
             var product = await Context.Data.Set<Product>().AsNoTracking().SingleOrDefaultAsync(p => p.Id == productId, cancellationToken);
             if (product is null)
             {
-                errors.Add(new RecordFieldError("productId", "Ürün bulunamadı."));
+                errors.Add(new RecordFieldError("productId", CrmMessages.Quote.ProductNotFound));
             }
             else if (product.Status != CatalogRules.StatusActive && (isNew || values.ContainsKey("productId")) && !await ProductUnchangedAsync(entity, product.Id, cancellationToken))
             {
-                errors.Add(new RecordFieldError("productId", "Pasif ya da taslak ürün yeni teklif kalemine eklenemez."));
+                errors.Add(new RecordFieldError("productId", CrmMessages.Quote.ProductNotSellable));
             }
             else
             {
@@ -681,25 +681,25 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
         {
             if (string.IsNullOrWhiteSpace(entity.Name))
             {
-                errors.Add(new RecordFieldError("name", "Kalem adı zorunludur."));
+                errors.Add(new RecordFieldError("name", CrmMessages.Quote.LineNameRequired));
             }
 
             // Katalog dışı (serbest) kalem ve fiyatı elle girmek yetkiye bağlıdır.
             if (!canManual && (isNew || values["unitPrice"] is not null || entity.Kind == QuoteLineKind.Free))
             {
-                errors.Add(new RecordFieldError("unitPrice", "Serbest kalem ekleme ve elle fiyat girme yetkiniz yok."));
+                errors.Add(new RecordFieldError("unitPrice", CrmMessages.Quote.FreeLineDenied));
             }
         }
 
         if (entity.Role == "PackageChild" && entity.ParentStableKey is null)
         {
-            errors.Add(new RecordFieldError("parentStableKey", "Paket bileşeninin ana satırı gerekir."));
+            errors.Add(new RecordFieldError("parentStableKey", CrmMessages.Quote.ParentRequired));
         }
 
         if (entity.ParentStableKey is { } parentKey
             && !await Context.Data.Set<QuoteLine>().AnyAsync(l => l.QuoteId == parent.Id && l.StableKey == parentKey, cancellationToken))
         {
-            errors.Add(new RecordFieldError("parentStableKey", "Ana satır bu teklifte bulunamadı."));
+            errors.Add(new RecordFieldError("parentStableKey", CrmMessages.Quote.ParentNotFound));
         }
 
         if (errors.Count > 0)
@@ -724,7 +724,9 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
             // Liste fiyatı yoksa yalnızca elle fiyat yetkisi olan kullanıcı kendi fiyatıyla devam edebilir.
             if (!(canManual && suppliedPrice is not null))
             {
-                errors.Add(new RecordFieldError("productId", result.Message ?? "Ürün için fiyat bulunamadı."));
+                errors.Add(result.Message is { } priceError
+                    ? new RecordFieldError("productId", priceError)
+                    : new RecordFieldError("productId", CrmMessages.Quote.PriceNotFound));
             }
 
             return;
@@ -732,7 +734,7 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
 
         if (line.PriceIncludesTax != parent.PriceIncludesTax)
         {
-            errors.Add(new RecordFieldError("productId", "Ürün fiyatının vergi dahil/hariç biçimi teklifinkiyle uyuşmuyor."));
+            errors.Add(new RecordFieldError("productId", CrmMessages.Quote.TaxModeMismatch));
             return;
         }
 
@@ -741,7 +743,7 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
         {
             if (!canManual)
             {
-                errors.Add(new RecordFieldError("unitPrice", "Elle birim fiyat girme yetkiniz yok; fiyat listeden gelir."));
+                errors.Add(new RecordFieldError("unitPrice", CrmMessages.Quote.ManualPriceDenied));
                 return;
             }
 
