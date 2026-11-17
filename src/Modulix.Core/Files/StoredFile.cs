@@ -22,7 +22,8 @@ public sealed class StoredFile : ITenantEntity, ICompanyShared
         // EF Core için
     }
 
-    public StoredFile(string entityKey, Guid recordId, string fileName, string contentType, long sizeBytes, string sha256, Guid? uploadedByUserId)
+    public StoredFile(string entityKey, Guid recordId, string fileName, string contentType, long sizeBytes, string sha256, Guid? uploadedByUserId,
+        string classification = FileClassification.Internal)
     {
         Id = Guid.CreateVersion7();
         EntityKey = entityKey;
@@ -32,7 +33,7 @@ public sealed class StoredFile : ITenantEntity, ICompanyShared
         SizeBytes = sizeBytes;
         Sha256 = sha256;
         StorageKey = NewStorageKey();
-        Classification = FileClassification.Internal;
+        Classification = classification;
         ScanStatus = FileScanStatus.NotScanned;
         UploadedByUserId = uploadedByUserId;
         CreatedAt = DateTimeOffset.UtcNow;
@@ -83,7 +84,13 @@ public static class FileClassification
     /// <summary>Yalnızca personel.</summary>
     public const string Internal = "Internal";
 
-    /// <summary>İndirmeye açık sınıflar; listede olmayan sınıf indirilemez.</summary>
+    /// <summary>
+    /// Modüle ait (ADR-0040 K9): erişimi sahibi olan modül denetler. Genel dosya uçları bu sınıfı listelemez, indirmez ve silmez; içerik yalnızca
+    /// <c>IModuleFiles</c> ile açılır.
+    /// </summary>
+    public const string ModuleOwned = "ModuleOwned";
+
+    /// <summary>Genel uçlardan indirmeye açık sınıflar; listede olmayan sınıf indirilemez.</summary>
     public static bool IsDownloadable(string classification) => classification == Internal;
 }
 

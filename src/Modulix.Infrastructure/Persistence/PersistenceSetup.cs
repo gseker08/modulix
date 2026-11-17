@@ -205,6 +205,7 @@ public static class PersistenceSetup
         services.AddScoped<Modulix.Infrastructure.Files.FileStore>();
         services.AddScoped<Modulix.Core.Contracts.Files.IFileStore>(sp => sp.GetRequiredService<Modulix.Infrastructure.Files.FileStore>());
         services.AddScoped<Modulix.Core.Contracts.Files.IFileLimits>(sp => sp.GetRequiredService<Modulix.Infrastructure.Files.FileStore>());
+        services.AddScoped<Modulix.Core.Contracts.Files.IModuleFiles>(sp => sp.GetRequiredService<Modulix.Infrastructure.Files.FileStore>());
 
         // Dosya yaşam döngüsü temizliği (ADR-0040 dilim 3): silinen kaydın dosyaları ve yetim içerik.
         services.AddScoped<Modulix.Infrastructure.Files.FileCleanup>();
