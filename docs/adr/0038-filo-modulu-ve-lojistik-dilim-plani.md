@@ -749,3 +749,7 @@ Karar (kullanıcı, 17 Kasım 2026: "otomatik ret", ardından "Firma ayarı"). B
 
 | Komut | Sonuç |
 | --- | --- |
+| `dotnet build` | Hatasız |
+| `dotnet test tests/Modulix.ArchitectureTests` / `tests/Modulix.Modules.Logistics.Tests` | 115/115 / 36/36 (ayarın varsayılanı ve seçenekleri birim testte) |
+| `... --filter "LogisticsExpenseTests"` (yerel SQL Server) | 22/22 (4 yeni). **Mutlu yol:** "Reddedilsin" iken iptal uyarısı reddi söyler; bekleyen masraf "Sefer iptal edildi: <gerekçe>" ile reddedilir, onaylanmış ve önceden reddedilmiş masraf değişmez, denetim kaydı yazılır; reddedilen yeniden gönderilip açık sefere aktarılır. **Varsayılan ve doğrulama:** varsayılan `keep`, iptal sonrası masraf beklemede kalır; geçersiz ayar değeri 422. **Tenant izolasyonu:** A'nın ayarı B'nin masrafını etkilemez, A B'nin seferini iptal edemez (404). **Yetki:** ayarı yönetici olmayan değiştiremez (403); sefer yazma izni olmayan iptal edemez ve masraf değişmez (403); masraf izni olmayan dağıtımcının iptali masrafı reddeder ve ona sayı söylenmez |
+| `... --filter "LogisticsTripTests"` (yerel SQL Server) | 8/9. Düşen `Invalid_assignments_and_unfit_trips_are_rejected_and_cancelling_releases_the_shipments` bu değişiklikten bağımsız: yerel paylaşımlı veritabanında `FieldRulePackageTests`'in bıraktığı, bütün firmalara uygulanan kilitli "ProductStandard" paketi (`logistics.shipment.weightKg` için "Yönetici onayı gerekir") sevkiyatı seferden çıkarmayı 422 ile durduruyor. CI her parçada temiz veritabanı kullanır |
