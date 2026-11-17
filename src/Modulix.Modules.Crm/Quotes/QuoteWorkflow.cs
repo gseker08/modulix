@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Sectors;
@@ -195,7 +196,7 @@ internal sealed class QuoteWorkflow(
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return Invalid("Revizyon gerekçesi zorunludur.", "reason");
+            return Invalid(CrmMessages.Quote.RevisionReasonRequired, "reason");
         }
 
         var source = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
@@ -275,7 +276,7 @@ internal sealed class QuoteWorkflow(
                 rule = QuoteRuleResult.Deny("approver-restricted", restriction);
             }
 
-            list.Add(new QuoteActionState(action, rule.Allowed, rule.Code, rule.Message));
+            list.Add(new QuoteActionState(action, rule.Allowed, rule.Code, rule.Message?.Text));
         }
 
         return RecordResult<IReadOnlyList<QuoteActionState>>.Ok(list);
@@ -296,26 +297,26 @@ internal sealed class QuoteWorkflow(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(permission))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission));
         }
 
         var quote = loaded.Value!;
         if (reasonRequired && string.IsNullOrWhiteSpace(reason))
         {
-            return Invalid("Gerekçe zorunludur.", "reason");
+            return Invalid(CrmMessages.Quote.ReasonRequired, "reason");
         }
 
         var now = time.GetUtcNow();
         var rule = QuoteRules.Can(action, Status(quote), await EffectiveApprovalAsync(quote, cancellationToken), ValidUntil(quote), now, await HasLinesAsync(id, cancellationToken));
         if (!rule.Allowed)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, rule.Message ?? "Bu işlem şu an yapılamaz.",
-                [new RecordFieldError(rule.Code ?? "status", rule.Message ?? string.Empty)]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, rule.Message ?? CrmMessages.Quote.ActionNotAllowed,
+                [new RecordFieldError(rule.Code ?? "status", rule.Message ?? CrmMessages.Quote.ActionNotAllowed)]);
         }
 
         if (checkSelfApproval && !(await PolicyAsync(cancellationToken)).AllowSelfApproval && await SubmittedByCurrentUserAsync(id, cancellationToken))
         {
-            return Invalid("Kendi gönderdiğiniz teklifi onaylayamazsınız.", "approvalStatus");
+            return Invalid(CrmMessages.Quote.OwnApproval, "approvalStatus");
         }
 
         if (checkApprover && await ApproverRestrictionAsync(quote, cancellationToken) is { } restriction)
@@ -521,6 +522,6 @@ internal sealed class QuoteWorkflow(
 
     private static string? Trim(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
-    private static RecordResult<RecordData> Invalid(string message, string field) =>
+    private static RecordResult<RecordData> Invalid(ServerMessage message, string field) =>
         RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

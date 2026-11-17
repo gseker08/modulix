@@ -131,12 +131,12 @@ internal sealed class QuoteComparisonService(IRecordPipeline pipeline, QuoteRead
         var right = await reader.QuoteAsync(rightId, cancellationToken);
         if (left is null || right is null)
         {
-            return RecordResult<QuoteComparison>.Fail(RecordErrorCode.NotFound, "Teklif bulunamadı.");
+            return RecordResult<QuoteComparison>.Fail(RecordErrorCode.NotFound, CrmMessages.Quote.NotFound);
         }
 
         if (left.FamilyId != right.FamilyId || left.Id == right.Id)
         {
-            const string message = "Yalnızca aynı teklif ailesinin iki farklı revizyonu karşılaştırılır.";
+            var message = CrmMessages.Quote.CompareSameFamily;
             return RecordResult<QuoteComparison>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError("with", message)]);
         }
 

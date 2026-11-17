@@ -45,11 +45,11 @@ internal sealed class TaxRateRecordStore(CrmStoreContext context) : CrmRecordSto
         entity.Code = entity.Code.Trim();
         if (entity.ValidFrom == default)
         {
-            errors.Add(new RecordFieldError("validFrom", "Geçerlilik başlangıcı zorunludur."));
+            errors.Add(new RecordFieldError("validFrom", CrmMessages.Pricing.ValidFromRequired));
         }
         else if (entity.ValidTo is { } to && to <= entity.ValidFrom)
         {
-            errors.Add(new RecordFieldError("validTo", "Bitiş, başlangıçtan sonra olmalıdır."));
+            errors.Add(new RecordFieldError("validTo", CrmMessages.Activity.EndAfterStart));
         }
         else
         {
@@ -58,7 +58,7 @@ internal sealed class TaxRateRecordStore(CrmStoreContext context) : CrmRecordSto
                 .Where(t => t.Id != entity.Id && t.Code == entity.Code).Select(t => new { t.ValidFrom, t.ValidTo }).ToListAsync(cancellationToken);
             if (others.Any(o => (o.ValidTo is null || entity.ValidFrom < o.ValidTo) && (entity.ValidTo is null || o.ValidFrom < entity.ValidTo)))
             {
-                errors.Add(new RecordFieldError("validFrom", "Bu vergi kodu için geçerlilik aralığı mevcut bir kayıtla çakışıyor."));
+                errors.Add(new RecordFieldError("validFrom", CrmMessages.Pricing.TaxRateOverlap));
             }
         }
 
@@ -72,7 +72,7 @@ internal sealed class TaxRateRecordStore(CrmStoreContext context) : CrmRecordSto
     {
         if (await Context.Data.Set<Product>().AnyAsync(p => p.TaxCategory == entity.Code, cancellationToken))
         {
-            throw new RecordConflictException("Ürünlerde kullanılan vergi kodunun oranı silinemez; bitiş tarihi verin ya da pasifleştirin.");
+            throw new RecordConflictException(CrmMessages.Pricing.TaxRateInUse);
         }
     }
 }
@@ -116,26 +116,26 @@ internal sealed class ExchangeRateRecordStore(CrmStoreContext context) : CrmReco
         var errors = new List<RecordFieldError>();
         if (entity.FromCurrency.Length != 3 || entity.ToCurrency.Length != 3)
         {
-            errors.Add(new RecordFieldError("fromCurrency", "Kaynak ve hedef para birimi zorunludur."));
+            errors.Add(new RecordFieldError("fromCurrency", CrmMessages.Pricing.CurrenciesRequired));
         }
         else if (entity.FromCurrency == entity.ToCurrency)
         {
-            errors.Add(new RecordFieldError("toCurrency", "Kaynak ve hedef para birimi aynı olamaz."));
+            errors.Add(new RecordFieldError("toCurrency", CrmMessages.Pricing.CurrenciesSame));
         }
 
         if (entity.Rate <= 0)
         {
-            errors.Add(new RecordFieldError("rate", "Kur sıfırdan büyük olmalıdır."));
+            errors.Add(new RecordFieldError("rate", CrmMessages.Pricing.RatePositive));
         }
 
         if (entity.ValidOn == default)
         {
-            errors.Add(new RecordFieldError("validOn", "Kurun geçerli olduğu gün zorunludur."));
+            errors.Add(new RecordFieldError("validOn", CrmMessages.Pricing.RateDayRequired));
         }
         else if (await Context.Data.Set<ExchangeRate>().AnyAsync(r => r.Id != entity.Id && r.FromCurrency == entity.FromCurrency
                      && r.ToCurrency == entity.ToCurrency && r.ValidOn == entity.ValidOn, cancellationToken))
         {
-            errors.Add(new RecordFieldError("validOn", "Bu para birimi çifti için o güne ait kur zaten var."));
+            errors.Add(new RecordFieldError("validOn", CrmMessages.Pricing.RateExists));
         }
 
         if (errors.Count > 0)
@@ -215,21 +215,21 @@ internal sealed class PriceListRecordStore(CrmStoreContext context) : CrmRecordS
 
         if (stored is not null && !PricingRules.CanTransition(stored.Status, entity.Status))
         {
-            errors.Add(new RecordFieldError("status", $"'{stored.Status}' durumundan '{entity.Status}' durumuna geçilemez."));
+            errors.Add(new RecordFieldError("status", CrmMessages.Pricing.StatusTransition(stored.Status, entity.Status)));
         }
         else if (stored is not null && stored.Status != PricingRules.ListDraft && Changed(stored, entity))
         {
-            errors.Add(new RecordFieldError("status", "Yayımlanmış ya da arşivlenmiş fiyat listesi değiştirilemez; yeni liste açın."));
+            errors.Add(new RecordFieldError("status", CrmMessages.Pricing.PriceListLocked));
         }
 
         if (entity.Scope == PricingRules.ScopeCustomer && entity.CompanyId is null)
         {
-            errors.Add(new RecordFieldError("companyId", "Müşteriye özel liste için firma seçin."));
+            errors.Add(new RecordFieldError("companyId", CrmMessages.Pricing.CustomerListCompany));
         }
 
         if (entity.Scope == PricingRules.ScopeSegment && string.IsNullOrWhiteSpace(entity.Segment))
         {
-            errors.Add(new RecordFieldError("segment", "Segment/kanal listesi için segment adı girin."));
+            errors.Add(new RecordFieldError("segment", CrmMessages.Pricing.SegmentRequired));
         }
 
         if (entity.Scope != PricingRules.ScopeCustomer)
@@ -244,7 +244,7 @@ internal sealed class PriceListRecordStore(CrmStoreContext context) : CrmRecordS
 
         if (entity.ValidFrom is { } from && entity.ValidTo is { } to && from >= to)
         {
-            errors.Add(new RecordFieldError("validTo", "Bitiş, başlangıçtan sonra olmalıdır."));
+            errors.Add(new RecordFieldError("validTo", CrmMessages.Activity.EndAfterStart));
         }
 
         if (errors.Count == 0 && entity.Status == PricingRules.ListPublished && stored?.Status != PricingRules.ListPublished)
@@ -269,7 +269,7 @@ internal sealed class PriceListRecordStore(CrmStoreContext context) : CrmRecordS
         var items = await Context.Data.Set<PriceListItem>().AsNoTracking().Where(i => i.PriceListId == entity.Id).ToListAsync(cancellationToken);
         if (items.Count == 0)
         {
-            errors.Add(new RecordFieldError("status", "Satırı olmayan fiyat listesi yayımlanamaz."));
+            errors.Add(new RecordFieldError("status", CrmMessages.Pricing.PublishNeedsLines));
             return;
         }
 
@@ -307,12 +307,12 @@ internal sealed class PriceListRecordStore(CrmStoreContext context) : CrmRecordS
     {
         if (entity.Status != PricingRules.ListDraft)
         {
-            throw new RecordConflictException("Yayımlanmış fiyat listesi silinemez; arşive alın.");
+            throw new RecordConflictException(CrmMessages.Pricing.PublishedDelete);
         }
 
         if (await Context.Data.Set<PriceListItem>().AnyAsync(i => i.PriceListId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Satırları olan liste silinemez; önce satırları silin.");
+            throw new RecordConflictException(CrmMessages.Pricing.ListHasLines);
         }
     }
 }
@@ -330,7 +330,7 @@ internal sealed class PriceListItemRecordStore(CrmStoreContext context) : CrmRec
 
     protected override IReadOnlyList<RecordField<PriceListItem>> Fields { get; } =
     [
-        Field.Reference<PriceListItem, PriceList>("priceListId", "Fiyat listesi bulunamadı.", i => i.PriceListId == Guid.Empty ? null : i.PriceListId,
+        Field.Reference<PriceListItem, PriceList>("priceListId", CrmMessages.Pricing.PriceListNotFound, i => i.PriceListId == Guid.Empty ? null : i.PriceListId,
             (i, v) => i.PriceListId = v ?? Guid.Empty, required: true),
         Field.Reference<PriceListItem, Product>("productId", "Ürün bulunamadı.", i => i.ProductId == Guid.Empty ? null : i.ProductId,
             (i, v) => i.ProductId = v ?? Guid.Empty, required: true),
@@ -376,12 +376,12 @@ internal sealed class PriceListItemRecordStore(CrmStoreContext context) : CrmRec
         var list = await Context.Data.Set<PriceList>().AsNoTracking().SingleOrDefaultAsync(l => l.Id == entity.PriceListId, cancellationToken);
         if (list is null)
         {
-            throw new RecordValidationException([new RecordFieldError("priceListId", "Fiyat listesi bulunamadı.")]);
+            throw new RecordValidationException([new RecordFieldError("priceListId", CrmMessages.Pricing.PriceListNotFound)]);
         }
 
         if (list.Status != PricingRules.ListDraft)
         {
-            errors.Add(new RecordFieldError("priceListId", "Yalnızca taslak fiyat listesinin satırı değiştirilebilir."));
+            errors.Add(new RecordFieldError("priceListId", CrmMessages.Pricing.DraftLinesOnly));
         }
 
         if (entity.IsFree)
@@ -391,7 +391,7 @@ internal sealed class PriceListItemRecordStore(CrmStoreContext context) : CrmRec
 
         if (entity.MaxQuantity is { } max && max <= entity.MinQuantity)
         {
-            errors.Add(new RecordFieldError("maxQuantity", "Üst sınır, alt sınırdan büyük olmalıdır."));
+            errors.Add(new RecordFieldError("maxQuantity", CrmMessages.Pricing.MaxAboveMin));
         }
 
         if (errors.Count == 0)
@@ -419,7 +419,7 @@ internal sealed class PriceListItemRecordStore(CrmStoreContext context) : CrmRec
         var status = await Context.Data.Set<PriceList>().AsNoTracking().Where(l => l.Id == entity.PriceListId).Select(l => l.Status).SingleOrDefaultAsync(cancellationToken);
         if (status != PricingRules.ListDraft)
         {
-            throw new RecordConflictException("Yalnızca taslak fiyat listesinin satırı silinebilir.");
+            throw new RecordConflictException(CrmMessages.Pricing.DraftLinesDeleteOnly);
         }
     }
 }
@@ -465,13 +465,13 @@ internal sealed class ProductComponentRecordStore(CrmStoreContext context) : Crm
         var errors = new List<RecordFieldError>();
         if (entity.PackageId == entity.ComponentId)
         {
-            errors.Add(new RecordFieldError("componentId", "Paket kendisini bileşen olarak içeremez."));
+            errors.Add(new RecordFieldError("componentId", CrmMessages.Pricing.PackageSelf));
         }
         else
         {
             if (await Context.Data.Set<ProductComponent>().AnyAsync(c => c.Id != entity.Id && c.PackageId == entity.PackageId && c.ComponentId == entity.ComponentId, cancellationToken))
             {
-                errors.Add(new RecordFieldError("componentId", "Bu bileşen pakette zaten var; miktarını güncelleyin."));
+                errors.Add(new RecordFieldError("componentId", CrmMessages.Pricing.ComponentExists));
             }
 
             var edges = await Context.Data.Set<ProductComponent>().AsNoTracking().Where(c => c.Id != entity.Id)
@@ -536,22 +536,22 @@ internal sealed class DiscountPolicyRecordStore(CrmStoreContext context) : CrmRe
         var errors = new List<RecordFieldError>();
         if ((entity.Percent is null) == (entity.Amount is null))
         {
-            errors.Add(new RecordFieldError("percent", "Yüzde ya da tutardan tam birini girin."));
+            errors.Add(new RecordFieldError("percent", CrmMessages.Pricing.PercentOrAmount));
         }
 
         if (entity.Percent is 0)
         {
-            errors.Add(new RecordFieldError("percent", "Yüzde sıfırdan büyük olmalıdır."));
+            errors.Add(new RecordFieldError("percent", CrmMessages.Pricing.PercentPositive));
         }
 
         if (entity.Amount is 0)
         {
-            errors.Add(new RecordFieldError("amount", "Tutar sıfırdan büyük olmalıdır."));
+            errors.Add(new RecordFieldError("amount", CrmMessages.Pricing.AmountPositive));
         }
 
         if (entity.Amount is not null && string.IsNullOrEmpty(entity.Currency))
         {
-            errors.Add(new RecordFieldError("currency", "Tutar indirimi için para birimi seçin."));
+            errors.Add(new RecordFieldError("currency", CrmMessages.Pricing.AmountCurrency));
         }
 
         if (entity.Amount is null)
@@ -561,7 +561,7 @@ internal sealed class DiscountPolicyRecordStore(CrmStoreContext context) : CrmRe
 
         if (entity.ValidFrom is { } from && entity.ValidTo is { } to && from > to)
         {
-            errors.Add(new RecordFieldError("validTo", "Bitiş, başlangıçtan önce olamaz."));
+            errors.Add(new RecordFieldError("validTo", CrmMessages.Field.EndBeforeStart));
         }
 
         return errors.Count > 0 ? Task.FromException(new RecordValidationException(errors)) : Task.CompletedTask;

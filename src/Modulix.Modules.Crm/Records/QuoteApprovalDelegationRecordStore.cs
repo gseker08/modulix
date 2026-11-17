@@ -50,17 +50,17 @@ internal sealed class QuoteApprovalDelegationRecordStore(CrmStoreContext context
         var errors = new List<RecordFieldError>();
         if (entity.FromUserId == Guid.Empty)
         {
-            errors.Add(new RecordFieldError("fromUserId", "Vekâlet veren zorunludur."));
+            errors.Add(new RecordFieldError("fromUserId", CrmMessages.Quote.DelegatorRequired));
         }
 
         if (entity.ToUserId == Guid.Empty)
         {
-            errors.Add(new RecordFieldError("toUserId", "Vekil zorunludur."));
+            errors.Add(new RecordFieldError("toUserId", CrmMessages.Quote.DelegateRequired));
         }
 
         if (entity.FromUserId != Guid.Empty && entity.FromUserId == entity.ToUserId)
         {
-            errors.Add(new RecordFieldError("toUserId", "Kişi kendine vekâlet veremez."));
+            errors.Add(new RecordFieldError("toUserId", CrmMessages.Quote.SelfDelegation));
         }
 
         if (entity.StartsAt == default)
@@ -70,7 +70,7 @@ internal sealed class QuoteApprovalDelegationRecordStore(CrmStoreContext context
 
         if (entity.EndsAt is { } end && end <= entity.StartsAt)
         {
-            errors.Add(new RecordFieldError("endsAt", "Bitiş, başlangıçtan sonra olmalıdır."));
+            errors.Add(new RecordFieldError("endsAt", CrmMessages.Activity.EndAfterStart));
         }
 
         return errors.Count > 0 ? Task.FromException(new RecordValidationException(errors)) : Task.CompletedTask;

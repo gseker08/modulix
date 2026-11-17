@@ -130,7 +130,7 @@ internal sealed class QuoteSharing(
 
         if (pdf.Length == 0 || pdf.Length > MaxPdfBytes || !pdf.AsSpan().StartsWith("%PDF-"u8))
         {
-            return RecordResult<QuoteDocumentInfo>.Fail(RecordErrorCode.ValidationFailed, "Üretilen belge geçerli bir PDF değil.");
+            return RecordResult<QuoteDocumentInfo>.Fail(RecordErrorCode.ValidationFailed, CrmMessages.Quote.InvalidPdf);
         }
 
         var document = new QuoteDocument
@@ -185,7 +185,7 @@ internal sealed class QuoteSharing(
         if (await reader.DocumentMetaAsync(documentId, cancellationToken) is not { } meta || meta.QuoteId != quoteId
             || await reader.DocumentContentAsync(documentId, cancellationToken) is not { } content)
         {
-            return RecordResult<QuoteDocumentFile>.Fail(RecordErrorCode.NotFound, "Belge bulunamadı.");
+            return RecordResult<QuoteDocumentFile>.Fail(RecordErrorCode.NotFound, CrmMessages.Quote.DocumentNotFound);
         }
 
         return RecordResult<QuoteDocumentFile>.Ok(new QuoteDocumentFile(meta.ToInfo(), meta.ContentType, content));
@@ -204,7 +204,7 @@ internal sealed class QuoteSharing(
         var rule = QuoteRules.Can(QuoteAction.Share, quote.Status, quote.ApprovalStatus, quote.ValidUntil, now, true);
         if (!rule.Allowed)
         {
-            return Conflict<QuoteShareLinkCreated>(rule.Message ?? "Bu teklif paylaşılamaz.");
+            return Conflict<QuoteShareLinkCreated>(rule.Message ?? CrmMessages.Quote.ShareNotAllowed);
         }
 
         var errors = new List<RecordFieldError>();
@@ -212,29 +212,30 @@ internal sealed class QuoteSharing(
         var email = Clean(request.RecipientEmail);
         if (name is { Length: > QuoteShareLink.NameMaxLength })
         {
-            errors.Add(new RecordFieldError("recipientName", "Alıcı adı çok uzun."));
+            errors.Add(new RecordFieldError("recipientName", CrmMessages.Quote.RecipientNameTooLong));
         }
 
         if (email is not null && !IsEmail(email))
         {
-            errors.Add(new RecordFieldError("recipientEmail", "Geçerli bir e-posta adresi girin."));
+            errors.Add(new RecordFieldError("recipientEmail", ServerMessages.Validation.Email));
         }
 
         if (request.ValidDays is { } requested and (< 1 or > MaxLinkDays))
         {
-            errors.Add(new RecordFieldError("validDays", $"Bağlantı süresi 1-{MaxLinkDays} gün olmalıdır."));
+            errors.Add(new RecordFieldError("validDays", CrmMessages.Quote.LinkDays(MaxLinkDays)));
         }
 
         var documents = await reader.DocumentsAsync(quoteId, cancellationToken);
         var document = request.DocumentId is { } wanted ? documents.FirstOrDefault(d => d.Id == wanted) : documents.FirstOrDefault();
         if (document is null)
         {
-            errors.Add(new RecordFieldError("documentId", "Bağlantı için önce müşteri belgesi (PDF) üretilmelidir."));
+            errors.Add(new RecordFieldError("documentId", CrmMessages.Quote.LinkNeedsDocument));
         }
 
         if (errors.Count > 0)
         {
-            return RecordResult<QuoteShareLinkCreated>.Fail(RecordErrorCode.ValidationFailed, errors[0].Message, errors);
+            return RecordResult<QuoteShareLinkCreated>.Fail(
+                RecordErrorCode.ValidationFailed, new ServerMessage(errors[0].Message, errors[0].MessageKey, [.. errors[0].MessageArgs ?? []]), errors);
         }
 
         // Varsayılan süre: teklif geçerlilik bitişinden bir hafta sonrası (kapanış sayfasını görebilsin), yoksa 30 gün.
@@ -286,13 +287,13 @@ internal sealed class QuoteSharing(
 
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return RecordResult<QuoteShareLinkInfo>.Fail(RecordErrorCode.ValidationFailed, "İptal gerekçesi zorunludur.", [new RecordFieldError("reason", "İptal gerekçesi zorunludur.")]);
+            return RecordResult<QuoteShareLinkInfo>.Fail(RecordErrorCode.ValidationFailed, CrmMessages.Quote.RevokeReasonRequired, [new RecordFieldError("reason", CrmMessages.Quote.RevokeReasonRequired)]);
         }
 
         var link = (await reader.LinksAsync(quoteId, cancellationToken)).FirstOrDefault(l => l.Id == linkId);
         if (link is null)
         {
-            return RecordResult<QuoteShareLinkInfo>.Fail(RecordErrorCode.NotFound, "Bağlantı bulunamadı.");
+            return RecordResult<QuoteShareLinkInfo>.Fail(RecordErrorCode.NotFound, CrmMessages.Quote.LinkNotFound);
         }
 
         if (link.RevokedAt is not null)
@@ -338,7 +339,7 @@ internal sealed class QuoteSharing(
 
         if (!QuoteDeliveryStatus.All.Contains(status))
         {
-            return RecordResult<string>.Fail(RecordErrorCode.ValidationFailed, "Geçersiz gönderim durumu.", [new RecordFieldError("deliveryStatus", "Geçersiz gönderim durumu.")]);
+            return RecordResult<string>.Fail(RecordErrorCode.ValidationFailed, CrmMessages.Quote.InvalidDeliveryStatus, [new RecordFieldError("deliveryStatus", CrmMessages.Quote.InvalidDeliveryStatus)]);
         }
 
         if (loaded.Quote!.DeliveryStatus == status)
@@ -366,12 +367,12 @@ internal sealed class QuoteSharing(
 
         if (anyOf is not null && !(await access.GetPermissionsAsync(cancellationToken)).Overlaps(anyOf))
         {
-            return new Loaded<T>(null, null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{anyOf[0]}' izni gerekir."));
+            return new Loaded<T>(null, null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(anyOf[0])));
         }
 
         var quote = await reader.QuoteAsync(quoteId, cancellationToken);
         return quote is null
-            ? new Loaded<T>(null, null, RecordResult<T>.Fail(RecordErrorCode.NotFound, "Teklif bulunamadı."))
+            ? new Loaded<T>(null, null, RecordResult<T>.Fail(RecordErrorCode.NotFound, CrmMessages.Quote.NotFound))
             : new Loaded<T>(record.Value, quote, null);
     }
 
@@ -391,7 +392,7 @@ internal sealed class QuoteSharing(
         link.Id, link.DocumentId, link.TokenHint, link.RecipientName, link.RecipientEmail, link.ExpiresAt, link.RevokedAt, link.RevokeReason,
         link.FirstViewedAt, link.CreatedAt, link.RevokedAt is not null ? "Revoked" : link.ExpiresAt <= now ? "Expired" : "Active");
 
-    private static RecordResult<T> Conflict<T>(string message) =>
+    private static RecordResult<T> Conflict<T>(ServerMessage message) =>
         RecordResult<T>.Fail(RecordErrorCode.Conflict, message, [new RecordFieldError("status", message)]);
 
     private static RecordResult<T> Failed<T>(RecordResult<RecordData> result) =>
@@ -523,7 +524,9 @@ internal sealed class QuoteCustomerPortal(
         var rule = QuoteRules.Can(action, context.Quote.Status, context.Quote.ApprovalStatus, context.Quote.ValidUntil, now, true);
         if (!rule.Allowed)
         {
-            return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.Conflict, rule.Message ?? texts.Get("crm.portal.cannot-decide"));
+            return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.Conflict, rule.Message is { } denied
+                ? denied.Key is { } key ? texts.Get(key, [.. denied.Args]) : denied.Text
+                : texts.Get("crm.portal.cannot-decide"));
         }
 
         var decision = new QuoteDecision

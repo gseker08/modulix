@@ -530,4 +530,372 @@ internal static class CrmMessages
         public static ServerMessage BulkShiftDays =>
             ServerMessage.Of("crm.server.activity.bulk-shift-days", "Kaydırılacak gün sayısı 1-366 arası olmalıdır.");
     }
+
+    /// <summary>Teklif kayıtları, kalemleri, kuralları, onay ve paylaşım iletileri.</summary>
+    public static class Quote
+    {
+        public static ServerMessage NotFound => ServerMessage.Of("crm.server.quote.not-found", "Teklif bulunamadı.");
+
+        public static ServerMessage SubmitDraftOnly => ServerMessage.Of("crm.server.quote.submit-draft-only", "Yalnızca taslak teklif onaya gönderilebilir.");
+
+        public static ServerMessage SubmitNeedsLines => ServerMessage.Of("crm.server.quote.submit-needs-lines", "Onaya göndermek için en az bir kalem gerekir.");
+
+        public static ServerMessage AlreadyPending => ServerMessage.Of("crm.server.quote.already-pending", "Teklif zaten onay bekliyor.");
+
+        public static ServerMessage NothingToWithdraw => ServerMessage.Of("crm.server.quote.nothing-to-withdraw", "Geri çekilecek bekleyen onay yok.");
+
+        public static ServerMessage NotPending => ServerMessage.Of("crm.server.quote.not-pending", "Teklif onay beklemiyor.");
+
+        public static ServerMessage PresentDraftOnly =>
+            ServerMessage.Of("crm.server.quote.present-draft-only", "Yalnızca taslak teklif müşteriye sunulabilir.");
+
+        public static ServerMessage PresentNeedsLines => ServerMessage.Of("crm.server.quote.present-needs-lines", "Sunmak için en az bir kalem gerekir.");
+
+        public static ServerMessage PresentExpired =>
+            ServerMessage.Of("crm.server.quote.present-expired", "Geçerlilik tarihi geçmiş teklif sunulamaz; tarihi güncelleyin.");
+
+        public static ServerMessage ApprovalRequired =>
+            ServerMessage.Of("crm.server.quote.approval-required", "İç onay tamamlanmadan teklif müşteriye sunulamaz.");
+
+        public static ServerMessage Expired => ServerMessage.Of("crm.server.quote.expired", "Teklifin geçerlilik süresi dolmuş.");
+
+        public static ServerMessage ShareDraft => ServerMessage.Of("crm.server.quote.share-draft", "Taslak teklif paylaşılamaz; önce müşteriye sunun.");
+
+        public static ServerMessage ShareExpired =>
+            ServerMessage.Of("crm.server.quote.share-expired", "Teklifin geçerlilik süresi dolmuş; paylaşım bağlantısı üretilemez.");
+
+        public static ServerMessage CancelNotAllowed => ServerMessage.Of("crm.server.quote.cancel-not-allowed", "Bu durumdaki teklif iptal edilemez.");
+
+        public static ServerMessage UnknownAction => ServerMessage.Of("crm.server.quote.unknown-action", "Bilinmeyen eylem.");
+
+        public static ServerMessage AlreadyAccepted => ServerMessage.Of("crm.server.quote.already-accepted", "Teklif daha önce kabul edilmiş.");
+
+        public static ServerMessage AlreadyRejected => ServerMessage.Of("crm.server.quote.already-rejected", "Teklif daha önce reddedilmiş.");
+
+        public static ServerMessage Cancelled => ServerMessage.Of("crm.server.quote.cancelled", "Teklif iptal edilmiş.");
+
+        public static ServerMessage Superseded => ServerMessage.Of("crm.server.quote.superseded", "Bu sürüm yeni bir revizyonla geçersizleşmiş.");
+
+        public static ServerMessage NotPresented => ServerMessage.Of("crm.server.quote.not-presented", "Teklif henüz müşteriye sunulmamış.");
+
+        public static ServerMessage ReviseDraft =>
+            ServerMessage.Of("crm.server.quote.revise-draft", "Taslak teklif zaten düzenlenebilir; revizyon gerekmez.");
+
+        public static ServerMessage ReviseAccepted =>
+            ServerMessage.Of("crm.server.quote.revise-accepted", "Kabul edilmiş teklif yeniden yazılamaz; sonraki ticari değişiklik ayrı süreçtir.");
+
+        public static ServerMessage ReviseNotAllowed => ServerMessage.Of("crm.server.quote.revise-not-allowed", "Bu durumdaki tekliften revizyon açılamaz.");
+
+        public static ServerMessage RevisionReasonRequired => ServerMessage.Of("crm.server.quote.revision-reason-required", "Revizyon gerekçesi zorunludur.");
+
+        public static ServerMessage ReasonRequired => ServerMessage.Of("crm.server.quote.reason-required", "Gerekçe zorunludur.");
+
+        public static ServerMessage ActionNotAllowed => ServerMessage.Of("crm.server.quote.action-not-allowed", "Bu işlem şu an yapılamaz.");
+
+        public static ServerMessage OwnApproval => ServerMessage.Of("crm.server.quote.own-approval", "Kendi gönderdiğiniz teklifi onaylayamazsınız.");
+
+        public static ServerMessage NotLinkedToOpportunity => ServerMessage.Of("crm.server.quote.not-linked-to-opportunity", "Teklif bu fırsata bağlı değil.");
+
+        public static ServerMessage PrimaryNeedsPresented =>
+            ServerMessage.Of("crm.server.quote.primary-needs-presented",
+                "Yalnızca müşteriye sunulmuş ya da kabul edilmiş teklif esas teklif olabilir.");
+
+        public static ServerMessage CompareSameFamily =>
+            ServerMessage.Of("crm.server.quote.compare-same-family", "Yalnızca aynı teklif ailesinin iki farklı revizyonu karşılaştırılır.");
+
+        public static ServerMessage AcceptedNotFound => ServerMessage.Of("crm.server.quote.accepted-not-found", "Kabul edilmiş teklif bulunamadı.");
+
+        public static ServerMessage InvalidPdf => ServerMessage.Of("crm.server.quote.invalid-pdf", "Üretilen belge geçerli bir PDF değil.");
+
+        public static ServerMessage DocumentNotFound => ServerMessage.Of("crm.server.quote.document-not-found", "Belge bulunamadı.");
+
+        public static ServerMessage RecipientNameTooLong => ServerMessage.Of("crm.server.quote.recipient-name-too-long", "Alıcı adı çok uzun.");
+
+        public static ServerMessage LinkDays(int max) =>
+            ServerMessage.Of("crm.server.quote.link-days", "Bağlantı süresi 1-{0} gün olmalıdır.", max);
+
+        public static ServerMessage LinkNeedsDocument =>
+            ServerMessage.Of("crm.server.quote.link-needs-document", "Bağlantı için önce müşteri belgesi (PDF) üretilmelidir.");
+
+        public static ServerMessage RevokeReasonRequired => ServerMessage.Of("crm.server.quote.revoke-reason-required", "İptal gerekçesi zorunludur.");
+
+        public static ServerMessage LinkNotFound => ServerMessage.Of("crm.server.quote.link-not-found", "Bağlantı bulunamadı.");
+
+        public static ServerMessage InvalidDeliveryStatus => ServerMessage.Of("crm.server.quote.invalid-delivery-status", "Geçersiz gönderim durumu.");
+
+        public static ServerMessage ShareNotAllowed => ServerMessage.Of("crm.server.quote.share-not-allowed", "Bu teklif paylaşılamaz.");
+
+        public static ServerMessage RevisionAndCopy => ServerMessage.Of("crm.server.quote.revision-and-copy", "Revizyon ve çoğaltma birlikte verilemez.");
+
+        public static ServerMessage ReviseLatestOnly =>
+            ServerMessage.Of("crm.server.quote.revise-latest-only", "Yalnızca ailenin son revizyonundan yeni revizyon açılır.");
+
+        public static ServerMessage DraftRevisionExists =>
+            ServerMessage.Of("crm.server.quote.draft-revision-exists", "Bu ailede zaten açık bir taslak revizyon var.");
+
+        public static ServerMessage NotDraftLocked =>
+            ServerMessage.Of("crm.server.quote.not-draft-locked", "Taslak olmayan teklif değiştirilemez; yeni revizyon açın.");
+
+        public static ServerMessage DiscountDenied => ServerMessage.Of("crm.server.quote.discount-denied", "İndirim uygulama yetkiniz yok.");
+
+        public static ServerMessage ExchangeRateTogether =>
+            ServerMessage.Of("crm.server.quote.exchange-rate-together", "Kur, raporlama para birimi ve kur tarihi birlikte verilmelidir.");
+
+        public static ServerMessage ReportingCurrencyDifferent =>
+            ServerMessage.Of("crm.server.quote.reporting-currency-different", "Raporlama para birimi teklif para biriminden farklı olmalıdır.");
+
+        public static ServerMessage DeleteDraftOnly =>
+            ServerMessage.Of("crm.server.quote.delete-draft-only", "Yalnızca taslak teklif silinebilir; diğerleri iptal edilir.");
+
+        public static ServerMessage ContactNotOfCompany =>
+            ServerMessage.Of("crm.server.quote.contact-not-of-company", "Seçilen kişi bu firmayla ilişkili değil.");
+
+        public static ServerMessage OpportunityNotOfCompany =>
+            ServerMessage.Of("crm.server.quote.opportunity-not-of-company", "Fırsat bu firmaya ait değil.");
+
+        public static ServerMessage PriceListCurrency(string currency) =>
+            ServerMessage.Of("crm.server.quote.price-list-currency", "Fiyat listesi para birimi ({0}) teklifin para biriminden farklı.", currency);
+
+        public static ServerMessage LineLocked =>
+            ServerMessage.Of("crm.server.quote.line-locked", "Taslak olmayan teklifin kalemi değiştirilemez; yeni revizyon açın.");
+
+        public static ServerMessage LineDeleteLocked =>
+            ServerMessage.Of("crm.server.quote.line-delete-locked", "Taslak olmayan teklifin kalemi silinemez; yeni revizyon açın.");
+
+        public static ServerMessage ProductNotFound => ServerMessage.Of("crm.server.quote.product-not-found", "Ürün bulunamadı.");
+
+        public static ServerMessage ProductNotSellable =>
+            ServerMessage.Of("crm.server.quote.product-not-sellable", "Pasif ya da taslak ürün yeni teklif kalemine eklenemez.");
+
+        public static ServerMessage LineNameRequired => ServerMessage.Of("crm.server.quote.line-name-required", "Kalem adı zorunludur.");
+
+        public static ServerMessage FreeLineDenied =>
+            ServerMessage.Of("crm.server.quote.free-line-denied", "Serbest kalem ekleme ve elle fiyat girme yetkiniz yok.");
+
+        public static ServerMessage ParentRequired => ServerMessage.Of("crm.server.quote.parent-required", "Paket bileşeninin ana satırı gerekir.");
+
+        public static ServerMessage ParentNotFound => ServerMessage.Of("crm.server.quote.parent-not-found", "Ana satır bu teklifte bulunamadı.");
+
+        public static ServerMessage PriceNotFound => ServerMessage.Of("crm.server.quote.price-not-found", "Ürün için fiyat bulunamadı.");
+
+        public static ServerMessage TaxModeMismatch =>
+            ServerMessage.Of("crm.server.quote.tax-mode-mismatch", "Ürün fiyatının vergi dahil/hariç biçimi teklifinkiyle uyuşmuyor.");
+
+        public static ServerMessage ManualPriceDenied =>
+            ServerMessage.Of("crm.server.quote.manual-price-denied", "Elle birim fiyat girme yetkiniz yok; fiyat listeden gelir.");
+
+        public static ServerMessage DelegatorRequired => ServerMessage.Of("crm.server.quote.delegator-required", "Vekâlet veren zorunludur.");
+
+        public static ServerMessage DelegateRequired => ServerMessage.Of("crm.server.quote.delegate-required", "Vekil zorunludur.");
+
+        public static ServerMessage SelfDelegation => ServerMessage.Of("crm.server.quote.self-delegation", "Kişi kendine vekâlet veremez.");
+
+        public static ServerMessage RuleConditionRequired =>
+            ServerMessage.Of("crm.server.quote.rule-condition-required", "En az bir koşul girin: indirim yüzdesi ya da genel toplam.");
+
+        public static ServerMessage RuleDiscountRange =>
+            ServerMessage.Of("crm.server.quote.rule-discount-range", "İndirim eşiği 0 ile 100 arasında (100 hariç) olmalıdır.");
+
+        public static ServerMessage RuleStepRange => ServerMessage.Of("crm.server.quote.rule-step-range", "Onay adımı 1 ile 9 arasında olmalıdır.");
+
+        public static ServerMessage RuleAmountNegative => ServerMessage.Of("crm.server.quote.rule-amount-negative", "Tutar eşiği negatif olamaz.");
+
+        public static ServerMessage ReportPermission(string permission) =>
+            ServerMessage.Of("crm.server.quote.report-permission", "Bu rapor için '{0}' izni gerekir.", permission);
+    }
+
+    /// <summary>Ürün kataloğu, birim, vergi, kur, fiyat listesi, paket ve indirim politikası iletileri.</summary>
+    public static class Pricing
+    {
+        public static ServerMessage CategoryCycle => ServerMessage.Of("crm.server.pricing.category-cycle", "Kategori kendi altına taşınamaz (döngü).");
+
+        public static ServerMessage CategoryInUse =>
+            ServerMessage.Of("crm.server.pricing.category-in-use", "Alt kategorisi ya da ürünü olan kategori silinemez; pasifleştirin.");
+
+        public static ServerMessage UnitFactorPositive =>
+            ServerMessage.Of("crm.server.pricing.unit-factor-positive", "Dönüşüm katsayısı sıfırdan büyük olmalıdır.");
+
+        public static ServerMessage UnitCodeTaken => ServerMessage.Of("crm.server.pricing.unit-code-taken", "Bu birim kodu zaten kullanılıyor.");
+
+        public static ServerMessage UnitInUseLocked =>
+            ServerMessage.Of("crm.server.pricing.unit-in-use-locked",
+                "Ürünlerde kullanılan birimin grubu ve katsayısı değiştirilemez; yeni birim tanımlayın.");
+
+        public static ServerMessage UnitInUse => ServerMessage.Of("crm.server.pricing.unit-in-use", "Ürünlerde kullanılan birim silinemez.");
+
+        public static ServerMessage SaleEndBeforeStart => ServerMessage.Of("crm.server.pricing.sale-end-before-start", "Satış bitişi başlangıçtan önce olamaz.");
+
+        public static ServerMessage QuantityPrecision =>
+            ServerMessage.Of("crm.server.pricing.quantity-precision", "Miktar hassasiyeti 0 ile 4 arasında olmalıdır.");
+
+        public static ServerMessage RecurringPeriodRequired =>
+            ServerMessage.Of("crm.server.pricing.recurring-period-required", "Dönemsel ücret için dönem seçin.");
+
+        public static ServerMessage ServiceDurationServiceOnly =>
+            ServerMessage.Of("crm.server.pricing.service-duration-service-only", "Hizmet süresi yalnızca hizmet kartında girilir.");
+
+        public static ServerMessage ProductCodeTaken =>
+            ServerMessage.Of("crm.server.pricing.product-code-taken", "Bu ürün kodu bu kuruluşta zaten kullanılıyor.");
+
+        public static ServerMessage StatusTransition(string from, string to) =>
+            ServerMessage.Of("crm.server.pricing.status-transition", "'{0}' durumundan '{1}' durumuna geçilemez.", from, to);
+
+        public static ServerMessage ProductDeleteDraftOnly =>
+            ServerMessage.Of("crm.server.pricing.product-delete-draft-only",
+                "Taslak dışındaki ürün silinmez; pasifleştirin ya da satıştan kaldırın.");
+
+        public static ServerMessage ValidFromRequired => ServerMessage.Of("crm.server.pricing.valid-from-required", "Geçerlilik başlangıcı zorunludur.");
+
+        public static ServerMessage TaxRateOverlap =>
+            ServerMessage.Of("crm.server.pricing.tax-rate-overlap", "Bu vergi kodu için geçerlilik aralığı mevcut bir kayıtla çakışıyor.");
+
+        public static ServerMessage TaxRateInUse =>
+            ServerMessage.Of("crm.server.pricing.tax-rate-in-use",
+                "Ürünlerde kullanılan vergi kodunun oranı silinemez; bitiş tarihi verin ya da pasifleştirin.");
+
+        public static ServerMessage CurrenciesRequired =>
+            ServerMessage.Of("crm.server.pricing.currencies-required", "Kaynak ve hedef para birimi zorunludur.");
+
+        public static ServerMessage CurrenciesSame => ServerMessage.Of("crm.server.pricing.currencies-same", "Kaynak ve hedef para birimi aynı olamaz.");
+
+        public static ServerMessage RatePositive => ServerMessage.Of("crm.server.pricing.rate-positive", "Kur sıfırdan büyük olmalıdır.");
+
+        public static ServerMessage RateDayRequired => ServerMessage.Of("crm.server.pricing.rate-day-required", "Kurun geçerli olduğu gün zorunludur.");
+
+        public static ServerMessage RateExists =>
+            ServerMessage.Of("crm.server.pricing.rate-exists", "Bu para birimi çifti için o güne ait kur zaten var.");
+
+        public static ServerMessage PriceListLocked =>
+            ServerMessage.Of("crm.server.pricing.price-list-locked",
+                "Yayımlanmış ya da arşivlenmiş fiyat listesi değiştirilemez; yeni liste açın.");
+
+        public static ServerMessage CustomerListCompany =>
+            ServerMessage.Of("crm.server.pricing.customer-list-company", "Müşteriye özel liste için firma seçin.");
+
+        public static ServerMessage SegmentRequired =>
+            ServerMessage.Of("crm.server.pricing.segment-required", "Segment/kanal listesi için segment adı girin.");
+
+        public static ServerMessage PublishNeedsLines => ServerMessage.Of("crm.server.pricing.publish-needs-lines", "Satırı olmayan fiyat listesi yayımlanamaz.");
+
+        public static ServerMessage PublishedDelete =>
+            ServerMessage.Of("crm.server.pricing.published-delete", "Yayımlanmış fiyat listesi silinemez; arşive alın.");
+
+        public static ServerMessage ListHasLines =>
+            ServerMessage.Of("crm.server.pricing.list-has-lines", "Satırları olan liste silinemez; önce satırları silin.");
+
+        public static ServerMessage PriceListNotFound => ServerMessage.Of("crm.server.pricing.price-list-not-found", "Fiyat listesi bulunamadı.");
+
+        public static ServerMessage DraftLinesOnly =>
+            ServerMessage.Of("crm.server.pricing.draft-lines-only", "Yalnızca taslak fiyat listesinin satırı değiştirilebilir.");
+
+        public static ServerMessage DraftLinesDeleteOnly =>
+            ServerMessage.Of("crm.server.pricing.draft-lines-delete-only", "Yalnızca taslak fiyat listesinin satırı silinebilir.");
+
+        public static ServerMessage MaxAboveMin => ServerMessage.Of("crm.server.pricing.max-above-min", "Üst sınır, alt sınırdan büyük olmalıdır.");
+
+        public static ServerMessage PackageSelf => ServerMessage.Of("crm.server.pricing.package-self", "Paket kendisini bileşen olarak içeremez.");
+
+        public static ServerMessage ComponentExists =>
+            ServerMessage.Of("crm.server.pricing.component-exists", "Bu bileşen pakette zaten var; miktarını güncelleyin.");
+
+        public static ServerMessage PercentOrAmount => ServerMessage.Of("crm.server.pricing.percent-or-amount", "Yüzde ya da tutardan tam birini girin.");
+
+        public static ServerMessage PercentPositive => ServerMessage.Of("crm.server.pricing.percent-positive", "Yüzde sıfırdan büyük olmalıdır.");
+
+        public static ServerMessage AmountPositive => ServerMessage.Of("crm.server.pricing.amount-positive", "Tutar sıfırdan büyük olmalıdır.");
+
+        public static ServerMessage AmountCurrency => ServerMessage.Of("crm.server.pricing.amount-currency", "Tutar indirimi için para birimi seçin.");
+    }
+
+    /// <summary>Satış hedefi, tahmin ve satış analizi iletileri.</summary>
+    public static class Planning
+    {
+        public static ServerMessage TargetPositive => ServerMessage.Of("crm.server.planning.target-positive", "Hedef sıfırdan büyük olmalıdır.");
+
+        public static ServerMessage CountWhole => ServerMessage.Of("crm.server.planning.count-whole", "Adet hedefi tam sayı olmalıdır.");
+
+        public static ServerMessage TargetOverlap =>
+            ServerMessage.Of("crm.server.planning.target-overlap", "Bu kapsam, metrik ve para birimi için dönem mevcut bir hedefle çakışıyor.");
+
+        public static ServerMessage PeriodRequired => ServerMessage.Of("crm.server.planning.period-required", "Dönem başı ve sonu zorunludur.");
+
+        public static ServerMessage PeriodOrder => ServerMessage.Of("crm.server.planning.period-order", "Dönem sonu başından önce olamaz.");
+
+        public static ServerMessage PeriodMaxDays(int days) =>
+            ServerMessage.Of("crm.server.planning.period-max-days", "Hedef dönemi en fazla {0} gün olabilir.", days);
+
+        public static ServerMessage UserTargetUser => ServerMessage.Of("crm.server.planning.user-target-user", "Kullanıcı hedefinde kullanıcı zorunludur.");
+
+        public static ServerMessage TenantTargetNoUser => ServerMessage.Of("crm.server.planning.tenant-target-no-user", "Tenant hedefinde kullanıcı verilmez.");
+
+        public static ServerMessage AmountCurrency => ServerMessage.Of("crm.server.planning.amount-currency", "Tutar hedefinde para birimi zorunludur.");
+
+        public static ServerMessage CountNoCurrency => ServerMessage.Of("crm.server.planning.count-no-currency", "Adet hedefinde para birimi olmaz.");
+
+        public static ServerMessage ForecastByWorkflow =>
+            ServerMessage.Of("crm.server.planning.forecast-by-workflow", "Tahmin yalnızca tahmin ekranından (iş akışıyla) oluşturulur.");
+
+        public static ServerMessage NoteDraftOnly => ServerMessage.Of("crm.server.planning.note-draft-only", "Not yalnızca taslak tahminde değiştirilir.");
+
+        public static ServerMessage DeleteDraftOnly =>
+            ServerMessage.Of("crm.server.planning.delete-draft-only", "Yalnızca taslak tahmin silinebilir; sunulan ve kilitli tahmin korunur.");
+
+        public static ServerMessage ReasonRequired => ServerMessage.Of("crm.server.planning.reason-required", "Gerekçe zorunludur.");
+
+        public static ServerMessage ReasonMaxLength(int max) =>
+            ServerMessage.Of("crm.server.planning.reason-max-length", "Gerekçe en fazla {0} karakter olabilir.", max);
+
+        public static ServerMessage UserForecastUser =>
+            ServerMessage.Of("crm.server.planning.user-forecast-user",
+                "Kullanıcı tahmininde kullanıcı zorunludur ve bu kuruluşun etkin üyesi olmalıdır.");
+
+        public static ServerMessage TenantForecastNoUser =>
+            ServerMessage.Of("crm.server.planning.tenant-forecast-no-user", "Tenant tahmininde kullanıcı verilmez.");
+
+        public static ServerMessage ForecastExists =>
+            ServerMessage.Of("crm.server.planning.forecast-exists",
+                "Bu dönem, kapsam ve para birimi için tahmin zaten var; kilitliyse gerekçeyle yeniden açın.");
+
+        public static ServerMessage RefreshDraftOnly => ServerMessage.Of("crm.server.planning.refresh-draft-only", "Yalnızca taslak tahmin yenilenir.");
+
+        public static ServerMessage LineNotFound => ServerMessage.Of("crm.server.planning.line-not-found", "Tahmin satırı bulunamadı.");
+
+        public static ServerMessage CategoryOneOf(string allowed) =>
+            ServerMessage.Of("crm.server.planning.category-one-of", "Kategori şunlardan biri olmalıdır: {0}.", allowed);
+
+        public static ServerMessage CategoryUnchanged => ServerMessage.Of("crm.server.planning.category-unchanged", "Kategori zaten bu değerde.");
+
+        public static ServerMessage AmountNotAdjustable =>
+            ServerMessage.Of("crm.server.planning.amount-not-adjustable",
+                "Tutarı ya da kuru olmayan satırın tutarı düzeltilemez; önce fırsat tutarını/kuru tamamlayıp yenileyin.");
+
+        public static ServerMessage AdjustmentFormat =>
+            ServerMessage.Of("crm.server.planning.adjustment-format",
+                "Düzeltme, en fazla iki ondalıklı bir sayı (delta) olmalıdır; boş bırakmak düzeltmeyi kaldırır.");
+
+        public static ServerMessage AdjustedNegative =>
+            ServerMessage.Of("crm.server.planning.adjusted-negative", "Düzeltme sonrası nihai tutar negatif olamaz.");
+
+        public static ServerMessage ProbabilityFormat =>
+            ServerMessage.Of("crm.server.planning.probability-format",
+                "Olasılık 0-100 arası tam sayı olmalıdır; boş bırakmak düzeltmeyi kaldırır.");
+
+        public static ServerMessage NoteMaxLength(int max) =>
+            ServerMessage.Of("crm.server.planning.note-max-length", "Not en fazla {0} karakter olabilir.", max);
+
+        public static ServerMessage ReopenLockedOnly => ServerMessage.Of("crm.server.planning.reopen-locked-only", "Yalnızca kilitli tahmin yeniden açılır.");
+
+        public static ServerMessage OpenVersionExists =>
+            ServerMessage.Of("crm.server.planning.open-version-exists",
+                "Bu dönem için zaten açık bir sürüm var; önce onu kilitleyin ya da silin.");
+
+        public static ServerMessage StatusTransition(string from, string to) =>
+            ServerMessage.Of("crm.server.planning.status-transition", "Tahmin '{0}' durumundan '{1}' durumuna geçirilemez.", from, to);
+
+        public static ServerMessage ForecastPermission(string permission) =>
+            ServerMessage.Of("crm.server.planning.forecast-permission", "Tahmin için '{0}' izni gerekir.", permission);
+
+        public static ServerMessage AnalysisPermission(string permission) =>
+            ServerMessage.Of("crm.server.planning.analysis-permission", "Bu analiz için '{0}' izni gerekir.", permission);
+    }
 }

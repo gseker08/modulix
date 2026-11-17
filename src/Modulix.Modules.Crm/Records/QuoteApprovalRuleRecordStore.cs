@@ -46,22 +46,22 @@ internal sealed class QuoteApprovalRuleRecordStore(CrmStoreContext context) : Cr
         var errors = new List<RecordFieldError>();
         if (entity.MinDiscountPercent is null && entity.MinGrossTotal is null)
         {
-            errors.Add(new RecordFieldError("minDiscountPercent", "En az bir koşul girin: indirim yüzdesi ya da genel toplam."));
+            errors.Add(new RecordFieldError("minDiscountPercent", CrmMessages.Quote.RuleConditionRequired));
         }
 
         if (entity.MinDiscountPercent is { } percent && (percent < 0 || percent >= 100))
         {
-            errors.Add(new RecordFieldError("minDiscountPercent", "İndirim eşiği 0 ile 100 arasında (100 hariç) olmalıdır."));
+            errors.Add(new RecordFieldError("minDiscountPercent", CrmMessages.Quote.RuleDiscountRange));
         }
 
         if (entity.Step is < 1 or > 9)
         {
-            errors.Add(new RecordFieldError("step", "Onay adımı 1 ile 9 arasında olmalıdır."));
+            errors.Add(new RecordFieldError("step", CrmMessages.Quote.RuleStepRange));
         }
 
         if (entity.MinGrossTotal is < 0)
         {
-            errors.Add(new RecordFieldError("minGrossTotal", "Tutar eşiği negatif olamaz."));
+            errors.Add(new RecordFieldError("minGrossTotal", CrmMessages.Quote.RuleAmountNegative));
         }
 
         // Para birimi yalnızca tutar koşuluyla anlamlıdır; tutar yoksa boşaltılır.

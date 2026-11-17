@@ -118,11 +118,11 @@ internal sealed class SalesTargetRecordStore(CrmStoreContext context) : CrmRecor
 
         if (entity.Value <= 0)
         {
-            errors.Add(new RecordFieldError("value", "Hedef sıfırdan büyük olmalıdır."));
+            errors.Add(new RecordFieldError("value", CrmMessages.Planning.TargetPositive));
         }
         else if (entity.Metric == TargetMetric.WonCount && entity.Value != decimal.Truncate(entity.Value))
         {
-            errors.Add(new RecordFieldError("value", "Adet hedefi tam sayı olmalıdır."));
+            errors.Add(new RecordFieldError("value", CrmMessages.Planning.CountWhole));
         }
 
         if (errors.Count == 0 && original is null)
@@ -132,7 +132,7 @@ internal sealed class SalesTargetRecordStore(CrmStoreContext context) : CrmRecor
                 .Select(o => new { o.PeriodStart, o.PeriodEnd }).ToListAsync(cancellationToken);
             if (overlapping.Any(o => TargetRules.Overlaps(o.PeriodStart, o.PeriodEnd.AddDays(1), entity.PeriodStart, entity.PeriodEnd.AddDays(1))))
             {
-                errors.Add(new RecordFieldError("periodStart", "Bu kapsam, metrik ve para birimi için dönem mevcut bir hedefle çakışıyor."));
+                errors.Add(new RecordFieldError("periodStart", CrmMessages.Planning.TargetOverlap));
             }
         }
 
@@ -168,33 +168,33 @@ internal sealed class SalesTargetRecordStore(CrmStoreContext context) : CrmRecor
     {
         if (entity.PeriodStart == default || entity.PeriodEnd == default)
         {
-            errors.Add(new RecordFieldError("periodStart", "Dönem başı ve sonu zorunludur."));
+            errors.Add(new RecordFieldError("periodStart", CrmMessages.Planning.PeriodRequired));
         }
         else if (entity.PeriodEnd < entity.PeriodStart)
         {
-            errors.Add(new RecordFieldError("periodEnd", "Dönem sonu başından önce olamaz."));
+            errors.Add(new RecordFieldError("periodEnd", CrmMessages.Planning.PeriodOrder));
         }
         else if (entity.PeriodEnd.DayNumber - entity.PeriodStart.DayNumber + 1 > SalesTarget.MaxSpanDays)
         {
-            errors.Add(new RecordFieldError("periodEnd", $"Hedef dönemi en fazla {SalesTarget.MaxSpanDays} gün olabilir."));
+            errors.Add(new RecordFieldError("periodEnd", CrmMessages.Planning.PeriodMaxDays(SalesTarget.MaxSpanDays)));
         }
 
         if (entity.ScopeType == TargetScope.User && entity.ScopeUserId is null)
         {
-            errors.Add(new RecordFieldError("scopeUserId", "Kullanıcı hedefinde kullanıcı zorunludur."));
+            errors.Add(new RecordFieldError("scopeUserId", CrmMessages.Planning.UserTargetUser));
         }
         else if (entity.ScopeType == TargetScope.Tenant && entity.ScopeUserId is not null)
         {
-            errors.Add(new RecordFieldError("scopeUserId", "Tenant hedefinde kullanıcı verilmez."));
+            errors.Add(new RecordFieldError("scopeUserId", CrmMessages.Planning.TenantTargetNoUser));
         }
 
         if (entity.Metric == TargetMetric.WonAmount && string.IsNullOrEmpty(entity.Currency))
         {
-            errors.Add(new RecordFieldError("currency", "Tutar hedefinde para birimi zorunludur."));
+            errors.Add(new RecordFieldError("currency", CrmMessages.Planning.AmountCurrency));
         }
         else if (entity.Metric == TargetMetric.WonCount && entity.Currency is not null)
         {
-            errors.Add(new RecordFieldError("currency", "Adet hedefinde para birimi olmaz."));
+            errors.Add(new RecordFieldError("currency", CrmMessages.Planning.CountNoCurrency));
         }
     }
 
@@ -292,7 +292,7 @@ internal sealed class ForecastSubmissionRecordStore(CrmStoreContext context, For
     protected override Task<(JsonObject Values, bool Linked)> PrepareNewAsync(ForecastSubmission entity, JsonObject values, CancellationToken cancellationToken) =>
         gate.IsOpen
             ? Task.FromResult((values, false))
-            : throw new RecordValidationException([new RecordFieldError("periodStart", "Tahmin yalnızca tahmin ekranından (iş akışıyla) oluşturulur.")]);
+            : throw new RecordValidationException([new RecordFieldError("periodStart", CrmMessages.Planning.ForecastByWorkflow)]);
 
     protected override async Task AppliedAsync(ForecastSubmission entity, JsonObject values, CancellationToken cancellationToken)
     {
@@ -301,7 +301,7 @@ internal sealed class ForecastSubmissionRecordStore(CrmStoreContext context, For
             // Genel uçtan yalnızca not değişir ve yalnızca Taslak durumunda; kilitli/sunulan tahmin değişmez.
             if (values.ContainsKey("note") && entity.Status != ForecastStatus.Draft)
             {
-                throw new RecordValidationException([new RecordFieldError("note", "Not yalnızca taslak tahminde değiştirilir.")]);
+                throw new RecordValidationException([new RecordFieldError("note", CrmMessages.Planning.NoteDraftOnly)]);
             }
 
             return;
@@ -317,7 +317,7 @@ internal sealed class ForecastSubmissionRecordStore(CrmStoreContext context, For
     {
         if (entity.Status != ForecastStatus.Draft)
         {
-            throw new RecordConflictException("Yalnızca taslak tahmin silinebilir; sunulan ve kilitli tahmin korunur.");
+            throw new RecordConflictException(CrmMessages.Planning.DeleteDraftOnly);
         }
 
         var items = await Context.Data.Set<ForecastItem>().Where(i => i.SubmissionId == entity.Id).ToListAsync(cancellationToken);

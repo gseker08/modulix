@@ -166,6 +166,33 @@ public class ServerMessageLanguageTests(ModulixApiFactory factory) : IClassFixtu
         Assert.Equal("Yeni sorumlu zorunludur.", (await ownerlessInTurkish.Content.ReadFromJsonAsync<BulkActivityResultDto>())!.Failures.Single().Message);
     }
 
+    /// <summary>Dilim 18d-1c: fiyatlandırma kaydının alan hatası (aynı para birimi çifti) okurun dilinde; kod ve alan adı aynı.</summary>
+    [Fact]
+    public async Task Crm_pricing_error_comes_in_the_users_language()
+    {
+        var tenant = await CrmTenantAsync();
+        var english = await factory.CreateUserAsync(tenant);
+        var turkish = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [PricesRead, PricesWrite], english, turkish);
+        using var englishClient = await LoginAsync(english, "en");
+        using var turkishClient = await LoginAsync(turkish);
+
+        var inEnglish = await SameCurrencyRateAsync(englishClient);
+        var inTurkish = await SameCurrencyRateAsync(turkishClient);
+
+        Assert.Equal(("ValidationFailed", "The source and target currencies cannot be the same."),
+            (inEnglish["code"]!.GetValue<string>(), inEnglish["errors"]!["toCurrency"]![0]!.GetValue<string>()));
+        Assert.Equal(("ValidationFailed", "Kaynak ve hedef para birimi aynı olamaz."),
+            (inTurkish["code"]!.GetValue<string>(), inTurkish["errors"]!["toCurrency"]![0]!.GetValue<string>()));
+    }
+
+    private static async Task<JsonObject> SameCurrencyRateAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync("/api/crm/exchange-rates", new SaveExchangeRateRequest("TRY", "TRY", 1m, new DateOnly(2026, 5, 30)));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        return await ProblemAsync(response);
+    }
+
     private static async Task<JsonObject> ShortTaxNumberAsync(HttpClient client)
     {
         var response = await client.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Dil Vergi A.Ş.", TaxNumber: "123"));

@@ -152,7 +152,7 @@ internal sealed class SalesAnalytics(
         var ctx = await ContextAsync(query, cancellationToken);
         if (!await access.HasPermissionAsync(CrmModule.Permissions.OpportunitiesRead, cancellationToken))
         {
-            return RecordResult<AnalyticsResult<StageFlowResult>>.Fail(RecordErrorCode.PermissionDenied, $"Bu analiz için '{CrmModule.Permissions.OpportunitiesRead}' izni gerekir.");
+            return RecordResult<AnalyticsResult<StageFlowResult>>.Fail(RecordErrorCode.PermissionDenied, CrmMessages.Planning.AnalysisPermission(CrmModule.Permissions.OpportunitiesRead));
         }
 
         var list = await choiceLists.GetAsync(CrmModule.Lists.OpportunityStage, cancellationToken);
