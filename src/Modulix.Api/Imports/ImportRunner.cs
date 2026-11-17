@@ -16,6 +16,7 @@ using Modulix.Core.Files;
 using Modulix.Core.Imports;
 using Modulix.Core.Reporting;
 using Modulix.Core.Platform;
+using Modulix.Core.Settings;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
 
@@ -170,7 +171,7 @@ public sealed class ImportRunner(
                 definition.TemplateVersion, mode, policy, correlation, time.GetUtcNow());
             db.ImportRuns.Add(run);
 
-            var fields = await services.GetRequiredService<ImportSchema>().FieldsAsync(tenant, definition, stopping);
+            var fields = await services.GetRequiredService<ImportSchema>().FieldsAsync(tenant, definition, stopping, LanguageOptions.Default);
             var issues = new IssueList(tenant.TenantId, run.Id, time);
 
             // Aynı dosya uyarısı (Dilim 4b): bu dosya aynı türe daha önce uygulanıp kayıt aldıysa ikinci yükleme mükerrer kayıt üretebilir.

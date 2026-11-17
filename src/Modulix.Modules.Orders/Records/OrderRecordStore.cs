@@ -92,6 +92,8 @@ internal sealed class OrderRecordStore(OrdersStoreContext context) : OrdersRecor
         ["currency"] = (q, v, _) => v.Trim().ToUpperInvariant() is { Length: SalesOrder.CurrencyLength } code ? q.Where(o => o.Currency == code) : null,
         ["deliveryFrom"] = (q, v, _) => FilterValue.Date(v) is { } d ? q.Where(o => o.PlannedDeliveryDate >= d) : null,
         ["deliveryTo"] = (q, v, _) => FilterValue.Date(v) is { } d ? q.Where(o => o.PlannedDeliveryDate <= d) : null,
+        // Müşteri zaman çizelgesinin sayfalama imleci (ADR-0053; sınır hariç). Varsayılan sıra oluşturulma anına göre en yeniden eskiyedir.
+        ["createdBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(o => o.CreatedAt < time) : null,
         // Gecikenler: planlanan teslim/başlangıç tarihi geçmiş, sonuçlanmamış ve gerçekleşmesi tamamlanmamış siparişler.
         ["overdue"] = (q, v, _) => FilterValue.Bool(v) is { } flag
             ? q.Where(o => (o.Status == OrderStatus.Approved && o.FulfillmentStatus != FulfillmentStatus.Completed

@@ -44,6 +44,17 @@ public sealed record ImportField(string Key, string Label, ImportFieldType Type 
     /// Modül tanımı vermez; içe aktarma tasarımından gelir.
     /// </summary>
     public IReadOnlyList<string> Aliases { get; init; } = [];
+
+    /// <summary>
+    /// Sistemin tanıdığı öteki başlık adları (ADR-0034, dilim 18c-5): Türkçe kaynak etiket ve desteklenen dillerdeki çevirileri. Şablon okurun
+    /// dilinde iner, ama başka dilde başlıklı dosya da aynı sütuna bağlanır. Modül tanımı vermez; içe aktarma şeması doldurur.
+    /// </summary>
+    public IReadOnlyList<string> LabelVariants { get; init; } = [];
+
+    /// <summary>
+    /// Seçeneklerin öteki dillerdeki adları (değer, ad); yalnızca hücre eşleştirmesinde kullanılır, şablonda ve ekranda görünmez (dilim 18c-5).
+    /// </summary>
+    public IReadOnlyList<SettingOption> OptionVariants { get; init; } = [];
 }
 
 /// <summary>Hücre değerinin hedef kaydı nasıl bulduğu: süzgeçler sırayla denenir, tek kayıt eşleşmelidir. Süzgeçler kayıt deposunda tanımlıdır.</summary>

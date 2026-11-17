@@ -113,12 +113,12 @@ public static class PlatformEndpoints
 
         // Sektör profilleri (Y9c): platform yöneticisi profilin kapalı modüllerini de açar.
         platform.MapGet("/profiles", (SectorProfileCatalog profiles) => SectorProfileEndpoints.ToDto(profiles));
-        platform.MapGet("/tenants/{tenantId:guid}/profile/{key}", async (Guid tenantId, string key, IPlatformAdministration admin, ModuleCatalog modules, CancellationToken ct) =>
+        platform.MapGet("/tenants/{tenantId:guid}/profile/{key}", async (Guid tenantId, string key, IPlatformAdministration admin, ModuleCatalog modules, IRequestLanguage language, ITextCatalog texts, CancellationToken ct) =>
         {
             try
             {
                 return await admin.PreviewProfileAsync(tenantId, key, ct) is { } plan
-                    ? Results.Ok(SectorProfileEndpoints.ToDto(plan, modules))
+                    ? Results.Ok(SectorProfileEndpoints.ToDto(plan, modules, texts.Bundle(await language.GetAsync(ct))))
                     : SectorProfileEndpoints.NotFound();
             }
             catch (Exception ex) when (ToProblem(ex) is { } problem)
@@ -126,12 +126,12 @@ public static class PlatformEndpoints
                 return problem;
             }
         });
-        platform.MapPost("/tenants/{tenantId:guid}/profile/{key}", async (Guid tenantId, string key, ClaimsPrincipal user, IPlatformAdministration admin, ModuleCatalog modules, CancellationToken ct) =>
+        platform.MapPost("/tenants/{tenantId:guid}/profile/{key}", async (Guid tenantId, string key, ClaimsPrincipal user, IPlatformAdministration admin, ModuleCatalog modules, IRequestLanguage language, ITextCatalog texts, CancellationToken ct) =>
         {
             try
             {
                 return await admin.ApplyProfileAsync(tenantId, key, UserId(user), ct) is { } plan
-                    ? Results.Ok(SectorProfileEndpoints.ToDto(plan, modules))
+                    ? Results.Ok(SectorProfileEndpoints.ToDto(plan, modules, texts.Bundle(await language.GetAsync(ct))))
                     : SectorProfileEndpoints.NotFound();
             }
             catch (Exception ex) when (ToProblem(ex) is { } problem)

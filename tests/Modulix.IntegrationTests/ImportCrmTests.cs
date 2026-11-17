@@ -298,6 +298,49 @@ public class ImportCrmTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
         Assert.Null(events.Single(e => e.RecordId == leads["Kurallı"]).Reason);
     }
 
+    /// <summary>
+    /// ADR-0034 dilim 18c-5: tanım adı, sütunlar, şablon başlığı ve seçenekler okurun dilinde; İngilizce ya da Türkçe (ya da karışık) başlıklı ve
+    /// seçenekli dosya aynı sütunlara bağlanır. Türkçe kullanıcı Türkçe görür; satır iletileri henüz Türkçedir (18d).
+    /// </summary>
+    [Fact]
+    public async Task Names_and_template_follow_the_readers_language_and_files_in_either_language_are_imported()
+    {
+        var (english, tenant, _) = await ImporterAsync();
+        using var _e = english;
+        var colleague = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, Importer, colleague);
+        using var turkish = await LoginAsync(colleague);
+        Assert.Equal(HttpStatusCode.OK, (await english.PutAsJsonAsync("/api/account/language", new Modulix.Shared.Account.UpdateLanguageRequest("en"))).StatusCode);
+
+        var definition = (await english.GetFromJsonAsync<List<ImportDefinitionDto>>("/api/imports/definitions"))!.Single(d => d.EntityKey == Company);
+        Assert.Equal("Company", definition.DisplayName);
+        Assert.Equal("Company name", definition.Fields.Single(f => f.Key == "name").Label);
+        var template = await english.GetAsync($"/api/imports/definitions/{Company}/template");
+        Assert.Equal(HttpStatusCode.OK, template.StatusCode);
+        Assert.StartsWith("Company name;Company type;Tax number;", Encoding.UTF8.GetString(await template.Content.ReadAsByteArrayAsync()).TrimStart('﻿'));
+
+        var inEnglish = await RunAsync(english, Company, "Company name;Company type;Status\r\nAcme;Legal entity;Potential\r\n");
+        Assert.Equal(("Succeeded", 1), (inEnglish.Run.Status, inEnglish.Run.CreatedCount));
+        Assert.Equal("Company (CRM)", inEnglish.Run.EntityName);
+        var inTurkish = await RunAsync(english, Company, "Firma adı;Firma türü;Durum\r\nBeta;Gerçek kişi;Müşteri\r\n");
+        Assert.Equal(("Succeeded", 1), (inTurkish.Run.Status, inTurkish.Run.CreatedCount));
+        var mixed = await RunAsync(turkish, Company, "Firma adı;Company type;Status\r\nGama;Legal entity;Passiv\r\n");
+        Assert.Equal(("Succeeded", 1), (mixed.Run.Status, mixed.Run.CreatedCount));
+
+        // Türkçe kullanıcı: aynı tanım ve sütunlar Türkçe.
+        var turkishDefinition = (await turkish.GetFromJsonAsync<List<ImportDefinitionDto>>("/api/imports/definitions"))!.Single(d => d.EntityKey == Company);
+        Assert.Equal("Firma", turkishDefinition.DisplayName);
+        Assert.Equal("Firma adı", turkishDefinition.Fields.Single(f => f.Key == "name").Label);
+        Assert.Equal("Firma (CRM)", mixed.Run.EntityName);
+
+        using var scope = factory.OpenScope(tenant.Id);
+        var companies = await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Set<Company>().AsNoTracking()
+            .Select(c => new { c.Party.Name, c.Party.Kind, c.Status }).ToListAsync();
+        Assert.Equal(
+            [("Acme", "Organization", "Prospect"), ("Beta", "Individual", "Customer"), ("Gama", "Organization", "Inactive")],
+            companies.Select(c => (c.Name, c.Kind.ToString(), c.Status)).Order());
+    }
+
     private static async Task<ImportDesignDto> DesignAsync(HttpClient client, string entityKey) =>
         (await client.GetFromJsonAsync<List<ImportDesignDto>>("/api/customization/import-designs"))!.Single(d => d.EntityKey == entityKey);
 

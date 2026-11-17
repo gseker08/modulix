@@ -112,11 +112,12 @@ public static partial class ImportRows
         }
     }
 
-    // Seçenek anahtarıyla ya da görünen adıyla yazılabilir.
+    // Seçenek anahtarıyla ya da görünen adıyla yazılabilir; görünen ad öteki dillerdeki adı da olabilir (ADR-0034 dilim 18c-5).
     private static string? Option(ImportField field, string text)
     {
         var name = ImportColumns.Name(text);
-        return field.Options.FirstOrDefault(o => ImportColumns.Name(o.Value) == name || ImportColumns.Name(o.Label) == name)?.Value;
+        return field.Options.FirstOrDefault(o => ImportColumns.Name(o.Value) == name || ImportColumns.Name(o.Label) == name)?.Value
+            ?? field.OptionVariants.FirstOrDefault(o => ImportColumns.Name(o.Label) == name)?.Value;
     }
 
     /// <summary>Türkçe biçim: nokta binlik, virgül ondalıktır. "12.5" gibi yanlış yorumlanabilecek yazım reddedilir (Ç7.1).</summary>
