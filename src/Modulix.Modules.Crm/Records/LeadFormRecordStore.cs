@@ -53,7 +53,7 @@ internal sealed class LeadFormRecordStore(CrmStoreContext context) : CrmRecordSt
             && values["allowedOrigins"] is JsonValue value && value.TryGetValue<string>(out var origins)
             && LeadFormOrigins.Parse(origins) is null)
         {
-            errors.Add(new RecordFieldError("allowedOrigins", "Her kaynak https://alanadi[:port] biçiminde olmalı (yol, joker ya da boşluk içermez); virgül ya da satırla ayırın."));
+            errors.Add(new RecordFieldError("allowedOrigins", CrmMessages.Lead.FormOrigins));
         }
 
         return errors;

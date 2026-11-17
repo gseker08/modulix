@@ -57,11 +57,11 @@ internal sealed class LeadScoreRuleRecordStore(CrmStoreContext context) : CrmRec
         var field = LeadScoring.Find(entity.Field);
         if (field is null)
         {
-            errors.Add(new RecordFieldError("field", "Puanlanacak alanı seçin."));
+            errors.Add(new RecordFieldError("field", CrmMessages.Lead.ScoreFieldRequired));
         }
         else if (!LeadScoring.OperatorsFor(field.Kind).Contains(entity.Operator))
         {
-            errors.Add(new RecordFieldError("operator", $"\"{field.Label}\" alanı için bu karşılaştırma kullanılamaz."));
+            errors.Add(new RecordFieldError("operator", CrmMessages.Lead.ScoreOperatorNotAllowed(field.Label)));
         }
 
         // Dolu/boş denetiminde değer anlamsızdır; diğer işleçlerde zorunludur.
@@ -71,7 +71,7 @@ internal sealed class LeadScoreRuleRecordStore(CrmStoreContext context) : CrmRec
         }
         else if (string.IsNullOrWhiteSpace(entity.Value))
         {
-            errors.Add(new RecordFieldError("value", "Karşılaştırılacak değeri girin."));
+            errors.Add(new RecordFieldError("value", CrmMessages.Lead.ScoreValueRequired));
         }
         else if (entity.Operator == LeadScoreOperator.AtLeast)
         {
@@ -82,7 +82,7 @@ internal sealed class LeadScoreRuleRecordStore(CrmStoreContext context) : CrmRec
             }
             else
             {
-                errors.Add(new RecordFieldError("value", $"1 ile {LeadScoreOperator.MaxCount} arasında bir tam sayı girin."));
+                errors.Add(new RecordFieldError("value", CrmMessages.Field.IntegerRange(1, LeadScoreOperator.MaxCount)));
             }
         }
         else
@@ -92,7 +92,7 @@ internal sealed class LeadScoreRuleRecordStore(CrmStoreContext context) : CrmRec
 
         if (entity.Points == 0)
         {
-            errors.Add(new RecordFieldError("points", "Puan sıfır olamaz; -100 ile 100 arasında bir değer girin."));
+            errors.Add(new RecordFieldError("points", CrmMessages.Lead.ScorePointsNonZero));
         }
 
         return errors.Count > 0 ? Task.FromException(new RecordValidationException(errors)) : Task.CompletedTask;

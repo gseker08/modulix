@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
@@ -123,7 +124,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
             if (!FieldsByName.TryGetValue(name, out var field))
             {
-                errors.Add(new RecordFieldError(name, "Bilinmeyen alan."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownField));
             }
             else if (!field.IsOmitted(node) && field.Parse(node).Error is { } error)
             {
@@ -135,7 +136,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
         {
             errors.AddRange(Fields
                 .Where(f => f.Required && !values.ContainsKey(f.Name))
-                .Select(f => new RecordFieldError(f.Name, "Bu alan zorunludur.")));
+                .Select(f => new RecordFieldError(f.Name, ServerMessages.Validation.Required)));
         }
 
         return errors;
@@ -367,7 +368,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
         if (!keys.Contains(sort, StringComparer.Ordinal))
         {
-            throw new RecordValidationException([new RecordFieldError("sort", "Geçersiz sıralama.")]);
+            throw new RecordValidationException([new RecordFieldError("sort", CrmMessages.Field.InvalidSort)]);
         }
 
         return (filters.Where(f => f.Key != "sort").ToDictionary(f => f.Key, f => f.Value), sort);
@@ -393,7 +394,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
                     : null;
             if (filter is null && !AsyncFilters.ContainsKey(name))
             {
-                errors.Add(new RecordFieldError(name, "Bilinmeyen filtre."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownFilter));
             }
             else if (filtered is not null)
             {
@@ -401,7 +402,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
             }
             else
             {
-                errors.Add(new RecordFieldError(name, "Geçersiz filtre değeri."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.InvalidFilterValue));
             }
         }
 
@@ -457,7 +458,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
                 // Oluştururken PrepareNewAsync kullanır; sonra değiştirilemez (boş değer verilmemiş sayılır).
                 if (!isNew && value is not null && !JsonNode.DeepEquals(field.Read(entity), JsonValue.Create(value.ToString())))
                 {
-                    errors.Add(new RecordFieldError(name, "Oluşturulduktan sonra değiştirilemez."));
+                    errors.Add(new RecordFieldError(name, CrmMessages.Field.CreateOnly));
                 }
 
                 continue;
@@ -466,7 +467,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
             if (field.Exists is { } exists && value is Guid id && !await exists(context, id, cancellationToken))
             {
                 // Başka tenant'ın kaydı da "bulunamadı" sayılır; varlığı belli edilmez.
-                errors.Add(new RecordFieldError(name, field.NotFoundMessage ?? "Kayıt bulunamadı."));
+                errors.Add(new RecordFieldError(name, field.NotFoundMessage ?? ServerMessages.Record.NotFound));
                 continue;
             }
 
@@ -476,7 +477,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
                 var unchanged = !isNew && choice is not null && field.Read(entity)?.GetValue<string>() == choice.Key;
                 if (choice is null || (!choice.Active && !unchanged))
                 {
-                    errors.Add(new RecordFieldError(name, choice is null ? "Listede olmayan değer." : "Bu değer artık kullanılmıyor."));
+                    errors.Add(new RecordFieldError(name, choice is null ? CrmMessages.Field.NotInList : CrmMessages.Field.Retired));
                     continue;
                 }
 
@@ -498,8 +499,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     {
         if (expectedVersion is { } expected && expected != RecordVersion(entity))
         {
-            throw new RecordConflictException(
-                $"Kayıt siz düzenlerken değişti (beklenen sürüm {expected}, güncel sürüm {RecordVersion(entity)}). Güncel halini alıp tekrar deneyin.");
+            throw new RecordConflictException(CrmMessages.Field.Concurrency(expected, RecordVersion(entity)));
         }
     }
 }

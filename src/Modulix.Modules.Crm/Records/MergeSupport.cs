@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
@@ -31,11 +32,11 @@ internal static class MergeSupport
         {
             if (!known.Contains(field) && !field.StartsWith(CustomPrefix, StringComparison.Ordinal))
             {
-                errors.Add(new RecordFieldError($"fieldChoices.{field}", "Bilinmeyen alan."));
+                errors.Add(new RecordFieldError($"fieldChoices.{field}", ServerMessages.Validation.UnknownField));
             }
             else if (choice is not (MergeRequest.FromSource or MergeRequest.FromTarget))
             {
-                errors.Add(new RecordFieldError($"fieldChoices.{field}", "Değer \"source\" veya \"target\" olmalıdır."));
+                errors.Add(new RecordFieldError($"fieldChoices.{field}", CrmMessages.Company.MergeChoice));
             }
         }
 

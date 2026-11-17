@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Domain;
@@ -46,12 +47,12 @@ internal abstract class ContactPointRecordStore(CrmStoreContext context) : CrmRe
         if (normalized is null)
         {
             errors.Add(new RecordFieldError("value", entity.Channel == ContactNormalization.Phone
-                ? "Geçerli bir telefon numarası girin (7-15 rakam; dahili numara nota yazılır)."
-                : "Geçerli bir e-posta adresi girin."));
+                ? CrmMessages.Company.ContactPointPhone
+                : ServerMessages.Validation.Email));
         }
         else if (entity.Channel == ContactNormalization.Phone && entity.Value.Length > Party.PhoneMaxLength)
         {
-            errors.Add(new RecordFieldError("value", $"Telefon en fazla {Party.PhoneMaxLength} karakter olabilir."));
+            errors.Add(new RecordFieldError("value", CrmMessages.Company.ContactPointPhoneLength(Party.PhoneMaxLength)));
         }
 
         if (!entity.IsActive)
@@ -70,12 +71,12 @@ internal abstract class ContactPointRecordStore(CrmStoreContext context) : CrmRe
         var siblings = SameOwner(Context.Data.Set<ContactPoint>(), entity).Where(p => p.Id != entity.Id && p.Channel == entity.Channel && p.IsActive);
         if (entity.IsActive && await siblings.AnyAsync(p => p.NormalizedValue == normalized, cancellationToken))
         {
-            errors.Add(new RecordFieldError("value", "Bu iletişim noktası aynı sahipte zaten kayıtlı."));
+            errors.Add(new RecordFieldError("value", CrmMessages.Company.ContactPointExists));
         }
 
         if (entity.IsPrimary && await siblings.AnyAsync(p => p.IsPrimary, cancellationToken))
         {
-            errors.Add(new RecordFieldError("isPrimary", "Bu sahipte bu kanal için zaten bir ana kayıt var; önce onun ana işaretini kaldırın."));
+            errors.Add(new RecordFieldError("isPrimary", CrmMessages.Company.PrimaryContactPointExists));
         }
 
         if (errors.Count > 0)
@@ -162,7 +163,7 @@ internal sealed class CompanyContactPointRecordStore(CrmStoreContext context) : 
         if (entity.LocationId is { } locationId
             && !await Context.Data.Set<Location>().AnyAsync(l => l.Id == locationId && l.CompanyId == company.Id, cancellationToken))
         {
-            throw CompanyScope.Invalid("locationId", "Lokasyon bu firmaya ait değil.");
+            throw CompanyScope.Invalid("locationId", CrmMessages.Lookup.LocationNotOfCompany);
         }
 
         ReadChannel(entity, values);
@@ -227,10 +228,10 @@ internal sealed class PersonContactPointRecordStore(CrmStoreContext context) : C
 
     protected override async Task<(JsonObject Values, bool Linked)> PrepareNewAsync(ContactPoint entity, JsonObject values, CancellationToken cancellationToken)
     {
-        var contactId = CompanyScope.IdOf(values["contactId"]) ?? throw CompanyScope.Invalid("contactId", "Bu alan zorunludur.");
+        var contactId = CompanyScope.IdOf(values["contactId"]) ?? throw CompanyScope.Invalid("contactId", ServerMessages.Validation.Required);
         if (!await CompanyLinks.CanSeeContactAsync(Context, contactId, cancellationToken))
         {
-            throw CompanyScope.Invalid("contactId", "Kişi bulunamadı.");
+            throw CompanyScope.Invalid("contactId", CrmMessages.Lookup.ContactNotFound);
         }
 
         if (CompanyScope.IdOf(values["companyContactId"]) is { } linkId)
@@ -239,7 +240,7 @@ internal sealed class PersonContactPointRecordStore(CrmStoreContext context) : C
                 .Where(l => l.Id == linkId && l.ContactId == contactId).Select(l => new { l.CompanyId }).SingleOrDefaultAsync(cancellationToken);
             if (link is null || !await CompanyLinks.CanSeeCompanyAsync(Context, link.CompanyId, cancellationToken))
             {
-                throw CompanyScope.Invalid("companyContactId", "İlişki bu kişiye ait değil.");
+                throw CompanyScope.Invalid("companyContactId", CrmMessages.Lookup.RelationNotOfContact);
             }
         }
 

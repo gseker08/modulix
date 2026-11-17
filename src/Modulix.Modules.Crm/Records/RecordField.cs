@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Domain;
@@ -48,7 +49,7 @@ internal sealed class RecordField<TEntity>
     public Func<CrmStoreContext, Guid, CancellationToken, Task<bool>>? Exists { get; init; }
 
     /// <summary>Bağlı kayıt bulunamazsa gösterilen mesaj.</summary>
-    public string? NotFoundMessage { get; init; }
+    public ServerMessage? NotFoundMessage { get; init; }
 
     /// <summary>Yalnızca oluştururken verilebilir (ör. bağlanılan ortak kaydın kimliği); depo kendisi yazar.</summary>
     public bool CreateOnly { get; init; }
@@ -97,7 +98,7 @@ internal sealed class RecordField<TEntity>
         // Boş metin de boş değer sayılır; zorunlu alanlarda "zorunludur" hatası verir.
         if (IsEmpty(node))
         {
-            return Nullable ? ParsedValue.Of(null) : ParsedValue.Fail(Required ? "Bu alan zorunludur." : "Bu alan boş bırakılamaz.");
+            return Nullable ? ParsedValue.Of(null) : ParsedValue.Fail(Required ? ServerMessages.Validation.Required : CrmMessages.Field.NotEmpty);
         }
 
         return parse(node);
@@ -111,11 +112,11 @@ internal sealed class RecordField<TEntity>
     public void Write(TEntity entity, object? value) => write(entity, value);
 }
 
-internal readonly record struct ParsedValue(object? Value, string? Error)
+internal readonly record struct ParsedValue(object? Value, ServerMessage? Error)
 {
     public static ParsedValue Of(object? value) => new(value, null);
 
-    public static ParsedValue Fail(string error) => new(null, error);
+    public static ParsedValue Fail(ServerMessage error) => new(null, error);
 }
 
 /// <summary>Alan türleri. Biçimler: metin, sayı, tarih "yyyy-MM-dd", zaman ISO 8601, liste değeri anahtarı ("Won"), kimlik GUID.</summary>
@@ -130,7 +131,7 @@ internal static class Field
             {
                 if (node is not JsonArray array || array.Any(i => i is not JsonValue v || v.GetValueKind() != JsonValueKind.String))
                 {
-                    return ParsedValue.Fail("Metin listesi bekleniyor.");
+                    return ParsedValue.Fail(ServerMessages.Validation.TextList);
                 }
 
                 var (codes, error) = ActivityCodeList.Normalize(array.Select(i => i!.GetValue<string>()));
@@ -150,11 +151,11 @@ internal static class Field
                         || item["code"] is not JsonValue code || code.GetValueKind() != JsonValueKind.String
                         || item["name"] is not JsonValue label || label.GetValueKind() != JsonValueKind.String))
                 {
-                    return ParsedValue.Fail("Kod ve ad çiftlerinden oluşan liste bekleniyor.");
+                    return ParsedValue.Fail(CrmMessages.Field.CodeNameList);
                 }
 
                 var json = array.ToJsonString();
-                return json.Length > maxLength ? ParsedValue.Fail($"En fazla {maxLength} karakter olabilir.") : ParsedValue.Of(array.Count == 0 ? null : json);
+                return json.Length > maxLength ? ParsedValue.Fail(ServerMessages.Validation.MaxLength(maxLength)) : ParsedValue.Of(array.Count == 0 ? null : json);
             },
             e => get(e) is { Length: > 0 } stored ? JsonNode.Parse(stored) : null,
             (e, v) => set(e, (string?)v));
@@ -164,7 +165,7 @@ internal static class Field
             {
                 var text = ParseText(node, maxLength);
                 return text.Error is null && text.Value is string value && !IsEmail(value)
-                    ? ParsedValue.Fail("Geçerli bir e-posta adresi girin.")
+                    ? ParsedValue.Fail(ServerMessages.Validation.Email)
                     : text;
             },
             e => get(e),
@@ -175,11 +176,11 @@ internal static class Field
             {
                 if (node.GetValueKind() != JsonValueKind.Number || !node.AsValue().TryGetValue<decimal>(out var amount))
                 {
-                    return ParsedValue.Fail("Sayı olmalıdır.");
+                    return ParsedValue.Fail(ServerMessages.Validation.Number);
                 }
 
                 return amount is < 0 or > 9_999_999_999_999_999.99m || decimal.Round(amount, 2) != amount
-                    ? ParsedValue.Fail("0 veya daha büyük, en fazla iki ondalıklı bir tutar girin.")
+                    ? ParsedValue.Fail(CrmMessages.Field.Money)
                     : ParsedValue.Of(amount);
             },
             e => get(e) is { } value ? JsonValue.Create(value) : null,
@@ -191,11 +192,11 @@ internal static class Field
             {
                 if (node.GetValueKind() != JsonValueKind.Number || !node.AsValue().TryGetValue<decimal>(out var value))
                 {
-                    return ParsedValue.Fail("Sayı olmalıdır.");
+                    return ParsedValue.Fail(ServerMessages.Validation.Number);
                 }
 
                 return value <= 0 || value > 999_999_999_999m || decimal.Round(value, 10) != value
-                    ? ParsedValue.Fail("Sıfırdan büyük, en fazla on ondalıklı bir sayı girin.")
+                    ? ParsedValue.Fail(CrmMessages.Field.PositiveDecimal)
                     : ParsedValue.Of(value);
             },
             e => get(e) is { } value ? JsonValue.Create(value) : null,
@@ -207,11 +208,11 @@ internal static class Field
             {
                 if (node.GetValueKind() != JsonValueKind.Number || !node.AsValue().TryGetValue<decimal>(out var value))
                 {
-                    return ParsedValue.Fail("Sayı olmalıdır.");
+                    return ParsedValue.Fail(ServerMessages.Validation.Number);
                 }
 
                 return value is < 0 or > 100 || decimal.Round(value, 4) != value
-                    ? ParsedValue.Fail("0 ile 100 arasında, en fazla dört ondalıklı bir oran girin.")
+                    ? ParsedValue.Fail(CrmMessages.Field.Rate)
                     : ParsedValue.Of(value);
             },
             e => get(e) is { } value ? JsonValue.Create(value) : null,
@@ -223,11 +224,11 @@ internal static class Field
             {
                 if (node.GetValueKind() != JsonValueKind.Number || !node.AsValue().TryGetValue<decimal>(out var value))
                 {
-                    return ParsedValue.Fail("Sayı olmalıdır.");
+                    return ParsedValue.Fail(ServerMessages.Validation.Number);
                 }
 
                 return value is < 0 or > 999_999_999_999m || decimal.Round(value, 6) != value
-                    ? ParsedValue.Fail("0 veya daha büyük, en fazla altı ondalıklı bir sayı girin.")
+                    ? ParsedValue.Fail(CrmMessages.Field.Quantity)
                     : ParsedValue.Of(value);
             },
             e => get(e) is { } value ? JsonValue.Create(value) : null,
@@ -239,7 +240,7 @@ internal static class Field
                 var text = ParseText(node, Opportunity.CurrencyLength);
                 return text.Value is string code && code.Length == Opportunity.CurrencyLength && code.All(char.IsAsciiLetter)
                     ? ParsedValue.Of(code.ToUpperInvariant())
-                    : ParsedValue.Fail("Üç harfli para birimi kodu girin (ör. TRY).");
+                    : ParsedValue.Fail(CrmMessages.Field.Currency);
             },
             e => get(e),
             (e, v) => set(e, (string)v!));
@@ -251,7 +252,7 @@ internal static class Field
                 var text = ParseText(node, Opportunity.CurrencyLength);
                 return text.Value is string code && code.Length == Opportunity.CurrencyLength && code.All(char.IsAsciiLetter)
                     ? ParsedValue.Of(code.ToUpperInvariant())
-                    : ParsedValue.Fail("Üç harfli para birimi kodu girin (ör. TRY).");
+                    : ParsedValue.Fail(CrmMessages.Field.Currency);
             },
             e => get(e),
             (e, v) => set(e, (string?)v));
@@ -261,7 +262,7 @@ internal static class Field
                 node.GetValueKind() == JsonValueKind.String
                 && DateOnly.TryParseExact(node.GetValue<string>(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
                     ? ParsedValue.Of(date)
-                    : ParsedValue.Fail("Tarih yyyy-AA-gg biçiminde olmalıdır."),
+                    : ParsedValue.Fail(ServerMessages.Validation.DateFormat),
             e => get(e) is { } value ? value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
             (e, v) => set(e, (DateOnly?)v));
 
@@ -270,7 +271,7 @@ internal static class Field
                 node.GetValueKind() == JsonValueKind.String
                 && DateTimeOffset.TryParse(node.GetValue<string>(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var time)
                     ? ParsedValue.Of(time.ToUniversalTime())
-                    : ParsedValue.Fail("Zaman ISO 8601 biçiminde olmalıdır."),
+                    : ParsedValue.Fail(CrmMessages.Field.Time),
             e => get(e) is { } value ? value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : null,
             (e, v) => set(e, (DateTimeOffset?)v));
 
@@ -282,7 +283,7 @@ internal static class Field
         new(name, required: false, nullable: !required, node =>
                 node.GetValueKind() == JsonValueKind.String && node.GetValue<string>().Trim() is var key && ChoiceValueKeys.IsValid(key)
                     ? ParsedValue.Of(key)
-                    : ParsedValue.Fail("Listede olmayan değer."),
+                    : ParsedValue.Fail(CrmMessages.Field.NotInList),
             e => get(e) is { Length: > 0 } value ? value : null,
             (e, v) => set(e, (string?)v))
         {
@@ -294,7 +295,7 @@ internal static class Field
         new(name, required: false, nullable: true, node =>
                 node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var percent) && percent is >= 0 and <= 100
                     ? ParsedValue.Of(percent)
-                    : ParsedValue.Fail("0 ile 100 arasında bir tam sayı girin."),
+                    : ParsedValue.Fail(CrmMessages.Field.Percent),
             e => get(e) is { } value ? JsonValue.Create(value) : null,
             (e, v) => set(e, (int?)v));
 
@@ -303,7 +304,7 @@ internal static class Field
         new(name, required: false, nullable: true, node =>
                 node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var minutes) && minutes >= 1 && minutes <= max
                     ? ParsedValue.Of(minutes)
-                    : ParsedValue.Fail($"1 ile {max} arasında dakika girin."),
+                    : ParsedValue.Fail(CrmMessages.Field.Minutes(max)),
             e => get(e) is { } value ? JsonValue.Create(value) : null,
             (e, v) => set(e, (int?)v));
 
@@ -313,7 +314,7 @@ internal static class Field
         new(name, required: false, nullable: true, node =>
                 node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var number) && number >= min && number <= max
                     ? ParsedValue.Of(number)
-                    : ParsedValue.Fail($"{min} ile {max} arasında bir tam sayı girin."),
+                    : ParsedValue.Fail(CrmMessages.Field.IntegerRange(min, max)),
             e => JsonValue.Create(get(e)),
             (e, v) => { if (v is int number) { set(e, number); } });
 
@@ -321,7 +322,7 @@ internal static class Field
         new(name, required: false, nullable: true, node =>
                 node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var count) && count >= 0
                     ? ParsedValue.Of(count)
-                    : ParsedValue.Fail("Sayı olmalıdır."),
+                    : ParsedValue.Fail(ServerMessages.Validation.Number),
             e => JsonValue.Create(get(e)),
             (e, v) => { if (v is int count) { set(e, count); } });
 
@@ -330,12 +331,12 @@ internal static class Field
         new(name, required: false, nullable: true, ParseId, e => get(e) is { } value ? value.ToString() : null, (e, v) => set(e, (Guid?)v))
         {
             Exists = (context, id, ct) => context.Members.IsActiveMemberAsync(id, ct),
-            NotFoundMessage = "Kullanıcı bu kuruluşun üyesi değil.",
+            NotFoundMessage = CrmMessages.Field.NotMember,
         };
 
     /// <summary>Aynı tenant'taki başka bir CRM kaydına bağ. Kayıt yoksa (veya başka tenant'ınsa) doğrulama hatası.</summary>
     public static RecordField<T> Reference<T, TTarget>(
-        string name, string notFoundMessage, Func<T, Guid?> get, Action<T, Guid?> set, bool required = false)
+        string name, ServerMessage notFoundMessage, Func<T, Guid?> get, Action<T, Guid?> set, bool required = false)
         where TTarget : CrmEntity =>
         new(name, required, nullable: !required, ParseId, e => get(e) is { } value ? value.ToString() : null, (e, v) => set(e, (Guid?)v))
         {
@@ -351,7 +352,7 @@ internal static class Field
                 && Enum.IsDefined(kind)
                 && !char.IsDigit(node.GetValue<string>()[0])
                     ? ParsedValue.Of(kind)
-                    : ParsedValue.Fail("Organization veya Individual olmalıdır."),
+                    : ParsedValue.Fail(CrmMessages.Field.PartyKind),
             e => get(e).ToString(),
             (e, v) => { if (v is PartyKind kind) { set(e, kind); } });
 
@@ -360,7 +361,7 @@ internal static class Field
         new(name, required: false, nullable: true, node =>
                 node.GetValueKind() is JsonValueKind.True or JsonValueKind.False
                     ? ParsedValue.Of(node.GetValue<bool>())
-                    : ParsedValue.Fail("true veya false olmalıdır."),
+                    : ParsedValue.Fail(CrmMessages.Field.Flag),
             e => JsonValue.Create(get(e)),
             (e, v) => set(e, v is true))
         {
@@ -377,17 +378,17 @@ internal static class Field
             {
                 if (node is not JsonArray array || array.Any(n => n is null || n.GetValueKind() != JsonValueKind.String))
                 {
-                    return ParsedValue.Fail("Metin listesi olmalıdır.");
+                    return ParsedValue.Fail(CrmMessages.Field.KeyList);
                 }
 
                 var keys = array.Select(n => n!.GetValue<string>().Trim()).ToList();
                 if (keys.FirstOrDefault(k => !allowed.Contains(k)) is { } unknown)
                 {
-                    return ParsedValue.Fail($"Geçersiz değer: {unknown}.");
+                    return ParsedValue.Fail(CrmMessages.Field.InvalidValue(unknown));
                 }
 
                 var joined = string.Join(',', keys.Distinct(StringComparer.Ordinal));
-                return joined.Length > maxLength ? ParsedValue.Fail("Çok fazla değer seçildi.") : ParsedValue.Of(joined.Length == 0 ? null : joined);
+                return joined.Length > maxLength ? ParsedValue.Fail(CrmMessages.Field.TooManyValues) : ParsedValue.Of(joined.Length == 0 ? null : joined);
             },
             e => new JsonArray([.. get(e).Select(k => (JsonNode?)JsonValue.Create(k))]),
             (e, v) => set(e, (string?)v));
@@ -398,7 +399,7 @@ internal static class Field
         new(name, required: false, nullable: true, node =>
                 node.GetValueKind() == JsonValueKind.String && node.GetValue<string>().Trim() is var key && allowed.Contains(key)
                     ? ParsedValue.Of(key)
-                    : ParsedValue.Fail($"Şunlardan biri olmalıdır: {string.Join(", ", allowed)}."),
+                    : ParsedValue.Fail(CrmMessages.Field.OneOf(string.Join(", ", allowed))),
             e => get(e),
             (e, v) => { if (v is string key) { set(e, key); } })
         {
@@ -410,7 +411,7 @@ internal static class Field
         new(name, required: false, nullable: true, node =>
                 node.GetValueKind() == JsonValueKind.String && node.GetValue<string>().Trim() is var key && allowed.Contains(key)
                     ? ParsedValue.Of(key)
-                    : ParsedValue.Fail($"Şunlardan biri olmalıdır: {string.Join(", ", allowed)}."),
+                    : ParsedValue.Fail(CrmMessages.Field.OneOf(string.Join(", ", allowed))),
             e => get(e),
             (e, v) => set(e, (string?)v));
 
@@ -449,7 +450,7 @@ internal static class Field
             {
                 var text = ParseText(node, maxLength);
                 return text.Error is null && text.Value is string value && ContactNormalization.NormalizePhone(value) is null
-                    ? ParsedValue.Fail("Geçerli bir telefon numarası girin.")
+                    ? ParsedValue.Fail(CrmMessages.Field.Phone)
                     : text;
             },
             e => get(e),
@@ -462,7 +463,7 @@ internal static class Field
                 var text = ParseText(node, Address.CountryLength);
                 return text.Value is string code && code.Length == Address.CountryLength && code.All(char.IsAsciiLetter)
                     ? ParsedValue.Of(code.ToUpperInvariant())
-                    : ParsedValue.Fail("İki harfli ülke kodu girin (ör. TR).");
+                    : ParsedValue.Fail(CrmMessages.Field.Country);
             },
             e => get(e),
             (e, v) => set(e, (string?)v));
@@ -473,7 +474,7 @@ internal static class Field
             {
                 var text = ParseText(node, maxLength);
                 return text.Error is null && text.Value is string value && (value.Any(char.IsWhiteSpace) || !value.Contains('.'))
-                    ? ParsedValue.Fail("Geçerli bir web adresi girin.")
+                    ? ParsedValue.Fail(CrmMessages.Field.Url)
                     : text;
             },
             e => get(e),
@@ -482,18 +483,18 @@ internal static class Field
     private static ParsedValue ParseId(JsonNode node) =>
         node.GetValueKind() == JsonValueKind.String && FilterValue.Id(node.GetValue<string>()) is { } id
             ? ParsedValue.Of(id)
-            : ParsedValue.Fail("Geçerli bir kayıt kimliği olmalıdır.");
+            : ParsedValue.Fail(ServerMessages.Validation.RecordId);
 
     private static ParsedValue ParseText(JsonNode node, int maxLength)
     {
         if (node.GetValueKind() != JsonValueKind.String)
         {
-            return ParsedValue.Fail("Metin olmalıdır.");
+            return ParsedValue.Fail(ServerMessages.Validation.Text);
         }
 
         var text = node.GetValue<string>().Trim();
         return text.Length > maxLength
-            ? ParsedValue.Fail($"En fazla {maxLength} karakter olabilir.")
+            ? ParsedValue.Fail(ServerMessages.Validation.MaxLength(maxLength))
             : ParsedValue.Of(text);
     }
 

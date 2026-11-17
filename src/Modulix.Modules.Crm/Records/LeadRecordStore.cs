@@ -58,8 +58,8 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         Field.Url<Lead>("website", Lead.UrlMaxLength, l => l.Website, (l, v) => l.Website = v),
         Field.Country<Lead>("country", l => l.Country, (l, v) => l.Country = v),
         Field.Text<Lead>("city", Address.PartMaxLength, l => l.City, (l, v) => l.City = v),
-        Field.Reference<Lead, Company>("companyId", "Firma bulunamadı.", l => l.CompanyId, (l, v) => l.CompanyId = v),
-        Field.Reference<Lead, Contact>("contactId", "Kişi bulunamadı.", l => l.ContactId, (l, v) => l.ContactId = v),
+        Field.Reference<Lead, Company>("companyId", CrmMessages.Lookup.CompanyNotFound, l => l.CompanyId, (l, v) => l.CompanyId = v),
+        Field.Reference<Lead, Contact>("contactId", CrmMessages.Lookup.ContactNotFound, l => l.ContactId, (l, v) => l.ContactId = v),
         Field.Text<Lead>("productInterest", Lead.ShortMaxLength, l => l.ProductInterest, (l, v) => l.ProductInterest = v),
         Field.CodeList<Lead>("serviceScope", l => l.ServiceScope, (l, v) => l.ServiceScope = v),
         Field.Text<Lead>("needDescription", Lead.TextMaxLength, l => l.NeedDescription, (l, v) => l.NeedDescription = v),
@@ -212,7 +212,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
         if (operation == RecordOperation.Create && errors.Count == 0
             && !Identifying.Any(name => values.TryGetPropertyValue(name, out var node) && node is not null && !string.IsNullOrWhiteSpace(node.ToString())))
         {
-            errors.Add(new RecordFieldError("lastName", "Talep sahibini tanıtan en az bir bilgi girin (ad, firma adı, e-posta, telefon ya da mevcut firma/kişi)."));
+            errors.Add(new RecordFieldError("lastName", CrmMessages.Lead.IdentityRequired));
         }
 
         return errors;
@@ -249,7 +249,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
             && owner != Context.CurrentUserId
             && !await CanAssignAsync(cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError(OwnerField, "Başka birine atamak için atama izni gerekir.")]);
+            throw new RecordValidationException([new RecordFieldError(OwnerField, CrmMessages.Lead.AssignPermissionRequired)]);
         }
 
         return (values, false);
@@ -340,7 +340,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
                 && (companyScope is null || (owner is { } ownerId && companyScope.Contains(ownerId)));
             if (!visible)
             {
-                errors.Add(new RecordFieldError("companyId", "Firma bulunamadı."));
+                errors.Add(new RecordFieldError("companyId", CrmMessages.Lookup.CompanyNotFound));
             }
         }
 
@@ -351,7 +351,7 @@ internal sealed class LeadRecordStore(CrmStoreContext context) : CrmRecordStore<
                     .Where(ContactRecordStore.VisibleTo(Context.Data, contactScope)).AnyAsync(cancellationToken));
             if (!visible)
             {
-                errors.Add(new RecordFieldError("contactId", "Kişi bulunamadı."));
+                errors.Add(new RecordFieldError("contactId", CrmMessages.Lookup.ContactNotFound));
             }
         }
 

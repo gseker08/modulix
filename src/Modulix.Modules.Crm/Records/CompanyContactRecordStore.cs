@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
@@ -143,20 +144,20 @@ internal sealed class CompanyContactRecordStore(CrmStoreContext context) : CrmRe
         var contactId = FieldNamed("contactId").Parse(values["contactId"]).Value as Guid?;
         if (companyId is null)
         {
-            errors.Add(new RecordFieldError("companyId", "Bu alan zorunludur."));
+            errors.Add(new RecordFieldError("companyId", ServerMessages.Validation.Required));
         }
         else if (!await CompanyLinks.CanSeeCompanyAsync(Context, companyId.Value, cancellationToken))
         {
-            errors.Add(new RecordFieldError("companyId", "Firma bulunamadı."));
+            errors.Add(new RecordFieldError("companyId", CrmMessages.Lookup.CompanyNotFound));
         }
 
         if (contactId is null)
         {
-            errors.Add(new RecordFieldError("contactId", "Bu alan zorunludur."));
+            errors.Add(new RecordFieldError("contactId", ServerMessages.Validation.Required));
         }
         else if (!await CompanyLinks.CanSeeContactAsync(Context, contactId.Value, cancellationToken))
         {
-            errors.Add(new RecordFieldError("contactId", "Kişi bulunamadı."));
+            errors.Add(new RecordFieldError("contactId", CrmMessages.Lookup.ContactNotFound));
         }
 
         if (errors.Count > 0)
@@ -182,7 +183,7 @@ internal sealed class CompanyContactRecordStore(CrmStoreContext context) : CrmRe
             entity.IsPrimary = false;
             if (entity.EndDate < entity.StartDate)
             {
-                errors.Add(new RecordFieldError("endDate", "Bitiş tarihi başlangıçtan önce olamaz."));
+                errors.Add(new RecordFieldError("endDate", CrmMessages.Field.EndBeforeStart));
             }
         }
 
@@ -190,14 +191,14 @@ internal sealed class CompanyContactRecordStore(CrmStoreContext context) : CrmRe
         if (entity.IsActive && await data.AnyAsync(
                 l => l.CompanyId == entity.CompanyId && l.ContactId == entity.ContactId && l.IsActive && l.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("contactId", "Bu kişi bu firmayla zaten ilişkili."));
+            errors.Add(new RecordFieldError("contactId", CrmMessages.Company.ContactAlreadyLinked));
         }
 
         // Ana irtibat firma başına tektir (yalnızca aktif ilişkiler); değiştirmek için önce eskisinin işareti kaldırılır.
         if (entity.IsPrimary && await data.AnyAsync(
                 l => l.CompanyId == entity.CompanyId && l.IsPrimary && l.IsActive && l.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("isPrimary", "Bu firmada zaten bir ana irtibat var; önce onun ana irtibat işaretini kaldırın."));
+            errors.Add(new RecordFieldError("isPrimary", CrmMessages.Company.PrimaryContactExists));
         }
 
         if (errors.Count > 0)
