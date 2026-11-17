@@ -110,6 +110,18 @@
                             </div>
                             <FieldError Field="phone" Errors="errors" />
                             break;
+                        case "preferredLanguage":
+                            <label class="@f.LabelClass()" for="preferredLanguage">@f.Label</label>
+                            <select id="preferredLanguage" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PreferredLanguage">
+                                <option value="">@Texts.Get("crm.language.default")</option>
+                                @foreach (var option in LanguageCodes.All)
+                                {
+                                    <option value="@option.Code">@option.Name</option>
+                                }
+                            </select>
+                            <small class="text-muted">@Texts.Get("crm.language.contact-help")</small>
+                            <FieldError Field="preferredLanguage" Errors="errors" />
+                            break;
                         case "notes":
                             <label class="@f.LabelClass()" for="notes">@f.Label</label>
                             <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
@@ -196,6 +208,7 @@
             {
                 Id = c.Id, Version = c.Version, FirstName = c.FirstName, LastName = c.LastName, CompanyId = c.CompanyId, Title = c.Title,
                 Email = c.Email, Phone = c.Phone, OwnerId = c.OwnerId, Notes = c.Notes, Custom = c.Custom?.DeepClone().AsObject() ?? [],
+                PreferredLanguage = c.PreferredLanguage,
             }
             : new ContactForm();
         errors = null;
@@ -211,7 +224,8 @@
     {
         busy = true;
         var request = new SaveContactRequest(form.FirstName, form.LastName, form.CompanyId, form.Title, form.Email, form.Phone, form.Notes, form.Version,
-            Custom: CustomFieldText.ForSave(CustomFields, form.Custom), OwnerId: form.OwnerId);
+            Custom: CustomFieldText.ForSave(CustomFields, form.Custom), OwnerId: form.OwnerId,
+            PreferredLanguage: string.IsNullOrEmpty(form.PreferredLanguage) ? null : form.PreferredLanguage);
         var result = form.Id is { } id
             ? await Api.PutAsync<ContactDto>($"{Url}/{id}", request)
             : await Api.PostAsync<ContactDto>(Url, request);
@@ -265,6 +279,8 @@
         public string? Email { get; set; }
 
         public string? Phone { get; set; }
+
+        public string? PreferredLanguage { get; set; }
 
         public Guid? OwnerId { get; set; }
 

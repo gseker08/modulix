@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Records;
@@ -40,10 +41,21 @@ internal static class QuoteSharingJson
 /// önce kayıt boru hattında doğrulanır; bulunamayan/kapsam dışı teklif 404 alır.
 /// </summary>
 internal sealed class QuoteSharing(
-    IRecordPipeline pipeline, QuoteWorkflowGate gate, ICurrentAccess access, QuoteReader reader, TimeProvider time) : IQuoteSharing
+    IRecordPipeline pipeline, QuoteWorkflowGate gate, ICurrentAccess access, QuoteReader reader, TimeProvider time, IRecipientLanguage languages) : IQuoteSharing
 {
     private const string Key = CrmModule.Entities.Quote;
     private const int MaxPdfBytes = 8 * 1024 * 1024;
+
+    public async Task<LocalizedTexts> CustomerTextsAsync(Guid quoteId, CancellationToken cancellationToken)
+    {
+        if (await reader.QuoteAsync(quoteId, cancellationToken) is not { } quote)
+        {
+            return await languages.ForExternalAsync(cancellationToken);
+        }
+
+        var (personId, partyId) = await reader.RecipientAsync(quote, cancellationToken);
+        return await languages.ForContactAsync(personId, partyId, cancellationToken);
+    }
     private const int MaxLinkDays = 180;
 
     /// <summary>Belge üretimi paylaşım izniyle ya da sunum izniyle yapılır (sunum sırasında belge sunan kişi adına üretilir).</summary>
@@ -401,16 +413,20 @@ internal sealed class QuoteSharing(
 /// kabul/ret/iptal yarışında yalnızca biri kazanır.
 /// </summary>
 internal sealed class QuoteCustomerPortal(
-    IRecordPipeline pipeline, QuoteWorkflowGate gate, QuoteReader reader, TimeProvider time, Modulix.Core.Contracts.Events.IBusinessEventPublisher events) : IQuoteCustomerPortal
+    IRecordPipeline pipeline, QuoteWorkflowGate gate, QuoteReader reader, TimeProvider time, Modulix.Core.Contracts.Events.IBusinessEventPublisher events,
+    IRecipientLanguage languages) : IQuoteCustomerPortal
 {
     private const string Key = CrmModule.Entities.Quote;
-    private const string Unknown = "Bağlantı geçersiz.";
+
+    // Bağlantı çözülemeyince alıcı bilinmez: tenant varsayılan dili (ADR-0034 §6).
+    private async Task<string> UnknownAsync(CancellationToken cancellationToken) =>
+        (await languages.ForExternalAsync(cancellationToken)).Get("crm.portal.unknown");
 
     public async Task<QuotePortalResult<QuotePortalView>> ViewAsync(string token, CancellationToken cancellationToken)
     {
         if (await ResolveAsync(token, cancellationToken) is not { } context)
         {
-            return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.NotFound, Unknown);
+            return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.NotFound, await UnknownAsync(cancellationToken));
         }
 
         var view = await BuildViewAsync(context, cancellationToken);
@@ -426,13 +442,13 @@ internal sealed class QuoteCustomerPortal(
     {
         if (await ResolveAsync(token, cancellationToken) is not { } context)
         {
-            return QuotePortalResult<QuoteDocumentFile>.Fail(QuotePortalError.NotFound, Unknown);
+            return QuotePortalResult<QuoteDocumentFile>.Fail(QuotePortalError.NotFound, await UnknownAsync(cancellationToken));
         }
 
         var view = await BuildViewAsync(context, cancellationToken);
         if (view.Snapshot is null || await reader.DocumentContentAsync(context.Document.Id, cancellationToken) is not { } content)
         {
-            return QuotePortalResult<QuoteDocumentFile>.Fail(QuotePortalError.Conflict, view.Message ?? "Belge şu an görüntülenemez.");
+            return QuotePortalResult<QuoteDocumentFile>.Fail(QuotePortalError.Conflict, view.Message ?? context.Texts.Get("crm.portal.document-unavailable"));
         }
 
         return QuotePortalResult<QuoteDocumentFile>.Ok(new QuoteDocumentFile(context.Document.ToInfo(), context.Document.ContentType, content));
@@ -442,13 +458,14 @@ internal sealed class QuoteCustomerPortal(
     {
         if (await ResolveAsync(request.Token, cancellationToken) is not { } context)
         {
-            return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.NotFound, Unknown);
+            return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.NotFound, await UnknownAsync(cancellationToken));
         }
 
+        var texts = context.Texts;
         var view = await BuildViewAsync(context, cancellationToken);
         if (!view.CanDecide)
         {
-            return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.Conflict, view.Message ?? "Bu teklif için karar verilemez.");
+            return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.Conflict, view.Message ?? texts.Get("crm.portal.cannot-decide"));
         }
 
         var fields = new Dictionary<string, string>();
@@ -458,47 +475,47 @@ internal sealed class QuoteCustomerPortal(
         var reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
         if (string.IsNullOrEmpty(name) || name.Length < 2)
         {
-            fields["signerName"] = "Ad soyad zorunludur.";
+            fields["signerName"] = texts.Get("crm.portal.signer-name-required");
         }
         else if (name.Length > QuoteDecision.NameMaxLength)
         {
-            fields["signerName"] = "Ad soyad çok uzun.";
+            fields["signerName"] = texts.Get("crm.portal.signer-name-too-long");
         }
 
         if (email is not null && (email.Length > QuoteShareLink.EmailMaxLength || !MailAddress.TryCreate(email, out var parsed) || parsed.Address != email || !email.Contains('.')))
         {
-            fields["signerEmail"] = "Geçerli bir e-posta adresi girin.";
+            fields["signerEmail"] = texts.Get("crm.portal.email-invalid");
         }
 
         if (title is { Length: > QuoteDecision.NameMaxLength })
         {
-            fields["signerTitle"] = "Ünvan çok uzun.";
+            fields["signerTitle"] = texts.Get("crm.portal.title-too-long");
         }
 
         if (reason is { Length: > Quote.ReasonMaxLength })
         {
-            fields["reason"] = $"Gerekçe en fazla {Quote.ReasonMaxLength} karakter olabilir.";
+            fields["reason"] = texts.Get("crm.portal.reason-too-long", Quote.ReasonMaxLength);
         }
 
         if (request.Accept && !request.ConfirmTerms)
         {
-            fields["confirmTerms"] = "Kabul için onay metnini işaretlemelisiniz.";
+            fields["confirmTerms"] = texts.Get("crm.portal.confirm-terms");
         }
 
         if (!request.Accept && reason is null)
         {
-            fields["reason"] = "Ret için kısa bir gerekçe yazın.";
+            fields["reason"] = texts.Get("crm.portal.reason-required");
         }
 
         // Müşteri gördüğü belgeye karar verir: sayfa eskidiyse (yeni belge/revizyon) karar reddedilir.
         if (!string.Equals(request.DocumentSha256, context.Document.Sha256, StringComparison.OrdinalIgnoreCase))
         {
-            fields["documentSha256"] = "Belge değişmiş; sayfayı yenileyip tekrar inceleyin.";
+            fields["documentSha256"] = texts.Get("crm.portal.document-changed");
         }
 
         if (fields.Count > 0)
         {
-            return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.Invalid, "Lütfen işaretli alanları düzeltin.", fields);
+            return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.Invalid, texts.Get("crm.portal.fix-fields"), fields);
         }
 
         var now = time.GetUtcNow();
@@ -506,7 +523,7 @@ internal sealed class QuoteCustomerPortal(
         var rule = QuoteRules.Can(action, context.Quote.Status, context.Quote.ApprovalStatus, context.Quote.ValidUntil, now, true);
         if (!rule.Allowed)
         {
-            return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.Conflict, rule.Message ?? "Bu teklif için karar verilemez.");
+            return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.Conflict, rule.Message ?? texts.Get("crm.portal.cannot-decide"));
         }
 
         var decision = new QuoteDecision
@@ -560,7 +577,7 @@ internal sealed class QuoteCustomerPortal(
         {
             // Sürüm çakışması: başka bir karar/iptal/revizyon yarışı kazanmıştır; müşteriye güncel durum söylenir.
             var latest = await ResolveAsync(request.Token, cancellationToken);
-            var message = latest is null ? "Teklif durumu değişti." : (await BuildViewAsync(latest, cancellationToken)).Message ?? "Teklif durumu değişti; sayfayı yenileyin.";
+            var message = latest is null ? texts.Get("crm.portal.state-changed") : (await BuildViewAsync(latest, cancellationToken)).Message ?? texts.Get("crm.portal.state-changed-refresh");
             return QuotePortalResult<QuotePortalView>.Fail(QuotePortalError.Conflict, result.Error!.Code == RecordErrorCode.Conflict ? message : result.Error.Message);
         }
 
@@ -570,7 +587,8 @@ internal sealed class QuoteCustomerPortal(
 
     // ---- yardımcılar
 
-    private sealed record Context(QuoteShareLink Link, QuoteDocumentMeta Document, Quote Quote);
+    /// <summary>Çözülmüş bağlantı; <see cref="Texts"/> müşterinin dilidir (teklifin kişisi → firması → tenant varsayılanı).</summary>
+    private sealed record Context(QuoteShareLink Link, QuoteDocumentMeta Document, Quote Quote, LocalizedTexts Texts);
 
     private async Task<Context?> ResolveAsync(string token, CancellationToken cancellationToken)
     {
@@ -586,7 +604,8 @@ internal sealed class QuoteCustomerPortal(
             return null;
         }
 
-        return new Context(link, document, quote);
+        var (personId, partyId) = await reader.RecipientAsync(quote, cancellationToken);
+        return new Context(link, document, quote, await languages.ForContactAsync(personId, partyId, cancellationToken));
     }
 
     private async Task<QuotePortalView> BuildViewAsync(Context context, CancellationToken cancellationToken)
@@ -594,30 +613,31 @@ internal sealed class QuoteCustomerPortal(
         var now = time.GetUtcNow();
         var quote = context.Quote;
         var document = context.Document;
+        var texts = context.Texts;
         QuoteDocumentSnapshot? Snapshot() => JsonSerializer.Deserialize<QuoteDocumentSnapshot>(document.Snapshot, QuoteSharingJson.Options);
 
         QuotePortalView Closed(string state, string message, QuoteDocumentSnapshot? snapshot = null, QuotePortalDecisionInfo? decision = null) =>
-            new(state, false, message, quote.QuoteNumber, document.RevisionNo, document.Sha256, context.Link.ExpiresAt, snapshot, null, decision);
+            new(state, false, message, quote.QuoteNumber, document.RevisionNo, document.Sha256, context.Link.ExpiresAt, snapshot, null, decision, texts.Language);
 
         if (context.Link.RevokedAt is not null)
         {
-            return Closed("link-revoked", "Bu bağlantı iptal edilmiş. Lütfen teklifi gönderen kişiyle iletişime geçin.");
+            return Closed("link-revoked", texts.Get("crm.portal.link-revoked"));
         }
 
         if (context.Link.ExpiresAt <= now)
         {
-            return Closed("link-expired", "Bu bağlantının süresi dolmuş. Lütfen teklifi gönderen kişiden yeni bir bağlantı isteyin.");
+            return Closed("link-expired", texts.Get("crm.portal.link-expired"));
         }
 
         // Bağlantı başka bir revizyonun belgesine aitse (ya da teklif artık o sürümde değilse) içerik gösterilmez.
         switch (quote.Status)
         {
             case QuoteStatus.Superseded:
-                return Closed("superseded", "Bu teklifin yeni bir revizyonu hazırlandı. Güncel teklif için lütfen teklifi gönderen kişiyle iletişime geçin.");
+                return Closed("superseded", texts.Get("crm.portal.superseded"));
             case QuoteStatus.Cancelled:
-                return Closed("cancelled", "Bu teklif iptal edilmiş.");
+                return Closed("cancelled", texts.Get("crm.portal.cancelled"));
             case QuoteStatus.Draft:
-                return Closed("cancelled", "Bu teklif şu an müşteriye açık değil.");
+                return Closed("cancelled", texts.Get("crm.portal.not-open"));
         }
 
         var snapshot = Snapshot();
@@ -626,17 +646,17 @@ internal sealed class QuoteCustomerPortal(
             var last = await reader.LastDecisionAsync(quote.Id, cancellationToken);
             var info = last is null ? null : new QuotePortalDecisionInfo(last.Decision, last.SignerName, last.CreatedAt);
             return Closed(quote.Status == QuoteStatus.Accepted ? "accepted" : "rejected",
-                quote.Status == QuoteStatus.Accepted ? "Bu teklif kabul edilmiştir." : "Bu teklif reddedilmiştir.", snapshot, info);
+                texts.Get(quote.Status == QuoteStatus.Accepted ? "crm.portal.accepted" : "crm.portal.rejected"), snapshot, info);
         }
 
         if (quote.Status == QuoteStatus.Expired || (quote.ValidUntil is { } until && until <= now))
         {
-            return Closed("expired", "Bu teklifin geçerlilik süresi dolmuş. Yeni bir teklif için lütfen teklifi gönderen kişiyle iletişime geçin.", snapshot);
+            return Closed("expired", texts.Get("crm.portal.expired"), snapshot);
         }
 
-        var statement = $"{snapshot?.CustomerName ?? "Firma"} adına, {quote.QuoteNumber} numaralı teklifi (V{quote.RevisionNo}, belge özeti {document.Sha256[..12]}) inceledim; "
-            + "belgedeki fiyat, koşul ve geçerlilik şartlarını kabul ediyorum.";
-        return new QuotePortalView("open", true, null, quote.QuoteNumber, document.RevisionNo, document.Sha256, context.Link.ExpiresAt, snapshot, statement, null);
+        // Kabul beyanı müşterinin dilindedir ve karar kaydına bu dilde yazılır (ADR-0034 §6).
+        var statement = texts.Get("crm.portal.statement", snapshot?.CustomerName ?? texts.Get("crm.portal.company"), quote.QuoteNumber, quote.RevisionNo, document.Sha256[..12]);
+        return new QuotePortalView("open", true, null, quote.QuoteNumber, document.RevisionNo, document.Sha256, context.Link.ExpiresAt, snapshot, statement, null, texts.Language);
     }
 
     /// <summary>İlk görüntülemeyi bağlantıya işler. Görüntüleme hatası müşteri sayfasını asla bozmaz.</summary>

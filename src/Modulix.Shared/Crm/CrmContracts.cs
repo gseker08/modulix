@@ -176,7 +176,8 @@ public sealed record CompanyDto(
     string? Kind = null,
     string? TaxOffice = null,
     string? IndustryName = null,
-    string? LegacyIndustry = null);
+    string? LegacyIndustry = null,
+    string? PreferredLanguage = null);
 
 /// <summary>
 /// Sorumlu boş bırakılırsa kaydı oluşturan kullanıcı atanır. Liste alanları (durum, aşama, tip) boş bırakılırsa yeni
@@ -201,7 +202,8 @@ public sealed record SaveCompanyRequest(
     JsonObject? Custom = null,
     Guid? PartyId = null,
     string? Kind = null,
-    string? TaxOffice = null);
+    string? TaxOffice = null,
+    string? PreferredLanguage = null);
 
 public sealed record ContactDto(
     Guid Id,
@@ -215,8 +217,10 @@ public sealed record ContactDto(
     string? Notes,
     JsonObject? Custom = null,
     Guid? PersonId = null,
-    Guid? OwnerId = null);
+    Guid? OwnerId = null,
+    string? PreferredLanguage = null);
 
+/// <summary>Yazışma dili (<see cref="PreferredLanguage"/>) boşsa kişinin firmasının dili, o da yoksa tenant varsayılanı kullanılır (ADR-0034 §6).</summary>
 public sealed record SaveContactRequest(
     string FirstName,
     string LastName,
@@ -228,7 +232,8 @@ public sealed record SaveContactRequest(
     long? Version = null,
     JsonObject? Custom = null,
     Guid? PersonId = null,
-    Guid? OwnerId = null);
+    Guid? OwnerId = null,
+    string? PreferredLanguage = null);
 
 /// <summary>Fırsat aşamasının hazır değerleri. Kapalı aşamayı kategoriden anlayın (<see cref="CrmLists.StageCategories"/>).</summary>
 public static class OpportunityStage

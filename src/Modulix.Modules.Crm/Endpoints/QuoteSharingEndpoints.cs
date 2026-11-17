@@ -143,7 +143,7 @@ internal static class QuoteSharingEndpoints
                     var quote = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Quote, id), ct);
                     var dto = ResourceEndpoints.ToDto<QuoteDto>(quote.Value!);
                     await delivery.EnqueueAsync(result.Value.Link.Id, request.RecipientEmail!.Trim(), request.RecipientName, (await documents.SellerNameAsync(ct)),
-                        dto.QuoteNumber, dto.Title, dto.ValidUntil, $"{PublicUrl.Resolve(http)}/{path}", ct);
+                        dto.QuoteNumber, dto.Title, dto.ValidUntil, $"{PublicUrl.Resolve(http)}/{path}", await sharing.CustomerTextsAsync(id, ct), ct);
                     state = (await delivery.GetAsync([result.Value.Link.Id], ct)).GetValueOrDefault(result.Value.Link.Id)
                         ?? new QuoteLinkDelivery(QuoteDeliveryStatus.Pending, null, null);
                 }
@@ -309,7 +309,7 @@ internal static class QuoteSharingEndpoints
             : JsonSerializer.Deserialize<PublicQuoteContent>(JsonSerializer.Serialize(v.Snapshot, JsonSerializerOptions.Web), JsonSerializerOptions.Web);
         return new PublicQuoteView(
             v.State, v.CanDecide, v.Message, v.QuoteNumber, v.RevisionNo, v.DocumentSha256, v.LinkExpiresAt, content, v.AcceptanceStatement,
-            v.Decision is null ? null : new PublicQuoteDecisionInfo(v.Decision.Decision, v.Decision.SignerName, v.Decision.At));
+            v.Decision is null ? null : new PublicQuoteDecisionInfo(v.Decision.Decision, v.Decision.SignerName, v.Decision.At), v.Language);
     }
 }
 
@@ -338,7 +338,7 @@ internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvid
             return RecordResult<QuoteDocumentInfo>.Fail(snapshot.Error!.Code, snapshot.Error.Message, snapshot.Error.FieldErrors);
         }
 
-        var pdf = QuotePdf.Render(snapshot.Value!);
+        var pdf = QuotePdf.Render(snapshot.Value!, await sharing.CustomerTextsAsync(quoteId, cancellationToken));
         return await sharing.StoreDocumentAsync(quoteId, snapshot.Value!, pdf, QuotePdf.TemplateVersion, cancellationToken);
     }
 

@@ -164,6 +164,18 @@
                             </div>
                             <FieldError Field="website" Errors="errors" />
                             break;
+                        case "preferredLanguage":
+                            <label class="@f.LabelClass()" for="preferredLanguage">@f.Label</label>
+                            <select id="preferredLanguage" class="form-select" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PreferredLanguage">
+                                <option value="">@Texts.Get("crm.language.default")</option>
+                                @foreach (var option in LanguageCodes.All)
+                                {
+                                    <option value="@option.Code">@option.Name</option>
+                                }
+                            </select>
+                            <small class="text-muted">@Texts.Get("crm.language.company-help")</small>
+                            <FieldError Field="preferredLanguage" Errors="errors" />
+                            break;
                         case "city":
                             <label class="@f.LabelClass()" for="city">@f.Label</label>
                             <input id="city" class="form-control" maxlength="@CrmLimits.CityMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.City" />
@@ -270,7 +282,7 @@
                 {
                     Id = c.Id, Version = c.Version, Name = c.Name, Kind = c.Kind ?? "Organization", TaxOffice = c.TaxOffice, TaxNumber = c.TaxNumber, Phone = c.Phone, Email = c.Email,
                     Website = c.Website, City = c.City, Address = c.Address, Industry = c.Industry, Status = c.Status,
-                    Source = c.Source, Tags = c.Tags, OwnerId = c.OwnerId, Notes = c.Notes,
+                    Source = c.Source, Tags = c.Tags, OwnerId = c.OwnerId, Notes = c.Notes, PreferredLanguage = c.PreferredLanguage,
                     Custom = c.Custom?.DeepClone().AsObject() ?? [],
                 }
                 : new CompanyForm { Status = Lookups.DefaultOf(CrmLists.CompanyStatus) ?? CompanyStatus.Prospect };
@@ -293,7 +305,8 @@
         var request = new SaveCompanyRequest(
             form.Name, form.TaxNumber, form.Phone, form.Email, form.Website, form.City, form.Notes, form.Version,
             form.Address, form.Industry, form.Status, string.IsNullOrEmpty(form.Source) ? null : form.Source, form.Tags, form.OwnerId, CustomFieldText.ForSave(CustomFields, form.Custom),
-            Kind: form.Kind, TaxOffice: form.TaxOffice, PartyId: form.Id is null ? usePartyId : null);
+            Kind: form.Kind, TaxOffice: form.TaxOffice, PartyId: form.Id is null ? usePartyId : null,
+            PreferredLanguage: string.IsNullOrEmpty(form.PreferredLanguage) ? null : form.PreferredLanguage);
         var result = form.Id is { } id
             ? await Api.PutAsync<CompanyDto>($"{Url}/{id}", request)
             : await Api.PostAsync<CompanyDto>(Url, request);
@@ -345,6 +358,8 @@
         public string? TaxNumber { get; set; }
 
         public string? Phone { get; set; }
+
+        public string? PreferredLanguage { get; set; }
 
         public string? Email { get; set; }
 

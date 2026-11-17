@@ -523,6 +523,40 @@ public class SupportChannelTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
     }
 
     [Fact]
+    public async Task The_survey_email_and_page_use_the_customer_companys_correspondence_language()
+    {
+        // ADR-0034 §6, dilim 22d: talebin firmasının yazışma dili (en) tenant varsayılanından (tr) önce gelir.
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        using var lead = await LoginAsync(s.Lead);
+        using var anonymous = Anonymous();
+        await SqlAsync(s.Tenant.Id, "UPDATE core.Parties SET PreferredLanguage = 'en' WHERE Id = {0}", s.PartyId);
+        await SetSettingAsync(manager, "support.survey.enabled", "true");
+        var address = $"dil-{Guid.NewGuid():N}@musteri.example.test";
+        await ResolveAsync(lead, await StartAsync(lead, await TakeAsync(lead, await TicketAsync(lead, s, "Language", address))));
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var mail = await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().EmailMessages.AsNoTracking()
+                .Where(e => e.TenantId == s.Tenant.Id && e.ToAddress == address).SingleAsync();
+            Assert.Equal("en", mail.Language);
+        }
+
+        var (tenantKey, token) = await SurveyLinkAsync(s.Tenant.Id, address);
+        var view = await (await SurveyAsync(anonymous, tenantKey, "view", new PublicSurveyTokenRequest(token))).Content.ReadFromJsonAsync<PublicSurveyView>();
+        Assert.Equal("en", view!.Language);
+
+        var invalid = await SurveyAsync(anonymous, tenantKey, "answer", new PublicSurveyAnswerRequest(token, 9));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        Assert.Contains("The rating must be between 1 and 5.", await invalid.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, (await SurveyAsync(anonymous, tenantKey, "answer", new PublicSurveyAnswerRequest(token, 4))).StatusCode);
+        var again = await SurveyAsync(anonymous, tenantKey, "answer", new PublicSurveyAnswerRequest(token, 2));
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        Assert.Contains("This survey has already been answered.", await again.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Reopened_tickets_get_a_new_survey_cycle_and_survey_results_respect_scope_and_tenant()
     {
         var s = await SetUpAsync();

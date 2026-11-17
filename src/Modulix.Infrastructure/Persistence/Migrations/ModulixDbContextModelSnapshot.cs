@@ -1238,6 +1238,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<string>("PreferredLanguage")
+                        .HasMaxLength(5)
+                        .HasColumnType("nvarchar(5)");
+
                     b.Property<string>("RelationshipRoles")
                         .HasMaxLength(1020)
                         .HasColumnType("nvarchar(1020)");
@@ -1362,6 +1366,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("PreferredLanguage")
+                        .HasMaxLength(5)
+                        .HasColumnType("nvarchar(5)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
