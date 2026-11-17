@@ -71,6 +71,13 @@ public interface IModule
     IReadOnlyList<ChoiceListDefinition> ChoiceLists => [];
 
     /// <summary>
+    /// Başka bir modülün (çoğunlukla Core'un) seçim listesine eklenen hazır değerler (H2): ortak listede sektöre özel sözlük o sektörün modülünde
+    /// tanımlanır (ör. araç muayenesi Filo'da, antrepo yer türü Depo'da). Değer listenin bir kategorisine bağlanır; anahtar listede tekil olmalıdır.
+    /// Katalog katkıyı listenin tanımına modül sırasıyla ekler; firma için hazır değerden farkı yoktur.
+    /// </summary>
+    IReadOnlyList<ChoiceValueContribution> ChoiceValueContributions => [];
+
+    /// <summary>
     /// Modülün kullandığı ortak kayıt türleri ve onları okuyup yazmaya yeten izinleri (ADR-0006, ör. CRM: Taraf okuma
     /// "crm.companies.read"). Bildirmeyen modülün izinleri ortak kayda erişim vermez.
     /// </summary>
@@ -204,6 +211,9 @@ public sealed record ChoiceListDefinition(
     /// <summary>Yeni kayıtta değer verilmezse atanan hazır değer; verilmezse (veya pasifse) ilk etkin değer.</summary>
     public string? Default { get; init; }
 }
+
+/// <summary>Başka modülün seçim listesine (<see cref="ListKey"/>) eklenen hazır değerler (<see cref="IModule.ChoiceValueContributions"/>).</summary>
+public sealed record ChoiceValueContribution(string ListKey, IReadOnlyList<ChoiceValueDefinition> Values);
 
 /// <summary>Kategori: kodun anladığı anlam (ör. "won" → "Kazanıldı").</summary>
 public sealed record ChoiceCategory(string Key, string DisplayName);

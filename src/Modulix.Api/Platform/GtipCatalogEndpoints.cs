@@ -1,23 +1,19 @@
 using System.Security.Claims;
-using Modulix.Api.Access;
 using Modulix.Api.Imports;
-using Modulix.Api.Platform;
 using Modulix.Api.Users;
-using Modulix.Core.Contracts.Customs;
-using Modulix.Core.Customs;
+using Modulix.Modules.Warehouse.Contracts.Customs;
 using Modulix.Shared.Customs;
-using Modulix.Shared.Warehouse;
 
-namespace Modulix.Api.Customs;
+namespace Modulix.Api.Platform;
 
 /// <summary>
-/// GTİP kataloğu (ADR-0032 K9). Yönetim platform yöneticisine açıktır (<c>/api/platform/gtip</c>, tenant gerekmez); okuma depo modülünü
-/// kullanan tenant'a açıktır (<c>/api/gtip</c>): katalog ürün standardı verisidir, tenant verisi değildir. Katalogda olmayan kod yalnızca
-/// uyarıdır, hiçbir kaydı engellemez.
+/// GTİP kataloğu yönetimi (ADR-0032 K9): platform yöneticisine açıktır (<c>/api/platform/gtip</c>, tenant gerekmez). Katalog tabloları depo modülünün
+/// başvuru tablolarıdır (ADR-0046 bölüm 6); platform uçları host'ta kalır (ADR-0046 karar 4), uygulama modüldedir. Tenant'ın okuma uçları modüldedir
+/// (<c>/api/warehouse/gtip</c>).
 /// </summary>
-public static class GtipEndpoints
+public static class GtipCatalogEndpoints
 {
-    public static IEndpointRouteBuilder MapGtipEndpoints(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapGtipCatalogEndpoints(this IEndpointRouteBuilder app)
     {
         var platform = app.MapGroup("/api/platform/gtip")
             .RequireAuthorization()
@@ -89,31 +85,8 @@ public static class GtipEndpoints
                 return Results.NoContent();
             }));
 
-        // Stok kartı formu yazarken kodu kontrol eder: depo modülü açık olmalı ve stok kartı okuma izni gerekir.
-        var read = app.MapGroup("/api/gtip")
-            .RequireAuthorization()
-            .RequireModule(WarehouseAccess.ModuleKey)
-            .RequirePermission(WarehouseAccess.StockItemsRead)
-            .WithTags("Warehouse");
-        read.MapGet("/check", async (string? code, DateOnly? date, IGtipCatalog catalog, TimeProvider time, CancellationToken ct) =>
-        {
-            var (value, error) = GtipRules.Normalize(code);
-            if (value is null)
-            {
-                return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: error ?? "GTİP kodu boş olamaz.");
-            }
-
-            var check = await catalog.CheckAsync(value, date ?? Today(time), ct);
-            return Results.Ok(new GtipCheckDto(check.Status.ToString(), check.Description, check.VersionName));
-        });
-        read.MapGet("/search", async (string? q, DateOnly? date, int? limit, IGtipCatalog catalog, TimeProvider time, CancellationToken ct) =>
-            (await catalog.SearchAsync(q ?? string.Empty, date ?? Today(time), limit ?? 10, ct))
-                .Select(s => new GtipEntryDto(s.Code, s.Description, s.Unit)).ToList());
-
         return app;
     }
-
-    private static DateOnly Today(TimeProvider time) => DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
 
     private static async Task<IResult> Run(Func<Task<IResult>> action)
     {

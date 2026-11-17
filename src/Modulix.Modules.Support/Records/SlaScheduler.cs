@@ -14,7 +14,7 @@ using Modulix.Modules.Support.Sla;
 namespace Modulix.Modules.Support.Lifecycle;
 
 /// <summary>Tur özeti: yeni işaretlenen ihlal sayısı ve uygulanan eskalasyon eylemi sayısı.</summary>
-public sealed record SlaSchedulerRun(int Breaches, int Escalations, int AutoClosed = 0);
+public sealed record SlaSchedulerRun(int Breaches, int Escalations, int AutoClosed = 0, int SurveyReminders = 0);
 
 /// <summary>
 /// SLA zamanlanmış işi (ADR-0024 dilim 2). Host, işi tenant başına bir kez çalıştırır (tenant başına oturum kilidi); aynı turun tekrar ya da paralel çalışması da güvenlidir:
@@ -34,6 +34,7 @@ internal sealed class SlaScheduler(
     TimeProvider time,
     IEmailQueue emailQueue,
     IRecipientLanguage languages,
+    SurveyIssuer surveys,
     INotificationRecipients? recipients = null,
     ISupportPolicyProvider? policy = null) : ISlaScheduler
 {
@@ -45,7 +46,45 @@ internal sealed class SlaScheduler(
         var breaches = await MarkBreachesAsync(now, cancellationToken);
         var escalations = await EscalateAsync(now, cancellationToken);
         var closed = await AutoCloseAsync(now, cancellationToken);
-        return new SlaSchedulerRun(breaches, escalations, closed);
+        var reminders = await RemindSurveysAsync(now, cancellationToken);
+        return new SlaSchedulerRun(breaches, escalations, closed, reminders);
+    }
+
+    /// <summary>
+    /// Anket hatırlatması (ADR-0024 §4.13): <c>support.survey.reminder-days</c> (0 kapalı) kadar gündür yanıtlanmayan, süresi dolmamış ankete bir kez hatırlatma yazılır. Talep o çözüm
+    /// döngüsünden çıkmışsa (yeniden açıldı, birleştirildi, iptal edildi) hatırlatılmaz. Hatırlatılan anket bir sonraki turda aday olmaz (tekrar çalıştırma güvenlidir).
+    /// </summary>
+    private async Task<int> RemindSurveysAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var settings = policy is null ? TicketPolicySettings.Default : await policy.GetAsync(cancellationToken);
+        var days = settings.SurveyReminderDays;
+        if (!settings.SurveyEnabled || days <= 0)
+        {
+            return 0;
+        }
+
+        var cutoff = now.AddDays(-days);
+        var due = await data.Set<SatisfactionSurvey>()
+            .Where(s => s.QueuedAt != null && s.QueuedAt <= cutoff && s.AnsweredAt == null && s.ReminderQueuedAt == null && s.ExpiresAt > now)
+            .OrderBy(s => s.QueuedAt).Take(BatchSize).ToListAsync(cancellationToken);
+        var sent = 0;
+        foreach (var survey in due)
+        {
+            var ticket = await data.Set<SupportTicket>().AsNoTracking().Where(t => t.Id == survey.TicketId)
+                .Select(t => new { t.Number, t.Status, t.ReopenCount, t.ReporterName }).FirstOrDefaultAsync(cancellationToken);
+            if (ticket is null || ticket.Status is not (TicketStatus.Resolved or TicketStatus.Closed) || ticket.ReopenCount + 1 != survey.Cycle
+                || !SurveyRules.ReminderDue(days, survey.QueuedAt, survey.AnsweredAt, survey.ReminderQueuedAt, survey.ExpiresAt, now))
+            {
+                continue;
+            }
+
+            if (await surveys.RemindAsync(survey, ticket.Number, ticket.ReporterName, now, cancellationToken))
+            {
+                sent++;
+            }
+        }
+
+        return sent;
     }
 
     /// <summary>

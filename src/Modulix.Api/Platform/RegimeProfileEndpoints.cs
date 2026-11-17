@@ -1,15 +1,14 @@
 using System.Security.Claims;
-using Modulix.Api.Platform;
 using Modulix.Api.Users;
-using Modulix.Core.Contracts.Customs;
-using Modulix.Core.Customs;
+using Modulix.Modules.Warehouse.Contracts.Customs;
 using Modulix.Shared.Customs;
 
-namespace Modulix.Api.Customs;
+namespace Modulix.Api.Platform;
 
 /// <summary>
 /// Rejim profili yönetimi (ADR-0032 K16): platform yöneticisine açıktır (<c>/api/platform/regime-profiles</c>, tenant gerekmez). Akış: profil oluştur →
 /// taslak içeriği kaydet (doğrulanır) → yayınla (doğrulandı/doğrulanmadı etiketiyle). Yazma uçları Operasyon rolüne bağlıdır (<see cref="PlatformAccessRules"/>).
+/// Profil tabloları depo modülünün başvuru tablolarıdır (ADR-0046 bölüm 6); platform uçları host'ta kalır (ADR-0046 karar 4), uygulama modüldedir.
 /// </summary>
 public static class RegimeProfileEndpoints
 {

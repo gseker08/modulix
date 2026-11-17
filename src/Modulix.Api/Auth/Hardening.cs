@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Modulix.Api.Tenancy;
+using Modulix.Core.Hosting;
 
 namespace Modulix.Api.Auth;
 
@@ -54,15 +55,15 @@ public static class Hardening
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            var permits = Math.Max(1, configuration.GetValue("Auth:RateLimitPerMinute", 30));
+            var permits = RateLimits.PerNode(configuration, "Auth:RateLimitPerMinute", 30);
             options.AddPolicy(AuthRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
                 $"auth|{context.Connection.RemoteIpAddress}",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 
             // Oturum açmış istekler için genel sınır: kişi başına ve firma başına (tek paylaşımlı veritabanında bir hesabın
             // ya da bir firmanın yükü diğer firmaları yavaşlatmasın). Oturumsuz uçlar kendi adlandırılmış ilkeleriyle sınırlıdır.
-            var perUser = configuration.GetValue($"{RateLimitingSection}:UserPerMinute", 600);
-            var perTenant = configuration.GetValue($"{RateLimitingSection}:TenantPerMinute", 3000);
+            var perUser = RateLimits.PerNode(configuration, $"{RateLimitingSection}:UserPerMinute", 600, minimum: 0);
+            var perTenant = RateLimits.PerNode(configuration, $"{RateLimitingSection}:TenantPerMinute", 3000, minimum: 0);
             options.GlobalLimiter = PartitionedRateLimiter.CreateChained(
                 PartitionedRateLimiter.Create<HttpContext, string>(context => SignedInPartition(context, "user", ClaimTypes.NameIdentifier, perUser)),
                 PartitionedRateLimiter.Create<HttpContext, string>(context => SignedInPartition(context, "tenant", ModulixClaimTypes.TenantId, perTenant)));

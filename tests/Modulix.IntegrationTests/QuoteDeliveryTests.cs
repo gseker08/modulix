@@ -149,6 +149,26 @@ public class QuoteDeliveryTests(ModulixApiFactory factory) : IClassFixture<Modul
         Assert.Contains("Teklifi görüntüle: ", inTurkish.TextBody);
     }
 
+    [Fact]
+    public async Task The_customer_email_and_document_use_the_companys_correspondence_language_before_the_tenant_default()
+    {
+        // ADR-0034 §6, dilim 22c: teklifin firmasının yazışma dili (az) tenant varsayılanından (tr) önce gelir; belge de bu dilde üretilir.
+        var s = await SetUpAsync();
+        using var admin = await LoginAsync(factory, s.Admin);
+        var company = await PostAsync<CompanyDto>(admin, "/api/crm/companies", new SaveCompanyRequest("Baku Logistics", PreferredLanguage: "az"));
+        var quote = await PresentedQuoteAsync(admin, company.Id);
+        var to = $"musteri-{Guid.NewGuid():N}@test.modulix";
+        await SendLinkAsync(admin, quote.Id, to);
+
+        var queued = await QueuedAsync(to);
+        Assert.Equal("az", queued.Language);
+        Assert.DoesNotContain("Merhaba", queued.TextBody);
+
+        var document = (await admin.GetFromJsonAsync<List<QuoteDocumentDto>>($"/api/crm/quotes/{quote.Id}/documents"))!.Single();
+        var pdf = await admin.GetByteArrayAsync($"/api/crm/quotes/{quote.Id}/documents/{document.Id}/file");
+        Assert.StartsWith("%PDF-", System.Text.Encoding.ASCII.GetString(pdf, 0, 5));
+    }
+
     private static async Task SendLinkAsync(HttpClient client, Guid quoteId, string address)
     {
         var response = await client.PostAsJsonAsync($"/api/crm/quotes/{quoteId}/share-links",

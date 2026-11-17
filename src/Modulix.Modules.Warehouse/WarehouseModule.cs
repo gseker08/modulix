@@ -4,6 +4,8 @@ using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Hosting;
+using Modulix.Modules.Warehouse.Contracts.Customs;
+using Modulix.Modules.Warehouse.Customs;
 using Modulix.Modules.Warehouse.Domain;
 using Modulix.Modules.Warehouse.Endpoints;
 using Modulix.Modules.Warehouse.Records;
@@ -99,7 +101,11 @@ public sealed class WarehouseModule : IModule, IModuleEndpoints
     public string Key => ModuleKey;
 
     /// <summary>Modüle özel uç noktalar (ADR-0046); genel kayıt uçları host'ta <c>OwnedRecords</c>'tan üretilir.</summary>
-    public void MapEndpoints(IEndpointRouteBuilder routes) => WarehouseDashboardEndpoints.MapEndpoints(routes);
+    public void MapEndpoints(IEndpointRouteBuilder routes)
+    {
+        WarehouseDashboardEndpoints.MapEndpoints(routes);
+        CustomsEndpoints.MapEndpoints(routes);
+    }
 
     public string DisplayName => "Depo";
 
@@ -241,6 +247,12 @@ public sealed class WarehouseModule : IModule, IModuleEndpoints
         new(Entities.CustomsDeclaration, "Gümrük beyannamesi"),
         new(Entities.CustomsDeclarationLine, "Beyanname satırı"),
         new(Entities.Lot, "Parti"),
+    ];
+
+    /// <summary>Antrepo, Core'un ortak yer türü listesine bu modülden eklenir (H2): sektör sözlüğü Core'da değil, sahibi modüldedir.</summary>
+    IReadOnlyList<ChoiceValueContribution> IModule.ChoiceValueContributions { get; } =
+    [
+        new(Place.KindList, [new("BondedWarehouse", "Antrepo", PlaceKindCategories.Site)]),
     ];
 
     /// <summary>
@@ -465,5 +477,14 @@ public sealed class WarehouseModule : IModule, IModuleEndpoints
         services.AddScoped<IRecordStore, StockBalanceRecordStore>();
         services.AddScoped<IRegistrationNoCheck, RegistrationNoCheck>();
         services.AddScoped<Dashboard.IWarehouseDashboard, WarehouseDashboard>();
+
+        // Gümrük başvuru verisi (ADR-0046 bölüm 6): tenant okur, platform yönetir (yönetim uçları host'ta, /api/platform).
+        services.AddScoped<GtipCatalogService>();
+        services.AddScoped<IGtipCatalog>(sp => sp.GetRequiredService<GtipCatalogService>());
+        services.AddScoped<IGtipCatalogAdmin>(sp => sp.GetRequiredService<GtipCatalogService>());
+        services.AddScoped<RegimeProfileService>();
+        services.AddScoped<IRegimeProfileCatalog>(sp => sp.GetRequiredService<RegimeProfileService>());
+        services.AddScoped<IRegimeProfileAdmin>(sp => sp.GetRequiredService<RegimeProfileService>());
+        services.AddSingleton<IGtipFileReader, GtipFileReader>();
     }
 }

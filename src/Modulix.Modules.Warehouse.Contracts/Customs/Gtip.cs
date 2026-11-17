@@ -1,4 +1,4 @@
-namespace Modulix.Core.Contracts.Customs;
+namespace Modulix.Modules.Warehouse.Contracts.Customs;
 
 /// <summary>
 /// GTİP biçim kuralları (ADR-0032 K9): kod <b>metin</b> saklanır, yalnızca rakamdır; ilk 6 hane HS kodudur, 12–14 hane desteklenir.

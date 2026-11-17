@@ -1,4 +1,5 @@
 using System.Globalization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Crm.Quotes;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -28,19 +29,20 @@ public static class QuotePdf
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
-    public static byte[] Render(QuoteDocumentSnapshot quote) => Build(quote).GeneratePdf();
+    /// <param name="t">Belgenin dili: müşterinin yazışma dili (ADR-0034 §6, dilim 22c). Sabit başlıklar bu dildedir; teklif içeriği girildiği gibidir.</param>
+    public static byte[] Render(QuoteDocumentSnapshot quote, LocalizedTexts t) => Build(quote, t).GeneratePdf();
 
     /// <summary>Belge tanımı (PDF üretimi ve görsel denetim için ortak).</summary>
-    public static QuestPDF.Infrastructure.IDocument Build(QuoteDocumentSnapshot quote)
+    public static QuestPDF.Infrastructure.IDocument Build(QuoteDocumentSnapshot quote, LocalizedTexts t)
     {
         var document = Document.Create(container => container.Page(page =>
         {
             page.Size(PageSizes.A4);
             page.Margin(32);
             page.DefaultTextStyle(style => style.FontSize(9).FontColor("#1B2430"));
-            page.Header().Element(header => Header(header, quote));
-            page.Content().PaddingTop(12).Element(content => Body(content, quote));
-            page.Footer().Element(footer => Footer(footer, quote));
+            page.Header().Element(header => Header(header, quote, t));
+            page.Content().PaddingTop(12).Element(content => Body(content, quote, t));
+            page.Footer().Element(footer => Footer(footer, quote, t));
         }));
 
         // Üretim anı değil sunum anı: aynı veriden üretilen belgenin üst bilgisi sabit kalır.
@@ -48,7 +50,7 @@ public static class QuotePdf
         {
             Title = $"{quote.QuoteNumber} V{quote.RevisionNo} - {quote.Title}",
             Author = quote.Seller.Name,
-            Subject = "Teklif",
+            Subject = t.Get("crm.quote-pdf.subject"),
             Creator = "ModüliX",
             Producer = "ModüliX",
             CreationDate = quote.PresentedAt,
@@ -63,7 +65,7 @@ public static class QuotePdf
 
     private static string Quantity(decimal value, string? unit) => $"{value.ToString("#,0.####", Numbers)}{(unit is null ? string.Empty : $" {unit}")}";
 
-    private static void Header(IContainer container, QuoteDocumentSnapshot quote) =>
+    private static void Header(IContainer container, QuoteDocumentSnapshot quote, LocalizedTexts t) =>
         container.Column(column =>
         {
             column.Item().Row(row =>
@@ -78,19 +80,19 @@ public static class QuotePdf
                 });
                 row.ConstantItem(190).AlignRight().Column(info =>
                 {
-                    info.Item().Text("TEKLİF").FontSize(16).Bold().FontColor(Accent);
-                    info.Item().Text($"No: {quote.QuoteNumber}  ·  Revizyon V{quote.RevisionNo}").FontSize(8);
-                    info.Item().Text($"Tarih: {quote.IssueDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}").FontSize(8);
+                    info.Item().Text(t.Get("crm.quote-pdf.heading")).FontSize(16).Bold().FontColor(Accent);
+                    info.Item().Text(t.Get("crm.quote-pdf.number", quote.QuoteNumber, quote.RevisionNo)).FontSize(8);
+                    info.Item().Text(t.Get("crm.quote-pdf.date", quote.IssueDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture))).FontSize(8);
                     if (quote.ValidUntil is { } until)
                     {
-                        info.Item().Text($"Geçerlilik: {Date(until)}").FontSize(8).Bold();
+                        info.Item().Text(t.Get("crm.quote-pdf.valid-until", Date(until))).FontSize(8).Bold();
                     }
                 });
             });
             column.Item().PaddingTop(6).LineHorizontal(1).LineColor(Accent);
         });
 
-    private static void Body(IContainer container, QuoteDocumentSnapshot quote) =>
+    private static void Body(IContainer container, QuoteDocumentSnapshot quote, LocalizedTexts t) =>
         container.Column(column =>
         {
             column.Spacing(10);
@@ -98,9 +100,9 @@ public static class QuotePdf
             {
                 row.RelativeItem().Column(customer =>
                 {
-                    customer.Item().Text("SAYIN").FontSize(7).FontColor(Muted).Bold();
+                    customer.Item().Text(t.Get("crm.quote-pdf.to")).FontSize(7).FontColor(Muted).Bold();
                     customer.Item().Text(quote.CustomerName).FontSize(11).Bold();
-                    var detail = string.Join(" · ", new[] { quote.CustomerCity, quote.CustomerTaxNumber is null ? null : $"VKN/TCKN: {quote.CustomerTaxNumber}" }.Where(p => p is not null));
+                    var detail = string.Join(" · ", new[] { quote.CustomerCity, quote.CustomerTaxNumber is null ? null : t.Get("crm.quote-pdf.tax-number", quote.CustomerTaxNumber) }.Where(p => p is not null));
                     if (detail.Length > 0)
                     {
                         customer.Item().Text(detail).FontColor(Muted);
@@ -109,7 +111,7 @@ public static class QuotePdf
                     var contact = string.Join(" · ", new[] { quote.ContactName, quote.ContactEmail }.Where(p => p is not null));
                     if (contact.Length > 0)
                     {
-                        customer.Item().Text($"İlgili: {contact}");
+                        customer.Item().Text(t.Get("crm.public-quote.contact", contact));
                     }
                 });
             });
@@ -123,12 +125,12 @@ public static class QuotePdf
                 }
             });
 
-            column.Item().Element(content => Lines(content, quote));
-            column.Item().AlignRight().Element(content => Totals(content, quote));
-            column.Item().Element(content => Terms(content, quote));
+            column.Item().Element(content => Lines(content, quote, t));
+            column.Item().AlignRight().Element(content => Totals(content, quote, t));
+            column.Item().Element(content => Terms(content, quote, t));
         });
 
-    private static void Lines(IContainer container, QuoteDocumentSnapshot quote) =>
+    private static void Lines(IContainer container, QuoteDocumentSnapshot quote, LocalizedTexts t) =>
         container.Table(table =>
         {
             table.ColumnsDefinition(columns =>
@@ -143,7 +145,7 @@ public static class QuotePdf
             });
             table.Header(header =>
             {
-                foreach (var (text, right) in new[] { ("#", false), ("Kalem", false), ("Miktar", true), ("Birim fiyat", true), ("İndirim", true), ("KDV", true), ("Net tutar", true) })
+                foreach (var (text, right) in new[] { ("#", false), (t.Get("crm.public-quote.col.item"), false), (t.Get("crm.public-quote.col.quantity"), true), (t.Get("crm.public-quote.col.unit-price"), true), (t.Get("crm.public-quote.col.discount"), true), (t.Get("crm.public-quote.col.vat"), true), (t.Get("crm.public-quote.col.net"), true) })
                 {
                     var cell = header.Cell().Background(Accent).PaddingVertical(4).PaddingHorizontal(3);
                     (right ? cell.AlignRight() : cell).Text(text).FontColor(Colors.White).Bold().FontSize(8);
@@ -174,7 +176,7 @@ public static class QuotePdf
                             text.Span($"  ({code})").FontColor(Muted).FontSize(8);
                         }
                     });
-                    if (RoleLabel(line) is { } label)
+                    if (RoleLabel(line, t) is { } label)
                     {
                         item.Item().Text(label).FontSize(7.5f).Italic().FontColor(Muted);
                     }
@@ -186,7 +188,7 @@ public static class QuotePdf
 
                     if (line.RecurringPeriod is { Length: > 0 } period)
                     {
-                        item.Item().Text($"Tekrarlayan: {PeriodLabel(period)}").FontSize(7.5f).FontColor(Muted);
+                        item.Item().Text(t.Get("crm.quote-pdf.recurring", PeriodLabel(period, t))).FontSize(7.5f).FontColor(Muted);
                     }
                 });
                 table.Cell().Element(Cell).AlignRight().Text(Quantity(line.Quantity, line.Unit));
@@ -197,7 +199,7 @@ public static class QuotePdf
             }
         });
 
-    private static void Totals(IContainer container, QuoteDocumentSnapshot quote) =>
+    private static void Totals(IContainer container, QuoteDocumentSnapshot quote, LocalizedTexts t) =>
         container.Width(240).Column(column =>
         {
             void Row(string label, string value, bool strong = false)
@@ -214,30 +216,30 @@ public static class QuotePdf
                 });
             }
 
-            Row("Liste toplamı", Money(quote.ListTotal, quote.Currency));
+            Row(t.Get("crm.public-quote.list-total"), Money(quote.ListTotal, quote.Currency));
             if (quote.DiscountTotal > 0)
             {
-                Row("Toplam indirim", "-" + Money(quote.DiscountTotal, quote.Currency));
+                Row(t.Get("crm.public-quote.discount-total"), "-" + Money(quote.DiscountTotal, quote.Currency));
             }
 
-            Row(quote.PriceIncludesTax ? "Net toplam (KDV hariç)" : "Net toplam", Money(quote.NetTotal, quote.Currency));
+            Row(quote.PriceIncludesTax ? t.Get("crm.quote-pdf.net-total-excl-vat") : t.Get("crm.public-quote.net-total"), Money(quote.NetTotal, quote.Currency));
             foreach (var group in quote.TaxGroups)
             {
-                Row($"KDV %{group.RatePercent.ToString("0.##", Numbers)}", Money(group.Tax, quote.Currency));
+                Row(t.Get("crm.public-quote.vat-rate", group.RatePercent.ToString("0.##", Numbers)), Money(group.Tax, quote.Currency));
             }
 
             column.Item().PaddingVertical(2).LineHorizontal(1).LineColor(Accent);
-            Row("GENEL TOPLAM", Money(quote.GrossTotal, quote.Currency), strong: true);
+            Row(t.Get("crm.quote-pdf.grand-total"), Money(quote.GrossTotal, quote.Currency), strong: true);
             if (quote.OptionalNet > 0)
             {
-                column.Item().PaddingTop(4).Text($"Opsiyonel/alternatif kalemler toplama dahil değildir (net {Money(quote.OptionalNet, quote.Currency)}).")
+                column.Item().PaddingTop(4).Text(t.Get("crm.public-quote.optional-note", Money(quote.OptionalNet, quote.Currency)))
                     .FontSize(7.5f).FontColor(Muted);
             }
         });
 
-    private static void Terms(IContainer container, QuoteDocumentSnapshot quote)
+    private static void Terms(IContainer container, QuoteDocumentSnapshot quote, LocalizedTexts t)
     {
-        var terms = new[] { ("Ödeme koşulları", quote.PaymentTerms), ("Teslimat koşulları", quote.DeliveryTerms), ("Ticari koşullar", quote.CommercialTerms) }
+        var terms = new[] { (t.Get("crm.public-quote.payment-terms"), quote.PaymentTerms), (t.Get("crm.public-quote.delivery-terms"), quote.DeliveryTerms), (t.Get("crm.public-quote.commercial-terms"), quote.CommercialTerms) }
             .Where(t => t.Item2 is { Length: > 0 }).ToList();
         if (terms.Count == 0)
         {
@@ -258,7 +260,7 @@ public static class QuotePdf
         });
     }
 
-    private static void Footer(IContainer container, QuoteDocumentSnapshot quote) =>
+    private static void Footer(IContainer container, QuoteDocumentSnapshot quote, LocalizedTexts t) =>
         container.Column(column =>
         {
             column.Item().LineHorizontal(0.5f).LineColor(Line);
@@ -268,7 +270,7 @@ public static class QuotePdf
                 row.ConstantItem(140).AlignRight().Text(text =>
                 {
                     text.DefaultTextStyle(style => style.FontSize(7.5f).FontColor(Muted));
-                    text.Span($"{quote.QuoteNumber} V{quote.RevisionNo}  ·  Sayfa ");
+                    text.Span(t.Get("crm.quote-pdf.page", quote.QuoteNumber, quote.RevisionNo) + " ");
                     text.CurrentPageNumber();
                     text.Span(" / ");
                     text.TotalPages();
@@ -276,11 +278,11 @@ public static class QuotePdf
             });
         });
 
-    private static string? RoleLabel(QuoteSnapshotLine line) => line.Role switch
+    private static string? RoleLabel(QuoteSnapshotLine line, LocalizedTexts t) => line.Role switch
     {
-        "Optional" => line.IsSelected ? "Opsiyonel — seçili (toplama dahil)" : "Opsiyonel — toplama dahil değil",
-        "Alternative" => line.IsSelected ? "Alternatif — seçili (toplama dahil)" : "Alternatif — toplama dahil değil",
-        "PackageChild" => "Paket bileşeni",
+        "Optional" => t.Get(line.IsSelected ? "crm.public-quote.role.optional-selected" : "crm.public-quote.role.optional"),
+        "Alternative" => t.Get(line.IsSelected ? "crm.public-quote.role.alternative-selected" : "crm.public-quote.role.alternative"),
+        "PackageChild" => t.Get("crm.public-quote.role.package-child"),
         _ => null,
     };
 
@@ -291,11 +293,11 @@ public static class QuotePdf
         _ => "—",
     };
 
-    private static string PeriodLabel(string period) => period switch
+    private static string PeriodLabel(string period, LocalizedTexts t) => period switch
     {
-        "Monthly" => "aylık",
-        "Quarterly" => "üç aylık",
-        "Yearly" => "yıllık",
+        "Monthly" => t.Get("crm.quote-pdf.period.monthly"),
+        "Quarterly" => t.Get("crm.quote-pdf.period.quarterly"),
+        "Yearly" => t.Get("crm.quote-pdf.period.yearly"),
         _ => period,
     };
 }

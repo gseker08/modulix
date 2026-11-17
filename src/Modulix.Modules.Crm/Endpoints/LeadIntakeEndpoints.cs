@@ -45,7 +45,7 @@ internal static class LeadIntakeEndpoints
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.AddPolicy(RateLimitPolicy, context =>
             {
-                var permits = Math.Max(1, context.RequestServices.GetRequiredService<IConfiguration>().GetValue("LeadIntake:RateLimitPerMinute", 20));
+                var permits = RateLimits.PerNode(context.RequestServices.GetRequiredService<IConfiguration>(), "LeadIntake:RateLimitPerMinute", 20);
                 return RateLimitPartition.GetFixedWindowLimiter(
                     $"{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["tenant"]}|{context.Request.RouteValues["formKey"]}",
                     _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
