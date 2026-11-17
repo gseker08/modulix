@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Authorization;
-using Modulix.Core.Contracts.Customs;
-using Modulix.Core.Customs;
+using Modulix.Modules.Warehouse.Contracts.Customs;
+using Modulix.Modules.Warehouse.Customs;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Shared.Auth;
@@ -88,11 +88,11 @@ public class GtipCatalogTests(ModulixApiFactory factory) : IClassFixture<Modulix
             Assert.Equal("NotFound", (await CheckAsync(tenant, "85171300", first)).Status);
 
             // Öneri: kod ön eki ya da tanım içinde; kod sırasıyla.
-            var byPrefix = (await tenant.GetFromJsonAsync<List<GtipEntryDto>>($"/api/gtip/search?q=0902&date={first:yyyy-MM-dd}"))!;
+            var byPrefix = (await tenant.GetFromJsonAsync<List<GtipEntryDto>>($"/api/warehouse/gtip/search?q=0902&date={first:yyyy-MM-dd}"))!;
             Assert.Equal(["09023000", "090230001100"], byPrefix.Select(e => e.Code));
-            var byName = (await tenant.GetFromJsonAsync<List<GtipEntryDto>>($"/api/gtip/search?q=telefon&date={second:yyyy-MM-dd}"))!;
+            var byName = (await tenant.GetFromJsonAsync<List<GtipEntryDto>>($"/api/warehouse/gtip/search?q=telefon&date={second:yyyy-MM-dd}"))!;
             Assert.Equal(["85171300"], byName.Select(e => e.Code));
-            Assert.Empty((await tenant.GetFromJsonAsync<List<GtipEntryDto>>($"/api/gtip/search?q=%20&date={first:yyyy-MM-dd}"))!);
+            Assert.Empty((await tenant.GetFromJsonAsync<List<GtipEntryDto>>($"/api/warehouse/gtip/search?q=%20&date={first:yyyy-MM-dd}"))!);
 
             // Platform denetim kaydı.
             using var scope = factory.Services.CreateScope();
@@ -129,7 +129,7 @@ public class GtipCatalogTests(ModulixApiFactory factory) : IClassFixture<Modulix
             Assert.Equal("NoCatalog", (await CheckAsync(tenant, "09023000", day)).Status);
             using var scope = factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-            Assert.False(await db.GtipCatalogEntries.AsNoTracking().AnyAsync(e => e.VersionId == version.Id));
+            Assert.False(await db.Set<GtipCatalogEntry>().AsNoTracking().AnyAsync(e => e.VersionId == version.Id));
         }
         finally
         {
@@ -154,20 +154,20 @@ public class GtipCatalogTests(ModulixApiFactory factory) : IClassFixture<Modulix
             await Assert.ThrowsAsync<ArgumentException>(() => admin.CreateVersionAsync(
                 s.PlatformAdmin.Id, new("Çift", day, null), [Tea[0], new GtipCatalogEntryInput(Tea[0].Code, "Aynı kod", null)], CancellationToken.None));
             await Assert.ThrowsAsync<ArgumentException>(() => admin.CreateVersionAsync(s.PlatformAdmin.Id, new("  ", day, null), Tea, CancellationToken.None));
-            Assert.False(await db.GtipCatalogVersions.AsNoTracking().AnyAsync(v => v.EffectiveFrom == day));
+            Assert.False(await db.Set<GtipCatalogVersion>().AsNoTracking().AnyAsync(v => v.EffectiveFrom == day));
 
             // Aynı yürürlük tarihli ikinci sürüm çakışır ve ilk sürümün satırları değişmez.
             var first = await admin.CreateVersionAsync(s.PlatformAdmin.Id, new("İlk", day, "ilk.xlsx"), Tea, CancellationToken.None);
             created.Add(first.Id);
             await Assert.ThrowsAsync<GtipCatalogConflictException>(() => admin.CreateVersionAsync(s.PlatformAdmin.Id, new("İkinci", day, null), [Tea[0]], CancellationToken.None));
-            Assert.Equal(3, await db.GtipCatalogEntries.AsNoTracking().CountAsync(e => e.VersionId == first.Id));
-            Assert.Single(await db.GtipCatalogVersions.AsNoTracking().Where(v => v.EffectiveFrom == day).ToListAsync());
+            Assert.Equal(3, await db.Set<GtipCatalogEntry>().AsNoTracking().CountAsync(e => e.VersionId == first.Id));
+            Assert.Single(await db.Set<GtipCatalogVersion>().AsNoTracking().Where(v => v.EffectiveFrom == day).ToListAsync());
 
             // Okuma uçları: biçimi bozuk kod 400, bilinmeyen sürüm 404.
             using var tenant = await LoginAsync(s.Reader);
-            Assert.Equal(HttpStatusCode.BadRequest, (await tenant.GetAsync("/api/gtip/check?code=abc")).StatusCode);
-            Assert.Equal(HttpStatusCode.BadRequest, (await tenant.GetAsync("/api/gtip/check?code=1234")).StatusCode);
-            Assert.Equal(HttpStatusCode.BadRequest, (await tenant.GetAsync("/api/gtip/check")).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await tenant.GetAsync("/api/warehouse/gtip/check?code=abc")).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await tenant.GetAsync("/api/warehouse/gtip/check?code=1234")).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await tenant.GetAsync("/api/warehouse/gtip/check")).StatusCode);
             using var platform = await LoginAsync(s.PlatformAdmin);
             Assert.Equal(HttpStatusCode.NotFound, (await platform.GetAsync($"/api/platform/gtip/versions/{Guid.NewGuid()}/entries")).StatusCode);
         }
@@ -194,11 +194,11 @@ public class GtipCatalogTests(ModulixApiFactory factory) : IClassFixture<Modulix
             Assert.Equal("Found", (await CheckAsync(readerA, "09023000", day)).Status);
             Assert.Equal("Found", (await CheckAsync(readerB, "09023000", day)).Status);
             using var withoutModule = await LoginAsync(s.NoModuleUser);
-            Assert.Equal(HttpStatusCode.Forbidden, (await withoutModule.GetAsync($"/api/gtip/check?code=09023000&date={day:yyyy-MM-dd}")).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await withoutModule.GetAsync($"/api/warehouse/gtip/check?code=09023000&date={day:yyyy-MM-dd}")).StatusCode);
 
             // Tesis izni stok kartı izni vermez; okuyucu katalog yönetemez.
             using var facilityOnly = await LoginAsync(s.FacilityOnly);
-            Assert.Equal(HttpStatusCode.Forbidden, (await facilityOnly.GetAsync($"/api/gtip/check?code=09023000&date={day:yyyy-MM-dd}")).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await facilityOnly.GetAsync($"/api/warehouse/gtip/check?code=09023000&date={day:yyyy-MM-dd}")).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await readerA.GetAsync("/api/platform/gtip/versions")).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await readerA.GetAsync($"/api/platform/gtip/versions/{Guid.NewGuid()}/entries?sort=code")).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await readerA.GetAsync($"/api/platform/gtip/versions/{version.Id}/entries")).StatusCode);
@@ -206,7 +206,7 @@ public class GtipCatalogTests(ModulixApiFactory factory) : IClassFixture<Modulix
 
             // Oturumsuz çağrı oturum ister.
             using var anonymous = factory.CreateBrowserClient();
-            Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/gtip/check?code=09023000&date={day:yyyy-MM-dd}")).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/warehouse/gtip/check?code=09023000&date={day:yyyy-MM-dd}")).StatusCode);
         }
         finally
         {
@@ -235,7 +235,7 @@ public class GtipCatalogTests(ModulixApiFactory factory) : IClassFixture<Modulix
 
     private static async Task<GtipCheckDto> CheckAsync(HttpClient client, string code, DateOnly day)
     {
-        var response = await client.GetAsync($"/api/gtip/check?code={Uri.EscapeDataString(code)}&date={day:yyyy-MM-dd}");
+        var response = await client.GetAsync($"/api/warehouse/gtip/check?code={Uri.EscapeDataString(code)}&date={day:yyyy-MM-dd}");
         Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<GtipCheckDto>())!;
     }

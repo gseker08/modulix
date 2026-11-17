@@ -1,5 +1,5 @@
 using Modulix.Core.Contracts.Customization;
-using Modulix.Core.Contracts.Customs;
+using Modulix.Modules.Warehouse.Contracts.Customs;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 

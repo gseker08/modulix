@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text;
 using Modulix.Core.Contracts.Modules;
-using Modulix.Core.Customs;
 using Modulix.Core.Reporting;
 
 namespace Modulix.Core.Imports;
@@ -105,8 +104,8 @@ public static class ImportCsvFile
     public static ImportFileContent Read(byte[] content)
     {
         ArgumentNullException.ThrowIfNull(content);
-        var delimiter = GtipCsv.DetectDelimiter(GtipCsv.Decode(content));
-        return ImportFiles.Build(delimiter, GtipCsv.Parse(content));
+        var delimiter = CsvFile.DetectDelimiter(CsvFile.Decode(content));
+        return ImportFiles.Build(delimiter, CsvFile.Parse(content));
     }
 }
 

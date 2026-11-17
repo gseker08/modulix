@@ -1,16 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Modulix.Core.Contracts.Customs;
-using Modulix.Core.Customs;
+using Modulix.Core.Contracts.Persistence;
+using Modulix.Modules.Warehouse.Contracts.Customs;
 
-namespace Modulix.Infrastructure.Persistence.Configurations;
+namespace Modulix.Modules.Warehouse.Customs;
 
 internal sealed class GtipCatalogVersionConfiguration : IEntityTypeConfiguration<GtipCatalogVersion>
 {
     public void Configure(EntityTypeBuilder<GtipCatalogVersion> builder)
     {
         // Platform kataloğu (ADR-0032 K9): TenantId taşımaz, RLS dışıdır.
-        builder.ToTable("GtipCatalogVersions", DatabaseSchemas.Platform);
+        builder.ToTable("GtipCatalogVersions", IPlatformReferenceEntity.Schema);
         builder.HasKey(v => v.Id);
         builder.Property(v => v.Id).ValueGeneratedNever();
         builder.Property(v => v.Name).HasMaxLength(GtipCatalogRules.NameMaxLength).IsRequired();
@@ -26,7 +26,7 @@ internal sealed class GtipCatalogEntryConfiguration : IEntityTypeConfiguration<G
 {
     public void Configure(EntityTypeBuilder<GtipCatalogEntry> builder)
     {
-        builder.ToTable("GtipCatalogEntries", DatabaseSchemas.Platform);
+        builder.ToTable("GtipCatalogEntries", IPlatformReferenceEntity.Schema);
 
         // (Sürüm, kod) anahtarı hem tekilliği hem de kod ve kod ön eki aramasını (LIKE 'xxxx%') karşılar.
         builder.HasKey(e => new { e.VersionId, e.Code });
@@ -42,7 +42,7 @@ internal sealed class RegimeProfileConfiguration : IEntityTypeConfiguration<Regi
     public void Configure(EntityTypeBuilder<RegimeProfile> builder)
     {
         // Platform kataloğu (ADR-0032 K16): TenantId taşımaz, RLS dışıdır.
-        builder.ToTable("RegimeProfiles", DatabaseSchemas.Platform);
+        builder.ToTable("RegimeProfiles", IPlatformReferenceEntity.Schema);
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).ValueGeneratedNever();
         builder.Property(p => p.Code).HasMaxLength(RegimeProfile.CodeMaxLength).IsRequired();
@@ -55,7 +55,7 @@ internal sealed class RegimeProfileVersionConfiguration : IEntityTypeConfigurati
 {
     public void Configure(EntityTypeBuilder<RegimeProfileVersion> builder)
     {
-        builder.ToTable("RegimeProfileVersions", DatabaseSchemas.Platform);
+        builder.ToTable("RegimeProfileVersions", IPlatformReferenceEntity.Schema);
         builder.HasKey(v => v.Id);
         builder.Property(v => v.Id).ValueGeneratedNever();
         builder.Property(v => v.ContentJson).IsRequired();
