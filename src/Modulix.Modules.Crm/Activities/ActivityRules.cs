@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Localization;
+
 namespace Modulix.Modules.Crm.Activities;
 
 /// <summary>
@@ -146,22 +148,22 @@ public static class ActivityRules
         status is not null && StatusesOf(family).Contains(status) ? status : InitialStatus(family);
 
     /// <summary>Geçiş geçerliyse null, değilse kullanıcıya gösterilecek neden.</summary>
-    public static string? CanMove(string family, string from, string to)
+    public static ServerMessage? CanMove(string family, string from, string to)
     {
         from = Normalize(family, from);
         if (from == to)
         {
-            return "Aktivite zaten bu durumda.";
+            return CrmMessages.Activity.AlreadyInStatus;
         }
 
         if (!StatusesOf(family).Contains(to))
         {
-            return "Bu tür aktivite bu duruma geçemez.";
+            return CrmMessages.Activity.StatusNotForType;
         }
 
         return Transitions.TryGetValue((Machine(family), from), out var allowed) && allowed.Contains(to)
             ? null
-            : from == ActivityStatus.Sent ? "Gönderilmiş e-posta değiştirilemez." : "Bu durumdan istenen duruma geçilemez.";
+            : from == ActivityStatus.Sent ? CrmMessages.Activity.SentEmailLocked : CrmMessages.Activity.TransitionNotAllowed;
     }
 
     /// <summary>
@@ -185,35 +187,35 @@ public static class ActivityRules
         ActivityStatus.IsOpen(status) && dueAt is { } due && due < now;
 
     /// <summary>Başlangıç/bitiş ve tüm gün alanlarının tutarlılığı; geçerliyse null.</summary>
-    public static string? ValidateSchedule(
+    public static ServerMessage? ValidateSchedule(
         bool isAllDay, DateTimeOffset? startAt, DateTimeOffset? endAt, DateOnly? startDate, DateOnly? endDate)
     {
         if (isAllDay)
         {
             if (startDate is null)
             {
-                return "Tüm gün etkinliğinde başlangıç tarihi zorunludur.";
+                return CrmMessages.Activity.AllDayStartRequired;
             }
 
             if (startAt is not null || endAt is not null)
             {
-                return "Tüm gün etkinliği saat içermez.";
+                return CrmMessages.Activity.AllDayNoTime;
             }
 
-            return endDate is { } end && end < startDate ? "Bitiş tarihi başlangıçtan önce olamaz." : null;
+            return endDate is { } end && end < startDate ? CrmMessages.Field.EndBeforeStart : null;
         }
 
         if (startDate is not null || endDate is not null)
         {
-            return "Tarih aralığı yalnızca tüm gün etkinliğinde kullanılır.";
+            return CrmMessages.Activity.DateRangeAllDayOnly;
         }
 
         if (endAt is not null && startAt is null)
         {
-            return "Bitiş verilmişse başlangıç da verilmelidir.";
+            return CrmMessages.Activity.EndNeedsStart;
         }
 
-        return startAt is { } start && endAt is { } end2 && end2 <= start ? "Bitiş, başlangıçtan sonra olmalıdır." : null;
+        return startAt is { } start && endAt is { } end2 && end2 <= start ? CrmMessages.Activity.EndAfterStart : null;
     }
 
     /// <summary>İki zaman bloğu çakışıyor mu? Yarı açık aralıklar: bitişi başka bloğun başlangıcına eşit olan çakışmaz.</summary>

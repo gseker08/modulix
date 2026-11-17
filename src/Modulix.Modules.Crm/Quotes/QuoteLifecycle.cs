@@ -357,7 +357,7 @@ internal sealed class QuoteExpiry(
                     var activity = await QuoteActivities.CreateAsync(pipeline, $"{QuoteActivities.ReminderPrefix}{quote.Title} ({quote.QuoteNumber})", due, record.Value!, ct);
                     if (!activity.IsSuccess)
                     {
-                        return RecordResult<bool>.Fail(activity.Error!.Code, activity.Error.Message, activity.Error.FieldErrors);
+                        return RecordResult<bool>.Fail(activity.Error!);
                     }
 
                     await markers.MarkAsync(quote.Id, QuoteMarkerKinds.ExpiryReminderCreated,

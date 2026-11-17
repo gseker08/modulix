@@ -92,8 +92,8 @@ internal sealed class OpportunityReport(
     {
         if (query.To < query.From)
         {
-            return RecordResult<OpportunityReportResult>.Fail(RecordErrorCode.ValidationFailed, "Bitiş tarihi başlangıçtan önce olamaz.",
-                [new RecordFieldError("to", "Bitiş tarihi başlangıçtan önce olamaz.")]);
+            return RecordResult<OpportunityReportResult>.Fail(RecordErrorCode.ValidationFailed, CrmMessages.Field.EndBeforeStart,
+                [new RecordFieldError("to", CrmMessages.Field.EndBeforeStart)]);
         }
 
         var staleDays = (policyProvider is null ? OpportunityPolicy.Default : await policyProvider.GetAsync(cancellationToken)).StaleDays;
@@ -105,7 +105,7 @@ internal sealed class OpportunityReport(
         if (live.Error is not null || closed.Error is not null)
         {
             var error = (live.Error ?? closed.Error)!;
-            return RecordResult<OpportunityReportResult>.Fail(error.Code, error.Message, error.FieldErrors);
+            return RecordResult<OpportunityReportResult>.Fail(error);
         }
 
         // Günler firmanın saat diliminde (kapanış tarihi de öyle damgalanır; satış analizleriyle aynı politika).

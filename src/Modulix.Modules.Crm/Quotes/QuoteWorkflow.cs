@@ -231,7 +231,7 @@ internal sealed class QuoteWorkflow(
         var record = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
         if (!record.IsSuccess)
         {
-            return RecordResult<IReadOnlyList<QuoteHistoryItem>>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors);
+            return RecordResult<IReadOnlyList<QuoteHistoryItem>>.Fail(record.Error!);
         }
 
         var rows = await reader.HistoryAsync(id, cancellationToken);
@@ -243,7 +243,7 @@ internal sealed class QuoteWorkflow(
         var record = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
         if (!record.IsSuccess)
         {
-            return RecordResult<IReadOnlyList<QuoteActionState>>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors);
+            return RecordResult<IReadOnlyList<QuoteActionState>>.Fail(record.Error!);
         }
 
         var granted = await access.GetPermissionsAsync(cancellationToken);
@@ -400,7 +400,7 @@ internal sealed class QuoteWorkflow(
         var record = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
         return record.IsSuccess
             ? RecordResult<QuoteApprovalRequirement>.Ok(await RequirementAsync(record.Value!, cancellationToken))
-            : RecordResult<QuoteApprovalRequirement>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors);
+            : RecordResult<QuoteApprovalRequirement>.Fail(record.Error!);
     }
 
     /// <summary>Genel eşik ayarı (varsa) ve eşleşen kurallar birlikte: biri yeterse onay gerekir.</summary>

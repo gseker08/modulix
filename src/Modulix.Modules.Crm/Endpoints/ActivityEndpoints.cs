@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Hosting;
 using Modulix.Modules.Crm.Activities;
@@ -150,17 +151,17 @@ internal static class ActivityEndpoints
     /// Toplu işlem kayıt başına bağımsızdır: her biri kendi yetki, kapsam ve sürüm denetiminden geçer, biri başarısız olunca
     /// diğerleri etkilenmez. Yanıt başarı sayısını ve başarısız kayıtların nedenini verir; "hepsi ya da hiçbiri" değildir.
     /// </summary>
-    private static async Task<IResult> BulkAsync(BulkActivityRequest request, IActivityWorkflow workflow, IRecordPipeline pipeline, CancellationToken ct)
+    private static async Task<IResult> BulkAsync(
+        BulkActivityRequest request, IActivityWorkflow workflow, IRecordPipeline pipeline, ILocalizer localizer, CancellationToken ct)
     {
         if (request.Items is null or { Count: 0 } || request.Items.Count > MaxBulk)
         {
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Geçersiz istek.",
-                detail: $"Bir seferde 1 ile {MaxBulk} arasında kayıt işlenebilir.");
+            return LocalizedProblems.Problem(StatusCodes.Status400BadRequest, CrmMessages.Activity.BulkInvalidTitle, CrmMessages.Activity.BulkCount(MaxBulk));
         }
 
         if (request.Action is not ("complete" or "cancel" or "reopen" or "reassign" or "reschedule-by-days"))
         {
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Geçersiz istek.", detail: "Bilinmeyen toplu işlem.");
+            return LocalizedProblems.Problem(StatusCodes.Status400BadRequest, CrmMessages.Activity.BulkInvalidTitle, CrmMessages.Activity.BulkUnknownAction);
         }
 
         var failures = new List<BulkActivityFailureDto>();
@@ -174,14 +175,16 @@ internal static class ActivityEndpoints
             }
             else
             {
-                failures.Add(new BulkActivityFailureDto(item.Id, error));
+                // Başarısızlık nedeni yanıt verisidir: okurun dilinde (anahtarsız ileti Türkçe kalır).
+                failures.Add(new BulkActivityFailureDto(item.Id,
+                    await localizer.TextAsync(new ServerMessage(error.Message, error.MessageKey, [.. error.MessageArgs ?? []]), ct)));
             }
         }
 
         return Results.Ok(new BulkActivityResultDto(failures, succeeded));
     }
 
-    private static async Task<string?> RunBulkAsync(
+    private static async Task<RecordError?> RunBulkAsync(
         BulkActivityRequest request, BulkActivityItem item, IActivityWorkflow workflow, IRecordPipeline pipeline, CancellationToken ct)
     {
         RecordError? error;
@@ -199,14 +202,14 @@ internal static class ActivityEndpoints
             case "reassign":
                 error = request.OwnerId is { } owner
                     ? (await workflow.ReassignAsync(item.Id, item.Version, owner, ct)).Error
-                    : new RecordError(RecordErrorCode.ValidationFailed, "Yeni sorumlu zorunludur.");
+                    : new RecordError(RecordErrorCode.ValidationFailed, CrmMessages.Activity.BulkOwnerRequired);
                 break;
             default:
                 error = await ShiftAsync(request, item, workflow, pipeline, ct);
                 break;
         }
 
-        return error?.Message;
+        return error;
     }
 
     private static async Task<RecordError?> ShiftAsync(
@@ -215,7 +218,7 @@ internal static class ActivityEndpoints
         var days = request.Days ?? 0;
         if (days == 0 || Math.Abs(days) > 366)
         {
-            return new RecordError(RecordErrorCode.ValidationFailed, "Kaydırılacak gün sayısı 1-366 arası olmalıdır.");
+            return new RecordError(RecordErrorCode.ValidationFailed, CrmMessages.Activity.BulkShiftDays);
         }
 
         var current = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Activity, item.Id), ct);

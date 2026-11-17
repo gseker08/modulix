@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Domain;
@@ -54,10 +55,10 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
         // Tamamlanma ve sonuç: oluştururken serbest (geçmiş tarihli kayıt), sonra yalnızca eylem servisi.
         Field.Time<Activity>("completedAt", a => a.CompletedAt, (a, v) => a.CompletedAt = v).GatedUpdate(),
         Field.OptionalChoice<Activity>("outcome", CrmModule.ActivityOutcomes.All, a => a.Outcome, (a, v) => a.Outcome = v).GatedUpdate(),
-        Field.Reference<Activity, Company>("companyId", "Firma bulunamadı.", a => a.CompanyId, (a, v) => a.CompanyId = v),
-        Field.Reference<Activity, Contact>("contactId", "Kişi bulunamadı.", a => a.ContactId, (a, v) => a.ContactId = v),
-        Field.Reference<Activity, Opportunity>("opportunityId", "Fırsat bulunamadı.", a => a.OpportunityId, (a, v) => a.OpportunityId = v),
-        Field.Reference<Activity, Lead>("leadId", "Müşteri adayı bulunamadı.", a => a.LeadId, (a, v) => a.LeadId = v),
+        Field.Reference<Activity, Company>("companyId", CrmMessages.Lookup.CompanyNotFound, a => a.CompanyId, (a, v) => a.CompanyId = v),
+        Field.Reference<Activity, Contact>("contactId", CrmMessages.Lookup.ContactNotFound, a => a.ContactId, (a, v) => a.ContactId = v),
+        Field.Reference<Activity, Opportunity>("opportunityId", CrmMessages.Opportunity.NotFound, a => a.OpportunityId, (a, v) => a.OpportunityId = v),
+        Field.Reference<Activity, Lead>("leadId", CrmMessages.Activity.LeadNotFound, a => a.LeadId, (a, v) => a.LeadId = v),
         Field.Owner<Activity>(OwnerField, a => a.OwnerId, (a, v) => a.OwnerId = v).GatedUpdate(),
         Field.Id<Activity>("createdBy", a => a.CreatedBy, (a, v) => a.CreatedBy = v).AsSystem(),
         Field.Text<Activity>("source", 20, a => a.Source, (a, v) => a.Source = v!).AsSystem(),
@@ -250,7 +251,7 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
             var oldFamily = ActivityFamily.Of(list.Find(stored.Type)?.Category);
             if (oldFamily != family && ActivityRules.Normalize(oldFamily, stored.Status) != ActivityRules.InitialStatus(oldFamily))
             {
-                errors.Add(new RecordFieldError("type", "Başlamış ya da kapanmış bir aktivitenin türü başka bir aileye değiştirilemez."));
+                errors.Add(new RecordFieldError("type", CrmMessages.Activity.FamilyChangeLocked));
             }
         }
 
@@ -264,7 +265,7 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
         {
             if (completedAt > DateTimeOffset.UtcNow.AddMinutes(5))
             {
-                errors.Add(new RecordFieldError("completedAt", "Tamamlanma zamanı gelecekte olamaz."));
+                errors.Add(new RecordFieldError("completedAt", CrmMessages.Activity.CompletedInFuture));
             }
 
             entity.Status = ActivityRules.CompletionTarget(family, entity.Outcome);
@@ -280,27 +281,27 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
         }
         else if (entity is { IsAllDay: false, StartAt: { } start, EndAt: { } end } && end - start > TimeSpan.FromDays(MaxTimedBlockDays))
         {
-            errors.Add(new RecordFieldError("endAt", $"Zaman bloğu en fazla {MaxTimedBlockDays} gün olabilir."));
+            errors.Add(new RecordFieldError("endAt", CrmMessages.Activity.TimedBlockMaxDays(MaxTimedBlockDays)));
         }
         else if (entity is { IsAllDay: true, StartDate: { } startDate } && ActivityRules.DaySpan(startDate, entity.EndDate) > MaxAllDaySpanDays)
         {
-            errors.Add(new RecordFieldError("endDate", $"Tüm gün etkinliği en fazla {MaxAllDaySpanDays} gün sürebilir."));
+            errors.Add(new RecordFieldError("endDate", CrmMessages.Activity.AllDayMaxDays(MaxAllDaySpanDays)));
         }
 
         if (entity.TimeZone is { } zone && !TimeZoneInfo.TryFindSystemTimeZoneById(zone, out _))
         {
-            errors.Add(new RecordFieldError("timeZone", "Geçerli bir saat dilimi kimliği girin (ör. Europe/Istanbul)."));
+            errors.Add(new RecordFieldError("timeZone", CrmMessages.Activity.InvalidTimeZone));
         }
 
         if (entity.StartAt is not null && entity.TimeZone is null)
         {
-            errors.Add(new RecordFieldError("timeZone", "Saatli etkinlik için saat dilimi zorunludur."));
+            errors.Add(new RecordFieldError("timeZone", CrmMessages.Activity.TimeZoneRequired));
         }
 
         // Kapanmış aktivitenin zamanı yeniden açılmadan değişmez: tamamlanmış geçmiş korunur.
         if (scheduleChanged && closed && stored is not null && !ActivityStatus.IsOpen(stored.Status))
         {
-            errors.Add(new RecordFieldError("dueAt", "Kapanmış aktivitenin zamanı değiştirilemez; önce yeniden açın."));
+            errors.Add(new RecordFieldError("dueAt", CrmMessages.Activity.ClosedScheduleLocked));
         }
         else if (scheduleChanged)
         {
@@ -336,12 +337,12 @@ internal sealed class ActivityRecordStore(CrmStoreContext context) : CrmRecordSt
     private async Task<List<RecordFieldError>> LinkErrorsAsync(Activity entity, Links? stored, CancellationToken cancellationToken)
     {
         var errors = new List<RecordFieldError>();
-        var checks = new (string Field, string Entity, string Message, Guid? Value, Guid? Old)[]
+        var checks = new (string Field, string Entity, ServerMessage Message, Guid? Value, Guid? Old)[]
         {
-            ("companyId", CrmModule.Entities.Company, "Firma bulunamadı.", entity.CompanyId, stored?.CompanyId),
-            ("contactId", CrmModule.Entities.Contact, "Kişi bulunamadı.", entity.ContactId, stored?.ContactId),
-            ("opportunityId", CrmModule.Entities.Opportunity, "Fırsat bulunamadı.", entity.OpportunityId, stored?.OpportunityId),
-            ("leadId", CrmModule.Entities.Lead, "Müşteri adayı bulunamadı.", entity.LeadId, stored?.LeadId),
+            ("companyId", CrmModule.Entities.Company, CrmMessages.Lookup.CompanyNotFound, entity.CompanyId, stored?.CompanyId),
+            ("contactId", CrmModule.Entities.Contact, CrmMessages.Lookup.ContactNotFound, entity.ContactId, stored?.ContactId),
+            ("opportunityId", CrmModule.Entities.Opportunity, CrmMessages.Opportunity.NotFound, entity.OpportunityId, stored?.OpportunityId),
+            ("leadId", CrmModule.Entities.Lead, CrmMessages.Activity.LeadNotFound, entity.LeadId, stored?.LeadId),
         };
 
         foreach (var (field, entityKey, message, value, old) in checks)

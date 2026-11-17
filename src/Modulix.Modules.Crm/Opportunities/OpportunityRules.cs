@@ -1,4 +1,5 @@
 using System.Globalization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Crm.Domain;
 
 namespace Modulix.Modules.Crm.Opportunities;
@@ -75,29 +76,29 @@ public static class OpportunityRules
     // ---- Durum geçişleri
 
     /// <summary>Aşama değiştirmek için fırsat açık olmalıdır (beklemede ya da kapalıyken değil).</summary>
-    public static string? CanChangeStage(string status) => status switch
+    public static ServerMessage? CanChangeStage(string status) => status switch
     {
         OpportunityStatus.Open => null,
-        OpportunityStatus.OnHold => "Beklemedeki fırsatın aşaması değiştirilemez; önce beklemeden çıkarın.",
-        _ => "Kapanmış fırsatın aşaması değiştirilemez; önce yeniden açın.",
+        OpportunityStatus.OnHold => CrmMessages.Opportunity.StageOnHold,
+        _ => CrmMessages.Opportunity.StageClosed,
     };
 
     /// <summary>Kapatma (kazanma, kaybetme, iptal) ve beklemeye alma yalnızca açık fırsatta yapılır.</summary>
-    public static string? CanClose(string status) => status switch
+    public static ServerMessage? CanClose(string status) => status switch
     {
         OpportunityStatus.Open => null,
-        OpportunityStatus.OnHold => "Beklemedeki fırsat kapatılamaz; önce beklemeden çıkarın.",
-        _ => "Fırsat zaten kapanmış.",
+        OpportunityStatus.OnHold => CrmMessages.Opportunity.CloseOnHold,
+        _ => CrmMessages.Opportunity.AlreadyClosed,
     };
 
-    public static string? CanHold(string status) => status == OpportunityStatus.Open
+    public static ServerMessage? CanHold(string status) => status == OpportunityStatus.Open
         ? null
-        : status == OpportunityStatus.OnHold ? "Fırsat zaten beklemede." : "Kapanmış fırsat beklemeye alınamaz.";
+        : status == OpportunityStatus.OnHold ? CrmMessages.Opportunity.AlreadyOnHold : CrmMessages.Opportunity.HoldClosed;
 
-    public static string? CanResume(string status) => status == OpportunityStatus.OnHold ? null : "Yalnızca beklemedeki fırsat beklemeden çıkarılır.";
+    public static ServerMessage? CanResume(string status) => status == OpportunityStatus.OnHold ? null : CrmMessages.Opportunity.ResumeOnHoldOnly;
 
-    public static string? CanReopen(string status) =>
-        OpportunityStatus.IsClosed(status) ? null : "Yalnızca kapanmış (kazanılan, kaybedilen ya da iptal edilen) fırsat yeniden açılır.";
+    public static ServerMessage? CanReopen(string status) =>
+        OpportunityStatus.IsClosed(status) ? null : CrmMessages.Opportunity.ReopenClosedOnly;
 
     // ---- Aşama ↔ durum tutarlılığı
 

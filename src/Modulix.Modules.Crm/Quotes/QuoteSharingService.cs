@@ -361,7 +361,7 @@ internal sealed class QuoteSharing(
         var record = await pipeline.GetAsync(new RecordRef(Key, quoteId), cancellationToken);
         if (!record.IsSuccess)
         {
-            return new Loaded<T>(null, null, RecordResult<T>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors));
+            return new Loaded<T>(null, null, RecordResult<T>.Fail(record.Error!));
         }
 
         if (anyOf is not null && !(await access.GetPermissionsAsync(cancellationToken)).Overlaps(anyOf))
@@ -395,7 +395,7 @@ internal sealed class QuoteSharing(
         RecordResult<T>.Fail(RecordErrorCode.Conflict, message, [new RecordFieldError("status", message)]);
 
     private static RecordResult<T> Failed<T>(RecordResult<RecordData> result) =>
-        RecordResult<T>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
+        RecordResult<T>.Fail(result.Error!);
 
     private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 

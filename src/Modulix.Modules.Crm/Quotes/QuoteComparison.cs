@@ -123,7 +123,7 @@ internal sealed class QuoteComparisonService(IRecordPipeline pipeline, QuoteRead
             var record = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Quote, id), cancellationToken);
             if (!record.IsSuccess)
             {
-                return RecordResult<QuoteComparison>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors);
+                return RecordResult<QuoteComparison>.Fail(record.Error!);
             }
         }
 

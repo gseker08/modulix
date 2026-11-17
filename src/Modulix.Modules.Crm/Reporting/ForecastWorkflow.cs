@@ -137,7 +137,7 @@ internal sealed class ForecastWorkflow(
         var page = await pipeline.QueryAsync(new RecordQuery(Key, 1, RecordQuery.MaxPageSize, null, filters), cancellationToken);
         return page.IsSuccess
             ? RecordResult<IReadOnlyList<ForecastHeader>>.Ok([.. page.Value!.Items.Select(ToHeader)])
-            : RecordResult<IReadOnlyList<ForecastHeader>>.Fail(page.Error!.Code, page.Error.Message, page.Error.FieldErrors);
+            : RecordResult<IReadOnlyList<ForecastHeader>>.Fail(page.Error!);
     }
 
     public async Task<RecordResult<ForecastDetail>> GetAsync(Guid id, CancellationToken cancellationToken)
@@ -552,7 +552,7 @@ internal sealed class ForecastWorkflow(
     public async Task<RecordResult<bool>> DeleteDraftAsync(Guid id, long? version, CancellationToken cancellationToken)
     {
         var deleted = await pipeline.DeleteAsync(new RecordRef(Key, id), version, cancellationToken);
-        return deleted.IsSuccess ? deleted : RecordResult<bool>.Fail(deleted.Error!.Code, deleted.Error.Message, deleted.Error.FieldErrors);
+        return deleted.IsSuccess ? deleted : RecordResult<bool>.Fail(deleted.Error!);
     }
 
     public async Task<RecordResult<ForecastComparison>> CompareAsync(Guid id, Guid? againstId, CancellationToken cancellationToken)
@@ -934,7 +934,7 @@ internal sealed class ForecastWorkflow(
         var record = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
         return record.IsSuccess
             ? RecordResult<ForecastHeader>.Ok(ToHeader(record.Value!))
-            : RecordResult<ForecastHeader>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors);
+            : RecordResult<ForecastHeader>.Fail(record.Error!);
     }
 
     // ---- Kapsam ve veri
@@ -1002,7 +1002,7 @@ internal sealed class ForecastWorkflow(
     private static decimal? ParseDecimal(string? text) =>
         decimal.TryParse(text, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value) && decimal.Round(value, 2) == value ? value : null;
 
-    private static RecordResult<T> Forward<T>(RecordError error) => RecordResult<T>.Fail(error.Code, error.Message, error.FieldErrors);
+    private static RecordResult<T> Forward<T>(RecordError error) => RecordResult<T>.Fail(error);
 
     private static RecordResult<T> Invalid<T>(string field, string message) =>
         RecordResult<T>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);

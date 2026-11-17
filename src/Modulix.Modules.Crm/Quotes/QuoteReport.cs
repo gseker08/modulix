@@ -106,7 +106,7 @@ internal sealed class QuoteReport(IRecordPipeline pipeline, TimeProvider time, Q
         var failed = new[] { drafts, presentedNow, presented, decided }.FirstOrDefault(p => p.Error is not null);
         if (failed is not null)
         {
-            return RecordResult<QuoteReportResult>.Fail(failed.Error!.Code, failed.Error.Message, failed.Error.FieldErrors);
+            return RecordResult<QuoteReportResult>.Fail(failed.Error!);
         }
 
         var now = time.GetUtcNow();
@@ -177,7 +177,7 @@ internal sealed class QuoteReport(IRecordPipeline pipeline, TimeProvider time, Q
         var decided = await ReadAsync(Merge(owner, "latestOnly", "true", "status", "Accepted", "decidedFrom", Iso(query.From), "decidedTo", Iso(query.To)), cancellationToken);
         if ((presented.Error ?? decided.Error) is { } error)
         {
-            return RecordResult<QuoteMarginReportResult>.Fail(error.Code, error.Message, error.FieldErrors);
+            return RecordResult<QuoteMarginReportResult>.Fail(error);
         }
 
         var rows = presented.Rows.Concat(decided.Rows).GroupBy(r => r.Id).Select(g => g.First()).ToList();

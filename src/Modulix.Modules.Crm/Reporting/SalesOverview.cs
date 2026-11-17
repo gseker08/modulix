@@ -106,7 +106,7 @@ internal sealed class SalesOverview(
         var load = await LoadAsync(query, withTrend: true, cancellationToken);
         if (load.Error is not null)
         {
-            return RecordResult<SalesOverviewResult>.Fail(load.Error.Code, load.Error.Message, load.Error.FieldErrors);
+            return RecordResult<SalesOverviewResult>.Fail(load.Error!);
         }
 
         var facts = load.Rows.Select(r => r.ToFact()).ToList();
@@ -145,7 +145,7 @@ internal sealed class SalesOverview(
         var load = await LoadAsync(query, withTrend: false, cancellationToken);
         if (load.Error is not null)
         {
-            return RecordResult<SalesCardDetail>.Fail(load.Error.Code, load.Error.Message, load.Error.FieldErrors);
+            return RecordResult<SalesCardDetail>.Fail(load.Error!);
         }
 
         var facts = load.Rows.Select(r => r.ToFact()).ToList();

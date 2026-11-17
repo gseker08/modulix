@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
 
@@ -95,20 +96,20 @@ internal sealed class OpportunityContactRecordStore(CrmStoreContext context) : C
         var contactId = FieldNamed("contactId").Parse(values["contactId"]).Value as Guid?;
         if (opportunityId is null)
         {
-            errors.Add(new RecordFieldError("opportunityId", "Bu alan zorunludur."));
+            errors.Add(new RecordFieldError("opportunityId", ServerMessages.Validation.Required));
         }
         else if (!await OpportunityLinks.CanSeeAsync(Context, opportunityId.Value, cancellationToken))
         {
-            errors.Add(new RecordFieldError("opportunityId", "Fırsat bulunamadı."));
+            errors.Add(new RecordFieldError("opportunityId", CrmMessages.Opportunity.NotFound));
         }
 
         if (contactId is null)
         {
-            errors.Add(new RecordFieldError("contactId", "Bu alan zorunludur."));
+            errors.Add(new RecordFieldError("contactId", ServerMessages.Validation.Required));
         }
         else if (!await CompanyLinks.CanSeeContactAsync(Context, contactId.Value, cancellationToken))
         {
-            errors.Add(new RecordFieldError("contactId", "Kişi bulunamadı."));
+            errors.Add(new RecordFieldError("contactId", CrmMessages.Lookup.ContactNotFound));
         }
 
         if (errors.Count > 0)
@@ -128,13 +129,13 @@ internal sealed class OpportunityContactRecordStore(CrmStoreContext context) : C
         var data = Context.Data.Set<OpportunityContact>();
         if (await data.AnyAsync(l => l.OpportunityId == entity.OpportunityId && l.ContactId == entity.ContactId && l.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("contactId", "Bu kişi bu fırsata zaten bağlı."));
+            errors.Add(new RecordFieldError("contactId", CrmMessages.Opportunity.ContactAlreadyLinked));
         }
 
         // Ana irtibat fırsat başına tektir; değiştirmek için önce eskisinin işareti kaldırılır.
         if (entity.IsPrimary && await data.AnyAsync(l => l.OpportunityId == entity.OpportunityId && l.IsPrimary && l.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("isPrimary", "Bu fırsatta zaten bir ana irtibat var; önce onun işaretini kaldırın."));
+            errors.Add(new RecordFieldError("isPrimary", CrmMessages.Opportunity.PrimaryContactExists));
         }
 
         if (errors.Count > 0)
@@ -198,12 +199,12 @@ internal sealed class OpportunityCompetitorRecordStore(CrmStoreContext context) 
         var opportunityId = FieldNamed("opportunityId").Parse(values["opportunityId"]).Value as Guid?;
         if (opportunityId is null)
         {
-            throw new RecordValidationException([new RecordFieldError("opportunityId", "Bu alan zorunludur.")]);
+            throw new RecordValidationException([new RecordFieldError("opportunityId", ServerMessages.Validation.Required)]);
         }
 
         if (!await OpportunityLinks.CanSeeAsync(Context, opportunityId.Value, cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError("opportunityId", "Fırsat bulunamadı.")]);
+            throw new RecordValidationException([new RecordFieldError("opportunityId", CrmMessages.Opportunity.NotFound)]);
         }
 
         entity.OpportunityId = opportunityId.Value;
@@ -214,12 +215,12 @@ internal sealed class OpportunityCompetitorRecordStore(CrmStoreContext context) 
     {
         if (entity.AlternativeCurrency is { } code && (code.Length != Opportunity.CurrencyLength || !code.All(char.IsAsciiLetter)))
         {
-            throw new RecordValidationException([new RecordFieldError("alternativeCurrency", "Üç harfli para birimi kodu girin (ör. TRY).")]);
+            throw new RecordValidationException([new RecordFieldError("alternativeCurrency", CrmMessages.Field.Currency)]);
         }
 
         if (entity.AlternativeAmount is not null && entity.AlternativeCurrency is null)
         {
-            throw new RecordValidationException([new RecordFieldError("alternativeCurrency", "Alternatif teklif tutarı için para birimi girin.")]);
+            throw new RecordValidationException([new RecordFieldError("alternativeCurrency", CrmMessages.Opportunity.AlternativeCurrencyRequired)]);
         }
 
         return Task.CompletedTask;

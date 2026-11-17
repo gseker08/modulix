@@ -138,6 +138,34 @@ public class ServerMessageLanguageTests(ModulixApiFactory factory) : IClassFixtu
         Assert.Equal("Eleme nedeni zorunludur.", inTurkish["title"]!.GetValue<string>());
     }
 
+    /// <summary>Dilim 18d-1b: aktivite toplu işleminin problem yanıtı ve kayıt başına başarısızlık nedeni okurun dilinde.</summary>
+    [Fact]
+    public async Task Crm_bulk_activity_messages_come_in_the_users_language()
+    {
+        var tenant = await CrmTenantAsync();
+        var english = await factory.CreateUserAsync(tenant);
+        var turkish = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [ActivitiesRead], english, turkish);
+        using var englishClient = await LoginAsync(english, "en");
+        using var turkishClient = await LoginAsync(turkish);
+        BulkActivityItem[] items = [new(Guid.NewGuid(), 1)];
+
+        var unknownInEnglish = await englishClient.PostAsJsonAsync("/api/crm/activities/bulk", new BulkActivityRequest("yok", items));
+        var unknownInTurkish = await turkishClient.PostAsJsonAsync("/api/crm/activities/bulk", new BulkActivityRequest("yok", items));
+        Assert.Equal(HttpStatusCode.BadRequest, unknownInEnglish.StatusCode);
+        var englishProblem = await ProblemAsync(unknownInEnglish);
+        var turkishProblem = await ProblemAsync(unknownInTurkish);
+        Assert.Equal(("Invalid request.", "Unknown bulk action."),
+            (englishProblem["title"]!.GetValue<string>(), englishProblem["detail"]!.GetValue<string>()));
+        Assert.Equal(("Geçersiz istek.", "Bilinmeyen toplu işlem."),
+            (turkishProblem["title"]!.GetValue<string>(), turkishProblem["detail"]!.GetValue<string>()));
+
+        var ownerlessInEnglish = await englishClient.PostAsJsonAsync("/api/crm/activities/bulk", new BulkActivityRequest("reassign", items));
+        var ownerlessInTurkish = await turkishClient.PostAsJsonAsync("/api/crm/activities/bulk", new BulkActivityRequest("reassign", items));
+        Assert.Equal("A new owner is required.", (await ownerlessInEnglish.Content.ReadFromJsonAsync<BulkActivityResultDto>())!.Failures.Single().Message);
+        Assert.Equal("Yeni sorumlu zorunludur.", (await ownerlessInTurkish.Content.ReadFromJsonAsync<BulkActivityResultDto>())!.Failures.Single().Message);
+    }
+
     private static async Task<JsonObject> ShortTaxNumberAsync(HttpClient client)
     {
         var response = await client.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Dil Vergi A.Ş.", TaxNumber: "123"));
