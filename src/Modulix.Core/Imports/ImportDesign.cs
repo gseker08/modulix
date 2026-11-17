@@ -151,7 +151,8 @@ public static class ImportDesignRules
         }
 
         // Ek başlık adları: bilinen alana ait, sınır içinde, başka bir alanın adı/anahtarı değil ve iki alanda birden kullanılmıyor.
-        var names = fields.SelectMany(f => new[] { (Name: ImportColumns.Name(f.Label), f.Key), (Name: ImportColumns.Name(f.Key), f.Key) })
+        var names = fields.SelectMany(f => new[] { (Name: ImportColumns.Name(f.Label), f.Key), (Name: ImportColumns.Name(f.Key), f.Key) }
+                .Concat(f.LabelVariants.Select(v => (Name: ImportColumns.Name(v), f.Key))))
             .Append((Name: ImportColumns.Name(ImportErrorReport.ErrorColumn), Key: string.Empty))
             .ToList();
         var claimed = new Dictionary<string, string>(StringComparer.Ordinal);

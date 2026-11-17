@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -32,18 +33,21 @@ internal sealed class ImportDesignService(
     ModuleCatalog catalog,
     IModuleEntitlements entitlements,
     ImportSchema schema,
-    IAuditWriter audit) : IImportDesignService
+    IAuditWriter audit,
+    IRequestLanguage language,
+    ITextCatalog texts) : IImportDesignService
 {
     public async Task<IReadOnlyList<ImportDesignInfo>> ListAsync(CancellationToken cancellationToken)
     {
         var tenant = RequireTenant();
         var enabled = await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken);
         var rows = await db.ImportDesigns.AsNoTracking().ToListAsync(cancellationToken);
+        var bundle = texts.Bundle(await language.GetAsync(cancellationToken));
         var result = new List<ImportDesignInfo>();
         foreach (var (moduleKey, definition) in catalog.ImportDefinitions.Where(i => catalog.IsEnabled(i.ModuleKey, enabled)))
         {
             var fields = await schema.AllFieldsAsync(tenant, definition, cancellationToken);
-            result.Add(ToInfo(definition, fields, rows.SingleOrDefault(r => r.EntityKey == definition.EntityKey)));
+            result.Add(ToInfo(definition, fields, rows.SingleOrDefault(r => r.EntityKey == definition.EntityKey), bundle));
         }
 
         return result;
@@ -101,15 +105,16 @@ internal sealed class ImportDesignService(
             return Conflict();
         }
 
-        return RecordResult<ImportDesignInfo>.Ok(ToInfo(found.Definition, fields, row));
+        return RecordResult<ImportDesignInfo>.Ok(ToInfo(found.Definition, fields, row, texts.Bundle(await language.GetAsync(cancellationToken))));
     }
 
-    private static ImportDesignInfo ToInfo(ImportDefinition definition, IReadOnlyList<ImportField> fields, TenantImportDesign? row)
+    private static ImportDesignInfo ToInfo(
+        ImportDefinition definition, IReadOnlyList<ImportField> fields, TenantImportDesign? row, IReadOnlyDictionary<string, string> bundle)
     {
         var design = row is null ? ImportDesignInput.Default : Parse(row);
         return new ImportDesignInfo(
             definition.EntityKey,
-            definition.DisplayName,
+            ImportLabels.Name(definition, bundle),
             design.Enabled,
             design.RunAutomation,
             [.. fields.Select(f => new ImportDesignField(f.Key, f.Label, f.Required || !design.Excluded.Contains(f.Key), f.Required || design.Required.Contains(f.Key), f.Required) { Aliases = design.AliasesOf(f.Key) })],

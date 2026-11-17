@@ -8,7 +8,7 @@ namespace Modulix.IntegrationTests;
 /// <summary>
 /// ADR-0034 dilim 18c: bütün modüllerin metadata adları üç sözlükte karşılığını taşır, Türkçe sözlük kaynak metinle aynıdır ve sözlükte
 /// hiçbir modülün tanımlamadığı <c>meta.*</c> anahtarı kalmaz. Kapsam: denetim kayıt türleri (tür, alan ve kodda tanımlı seçenek adları;
-/// 18c-1), modül adları, izinlerin açıklaması ve satır adı, hazır roller ("Salt okur" dahil; 18c-2), form düzeni ve firma ayarı adları (18c-3), seçim listeleri, özel alan türleri, lookup ve kayıt devri adları (18c-4).
+/// 18c-1), modül adları, izinlerin açıklaması ve satır adı, hazır roller ("Salt okur" dahil; 18c-2), form düzeni ve firma ayarı adları (18c-3), seçim listeleri, özel alan türleri, lookup ve kayıt devri adları (18c-4), içe aktarma tanımları (tanım, sütun ve sabit seçenek adları; 18c-5).
 /// Veritabanı gerekmez; katalog uygulamanın kaydettiği modüllerden kurulur.
 /// </summary>
 public class MetadataTextsCatalogTests
@@ -17,7 +17,14 @@ public class MetadataTextsCatalogTests
         (IModule[])typeof(Program).Assembly.GetType("ModulixModules", throwOnError: true)!.GetMethod("Create")!.Invoke(null, null)!);
 
     private static IEnumerable<(string Key, string Source)> Names() =>
-        AuditedNames().Concat(AccessNames()).Concat(FormNames()).Concat(SettingNames()).Concat(CustomizationNames());
+        AuditedNames().Concat(AccessNames()).Concat(FormNames()).Concat(SettingNames()).Concat(CustomizationNames()).Concat(ImportNames());
+
+    private static IEnumerable<(string Key, string Source)> ImportNames() =>
+        Catalog.ImportDefinitions.SelectMany(i =>
+            new[] { (MetadataTexts.ImportKey(i.Definition.EntityKey), i.Definition.DisplayName) }
+                .Concat(i.Definition.Fields.SelectMany(f =>
+                    new[] { (MetadataTexts.ImportFieldKey(i.Definition.EntityKey, f.Key), f.Label) }
+                        .Concat(f.Options.Select(o => (MetadataTexts.ImportOptionKey(i.Definition.EntityKey, f.Key, o.Value), o.Label))))));
 
     private static IEnumerable<(string Key, string Source)> CustomizationNames() =>
         Catalog.ChoiceLists.SelectMany(l =>
@@ -90,5 +97,47 @@ public class MetadataTextsCatalogTests
             var orphans = TextCatalog.Load(language).Keys.Where(k => k.StartsWith("meta.", StringComparison.Ordinal) && !known.Contains(k)).ToList();
             Assert.True(orphans.Count == 0, $"{language}: kullanılmayan metadata anahtarı:\n" + string.Join('\n', orphans));
         }
+    }
+
+    /// <summary>
+    /// Dosya başlığı her dildeki adla eşleştiği için (18c-5) bir tanımda iki sütunun herhangi bir dildeki adı ya da anahtarı çakışmamalı;
+    /// çakışırsa başlık yanlış sütuna bağlanabilir. Seçeneklerin adları da sütun içinde tekildir.
+    /// </summary>
+    [Fact]
+    public void Import_column_and_option_names_do_not_collide_across_languages()
+    {
+        var bundles = new[] { "tr", "en", "az" }.Select(TextCatalog.Load).ToList();
+        var problems = new List<string>();
+        foreach (var (_, definition) in Catalog.ImportDefinitions)
+        {
+            var owners = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var field in definition.Fields)
+            {
+                var names = bundles.Select(b => MetadataTexts.Text(b, MetadataTexts.ImportFieldKey(definition.EntityKey, field.Key), field.Label))
+                    .Append(field.Label).Append(field.Key).Select(n => n.Trim().ToLower(System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))).Distinct();
+                foreach (var name in names)
+                {
+                    if (!owners.TryAdd(name, field.Key) && owners[name] != field.Key)
+                    {
+                        problems.Add($"{definition.EntityKey}: '{name}' hem {owners[name]} hem {field.Key}");
+                    }
+                }
+
+                var options = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var option in field.Options)
+                {
+                    foreach (var name in bundles.Select(b => MetadataTexts.Text(b, MetadataTexts.ImportOptionKey(definition.EntityKey, field.Key, option.Value), option.Label))
+                        .Append(option.Label).Append(option.Value).Select(n => n.Trim().ToLower(System.Globalization.CultureInfo.GetCultureInfo("tr-TR"))).Distinct())
+                    {
+                        if (!options.TryAdd(name, option.Value) && options[name] != option.Value)
+                        {
+                            problems.Add($"{definition.EntityKey}.{field.Key}: '{name}' hem {options[name]} hem {option.Value}");
+                        }
+                    }
+                }
+            }
+        }
+
+        Assert.True(problems.Count == 0, string.Join('\n', problems));
     }
 }
