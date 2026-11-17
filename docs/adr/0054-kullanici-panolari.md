@@ -1,6 +1,6 @@
 # ADR-0054: Kullanıcı panoları ve pano bileşenleri
 
-- **Durum:** Kabul edildi, 17 Kasım 2026. Dilim 1a (model, servis, uç noktalar) teslim edildi; ekran dilim 1b'de.
+- **Durum:** Kabul edildi, 17 Kasım 2026. Dilim 1a (model, servis, uç noktalar) ve 1b (ekran) teslim edildi.
 - **Kaynak:** [CRM eksik süreç epikleri](../crm-eksik-surecler-epicleri.md) E2; [öncelik listesi](../oncelikli-isler.md) R2.
 - **İlgili:** ADR-0035 (raporlama ve rapor merkezi), ADR-0020 (tek veritabanı, RLS).
 
@@ -76,6 +76,17 @@ Doğrulama hatası 422 ve alan hatasıyla döner (`name`, `widgets`).
 | 2 | Paylaşım (kullanıcı, rol/departman) ve varsayılan pano |
 | 3 | Canlı yenileme (aralıkla ya da iş olayıyla) |
 | 4 | Ekip/departman kırılımı (ADR-0035 A-11 ile) |
+
+## Ekran (dilim 1b)
+
+- `/raporlar/panolar`: çağıranın panoları (kutu listesi) ve "Pano oluştur" formu. Rapor merkezinin başlığındaki "Panolar" düğmesiyle açılır;
+  ayrı menü girdisi yoktur (rapor merkezi tek ekranlı uygulamadır).
+- `/raporlar/panolar/{id}`: sayı bileşenleri üstte KPI kutuları (`DashKpi`), çubuk bileşenleri altta kartlar (`BarChart`). Yeni sınıf ya da
+  token eklenmedi; CRM panosunun `dash-*` sınıfları kullanılır.
+- Çubuk grafik en fazla 10 grubu çizer; birden çok para birimi varsa yalnızca ilki çizilir ve not düşülür (para birimleri toplanamaz).
+- Düzenleme tek formdur: ad, bileşen satırları (rapor, gösterim, başlık, yukarı/aşağı, kaldır). Kaydedilene kadar pano değişmez. Rapor
+  seçicisi çağıranın görebildiği ilk 100 raporu listeler.
+- Bakan kişinin artık göremediği raporun bileşeni "Bu rapor artık size görünmüyor" yazar ve düzenlemeye alınmaz; kaydedince panodan düşer.
 
 ## Sonuçlar
 

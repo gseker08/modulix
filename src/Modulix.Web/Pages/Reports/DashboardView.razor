@@ -1,0 +1,281 @@
+@page "/raporlar/panolar/{Id:guid}"
+@using System.Net
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+@inject ToastService Toasts
+
+<PageTitle>@(detail?.Summary.Name ?? Texts.Get("reports.dashboards.title")) · Modulix</PageTitle>
+
+@* Pano görünümü ve düzenleme (ADR-0054). Bileşenler birbirinden bağımsız yüklenir; her biri verisini bakan kişinin yetkisiyle alır.
+   Düzenleme adı ve bileşen listesini bütün olarak kaydeder (PUT, sürüm denetimli); kaydedilene kadar hiçbir şey değişmez. *@
+<AuthGate Permission="@ReportAccess.Read">
+    <a class="back-link" href="raporlar/panolar">← @Texts.Get("reports.dashboards.title")</a>
+
+    @if (detail is null)
+    {
+        @if (notFound)
+        {
+            <EmptyState Icon="dashboard" Title="@Texts.Get("reports.dashboards.notFound")" />
+        }
+        else if (message is not null)
+        {
+            <Notice Text="@message" Failed="true" />
+        }
+        else
+        {
+            <LoadingState Kind="LoadingKind.Cards" Rows="3" />
+        }
+    }
+    else
+    {
+        <PageHeader Title="@detail.Summary.Name" Icon="dashboard" Subtitle="@Texts.Get("reports.dashboards.updated", CrmLabels.Time(detail.Summary.UpdatedAt))">
+            @if (!editing && Session.Can(ReportAccess.Manage))
+            {
+                <button type="button" class="btn btn-outline-secondary" @onclick="StartEditAsync">@Texts.Get("reports.dashboards.edit")</button>
+            }
+        </PageHeader>
+
+        <Notice Text="@message" Failed="true" />
+
+        @if (editing)
+        {
+            <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <div class="mb-3">
+                    <label class="form-label" for="dashboard-name">@Texts.Get("reports.dashboards.name")</label>
+                    <input id="dashboard-name" class="form-control" maxlength="120" @bind="name" @bind:event="oninput" />
+                    <FieldError Field="name" Errors="errors" />
+                </div>
+
+                <h2>@Texts.Get("reports.dashboards.widgets")</h2>
+                <FieldError Field="widgets" Errors="errors" />
+                @if (reports is { Count: 0 })
+                {
+                    <EmptyState Compact="true" Icon="file-text" Title="@Texts.Get("reports.dashboards.noReports")">
+                        <a class="btn btn-tonal btn-sm" href="raporlar">@Texts.Get("nav.app.reports")</a>
+                    </EmptyState>
+                }
+
+                @for (var i = 0; i < widgets.Count; i++)
+                {
+                    var index = i;
+                    var widget = widgets[index];
+                    <div class="form-grid" role="group" aria-label="@Texts.Get("reports.dashboards.widgetNumber", index + 1)">
+                        <div>
+                            <label class="form-label" for="widget-report-@index">@Texts.Get("reports.dashboards.widget.report")</label>
+                            <select id="widget-report-@index" class="form-select" @bind="widget.ReportId">
+                                @if (widget.ReportId == Guid.Empty)
+                                {
+                                    <option value="@Guid.Empty">@Texts.Get("support.choose")</option>
+                                }
+                                @foreach (var report in ReportOptions(widget))
+                                {
+                                    <option value="@report.Id">@report.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label" for="widget-kind-@index">@Texts.Get("reports.dashboards.widget.kind")</label>
+                            <select id="widget-kind-@index" class="form-select" @bind="widget.Kind">
+                                <option value="number">@Texts.Get("reports.dashboards.kind.number")</option>
+                                <option value="bar">@Texts.Get("reports.dashboards.kind.bar")</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label" for="widget-title-@index">@Texts.Get("reports.dashboards.widget.title")</label>
+                            <input id="widget-title-@index" class="form-control" maxlength="120" @bind="widget.Title" />
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-ghost btn-sm" disabled="@(index == 0)" @onclick="() => Move(index, -1)">@Texts.Get("reports.dashboards.moveUp")</button>
+                            <button type="button" class="btn btn-ghost btn-sm" disabled="@(index == widgets.Count - 1)" @onclick="() => Move(index, 1)">@Texts.Get("reports.dashboards.moveDown")</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => widgets.RemoveAt(index)">@Texts.Get("reports.dashboards.removeWidget")</button>
+                        </div>
+                    </div>
+                }
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-tonal" disabled="@(widgets.Count >= MaxWidgets || reports is not { Count: > 0 })" @onclick="AddWidget">@Texts.Get("reports.dashboards.addWidget")</button>
+                </div>
+
+                <div class="form-actions">
+                    <ConfirmAction Class="btn btn-outline-danger" Question="@Texts.Get("reports.dashboards.deleteQuestion")" OnConfirm="DeleteAsync">@Texts.Get("reports.dashboards.delete")</ConfirmAction>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelEdit">@Texts.Get("common.cancel")</button>
+                    <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name) || widgets.Any(w => w.ReportId == Guid.Empty))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
+                </div>
+            </form>
+        }
+        else if (detail.Widgets.Count == 0)
+        {
+            <EmptyState Icon="dashboard" Title="@Texts.Get("reports.dashboards.noWidgets")" Text="@(Session.Can(ReportAccess.Manage) ? Texts.Get("reports.dashboards.noWidgetsHelp") : null)" />
+        }
+        else
+        {
+            @if (detail.Widgets.Any(w => w.Kind == "number"))
+            {
+                <div class="dash-kpis">
+                    @foreach (var widget in detail.Widgets.Where(w => w.Kind == "number"))
+                    {
+                        <DashboardWidgetCard @key="widget.Id" DashboardId="detail.Summary.Id" Widget="widget" />
+                    }
+                </div>
+            }
+
+            @if (detail.Widgets.Any(w => w.Kind != "number"))
+            {
+                <div class="dash-grid">
+                    @foreach (var widget in detail.Widgets.Where(w => w.Kind != "number"))
+                    {
+                        <DashboardWidgetCard @key="widget.Id" DashboardId="detail.Summary.Id" Widget="widget" />
+                    }
+                </div>
+            }
+        }
+    }
+</AuthGate>
+
+@code {
+    /// <summary>Sunucudaki <c>Dashboard.MaxWidgets</c> ile aynı.</summary>
+    private const int MaxWidgets = 12;
+
+    [Parameter] public Guid Id { get; set; }
+
+    /// <summary>Yeni oluşturulan pano doğrudan düzenleme kipinde açılır.</summary>
+    [SupplyParameterFromQuery(Name = "duzenle")] public string? EditQuery { get; set; }
+
+    private sealed class EditWidget
+    {
+        public Guid ReportId { get; set; }
+
+        public string Kind { get; set; } = "number";
+
+        public string? Title { get; set; }
+
+        /// <summary>Kayıtlı bileşenin rapor adı; rapor listede yoksa (ör. 100'den fazla rapor) seçenek olarak korunur.</summary>
+        public string? ReportName { get; init; }
+    }
+
+    private DashboardDetailDto? detail;
+    private List<ReportSummaryDto>? reports;
+    private readonly List<EditWidget> widgets = [];
+    private string name = string.Empty;
+    private string? message;
+    private bool notFound;
+    private bool editing;
+    private bool busy;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (detail?.Summary.Id == Id)
+        {
+            return;
+        }
+
+        (detail, editing, message, notFound) = (null, false, null, false);
+        var result = await Api.GetAsync<DashboardDetailDto>($"/api/dashboards/{Id}");
+        detail = result.Value;
+        notFound = result.Status == HttpStatusCode.NotFound;
+        message = notFound ? null : result.Error;
+        if (detail is not null && EditQuery == "1" && Session.Can(ReportAccess.Manage))
+        {
+            await StartEditAsync();
+        }
+    }
+
+    private async Task StartEditAsync()
+    {
+        if (detail is null)
+        {
+            return;
+        }
+
+        if (reports is null)
+        {
+            var result = await Api.GetAsync<ReportPageDto>("/api/reports?scope=all&pageSize=100");
+            reports = result.Value?.Items.OrderBy(r => r.Name, StringComparer.CurrentCulture).ToList() ?? [];
+            message = result.Error;
+        }
+
+        name = detail.Summary.Name;
+        widgets.Clear();
+        // Artık görünmeyen raporun bileşeni düzenlemeye alınmaz (kaydedilemez); kaydedince panodan düşer.
+        widgets.AddRange(detail.Widgets.Where(w => w.ReportName is not null)
+            .Select(w => new EditWidget { ReportId = w.ReportId, Kind = w.Kind, Title = w.Title, ReportName = w.ReportName }));
+        errors = null;
+        editing = true;
+    }
+
+    private IEnumerable<(Guid Id, string Name)> ReportOptions(EditWidget widget)
+    {
+        var options = (reports ?? []).Select(r => (r.Id, r.Name)).ToList();
+        if (widget.ReportName is not null && options.All(o => o.Id != widget.ReportId))
+        {
+            options.Insert(0, (widget.ReportId, widget.ReportName));
+        }
+
+        return options;
+    }
+
+    private void AddWidget() => widgets.Add(new EditWidget { ReportId = reports is { Count: > 0 } ? reports[0].Id : Guid.Empty });
+
+    private void Move(int index, int offset)
+    {
+        var target = index + offset;
+        if (target >= 0 && target < widgets.Count)
+        {
+            (widgets[index], widgets[target]) = (widgets[target], widgets[index]);
+        }
+    }
+
+    private void CancelEdit()
+    {
+        editing = false;
+        errors = null;
+        message = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (detail is null)
+        {
+            return;
+        }
+
+        busy = true;
+        var request = new SaveDashboardRequest(
+            name, [.. widgets.Select(w => new DashboardWidgetRequest(w.ReportId, w.Kind, w.Title))], detail.Summary.Version);
+        var result = await Api.PutAsync<DashboardDetailDto>($"/api/dashboards/{detail.Summary.Id}", request);
+        busy = false;
+        errors = result.FieldErrors;
+        if (result.Value is { } saved)
+        {
+            detail = saved;
+            editing = false;
+            message = null;
+            Toasts.Success(Texts.Get("reports.dashboards.saved"));
+        }
+        else
+        {
+            message = result.FieldErrors.Count > 0 ? null : result.Error;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (detail is null)
+        {
+            return;
+        }
+
+        var result = await Api.DeleteAsync($"/api/dashboards/{detail.Summary.Id}");
+        if (result.IsSuccess)
+        {
+            Toasts.Success(Texts.Get("reports.dashboards.deleted"));
+            Navigation.NavigateTo("raporlar/panolar");
+        }
+        else
+        {
+            message = result.Error;
+        }
+    }
+}

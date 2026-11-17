@@ -1,0 +1,159 @@
+@using System.Net
+@inject ApiClient Api
+
+@* Pano bileşeni (ADR-0054): bağlı raporun sonucunu sayı ya da çubuk grafik olarak gösterir. Veri bileşen başına ayrı istekle gelir ve
+   sunucuda bakan kişinin yetkisiyle hesaplanır; burada yalnızca gösterim vardır. Renk tek başına bilgi taşımaz: her durum metinle yazılır. *@
+@if (Number() is { } number)
+{
+    <DashKpi Label="@Heading" Icon="hash" Tone="teal" Value="@number.Value" Detail="@number.Detail" />
+}
+else
+{
+    <section class="dash-card" aria-label="@Heading">
+        <div class="dash-card-head">
+            <h2>@Heading</h2>
+            @if (Widget.ReportName is not null)
+            {
+                <a href="raporlar/@Widget.ReportId">@Texts.Get("reports.dashboards.widget.openReport")</a>
+            }
+        </div>
+        @if (loading)
+        {
+            <LoadingState Rows="3" />
+        }
+        else if (hidden)
+        {
+            <EmptyState Compact="true" Icon="shield" Title="@Texts.Get("reports.dashboards.widget.hidden")" />
+        }
+        else if (error is not null)
+        {
+            <p class="text-muted" role="alert">@error</p>
+        }
+        else if (result is { Status: not "ok" })
+        {
+            <p class="text-muted" role="status">@Texts.Get("reports.dashboards.widget.failed", result.Issues.FirstOrDefault()?.Message ?? result.Status)</p>
+        }
+        else if (Bars() is { Slices.Count: > 0 } bars)
+        {
+            <BarChart Slices="bars.Slices" Title="@Heading" ValueFormat="@bars.Format" />
+            @if (bars.Note is not null)
+            {
+                <p class="small text-muted mb-0">@bars.Note</p>
+            }
+        }
+        else
+        {
+            <EmptyState Compact="true" Title="@Texts.Get("reports.dashboards.widget.noData")" />
+        }
+    </section>
+}
+
+@code {
+    /// <summary>Çubuk grafikte gösterilen en fazla grup; fazlası not olarak yazılır.</summary>
+    private const int MaxBars = 10;
+
+    [Parameter, EditorRequired] public Guid DashboardId { get; set; }
+
+    [Parameter, EditorRequired] public DashboardWidgetDto Widget { get; set; } = default!;
+
+    private ReportResultDto? result;
+    private bool loading = true;
+    private bool hidden;
+    private string? error;
+    private Guid loadedFor;
+
+    private string Heading => Widget.Title ?? Widget.ReportName ?? Texts.Get("reports.dashboards.widget.hidden");
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == Widget.Id)
+        {
+            return;
+        }
+
+        loadedFor = Widget.Id;
+        (loading, hidden, error, result) = (true, false, null, null);
+        var response = await Api.GetAsync<ReportResultDto>($"/api/dashboards/{DashboardId}/widgets/{Widget.Id}/data");
+        loading = false;
+        result = response.Value;
+        hidden = response.Status == HttpStatusCode.NotFound;
+        error = hidden ? null : response.Error;
+    }
+
+    private int MeasureIndex(ReportResultDto r)
+    {
+        for (var i = 0; i < r.Columns.Count; i++)
+        {
+            if (r.Columns[i].Role == "measure")
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>Sayı bileşeni: özet raporda genel toplamın ilk ölçüsü (para birimi başına), tablo raporunda eşleşen kayıt sayısı.</summary>
+    private (string Value, string? Detail)? Number()
+    {
+        if (Widget.Kind != "number" || result is not { Status: "ok" } r)
+        {
+            return null;
+        }
+
+        var index = MeasureIndex(r);
+        if (!r.IsSummary || index < 0 || r.Totals.Count == 0)
+        {
+            return (r.RowsMatched.ToString("N0", Regional.Numbers), Texts.Get("reports.dashboards.widget.records"));
+        }
+
+        var column = r.Columns[index];
+        if (column.Kind != "money")
+        {
+            // Sayı ölçüsü (kayıt sayısı vb.) toplam satırları para birimine bölünmüş olsa da toplanabilir.
+            var sum = r.Totals.Where(t => index < t.Cells.Count).Sum(t => ReportCenterLabels.Decimal(t.Cells[index]) ?? 0m);
+            return (sum.ToString(sum == Math.Truncate(sum) ? "N0" : "N2", Regional.Numbers), column.Label);
+        }
+
+        var values = r.Totals
+            .Where(t => index < t.Cells.Count)
+            .Select(t => string.IsNullOrEmpty(t.Currency) ? ReportCenterLabels.Cell(t.Cells[index], column) : $"{ReportCenterLabels.Cell(t.Cells[index], column)} {t.Currency}")
+            .ToList();
+        return values.Count == 0 ? ("—", column.Label) : (values[0], values.Count > 1 ? $"{column.Label} · {string.Join(" · ", values.Skip(1))}" : column.Label);
+    }
+
+    /// <summary>Çubuk bileşeni: grupların ilk ölçüsü. Tutar ölçüsünde birden çok para birimi varsa yalnızca ilki çizilir ve not düşülür.</summary>
+    private (IReadOnlyList<ChartSlice> Slices, string Format, string? Note)? Bars()
+    {
+        if (result is not { Status: "ok", IsSummary: true } r || MeasureIndex(r) is var index && index < 0)
+        {
+            return null;
+        }
+
+        // Tutar ölçüsünde para birimleri toplanamaz: yalnızca ilki çizilir. Sayı ölçüsünde para birimine bölünmüş satırlar grup başına toplanır.
+        var currency = r.Columns[index].Kind == "money" ? r.Rows.Select(row => row.Currency).FirstOrDefault(c => !string.IsNullOrEmpty(c)) : null;
+        var rows = r.Rows
+            .Where(row => currency is null || row.Currency == currency)
+            .Select(row => (Title: ReportCenterLabels.RowTitle(r, row with { Currency = null }), Value: index < row.Cells.Count ? ReportCenterLabels.Decimal(row.Cells[index]) : null))
+            .Where(row => row.Value is not null)
+            .GroupBy(row => row.Title)
+            .Select(g => (Title: g.Key, Value: (decimal?)g.Sum(row => row.Value!.Value)))
+            .ToList();
+
+        var notes = new List<string>();
+        if (currency is not null)
+        {
+            notes.Add(Texts.Get("reports.dashboards.widget.currencyNote", currency));
+        }
+
+        if (rows.Count > MaxBars)
+        {
+            notes.Add(Texts.Get("reports.dashboards.widget.moreGroups", MaxBars));
+        }
+
+        return (
+            [.. rows.Take(MaxBars).Select(row => new ChartSlice(row.Title, row.Value!.Value))],
+            r.Columns[index].Kind == "number" && rows.All(row => row.Value == Math.Truncate(row.Value!.Value)) ? "N0" : "N2",
+            notes.Count == 0 ? null : $"{r.Columns[index].Label} · {string.Join(" · ", notes)}");
+    }
+}

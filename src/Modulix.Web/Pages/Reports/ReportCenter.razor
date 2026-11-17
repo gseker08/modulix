@@ -11,6 +11,7 @@
         {
             <a class="btn btn-primary" href="raporlar/yeni">@Texts.Get("reports.center.newReport")</a>
         }
+        <a class="btn btn-outline-secondary" href="raporlar/panolar">@Texts.Get("reports.dashboards.title")</a>
         @if (Session.Can(ReportAccess.Export))
         {
             <a class="btn btn-outline-secondary" href="raporlar/disa-aktarimlar">@Texts.Get("reports.exports.title")</a>
