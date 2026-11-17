@@ -405,5 +405,7 @@ public sealed class OrdersModule : IModule, IModuleEndpoints
         services.AddScoped<IOrderQueries, OrderQueries>();
         services.AddScoped<IOrderSummary, OrderSummary>();
         services.AddScoped<IActivityLinkTarget, OrderLinkTarget>();
+        // Müşteri zaman çizelgesinin sipariş kaynağı (ADR-0053); CRM kayıtlı kaynakları birleştirir.
+        services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, OrderTimelineSource>();
     }
 }

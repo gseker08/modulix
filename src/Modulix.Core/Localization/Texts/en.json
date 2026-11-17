@@ -460,6 +460,8 @@
   "crm.timeline.kind.activity": "Activity",
   "crm.timeline.kind.opportunity": "Opportunity",
   "crm.timeline.kind.quote": "Quote",
+  "crm.timeline.kind.order": "Order",
+  "crm.timeline.kind.other": "Record",
   "crm.company.tabs.aria": "Company sections",
   "crm.company.tickets": "Support tickets",
   "crm.company.won": "Won",
