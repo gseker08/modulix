@@ -176,24 +176,28 @@ public partial class ReportCenterTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ShareReportToAsync(s.Admin, report.Summary.Id)).StatusCode);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ShareDashboardToAsync(s.Admin, dashboard.Summary.Id)).StatusCode);
 
-        // Kapalı iş birimi hedef olamaz.
+        // Kapalı iş birimi hedef olamaz (üyesiz bir birim açılıp kapatılır).
+        Guid closedId;
         using (var scope = factory.OpenScope(s.TenantId))
         {
             var units = scope.ServiceProvider.GetRequiredService<IBusinessUnitService>();
-            Assert.NotNull(await units.SetActiveAsync(a.DealerId, false, CancellationToken.None));
+            var root = (await units.ListAsync(CancellationToken.None)).Single(u => u.ParentId is null);
+            var closed = await units.CreateAsync(root.Id, "Kapalı Birim", null, BusinessUnitKinds.Other, CancellationToken.None);
+            closedId = closed!.Unit.Id;
+            Assert.NotNull(await units.SetActiveAsync(closedId, false, CancellationToken.None));
         }
 
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ShareReportToAsync(s.Admin, report.Summary.Id, Group("businessUnit", a.DealerId))).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ShareReportToAsync(s.Admin, report.Summary.Id, Group("businessUnit", closedId))).StatusCode);
 
         // Hiçbir geçersiz istek paylaşımı değiştirmedi.
         Assert.Equal("private", (await ReadAsync<ReportDetailDto>(await s.Admin.GetAsync($"{Reports}/{report.Summary.Id}"))).Summary.Visibility);
 
-        // Seçenek listesi rol, ekip ve etkin birimleri adıyla verir (kapalı bayi yok).
+        // Seçenek listesi rol, ekip ve etkin birimleri adıyla verir (kapalı birim yok).
         var options = await ReadAsync<List<ShareGroupOptionDto>>(await s.Admin.GetAsync(ShareGroups));
         Assert.Contains(options, o => o.Kind == "role" && o.Id == a.RoleId);
         Assert.Contains(options, o => o.Kind == "team" && o.Id == a.TeamId);
         Assert.Contains(options, o => o is { Kind: "businessUnit", Name: "Marmara Bölge" } && o.Id == a.RegionId);
-        Assert.DoesNotContain(options, o => o.Id == a.DealerId);
+        Assert.DoesNotContain(options, o => o.Id == closedId);
     }
 
     [Fact]
