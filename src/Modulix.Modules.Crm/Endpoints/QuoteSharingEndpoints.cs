@@ -58,7 +58,7 @@ internal static class QuoteSharingEndpoints
         });
 
     private static int Permits(HttpContext context) =>
-        Math.Max(2, context.RequestServices.GetRequiredService<IConfiguration>().GetValue("QuotePublic:RateLimitPerMinute", 60));
+        RateLimits.PerNode(context.RequestServices.GetRequiredService<IConfiguration>(), "QuotePublic:RateLimitPerMinute", 60, minimum: 2);
 
     /// <summary><paramref name="routes"/> host tarafından oturumsuz <c>/api/public</c> grubu olarak gelir (ADR-0046); yollar <c>/api/public/quotes/{tenant}/…</c>.</summary>
     public static void MapPublic(IEndpointRouteBuilder routes)

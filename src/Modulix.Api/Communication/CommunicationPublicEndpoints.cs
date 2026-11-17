@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Communication;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Hosting;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
@@ -25,7 +26,7 @@ internal static class CommunicationPublicEndpoints
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            var permits = Math.Max(2, configuration.GetValue("CommunicationPublic:RateLimitPerMinute", 30));
+            var permits = RateLimits.PerNode(configuration, "CommunicationPublic:RateLimitPerMinute", 30, minimum: 2);
             options.AddPolicy(Policy, context => RateLimitPartition.GetFixedWindowLimiter(
                 $"communication|{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["tenant"]}",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));

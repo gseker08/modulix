@@ -47,7 +47,7 @@ internal static class ContractSignatureEndpoints
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.AddPolicy(WebhookPolicy, context =>
             {
-                var permits = Math.Max(2, context.RequestServices.GetRequiredService<IConfiguration>().GetValue("ContractSignature:RateLimitPerMinute", 120));
+                var permits = RateLimits.PerNode(context.RequestServices.GetRequiredService<IConfiguration>(), "ContractSignature:RateLimitPerMinute", 120, minimum: 2);
                 return RateLimitPartition.GetFixedWindowLimiter(
                     $"signature-webhook|{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["provider"]}",
                     _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });
