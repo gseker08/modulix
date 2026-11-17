@@ -12,6 +12,7 @@ using Modulix.Shared.Files;
 using Modulix.Shared.Logistics;
 using Modulix.Shared.Lookups;
 using Modulix.Shared.Records;
+using Modulix.Shared.Settings;
 using static Modulix.Modules.Logistics.LogisticsModule.Permissions;
 using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
 
@@ -420,6 +421,147 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
     private static async Task<LogisticsActionDto> ActionAsync(HttpClient client, string kind, Guid id, string action) =>
         Assert.Single((await client.GetFromJsonAsync<List<LogisticsActionDto>>($"/api/logistics/{kind}/{id}/actions"))!, x => x.Action == action);
 
+    // --- sefer iptalinde bekleyen masrafların otomatik reddi: firma ayarı (ADR-0038 bölüm 30) ---
+
+    /// <summary>
+    /// Mutlu yol: ayar "Reddedilsin" iken iptal adımının uyarısı masrafların reddedileceğini söyler; iptal bekleyen masrafları "Sefer iptal edildi:
+    /// &lt;gerekçe&gt;" ile reddeder, onaylanmış ve önceden reddedilmiş masraf değişmez, denetim kaydı yazılır. Gerçek harcama yeniden onaya gönderilip
+    /// başka sefere aktarılabilir.
+    /// </summary>
+    [Fact]
+    public async Task With_the_reject_setting_cancelling_a_trip_rejects_its_pending_expenses_and_leaves_decided_ones()
+    {
+        var s = await SetUpAsync();
+        await SetCancelPendingExpensesAsync(s.TenantId, LogisticsModuleSettings.Reject);
+        using var operations = await LoginAsync(s.Operations);
+        using var manager = await LoginAsync(s.Manager);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var pending = await PostAsync(operations, Expenses, Fuel(trip.Id));
+        var approved = await ActAsync(manager, await PostAsync(operations, Expenses, Toll(trip.Id)), "approve");
+        var rejected = await ActAsync(manager, await PostAsync(operations, Expenses, Toll(trip.Id)), "reject", "Fiş eksik");
+
+        Assert.Contains("reddedilir", (await ActionAsync(operations, "trips", trip.Id, "cancel")).Warning);
+        Assert.Equal("cancelled", (await ActAsync(operations, trip, "cancel", "Müşteri vazgeçti", kind: "trips")).Values["status"]!.GetValue<string>());
+
+        var auto = await GetAsync(manager, $"{Expenses}/{pending.Id}");
+        Assert.Equal(("rejected", "Sefer iptal edildi: Müşteri vazgeçti"), (auto.Values["status"]!.GetValue<string>(), auto.Values["statusReason"]!.GetValue<string>()));
+        Assert.Equal("approved", (await GetAsync(manager, $"{Expenses}/{approved.Id}")).Values["status"]!.GetValue<string>());
+        Assert.Equal(rejected.Version, (await GetAsync(manager, $"{Expenses}/{rejected.Id}")).Version);
+        var history = (await manager.GetFromJsonAsync<AuditPageResponse>($"{Expenses}/{pending.Id}/history"))!;
+        Assert.Contains(history.Items, h => h.Changes.Any(c => c.Field == "status"));
+
+        // Gerçek harcamaydı: yeniden onaya gönderilir ve açık sefere aktarılır.
+        var resubmitted = await ActAsync(operations, auto, "resubmit");
+        var open = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var moved = await operations.PostAsJsonAsync($"/api/logistics/expenses/{resubmitted.Id}/transfer",
+            new TransferExpenseRequest(open.Id, resubmitted.Version, "Yakıt yeni seferde kullanıldı"));
+        Assert.True(moved.StatusCode == HttpStatusCode.OK, await moved.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>
+    /// Varsayılan ("Beklemede kalsın") davranış değişmez: ayar seçenekleri ve varsayılanı, iptal sonrası bekleyen masraf beklemede kalır ve uyarı
+    /// onaylayanın karar vereceğini söyler. Geçersiz ayar değeri kaydedilmez (422).
+    /// </summary>
+    [Fact]
+    public async Task By_default_cancelling_a_trip_keeps_pending_expenses_and_an_unknown_setting_value_is_refused()
+    {
+        var s = await SetUpAsync();
+        var admin = await AdminAsync(s.TenantId);
+        using var adminClient = await LoginAsync(admin);
+        var setting = (await adminClient.GetFromJsonAsync<SettingsResponse>("/api/settings"))!.Settings.Single(x => x.Key == LogisticsModuleSettings.Key);
+        Assert.Equal(LogisticsModuleSettings.Keep, setting.Value);
+        var invalid = await adminClient.PutAsJsonAsync("/api/settings",
+            new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { [LogisticsModuleSettings.Key] = new("hepsini-sil", setting.Version) }));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+
+        using var operations = await LoginAsync(s.Operations);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(operations, Expenses, Toll(trip.Id));
+        Assert.Contains("beklemede kalır", (await ActionAsync(operations, "trips", trip.Id, "cancel")).Warning);
+        await ActAsync(operations, trip, "cancel", "Müşteri vazgeçti", kind: "trips");
+
+        Assert.Equal("pending", (await GetAsync(operations, $"{Expenses}/{expense.Id}")).Values["status"]!.GetValue<string>());
+    }
+
+    /// <summary>Tenant izolasyonu: ayar firmaya özgüdür. A'da "Reddedilsin" açıkken B'nin iptali B'nin masrafını reddetmez; A'nın iptali yalnızca A'nınkini.</summary>
+    [Fact]
+    public async Task The_reject_setting_of_one_tenant_does_not_touch_another_tenants_expenses()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        await SetCancelPendingExpensesAsync(a.TenantId, LogisticsModuleSettings.Reject);
+        using var opsA = await LoginAsync(a.Operations);
+        using var opsB = await LoginAsync(b.Operations);
+        var tripA = await PostAsync(opsA, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var tripB = await PostAsync(opsB, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expenseA = await PostAsync(opsA, Expenses, Toll(tripA.Id));
+        var expenseB = await PostAsync(opsB, Expenses, Toll(tripB.Id));
+
+        // A, B'nin seferini iptal edemez (404); B'nin iptali B'nin ayarına (varsayılan) göre davranır.
+        Assert.Equal(HttpStatusCode.NotFound, (await opsA.PostAsJsonAsync($"/api/logistics/trips/{tripB.Id}/actions",
+            new RunLogisticsActionRequest("cancel", tripB.Version, "Yabancı"))).StatusCode);
+        await ActAsync(opsB, tripB, "cancel", "Müşteri vazgeçti", kind: "trips");
+        Assert.Equal("pending", (await GetAsync(opsB, $"{Expenses}/{expenseB.Id}")).Values["status"]!.GetValue<string>());
+
+        await ActAsync(opsA, tripA, "cancel", "Müşteri vazgeçti", kind: "trips");
+        Assert.Equal("rejected", (await GetAsync(opsA, $"{Expenses}/{expenseA.Id}")).Values["status"]!.GetValue<string>());
+        Assert.Equal("pending", (await GetAsync(opsB, $"{Expenses}/{expenseB.Id}")).Values["status"]!.GetValue<string>());
+    }
+
+    /// <summary>
+    /// Yetki: ret kararı firmanın ayarıdır, iptal edenin değil. Sefer yazma izni olmayan iptal edemez ve masraflar değişmez (403); seferi yöneten ama
+    /// masraf izni olmayan kişinin iptali masrafları reddeder ve ona masraf sayısı söylenmez. Ayarı yalnızca yönetici değiştirir (403).
+    /// </summary>
+    [Fact]
+    public async Task Only_a_trip_writer_can_trigger_the_automatic_rejection_and_only_an_admin_can_turn_it_on()
+    {
+        var s = await SetUpAsync();
+        using var operations = await LoginAsync(s.Operations);
+        var settings = (await operations.PutAsJsonAsync("/api/settings", new SaveSettingsRequest(
+            new Dictionary<string, SettingWriteDto> { [LogisticsModuleSettings.Key] = new(LogisticsModuleSettings.Reject, 0) }))).StatusCode;
+        Assert.Equal(HttpStatusCode.Forbidden, settings);
+
+        await SetCancelPendingExpensesAsync(s.TenantId, LogisticsModuleSettings.Reject);
+        using var outsider = await LoginAsync(s.Outsider);
+        using var dispatcher = await LoginAsync(s.Dispatcher);
+        var trip = await PostAsync(operations, Trips, new JsonObject { ["plannedStart"] = Iso(Today) });
+        var expense = await PostAsync(operations, Expenses, Toll(trip.Id));
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await outsider.PostAsJsonAsync($"/api/logistics/trips/{trip.Id}/actions",
+            new RunLogisticsActionRequest("cancel", trip.Version, "Yetkisiz"))).StatusCode);
+        Assert.Equal("pending", (await GetAsync(operations, $"{Expenses}/{expense.Id}")).Values["status"]!.GetValue<string>());
+
+        Assert.Null((await ActionAsync(dispatcher, "trips", trip.Id, "cancel")).Warning);
+        await ActAsync(dispatcher, trip, "cancel", "Araç arızalandı", kind: "trips");
+        Assert.Equal("rejected", (await GetAsync(operations, $"{Expenses}/{expense.Id}")).Values["status"]!.GetValue<string>());
+    }
+
+    private static class LogisticsModuleSettings
+    {
+        public const string Key = Modulix.Modules.Logistics.LogisticsModule.SettingKeys.CancelPendingExpenses;
+        public const string Keep = Modulix.Modules.Logistics.LogisticsModule.CancelPendingExpenseModes.Keep;
+        public const string Reject = Modulix.Modules.Logistics.LogisticsModule.CancelPendingExpenseModes.Reject;
+    }
+
+    /// <summary>Kurulumda açılan firmalar: ayar değiştirecek yönetici kullanıcı bu firmaya eklenir.</summary>
+    private readonly Dictionary<Guid, Modulix.Core.Platform.Tenant> tenants = [];
+
+    private async Task<ModulixUser> AdminAsync(Guid tenantId)
+    {
+        var admin = await factory.CreateUserAsync(tenants[tenantId]);
+        await factory.MakeAdministratorAsync(tenantId, admin);
+        return admin;
+    }
+
+    private async Task SetCancelPendingExpensesAsync(Guid tenantId, string value)
+    {
+        using var admin = await LoginAsync(await AdminAsync(tenantId));
+        var current = (await admin.GetFromJsonAsync<SettingsResponse>("/api/settings"))!.Settings.Single(x => x.Key == LogisticsModuleSettings.Key);
+        var response = await admin.PutAsJsonAsync("/api/settings",
+            new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { [LogisticsModuleSettings.Key] = new(value, current.Version) }));
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+    }
+
     // --- iptal edilen seferin masrafını başka sefere aktarma (ADR-0038 bölüm 28) ---
 
     /// <summary>
@@ -696,6 +838,7 @@ public class LogisticsExpenseTests(ModulixApiFactory factory) : IClassFixture<Mo
     private async Task<Setup> SetUpAsync()
     {
         var tenant = await factory.CreateTenantAsync();
+        tenants[tenant.Id] = tenant;
         await factory.SetModuleAsync(tenant.Id, "logistics", enabled: true);
         var operations = await factory.CreateUserAsync(tenant);
         var manager = await factory.CreateUserAsync(tenant);
