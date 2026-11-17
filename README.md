@@ -586,7 +586,7 @@ X-Lead-Form-Secret: lfs_...                   # yalnızca sunucudan sunucuya (ta
 
 1. `Domain`: entity'ler `ITenantEntity` uygular. `Persistence`: `IEntityTypeConfiguration` sınıfları, şema = modül anahtarı (aksi halde uygulama açılmaz).
 2. `Records`: her entity için bir kayıt deposu (`CrmRecordStore` kalıbı); `IModule.ConfigureServices` içinde kaydedilir.
-3. `Program.cs` → `ModulixModules.Create()` listesine modülü ekleyin, uç noktaları `MapCrmEndpoints` gibi eşleyin.
+3. `Modulix.Api/ModulixModules.cs` → `ModulixModules.Create()` listesine modülü ekleyin; uç noktalar `IModuleEndpoints` ile modülden keşfedilir, `Program.cs` değişmez.
 4. Migration üretin ve her tablo için `TenantIsolationSql.AddTable` ekleyin; eklenmezse `Every_tenant_table_is_protected_by_row_level_security` testi kırılır.
 5. Müşteri, tedarikçi, taşıyıcı ya da kişi tutan modül yeni firma veya kişi tablosu açmaz. Ortak kayda (`Party`, `Person`) bağlanan bir uzantı entity'si yazar, `SharedRecordAccess` ve `SharedRecordReferences` bildirir (CRM'deki `Company` / `CompanyRecordStore` kalıbı, ADR-0006).
 

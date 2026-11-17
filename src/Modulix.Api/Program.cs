@@ -36,15 +36,6 @@ using Modulix.Infrastructure.Events;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Records;
 using Modulix.Infrastructure.Users;
-using Modulix.Modules.Crm;
-using Modulix.Modules.Logistics;
-using Modulix.Modules.Contracts;
-using Modulix.Modules.Orders;
-using Modulix.Modules.Marketing;
-using Modulix.Modules.Warehouse;
-using Modulix.Modules.Fleet;
-using Modulix.Modules.Hr;
-using Modulix.Modules.Support;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -76,7 +67,7 @@ builder.Services.AddModulixTenancy();
 builder.Services.AddModulixServerLocalization();
 
 builder.Services.AddModulixModules(ModulixModules.Create());
-builder.Services.AddScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, Modulix.Api.HostFollowUpActivities>();
+builder.Services.AddModulixModuleBridges();
 
 // Sektör profilleri (Y9c): tanımlar açılışta modül kataloğuna göre doğrulanır.
 builder.Services.AddSingleton(sp => new SectorProfileCatalog(SectorProfiles.Create(), sp.GetRequiredService<ModuleCatalog>()));
@@ -299,13 +290,4 @@ public partial class Program
 {
     /// <summary>Hazır olma denetimine (<c>/health/ready</c>) giren sağlık denetimlerinin etiketi.</summary>
     internal const string ReadyTag = "ready";
-}
-
-/// <summary>
-/// Uygulamanın modülleri. Yeni bir modül eklemek için IModule uygulamasını listeye ekleyin; API, migration
-/// komutu ve 'dotnet ef migrations add' aynı listeyi kullanır.
-/// </summary>
-internal static class ModulixModules
-{
-    public static IModule[] Create() => [new CrmModule(), new LogisticsModule(), new ContractsModule(), new OrdersModule(), new SupportModule(), new MarketingModule(), new WarehouseModule(), new FleetModule(), new HrModule()];
 }

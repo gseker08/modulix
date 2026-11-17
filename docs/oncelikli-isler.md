@@ -58,9 +58,9 @@ Kaynaklar: ADR-0046 ve ADR-0049 durum satırları, `core-mimari-degerlendirme-20
 | C2 | Orta modüllerin uç noktaları modüle (Sipariş, Destek, Marketing) | ADR-0046 dilim 5, H3 | Yapıldı (16 Kasım): Sipariş, Pazarlama, Destek; ortak `ResourceEndpoints`, `IRecordExportAudit`, `CsvText`, `IModulePublicEndpoints`, `IPublicTenantScopes` |
 | C3 | Büyük modüllerin uç noktaları modüle (Sözleşme, CRM; CRM birden çok PR) | ADR-0046 dilim 6, H3 | Yapıldı (16 Kasım): Sözleşme ve CRM'in bütün uç noktaları modülde; `Api/Crm` ve `Api/Contracts` klasörleri kalktı |
 | C4 | Customs'ın Antrepo'ya taşınması ve Core hazır listelerindeki sektör sözlüğü | ADR-0046 dilim 7, H1, H2 | Customs yapıldı (17 Kasım): sözleşmeler `Modulix.Modules.Warehouse.Contracts`'ta, uygulama ve tenant uçları modülde, tablolar başvuru tablosu (`IPlatformReferenceEntity`); `Api`'de modül klasörü kalmadı. Sektör sözlüğü de yapıldı (17 Kasım): `IModule.ChoiceValueContributions`; araç belgeleri Filo'ya, sürücü belgeleri Lojistik'e, antrepo yer türü Depo'ya taşındı |
-| C5 | Seriyi firma yapılandırır (önek, basamak, sıfırlama; yönetim ekranı) | ADR-0049 dilim 2 | Açık kararlar listesinde değil |
+| C5 | Seriyi firma yapılandırır (önek, basamak, sıfırlama; yönetim ekranı) | ADR-0049 dilim 2 | Yapıldı: dilim 2a (API) ve 2b (Yönetim > Belge numaraları); 2c (şirket başına seri) kullanan belge olmadığı için ertelendi |
 | C6 | Modül bağımlılık beyanı (`IModule` + lisans atamada denetim) | H7 | Yapıldı (17 Kasım): ADR-0051, dilim 1 (beyan, katalog doğrulaması, mimari test) ve dilim 2 (hak yazılırken zorunlu bağımlılık denetimi) yapıldı (16 Kasım); dilim 3a (platform: bağımlılık bilgisi, eksik bağımlılık uyarısı, "bağımlılığı eksik firmalar" raporu) ve dilim 3b (firma yöneticisine Yönetim ana sayfasında bilgi) |
-| C7 | Kapanış: `Program.cs`'te modüle özel satır kalmadığını denetleyen mimari test | ADR-0046 dilim 8 | En son |
+| C7 | Kapanış: `Program.cs`'te modüle özel satır kalmadığını denetleyen mimari test | ADR-0046 dilim 8 | Yapıldı (17 Kasım): `HostProgramRulesTests`; modül listesi ve host köprüleri `Api/ModulixModules.cs`'te |
 
 Core'da karar bekleyenler: ADR-0049 dilim 3 (numara biçimi) ve 5 (kur kaynağı), entegrasyon katmanı (E1), belge çıktısı (E2), portal kimliği (E4),
 saklama politikası (E5), yapay zekâ çekirdeği (E6, ADR-0047).
