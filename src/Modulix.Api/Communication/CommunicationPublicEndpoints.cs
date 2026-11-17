@@ -100,7 +100,7 @@ internal static class CommunicationPublicEndpoints
         var view = result.View!;
         return Results.Ok(new PublicCommunicationView(
             view.Channel.ToString(), view.MaskedAddress, view.State, view.CanUnsubscribe, view.CanResubscribe, view.Message, found.Name, view.ExpiresAt,
-            view.Topics?.Select(t => new PublicTopicDto(t.Key, t.Name, t.Subscribed, t.CanChange)).ToList()));
+            view.Topics?.Select(t => new PublicTopicDto(t.Key, t.Name, t.Subscribed, t.CanChange)).ToList(), view.Language));
     }
 
     private static IResult? Guard(HttpContext http)
