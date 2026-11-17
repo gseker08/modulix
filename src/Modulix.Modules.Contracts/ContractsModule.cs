@@ -503,5 +503,7 @@ public sealed class ContractsModule : IModule, IModuleEndpoints, IModulePublicEn
         services.AddScoped<IContractSignatures, ContractSignatures>();
         services.AddScoped<ContractSystemAnchor>();
         services.AddScoped<IActivityLinkTarget, ContractLinkTarget>();
+        // Müşteri zaman çizelgesinin sözleşme kaynağı (ADR-0053); CRM kayıtlı kaynakları birleştirir.
+        services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, ContractTimelineSource>();
     }
 }

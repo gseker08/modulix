@@ -55,6 +55,10 @@
                             {
                                 <span class="badge stage-@OrderLabels.StatusBadge(status)">@OrderLabels.Label(OrderLabels.Statuses, status)</span>
                             }
+                            else if (item.EntityKey == ContractsAccess.ContractEntityKey)
+                            {
+                                <span class="badge stage-@ContractLabels.EffectiveBadge(status)">@ContractLabels.Label(ContractLabels.Effectives, status)</span>
+                            }
                             else if (family is not null)
                             {
                                 <span class="timeline-meta">@ActivityLabels.Status(family, status)</span>
@@ -126,6 +130,7 @@
         CrmEntityKeys.Opportunity => "target",
         CrmEntityKeys.Quote => "file-text",
         OrdersAccess.OrderEntityKey => "package",
+        ContractsAccess.ContractEntityKey => "clipboard-list",
         CrmEntityKeys.Activity => ActivityLabels.Icon(family),
         _ => "clock",
     };
@@ -135,6 +140,7 @@
         CrmEntityKeys.Opportunity => Texts.Get("crm.timeline.kind.opportunity"),
         CrmEntityKeys.Quote => Texts.Get("crm.timeline.kind.quote"),
         OrdersAccess.OrderEntityKey => Texts.Get("crm.timeline.kind.order"),
+        ContractsAccess.ContractEntityKey => Texts.Get("crm.timeline.kind.contract"),
         CrmEntityKeys.Activity => Texts.Get("crm.timeline.kind.activity"),
         // Arayüzün henüz tanımadığı kaynak: satır yine görünür, türü genel adla yazılır.
         _ => Texts.Get("crm.timeline.kind.other"),
@@ -146,6 +152,7 @@
         CrmEntityKeys.Opportunity => $"crm/firsatlar/{item.RecordId}",
         CrmEntityKeys.Quote => $"crm/teklifler/{item.RecordId}",
         OrdersAccess.OrderEntityKey => $"siparisler/{item.RecordId}",
+        ContractsAccess.ContractEntityKey => $"sozlesmeler/{item.RecordId}",
         _ => null,
     };
 }

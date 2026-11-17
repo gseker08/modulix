@@ -1,7 +1,7 @@
 # ADR-0053: Birleşik müşteri zaman çizelgesi
 
 - **Durum:** Dilim 1 (kaynak sözleşmesi, CRM kaynakları, uç nokta, firma kartında sekme) 17 Kasım 2026'da teslim edildi (PR #468).
-  Dilim 2a (Sipariş kaynağı) 17 Kasım 2026'da teslim edilir. Diğer dilimler öneridir.
+  Dilim 2a (Sipariş kaynağı) ve 2b (Sözleşme kaynağı) 17 Kasım 2026'da teslim edilir. Diğer dilimler öneridir.
 - **Kaynak:** [CRM eksik süreç epic listesi](../crm-eksik-surecler-epicleri.md) E9.
 
 ## Bağlam
@@ -64,15 +64,18 @@ token yoktur. Fırsat ve teklif satırı kendi sayfasına bağlanır; "Daha eski
    - **Görünen ad kararı:** sözleşme değişmedi; durum ve tür kodlarının görünen adını arayüz verir (`OrderLabels` gibi modül etiket
      yardımcılarıyla, okurun dilinde). Kaynak görünen ad üretmez: çeviri altyapısı (ADR-0034) arayüzdedir. Arayüzün henüz tanımadığı
      kayıt türü genel adla ("Kayıt") ve bağlantısız çizilir; satır kaybolmaz.
-   - Kalan: Sözleşme, Destek (Destek modülünün CRM sözleşme projesine başvurusu mimari kural tablosuna eklenecek), Pazarlama.
+   - **2b Sözleşme (17 Kasım 2026):** `ContractTimelineSource` (`contracts.contracts`), Sözleşme modülünde. Siparişle aynı kalıp: taraf
+     kimliğiyle süzülür, satırın anı oluşturulma anıdır, tanıtıcı sözleşme numarasıdır; durum olarak yürürlük durumu (`effectiveStatus`)
+     verilir. Sözleşme deposuna `createdBefore` süzgeci eklendi.
+   - Kalan: Destek (Destek modülünün CRM sözleşme projesine başvurusu mimari kural tablosuna eklenecek), Pazarlama.
 3. Kaynak türüne göre süzgeç ve özet şeridi (son temas, açık iş sayısı).
 4. Durum değişikliği satırları (fırsat kazanıldı/kaybedildi, teklif kabul edildi) ve müşteri adayı geçmişi (dönüşen aday).
 
 ## Yapılmadı / sınırlar
 
-- Sözleşme, Destek ve Pazarlama satırları yok (Sipariş dilim 2a ile geldi); firma kartındaki ilişkili sipariş, destek ve kampanya
+- Destek ve Pazarlama satırları yok (Sipariş dilim 2a, Sözleşme dilim 2b ile geldi); firma kartındaki ilişkili sipariş, destek ve kampanya
   listeleri yerinde duruyor.
 - Bir kayıt tek satırdır: fırsatın kazanılması ya da teklifin kabulü ayrı satır üretmez (durum rozeti güncel durumu gösterir).
-- Sipariş satırı (dilim 2a) tarayıcıda gözle doğrulanmadı.
+- Sipariş ve sözleşme satırları (dilim 2a, 2b) tarayıcıda gözle doğrulanmadı.
 - Ekran 17 Kasım 2026'da açık ve koyu temada, 1440 px ve 390 px genişlikte gözle doğrulandı. Yeni sekmeyle firma detayının sekme çubuğu
   1440 px'te taşıyordu; "Fırsatlar ve müşteri adayları" sekmesinin adı "Satış" olarak kısaltıldı (kişi detayında da aynı etiket).

@@ -78,6 +78,8 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
     protected override IReadOnlyDictionary<string, RecordFilter<Contract>> Filters { get; } = new Dictionary<string, RecordFilter<Contract>>
     {
         ["partyId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PartyId == id) : null,
+        // Müşteri zaman çizelgesinin sayfalama imleci (ADR-0053; sınır hariç). Varsayılan sıra oluşturulma anına göre en yeniden eskiyedir.
+        ["createdBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(c => c.CreatedAt < time) : null,
         ["personId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PersonId == id) : null,
         ["previousContractId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.PreviousContractId == id) : null,
         ["sourceQuoteId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(c => c.SourceQuoteId == id) : null,
