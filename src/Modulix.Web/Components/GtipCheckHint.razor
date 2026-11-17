@@ -39,7 +39,7 @@
             return;
         }
 
-        var result = await Api.GetAsync<GtipCheckDto>($"/api/gtip/check?code={Uri.EscapeDataString(code)}");
+        var result = await Api.GetAsync<GtipCheckDto>($"/api/warehouse/gtip/check?code={Uri.EscapeDataString(code)}");
 
         // Yanıt gelene kadar kod değiştiyse eski yanıt gösterilmez.
         if (code == Code)

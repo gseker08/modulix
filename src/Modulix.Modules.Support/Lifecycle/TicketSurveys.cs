@@ -67,8 +67,8 @@ internal sealed class SurveyIssuer(SupportReader reader, IEmailQueue emails, INo
         {
             try
             {
-                // Müşterinin hesabı yoktur: firmanın varsayılan dili (ADR-0034 §6, dilim 18b).
-                var t = await languages.ForExternalAsync(cancellationToken);
+                // Müşterinin hesabı yoktur: talebin kişisinin yazışma dili → firmasınınki → tenant varsayılanı (ADR-0034 §6, dilim 22d).
+                var t = await languages.ForContactAsync(ticket.PersonId, ticket.PartyId, cancellationToken);
                 var greeting = string.IsNullOrWhiteSpace(name) ? t.Get("email.common.greeting-anonymous") : t.Get("email.common.greeting", name.Trim());
                 var body = t.Get("email.survey.body", ticket.Number);
                 var footer = t.Get("email.survey.footer", survey.ExpiresAt.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture));
@@ -93,9 +93,56 @@ internal sealed class SurveyIssuer(SupportReader reader, IEmailQueue emails, INo
 
         context.Data.Set<SatisfactionSurvey>().Add(survey);
     }
+
+    /// <summary>
+    /// Yanıtlanmayan anket için tek hatırlatma (ADR-0024 §4.13). İlk bağlantının belirteci saklanmadığı için hatırlatma ikinci bir belirteç üretir; özeti ankete yazılır ve iki bağlantı da
+    /// aynı anketi açar. Genel adres ayarlı değilse ya da adres geçersizse hiçbir şey yazılmaz (false). Çağıran satırı izlenen (tracked) olarak verir; kaydı zamanlayıcı yapar.
+    /// </summary>
+    public async Task<bool> RemindAsync(SatisfactionSurvey survey, string ticketNumber, string? recipientName, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (tenant.Current is not { } current || string.IsNullOrWhiteSpace(survey.RecipientEmail))
+        {
+            return false;
+        }
+
+        var token = SurveyTokens.New();
+        if (links.Link($"anket/{current.TenantId:N}#t={token}") is not { } url)
+        {
+            return false;
+        }
+
+        try
+        {
+            var t = await languages.ForExternalAsync(cancellationToken);
+            var name = string.IsNullOrWhiteSpace(recipientName) ? null : recipientName.Trim();
+            var greeting = name is null ? t.Get("email.common.greeting-anonymous") : t.Get("email.common.greeting", name);
+            var body = t.Get("email.survey-reminder.body", ticketNumber);
+            var footer = t.Get("email.survey.footer", survey.ExpiresAt.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture));
+            emails.Enqueue(new EmailMessage(survey.RecipientEmail, t.Get("email.survey-reminder.subject", ticketNumber),
+                $"<p>{WebUtility.HtmlEncode(greeting)}</p><p>{WebUtility.HtmlEncode(body)}</p>"
+                + $"<p><a href=\"{WebUtility.HtmlEncode(url)}\">{WebUtility.HtmlEncode(t.Get("email.survey.action"))}</a></p>"
+                + $"<p style=\"color:#666\">{WebUtility.HtmlEncode(footer)}</p>")
+            {
+                ToName = name,
+                TextBody = $"{greeting}\n\n{body}\n\n{t.Get("email.survey.action-text", url)}\n\n{footer}",
+                Reference = $"support.survey-reminder:{survey.Id}",
+                Language = t.Language,
+            });
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+
+        survey.ReminderTokenHash = SurveyTokens.Hash(token);
+        survey.ReminderQueuedAt = now;
+        survey.Touch();
+        return true;
+    }
 }
 
-public sealed record SurveyItem(Guid Id, int Cycle, string State, DateTimeOffset? QueuedAt, DateTimeOffset ExpiresAt, DateTimeOffset? AnsweredAt, int? Rating, string? Comment, DateTimeOffset CreatedAt);
+public sealed record SurveyItem(Guid Id, int Cycle, string State, DateTimeOffset? QueuedAt, DateTimeOffset ExpiresAt, DateTimeOffset? AnsweredAt, int? Rating, string? Comment, DateTimeOffset CreatedAt,
+    DateTimeOffset? ReminderQueuedAt = null);
 
 /// <summary>Talebin anketleri (personel görünümü). Talep okuma izni ve veri kapsamı geçerlidir; belirteç ve alıcı adresi dönmez.</summary>
 public interface ITicketSurveys
@@ -117,7 +164,7 @@ internal sealed class TicketSurveys(IRecordPipeline pipeline, SupportStoreContex
         var rows = await context.Data.Set<SatisfactionSurvey>().AsNoTracking().Where(s => s.TicketId == ticketId).OrderBy(s => s.Cycle).ToListAsync(cancellationToken);
         return RecordResult<IReadOnlyList<SurveyItem>>.Ok([.. rows.Select(s => new SurveyItem(
             s.Id, s.Cycle, s.AnsweredAt is not null ? "Answered" : s.ExpiresAt <= now ? "Expired" : s.QueuedAt is null ? "NotSent" : "Sent",
-            s.QueuedAt, s.ExpiresAt, s.AnsweredAt, s.Rating, s.Comment, s.CreatedAt))]);
+            s.QueuedAt, s.ExpiresAt, s.AnsweredAt, s.Rating, s.Comment, s.CreatedAt, s.ReminderQueuedAt))]);
     }
 }
 
@@ -128,7 +175,9 @@ public enum SurveyPortalError
     Conflict,
 }
 
-public sealed record SurveyPortalView(string State, bool CanAnswer, string? Message, string TicketNumber, string Subject, DateTimeOffset ExpiresAt, int? Rating);
+/// <summary>Anket sayfasının durumu; <see cref="Language"/> müşterinin dilidir (iletiler bu dildedir; sayfa bu dilin sözlüğünü yükler).</summary>
+public sealed record SurveyPortalView(
+    string State, bool CanAnswer, string? Message, string TicketNumber, string Subject, DateTimeOffset ExpiresAt, int? Rating, string Language = "tr");
 
 public sealed record SurveyPortalResult<T>(T? Value, SurveyPortalError? Error, string? Message, IReadOnlyDictionary<string, string>? Fields)
 {
@@ -151,38 +200,43 @@ public interface ISurveyPortal
     Task<SurveyPortalResult<SurveyPortalView>> AnswerAsync(string token, int rating, string? comment, CancellationToken cancellationToken);
 }
 
-internal sealed class SurveyPortal(IRecordPipeline pipeline, TicketWorkflowGate gate, SupportStoreContext context) : ISurveyPortal
+internal sealed class SurveyPortal(IRecordPipeline pipeline, TicketWorkflowGate gate, SupportStoreContext context, IRecipientLanguage languages) : ISurveyPortal
 {
-    private const string Unknown = "Bağlantı geçersiz.";
+    // Bağlantı çözülemeyince alıcı bilinmez: tenant varsayılan dili (ADR-0034 §6).
+    private async Task<string> UnknownAsync(CancellationToken cancellationToken) =>
+        (await languages.ForExternalAsync(cancellationToken)).Get("support.portal.unknown");
 
     public async Task<SurveyPortalResult<SurveyPortalView>> ViewAsync(string token, CancellationToken cancellationToken) =>
         await ResolveAsync(token, cancellationToken) is { } found
-            ? SurveyPortalResult<SurveyPortalView>.Ok(ViewOf(found.Survey, found.Number, found.Subject))
-            : SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.NotFound, Unknown);
+            ? SurveyPortalResult<SurveyPortalView>.Ok(ViewOf(found))
+            : SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.NotFound, await UnknownAsync(cancellationToken));
 
     public async Task<SurveyPortalResult<SurveyPortalView>> AnswerAsync(string token, int rating, string? comment, CancellationToken cancellationToken)
     {
         if (await ResolveAsync(token, cancellationToken) is not { } found)
         {
-            return SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.NotFound, Unknown);
+            return SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.NotFound, await UnknownAsync(cancellationToken));
         }
 
+        var t = found.Texts;
         var survey = found.Survey;
-        var (open, reason) = SurveyRules.CanAnswer(survey.AnsweredAt, survey.ExpiresAt, context.Time.GetUtcNow());
+        var (open, _) = SurveyRules.CanAnswer(survey.AnsweredAt, survey.ExpiresAt, context.Time.GetUtcNow());
         if (!open)
         {
-            return SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.Conflict, reason!);
+            return SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.Conflict, ClosedMessage(survey, t));
         }
 
         if (!SurveyRules.IsValidRating(rating))
         {
-            return SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.Invalid, "Puan 1-5 arasında olmalıdır.", new Dictionary<string, string> { ["rating"] = "Puan 1-5 arasında olmalıdır." });
+            var invalid = t.Get("support.portal.rating-range");
+            return SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.Invalid, invalid, new Dictionary<string, string> { ["rating"] = invalid });
         }
 
         var text = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
         if (text is { } c && c.Length > SatisfactionSurvey.CommentMaxLength)
         {
-            return SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.Invalid, "Yorum çok uzun.", new Dictionary<string, string> { ["comment"] = $"En fazla {SatisfactionSurvey.CommentMaxLength} karakter olabilir." });
+            return SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.Invalid, t.Get("support.portal.comment-too-long"),
+                new Dictionary<string, string> { ["comment"] = t.Get("support.portal.comment-max", SatisfactionSurvey.CommentMaxLength) });
         }
 
         var kind = SurveyRules.IsLow(rating) ? TicketEventKinds.LowSatisfaction : TicketEventKinds.SurveyAnswered;
@@ -208,22 +262,23 @@ internal sealed class SurveyPortal(IRecordPipeline pipeline, TicketWorkflowGate 
                 var updated = await pipeline.UpdateAsync(new RecordCommand(SupportModule.Entities.Ticket, survey.TicketId, values, null) { Reason = $"support.{kind}" }, cancellationToken);
                 if (!updated.IsSuccess)
                 {
-                    return SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.Conflict, "Anket şu an yanıtlanamıyor.");
+                    return SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.Conflict, t.Get("support.portal.unavailable"));
                 }
             }
         }
         catch (DbUpdateException)
         {
-            return SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.Conflict, "Bu anket daha önce yanıtlandı.");
+            return SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.Conflict, t.Get("support.portal.answered"));
         }
 
         var refreshed = await ResolveAsync(token, cancellationToken);
         return refreshed is null
-            ? SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.NotFound, Unknown)
-            : SurveyPortalResult<SurveyPortalView>.Ok(ViewOf(refreshed.Survey, refreshed.Number, refreshed.Subject));
+            ? SurveyPortalResult<SurveyPortalView>.Fail(SurveyPortalError.NotFound, await UnknownAsync(cancellationToken))
+            : SurveyPortalResult<SurveyPortalView>.Ok(ViewOf(refreshed));
     }
 
-    private sealed record Found(SatisfactionSurvey Survey, string Number, string Subject);
+    /// <summary>Çözülmüş anket; <see cref="Texts"/> müşterinin dilidir (talebin kişisi → firması → tenant varsayılanı).</summary>
+    private sealed record Found(SatisfactionSurvey Survey, string Number, string Subject, LocalizedTexts Texts);
 
     private async Task<Found?> ResolveAsync(string token, CancellationToken cancellationToken)
     {
@@ -233,21 +288,29 @@ internal sealed class SurveyPortal(IRecordPipeline pipeline, TicketWorkflowGate 
         }
 
         var hash = SurveyTokens.Hash(token);
-        var survey = await context.Data.Set<SatisfactionSurvey>().AsNoTracking().FirstOrDefaultAsync(s => s.TokenHash == hash, cancellationToken);
+        var survey = await context.Data.Set<SatisfactionSurvey>().AsNoTracking().FirstOrDefaultAsync(s => s.TokenHash == hash || s.ReminderTokenHash == hash, cancellationToken);
         if (survey is null)
         {
             return null;
         }
 
-        var ticket = await context.Data.Set<SupportTicket>().AsNoTracking().Where(t => t.Id == survey.TicketId).Select(t => new { t.Number, t.Subject }).FirstOrDefaultAsync(cancellationToken);
-        return ticket is null ? null : new Found(survey, ticket.Number, ticket.Subject);
+        var ticket = await context.Data.Set<SupportTicket>().AsNoTracking().Where(t => t.Id == survey.TicketId)
+            .Select(t => new { t.Number, t.Subject, t.PersonId, t.PartyId }).FirstOrDefaultAsync(cancellationToken);
+        return ticket is null
+            ? null
+            : new Found(survey, ticket.Number, ticket.Subject, await languages.ForContactAsync(ticket.PersonId, ticket.PartyId, cancellationToken));
     }
 
-    private SurveyPortalView ViewOf(SatisfactionSurvey survey, string number, string subject)
+    private SurveyPortalView ViewOf(Found found)
     {
-        var (open, reason) = SurveyRules.CanAnswer(survey.AnsweredAt, survey.ExpiresAt, context.Time.GetUtcNow());
+        var survey = found.Survey;
+        var (open, _) = SurveyRules.CanAnswer(survey.AnsweredAt, survey.ExpiresAt, context.Time.GetUtcNow());
         var state = survey.AnsweredAt is not null ? "answered" : open ? "open" : "expired";
-        return new SurveyPortalView(state, open, open ? null : reason, number, subject, survey.ExpiresAt, survey.Rating);
+        return new SurveyPortalView(state, open, open ? null : ClosedMessage(survey, found.Texts), found.Number, found.Subject, survey.ExpiresAt, survey.Rating,
+            found.Texts.Language);
     }
+
+    private static string ClosedMessage(SatisfactionSurvey survey, LocalizedTexts t) =>
+        t.Get(survey.AnsweredAt is not null ? "support.portal.answered" : "support.portal.expired");
 }
 

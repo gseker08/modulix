@@ -15,22 +15,23 @@ public sealed record QuoteLinkDelivery(string Status, string? Error, DateTimeOff
 /// alıcıya ulaştığını söylemez. Gönderen/SMTP yapılandırılmamışsa e-posta kuyrukta <c>Pending</c> bekler; hiçbir şey sahte "gönderildi" olmaz.
 /// Geliştirmede SMTP yerel Mailpit'tir, gerçek müşteriye e-posta gitmez.
 /// </summary>
-internal sealed class QuoteDelivery(IEmailQueue emails, IEmailDeliveries deliveries, IRecipientLanguage languages)
+internal sealed class QuoteDelivery(IEmailQueue emails, IEmailDeliveries deliveries)
 {
     public const string ReferencePrefix = "crm.quote-link:";
 
     public static string Reference(Guid linkId) => $"{ReferencePrefix}{linkId:N}";
 
     /// <summary>
-    /// Müşteri bağlantı e-postasını kuyruğa yazar. Müşterinin hesabı olmadığı için e-posta firmanın varsayılan dilindedir (ADR-0034 §6, dilim 18b).
+    /// Müşteri bağlantı e-postasını kuyruğa yazar. E-posta müşterinin dilindedir (<paramref name="t"/>: teklifin kişisi → firması → tenant
+    /// varsayılanı; ADR-0034 §6, dilim 22c).
     /// Başarısızlıkta istisna fırlatır (çağıran yakalar ve durumu <c>Failed</c> gösterir).
     /// </summary>
-    public async Task EnqueueAsync(
+    public Task EnqueueAsync(
         Guid linkId, string to, string? recipientName, string sellerName, string quoteNumber, string quoteTitle, DateTimeOffset? validUntil, string url,
-        CancellationToken cancellationToken)
+        LocalizedTexts t, CancellationToken cancellationToken)
     {
-        LocalizedTexts t = await languages.ForExternalAsync(cancellationToken);
         emails.Enqueue(QuoteEmails.ShareLink(t, to, recipientName, sellerName, quoteNumber, quoteTitle, validUntil, url) with { Reference = Reference(linkId) });
+        return Task.CompletedTask;
     }
 
     /// <summary>Bağlantıların e-posta durumu; e-postası olmayan bağlantı sonuçta yoktur (gönderilmedi).</summary>

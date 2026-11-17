@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Modules;
 using Modulix.Core.Settings;
 
@@ -11,6 +12,15 @@ public class LanguageOptionsTests
     {
         Assert.Equal(["tr", "en", "az"], LanguageOptions.Languages.Select(l => l.Value));
         Assert.All(LanguageOptions.Languages, l => Assert.InRange(l.Value.Length, 1, LanguageOptions.MaxLength));
+    }
+
+    [Fact]
+    public void Correspondence_languages_of_people_and_companies_are_the_interface_languages()
+    {
+        Assert.Equal(LanguageOptions.Languages.Select(l => l.Value), CorrespondenceLanguages.Codes);
+        Assert.Equal(LanguageOptions.MaxLength, CorrespondenceLanguages.MaxLength);
+        Assert.Equal("en", CorrespondenceLanguages.Normalize(" EN "));
+        Assert.Null(CorrespondenceLanguages.Normalize("de"));
     }
 
     [Theory]

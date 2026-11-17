@@ -288,6 +288,40 @@ public class CommunicationPortalTests : IClassFixture<ModulixApiFactory>, IAsync
 
     private static string TokenOf(UnsubscribeLink link) => link.PageUrl[(link.PageUrl.IndexOf("#t=", StringComparison.Ordinal) + 3)..];
 
+    // ---- Dil (ADR-0034 §6, dilim 22e) ----
+
+    [Fact]
+    public async Task The_page_speaks_the_language_of_the_person_with_this_address_and_another_tenants_person_does_not_count()
+    {
+        var tenant = await factory.CreateTenantAsync("Baku Trade");
+        var other = await factory.CreateTenantAsync("Diger Firma");
+        var address = $"leyla-{Guid.NewGuid():N}@b.test";
+        await GrantAsync(tenant, address);
+        await AddPersonAsync(other, address, "en");
+        using var client = Anonymous();
+
+        // Kişi yoksa (yalnızca başka tenant'ta var) tenant varsayılanı: Türkçe.
+        var plain = (await (await PostAsync(client, tenant, "view", TokenOf(await IssueAsync(tenant, address)))).Content.ReadFromJsonAsync<PublicCommunicationView>())!;
+        Assert.Equal("tr", plain.Language);
+
+        // Bu tenant'ta adresi taşıyan kişinin dili (az) kullanılır; iletiler bu dildedir.
+        await AddPersonAsync(tenant, address, "az");
+        var link = await IssueAsync(tenant, address);
+        var view = (await (await PostAsync(client, tenant, "view", TokenOf(link))).Content.ReadFromJsonAsync<PublicCommunicationView>())!;
+        Assert.Equal("az", view.Language);
+        var unsubscribed = (await (await PostAsync(client, tenant, "unsubscribe", TokenOf(link))).Content.ReadFromJsonAsync<PublicCommunicationView>())!;
+        Assert.Equal("Sizə marketinq mesajı göndərilmir.", unsubscribed.Message);
+    }
+
+    private async Task AddPersonAsync(Tenant tenant, string address, string language)
+    {
+        using var scope = OpenScope(tenant.Id);
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        db.Set<Modulix.Core.Contracts.SharedRecords.Person>().Add(
+            new Modulix.Core.Contracts.SharedRecords.Person { FirstName = "Leyla", LastName = "Aliyeva", Email = address, PreferredLanguage = language });
+        await db.SaveChangesAsync();
+    }
+
     private static string Title(string problem) => System.Text.Json.JsonDocument.Parse(problem).RootElement.GetProperty("title").GetString()!;
 
     private async Task<UnsubscribeLink> IssueAsync(Tenant tenant, string address)

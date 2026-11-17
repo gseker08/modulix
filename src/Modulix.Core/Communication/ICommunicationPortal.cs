@@ -23,9 +23,10 @@ public sealed record PortalTopic(string Key, string Name, bool Subscribed, bool 
 
 /// <param name="MaskedAddress">Adres maskelidir ("a***@example.com"): bağlantıyı bulan kişiye adresin tamamı gösterilmez.</param>
 /// <param name="Topics">Açık konular. Yalnızca pazarlama izni açıkken ve engel yokken doludur (konu izin vermez, yalnızca daraltır).</param>
+/// <summary>Tercih merkezinin durumu; <see cref="Language"/> alıcının dilidir (iletiler bu dildedir; sayfa bu dilin sözlüğünü yükler).</summary>
 public sealed record PortalView(
     CommunicationChannel Channel, string MaskedAddress, string State, bool CanUnsubscribe, bool CanResubscribe, string? Message, DateTimeOffset ExpiresAt,
-    IReadOnlyList<PortalTopic>? Topics = null);
+    IReadOnlyList<PortalTopic>? Topics = null, string Language = "tr");
 
 public enum PortalError
 {

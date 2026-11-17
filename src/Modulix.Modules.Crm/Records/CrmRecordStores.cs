@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
@@ -17,7 +18,7 @@ namespace Modulix.Modules.Crm.Records;
 internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmRecordStore<Company>(context), IMergeableRecordStore
 {
     /// <summary>Taraftaki alanlar. Mevcut tarafa bağlanırken boş gönderilenler taraftaki değeri silmez.</summary>
-    private static readonly string[] PartyFields = ["name", "kind", "taxOffice", "taxNumber", "phone", "email", "website", "city", "address", "industry"];
+    private static readonly string[] PartyFields = ["name", "kind", "taxOffice", "taxNumber", "phone", "email", "website", "city", "address", "industry", "preferredLanguage"];
 
     public override string EntityKey => CrmModule.Entities.Company;
 
@@ -37,6 +38,8 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         Field.Text<Company>("website", Party.WebsiteMaxLength, c => c.Party.Website, (c, v) => c.Party.Website = v),
         Field.Text<Company>("city", Party.CityMaxLength, c => c.Party.City, (c, v) => c.Party.City = v),
         Field.Text<Company>("address", Party.AddressMaxLength, c => c.Party.Address, (c, v) => c.Party.Address = v),
+        // Yazışma dili (ADR-0034 §6): dış alıcıya giden içerik ve açık sayfalar bu dilde; boşsa tenant varsayılanı.
+        Field.OptionalChoice<Company>("preferredLanguage", CorrespondenceLanguages.Codes, c => c.Party.PreferredLanguage, (c, v) => c.Party.PreferredLanguage = v),
         // Sektör (ADR-0043) ortak firma kaydındadır (Party.IndustryCode) ve sektör kataloğundan bir koddur. Yazarken kod ya da etkin sektör adı
         // verilebilir (içe aktarma, Lead dönüşümü); kayda her zaman kod yazılır. "industryName" katalogdaki adı verir; "legacyIndustry" katalog
         // öncesi serbest metindir (eşleşmeyen eski değer korunur, sektör seçilince temizlenir).
@@ -275,7 +278,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
     {
         ["name"] = entity.Party.Name, ["kind"] = entity.Party.Kind.ToString(), ["taxOffice"] = entity.Party.TaxOffice, ["taxNumber"] = entity.Party.TaxNumber, ["phone"] = entity.Party.Phone,
         ["email"] = entity.Party.Email, ["website"] = entity.Party.Website, ["city"] = entity.Party.City, ["address"] = entity.Party.Address,
-        ["industry"] = entity.Party.IndustryCode,
+        ["industry"] = entity.Party.IndustryCode, ["preferredLanguage"] = entity.Party.PreferredLanguage,
     };
 }
 
@@ -297,6 +300,8 @@ internal sealed partial class ContactRecordStore(CrmStoreContext context) : CrmR
         Field.Text<Contact>("title", Person.TitleMaxLength, c => c.Person.Title, (c, v) => c.Person.Title = v),
         Field.Email<Contact>("email", Person.EmailMaxLength, c => c.Person.Email, (c, v) => c.Person.Email = v),
         Field.Text<Contact>("phone", Person.PhoneMaxLength, c => c.Person.Phone, (c, v) => c.Person.Phone = v),
+        // Yazışma dili; boşsa firmanın dili, o da yoksa tenant varsayılanı (ADR-0034 §6).
+        Field.OptionalChoice<Contact>("preferredLanguage", CorrespondenceLanguages.Codes, c => c.Person.PreferredLanguage, (c, v) => c.Person.PreferredLanguage = v),
         Field.Owner<Contact>(OwnerField, c => c.OwnerId, (c, v) => c.OwnerId = v),
         Field.Text<Contact>("notes", Company.NotesMaxLength, c => c.Notes, (c, v) => c.Notes = v),
     ];
@@ -537,5 +542,6 @@ internal sealed partial class ContactRecordStore(CrmStoreContext context) : CrmR
     {
         ["firstName"] = entity.Person.FirstName, ["lastName"] = entity.Person.LastName, ["title"] = entity.Person.Title,
         ["email"] = entity.Person.Email, ["phone"] = entity.Person.Phone, ["partyId"] = entity.Person.PartyId?.ToString(),
+        ["preferredLanguage"] = entity.Person.PreferredLanguage,
     };
 }

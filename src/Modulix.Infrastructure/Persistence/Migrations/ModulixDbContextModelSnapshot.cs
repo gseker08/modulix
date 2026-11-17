@@ -1238,6 +1238,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<string>("PreferredLanguage")
+                        .HasMaxLength(5)
+                        .HasColumnType("nvarchar(5)");
+
                     b.Property<string>("RelationshipRoles")
                         .HasMaxLength(1020)
                         .HasColumnType("nvarchar(1020)");
@@ -1362,6 +1366,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("PreferredLanguage")
+                        .HasMaxLength(5)
+                        .HasColumnType("nvarchar(5)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
@@ -1859,7 +1867,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("FormLayouts", "meta");
                 });
 
-            modelBuilder.Entity("Modulix.Core.Customs.GtipCatalogEntry", b =>
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Customs.GtipCatalogEntry", b =>
                 {
                     b.Property<Guid>("VersionId")
                         .HasColumnType("uniqueidentifier");
@@ -1883,7 +1891,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("GtipCatalogEntries", "platform");
                 });
 
-            modelBuilder.Entity("Modulix.Core.Customs.GtipCatalogVersion", b =>
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Customs.GtipCatalogVersion", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
@@ -1917,7 +1925,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("GtipCatalogVersions", "platform");
                 });
 
-            modelBuilder.Entity("Modulix.Core.Customs.RegimeProfile", b =>
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Customs.RegimeProfile", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
@@ -1946,7 +1954,7 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("RegimeProfiles", "platform");
                 });
 
-            modelBuilder.Entity("Modulix.Core.Customs.RegimeProfileVersion", b =>
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Customs.RegimeProfileVersion", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
@@ -3198,6 +3206,77 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "StartsAt");
 
                     b.ToTable("TenantSubscriptions", "platform");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Reporting.Dashboard", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "OwnerUserId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Dashboards", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Reporting.DashboardWidget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DashboardId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ReportId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ReportId");
+
+                    b.HasIndex("TenantId", "DashboardId", "Position");
+
+                    b.ToTable("DashboardWidgets", "core");
                 });
 
             modelBuilder.Entity("Modulix.Core.Reporting.ReportDefinition", b =>
@@ -14327,6 +14406,13 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("nvarchar(254)");
 
+                    b.Property<DateTimeOffset?>("ReminderQueuedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReminderTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -14348,6 +14434,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ReminderTokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Surveys_ReminderToken")
+                        .HasFilter("[ReminderTokenHash] IS NOT NULL");
 
                     b.HasIndex("TenantId", "TokenHash")
                         .IsUnique()
@@ -16495,18 +16586,18 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Modulix.Core.Customs.GtipCatalogEntry", b =>
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Customs.GtipCatalogEntry", b =>
                 {
-                    b.HasOne("Modulix.Core.Customs.GtipCatalogVersion", null)
+                    b.HasOne("Modulix.Modules.Warehouse.Customs.GtipCatalogVersion", null)
                         .WithMany()
                         .HasForeignKey("VersionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Modulix.Core.Customs.RegimeProfileVersion", b =>
+            modelBuilder.Entity("Modulix.Modules.Warehouse.Customs.RegimeProfileVersion", b =>
                 {
-                    b.HasOne("Modulix.Core.Customs.RegimeProfile", null)
+                    b.HasOne("Modulix.Modules.Warehouse.Customs.RegimeProfile", null)
                         .WithMany()
                         .HasForeignKey("ProfileId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -16672,6 +16763,23 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("PlanId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Reporting.DashboardWidget", b =>
+                {
+                    b.HasOne("Modulix.Core.Reporting.Dashboard", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DashboardId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Core.Reporting.ReportDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ReportId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

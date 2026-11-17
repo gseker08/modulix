@@ -38,6 +38,7 @@ public static class CrmForms
             new("phone", "Telefon", "iletisim", 4),
             new("email", "E-posta", "iletisim", 4),
             new("website", "Web sitesi", "iletisim", 4),
+            new("preferredLanguage", "Yazışma dili", "iletisim", 4),
             new("city", "Şehir", "iletisim", 4),
             new("notes", "Notlar", "notlar", 12),
         ]),
@@ -58,6 +59,7 @@ public static class CrmForms
             new("ownerId", "Sorumlu", "kisi", 4),
             new("email", "E-posta (ana)", "iletisim", 6),
             new("phone", "Telefon (ana)", "iletisim", 6),
+            new("preferredLanguage", "Yazışma dili", "iletisim", 6),
             new("notes", "Notlar", "notlar", 12),
         ]),
 

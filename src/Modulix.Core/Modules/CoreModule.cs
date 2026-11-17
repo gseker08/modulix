@@ -248,6 +248,9 @@ public sealed class CoreModule : IModule
         /// <summary>Kayıtlı rapor (ADR-0035, dilim 3); kaydın kimliği raporun kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
         public const string Report = "core.report";
 
+        /// <summary>Kullanıcı panosu (CRM epik E2); kaydın kimliği panonun kimliğidir. Bileşenlerin okunabilir özeti yazılır.</summary>
+        public const string Dashboard = "core.dashboard";
+
         /// <summary>Zamanlanmış rapor (ADR-0035, dilim 4); kaydın kimliği zamanlamanın kimliğidir.</summary>
         public const string ReportSchedule = "core.report-schedule";
 
@@ -698,6 +701,10 @@ public sealed class CoreModule : IModule
                 ["visibility"] = new Dictionary<string, string> { ["Private"] = "Özel", ["Users"] = "Seçilen kullanıcılar", ["Tenant"] = "Firma" },
             },
         },
+        new(AuditedEntityKeys.Dashboard, "Pano", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["widgets"] = "Bileşenler",
+        }, "name"),
         new(AuditedEntityKeys.AuditArchive, "Denetim kaydı arşivi", null, new Dictionary<string, string>
         {
             ["period"] = "Dönem", ["rows"] = "Satır sayısı", ["bytes"] = "Boyut (bayt)", ["sha256"] = "SHA-256 özeti",
@@ -765,20 +772,26 @@ public sealed class CoreModule : IModule
             ["kind"] = "Tür", ["name"] = "Ünvan", ["taxOffice"] = "Vergi dairesi", ["taxNumber"] = "Vergi no", ["phone"] = "Telefon",
             ["email"] = "E-posta", ["website"] = "Web sitesi", ["city"] = "Şehir", ["address"] = "Adres",
             ["relationshipRoles"] = "İlişki rolleri", ["customerSectors"] = "Müşteri sektörü", ["serviceNeeds"] = "Hizmet ihtiyacı",
+            ["preferredLanguage"] = "Yazışma dili",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
                 ["kind"] = new Dictionary<string, string> { ["Organization"] = "Tüzel kişi", ["Individual"] = "Gerçek kişi" },
+                ["preferredLanguage"] = new Dictionary<string, string> { ["tr"] = "Türkçe", ["en"] = "English", ["az"] = "Azərbaycanca" },
             },
         },
         new(SharedEntities.Person, "Kişi (ortak kayıt)", null, new Dictionary<string, string>
         {
             ["firstName"] = "Ad", ["lastName"] = "Soyad", ["email"] = "E-posta", ["phone"] = "Telefon", ["title"] = "Unvan",
-            ["partyId"] = "Firma",
+            ["partyId"] = "Firma", ["preferredLanguage"] = "Yazışma dili",
         })
         {
             TitleFields = ["firstName", "lastName"],
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["preferredLanguage"] = new Dictionary<string, string> { ["tr"] = "Türkçe", ["en"] = "English", ["az"] = "Azərbaycanca" },
+            },
             References = new Dictionary<string, string> { ["partyId"] = SharedEntities.Party },
         },
         new(SharedEntities.PartyRelationship, "Firma ilişkisi (ortak kayıt)", null, new Dictionary<string, string>

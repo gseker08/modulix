@@ -57,7 +57,7 @@ Kaynaklar: ADR-0046 ve ADR-0049 durum satırları, `core-mimari-degerlendirme-20
 | C1 | Kalan modül işlerinin tek zamanlayıcıya taşınması: Destek → `QuoteExpiry` → `ContractJobs` → `MarketingSend` (iş başına bir PR) | ADR-0046 dilim 4, E3 | Yapıldı (15-16 Kasım): Destek, `QuoteExpiry`, `ContractJobs`, `MarketingSend` (kuyruk moduyla) |
 | C2 | Orta modüllerin uç noktaları modüle (Sipariş, Destek, Marketing) | ADR-0046 dilim 5, H3 | Yapıldı (16 Kasım): Sipariş, Pazarlama, Destek; ortak `ResourceEndpoints`, `IRecordExportAudit`, `CsvText`, `IModulePublicEndpoints`, `IPublicTenantScopes` |
 | C3 | Büyük modüllerin uç noktaları modüle (Sözleşme, CRM; CRM birden çok PR) | ADR-0046 dilim 6, H3 | Yapıldı (16 Kasım): Sözleşme ve CRM'in bütün uç noktaları modülde; `Api/Crm` ve `Api/Contracts` klasörleri kalktı |
-| C4 | Customs'ın Antrepo'ya taşınması ve Core hazır listelerindeki sektör sözlüğü | ADR-0046 dilim 7, H1, H2 | C3'ten bağımsız başlanabilir |
+| C4 | Customs'ın Antrepo'ya taşınması ve Core hazır listelerindeki sektör sözlüğü | ADR-0046 dilim 7, H1, H2 | Customs yapıldı (17 Kasım): sözleşmeler `Modulix.Modules.Warehouse.Contracts`'ta, uygulama ve tenant uçları modülde, tablolar başvuru tablosu (`IPlatformReferenceEntity`); `Api`'de modül klasörü kalmadı. Kalan: sektör sözlüğü (H1, H2) |
 | C5 | Seriyi firma yapılandırır (önek, basamak, sıfırlama; yönetim ekranı) | ADR-0049 dilim 2 | Açık kararlar listesinde değil |
 | C6 | Modül bağımlılık beyanı (`IModule` + lisans atamada denetim) | H7 | Yapıldı (17 Kasım): ADR-0051, dilim 1 (beyan, katalog doğrulaması, mimari test) ve dilim 2 (hak yazılırken zorunlu bağımlılık denetimi) yapıldı (16 Kasım); dilim 3a (platform: bağımlılık bilgisi, eksik bağımlılık uyarısı, "bağımlılığı eksik firmalar" raporu) ve dilim 3b (firma yöneticisine Yönetim ana sayfasında bilgi) |
 | C7 | Kapanış: `Program.cs`'te modüle özel satır kalmadığını denetleyen mimari test | ADR-0046 dilim 8 | En son |
@@ -70,7 +70,7 @@ saklama politikası (E5), yapay zekâ çekirdeği (E6, ADR-0047).
 | Sıra | İş | Kaynak | Durum |
 |------|----|--------|-------|
 | R1 | Müşteri adayı skorlama dilim 2–4 (davranış puanı, azalma/eşik olayı, puan açıklaması) | CRM epik E1 | Dilim 1 PR #417'de; birleşince devam |
-| R2 | Canlı panolar ve pano bileşenleri (A-11 ekip/departman kırılımı ile) | CRM epik E2 | Sırada |
+| R2 | Canlı panolar ve pano bileşenleri (A-11 ekip/departman kırılımı ile) | CRM epik E2 | Sürüyor: [ADR-0054](adr/0054-kullanici-panolari.md) dilim 1a (model, servis, uç noktalar; 17 Kasım); sırada 1b ekran |
 | R3 | Birleşik 360° müşteri zaman çizelgesi | CRM epik E9, [ADR-0053](adr/0053-musteri-zaman-cizelgesi.md) | Dilim 1 (kaynak sözleşmesi, CRM kaynakları, sekme) 17 Kasım'da; kalan: diğer modüllerin kaynakları, süzgeç ve özet şeridi |
 | R4 | Çalışma alanı rengi ve rol bazlı menü | CRM epik E8 | Önce tasarım sisteminde "firmanın değiştirebileceği tokenlar" |
 | R5 | Müşteri yolculukları + görsel süreç tasarımcısı (ortak akış modeli) | CRM epik E4, E6 | `fake` sağlayıcıyla |

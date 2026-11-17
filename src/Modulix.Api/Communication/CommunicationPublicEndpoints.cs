@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Communication;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Hosting;
 using Modulix.Core.Platform;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Platform;
@@ -25,7 +26,7 @@ internal static class CommunicationPublicEndpoints
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            var permits = Math.Max(2, configuration.GetValue("CommunicationPublic:RateLimitPerMinute", 30));
+            var permits = RateLimits.PerNode(configuration, "CommunicationPublic:RateLimitPerMinute", 30, minimum: 2);
             options.AddPolicy(Policy, context => RateLimitPartition.GetFixedWindowLimiter(
                 $"communication|{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["tenant"]}",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -99,7 +100,7 @@ internal static class CommunicationPublicEndpoints
         var view = result.View!;
         return Results.Ok(new PublicCommunicationView(
             view.Channel.ToString(), view.MaskedAddress, view.State, view.CanUnsubscribe, view.CanResubscribe, view.Message, found.Name, view.ExpiresAt,
-            view.Topics?.Select(t => new PublicTopicDto(t.Key, t.Name, t.Subscribed, t.CanChange)).ToList()));
+            view.Topics?.Select(t => new PublicTopicDto(t.Key, t.Name, t.Subscribed, t.CanChange)).ToList(), view.Language));
     }
 
     private static IResult? Guard(HttpContext http)

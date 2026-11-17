@@ -84,6 +84,7 @@ public static class ReportEndpoints
 
         MapExports(group);
         MapSchedules(group);
+        app.MapDashboardEndpoints();
         return app;
     }
 
@@ -301,7 +302,7 @@ public static class ReportEndpoints
 
     private static ReportIssueDto ToDto(ReportIssue i) => new(Name(i.Code), i.Field, i.Message, i.Blocking);
 
-    private static ReportResultDto ToDto(ReportResult r) => new(
+    internal static ReportResultDto ToDto(ReportResult r) => new(
         Name(r.Status), r.IsSummary,
         [.. r.Columns.Select(c => new ReportResultColumnDto(c.Key, c.Label, Name(c.Kind), Name(c.Role), c.ExcludedRows))],
         [.. r.Rows.Select(ToDto)], [.. r.Totals.Select(ToDto)], r.RowsRead, r.RowsMatched, r.Truncated, r.RowsLimited, r.Page, r.PageSize, r.GeneratedAt,

@@ -1,7 +1,8 @@
 using System.Text;
-using Modulix.Core.Customs;
+using Modulix.Core.Imports;
+using Modulix.Modules.Warehouse.Contracts.Customs;
 
-namespace Modulix.Core.Tests.Customs;
+namespace Modulix.Modules.Warehouse.Tests.Customs;
 
 /// <summary>GTİP dosyası yorumlama kuralları (ADR-0032 K9): başlık eşleme, hücre normalleştirme, satır hataları, CSV çözümleme.</summary>
 public class GtipImportRulesTests
@@ -134,7 +135,7 @@ public class GtipImportRulesTests
         var text = "GTİP;Tanım;Birim\r\n0902.30.00;\"Siyah çay; fermente \"\"özel\"\"\";kg\r\n18050000;Kakao tozu;\r\n";
         var bytes = new UTF8Encoding(true).GetPreamble().Concat(Encoding.UTF8.GetBytes(text)).ToArray();
 
-        var rows = GtipCsv.Parse(bytes).ToList();
+        var rows = CsvFile.Parse(bytes).ToList();
         var result = GtipImportRules.Interpret(rows);
 
         Assert.Equal(3, rows.Count);
@@ -149,7 +150,7 @@ public class GtipImportRulesTests
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         var bytes = Encoding.GetEncoding(1254).GetBytes("GTİP;Eşya Tanımı\n09023000;Çay, şeker ve ığdır\n");
 
-        var result = GtipImportRules.Interpret(GtipCsv.Parse(bytes));
+        var result = GtipImportRules.Interpret(CsvFile.Parse(bytes));
 
         Assert.Equal("Çay, şeker ve ığdır", Assert.Single(result.Entries).Description);
     }
@@ -160,12 +161,12 @@ public class GtipImportRulesTests
     [InlineData("a\tb\tc", '\t')]
     [InlineData("tek sütun", ';')]
     public void Delimiter_is_detected_from_the_first_line(string text, char expected) =>
-        Assert.Equal(expected, GtipCsv.DetectDelimiter(text));
+        Assert.Equal(expected, CsvFile.DetectDelimiter(text));
 
     [Fact]
     public void Csv_without_trailing_newline_keeps_the_last_row()
     {
-        var rows = GtipCsv.Parse(Encoding.UTF8.GetBytes("GTİP,Tanım\n09023000,Çay")).ToList();
+        var rows = CsvFile.Parse(Encoding.UTF8.GetBytes("GTİP,Tanım\n09023000,Çay")).ToList();
 
         Assert.Equal(2, rows.Count);
         Assert.Equal("Çay", rows[1][1]);

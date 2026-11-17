@@ -183,7 +183,7 @@ public class WarehouseRegimeBindingTests(ModulixApiFactory factory) : IClassFixt
         foreach (var (actor, profile) in createdProfiles)
         {
             using var scope = factory.Services.CreateScope();
-            await scope.ServiceProvider.GetRequiredService<Modulix.Core.Customs.IRegimeProfileAdmin>().SetActiveAsync(actor, profile, false, CancellationToken.None);
+            await scope.ServiceProvider.GetRequiredService<Modulix.Modules.Warehouse.Contracts.Customs.IRegimeProfileAdmin>().SetActiveAsync(actor, profile, false, CancellationToken.None);
         }
     }
 

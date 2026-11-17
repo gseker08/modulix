@@ -25,4 +25,10 @@ public interface IRecipientLanguage
 
     /// <summary>Kullanıcı hesabı olmayan alıcının dili: aktif tenant'ın varsayılanı, yoksa <c>tr</c>.</summary>
     ValueTask<LocalizedTexts> ForExternalAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Kayıttaki kişinin (müşteri yetkilisi) dili (dilim 22b): ortak kişinin yazışma dili → firmanın (verilen taraf, yoksa kişinin
+    /// çalıştığı taraf) yazışma dili → <see cref="ForExternalAsync"/>. Kayıtlar aktif tenant'ta aranır; bulunamayan kimlik atlanır.
+    /// </summary>
+    ValueTask<LocalizedTexts> ForContactAsync(Guid? personId, Guid? partyId, CancellationToken cancellationToken);
 }

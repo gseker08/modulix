@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.SharedRecords;
 
 namespace Modulix.Infrastructure.Persistence.Configurations;
@@ -45,6 +46,7 @@ internal sealed class PartyConfiguration : IEntityTypeConfiguration<Party>
         builder.Property(p => p.RelationshipRoles).HasMaxLength(Party.CodeListMaxLength);
         builder.Property(p => p.CustomerSectors).HasMaxLength(Party.CodeListMaxLength);
         builder.Property(p => p.ServiceNeeds).HasMaxLength(Party.CodeListMaxLength);
+        builder.Property(p => p.PreferredLanguage).HasMaxLength(CorrespondenceLanguages.MaxLength);
         builder.HasIndex(p => new { p.TenantId, p.Name });
 
         // Vergi numarası tenant içinde tekildir; boş bırakılan kayıtlar bu kurala girmez (SQL Server filtreli indeks üretir).
@@ -83,6 +85,7 @@ internal sealed class PersonConfiguration : IEntityTypeConfiguration<Person>
         builder.Property(p => p.Email).HasMaxLength(Person.EmailMaxLength);
         builder.Property(p => p.Phone).HasMaxLength(Person.PhoneMaxLength);
         builder.Property(p => p.Title).HasMaxLength(Person.TitleMaxLength);
+        builder.Property(p => p.PreferredLanguage).HasMaxLength(CorrespondenceLanguages.MaxLength);
         builder.HasIndex(p => new { p.TenantId, p.LastName, p.FirstName });
         builder.HasIndex(p => new { p.TenantId, p.Email });
 

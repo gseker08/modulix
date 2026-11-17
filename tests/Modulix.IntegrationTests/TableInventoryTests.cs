@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Infrastructure.Persistence;
 
@@ -47,9 +48,9 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
         ["platform.RelationshipRoles"] = "Firma ilişki rolü kataloğu (ADR-0029 K9): TenantId yok; platform yöneticisi yönetir.",
         ["platform.Industries"] = "Sektör kataloğu (ADR-0043): firma sektörü seçim listesi, TenantId yok; platform yöneticisi yönetir, silinmez pasife alınır.",
         ["platform.ActivityNodeCapabilities"] ="Faaliyet–yetenek eşlemesi (ADR-0029): TenantId yok.",
-        ["platform.GtipCatalogVersions"] = "GTİP kataloğu sürümü (ADR-0032 K9): Bakanlık tarifesi, TenantId yok; platform yöneticisi yönetir.",
+        ["platform.GtipCatalogVersions"] = "GTİP kataloğu sürümü (ADR-0032 K9): Bakanlık tarifesi, TenantId yok; platform yöneticisi yönetir. Depo modülünün başvuru tablosu (ADR-0046 bölüm 6).",
         ["platform.GtipCatalogEntries"] = "GTİP kataloğu satırı (ADR-0032 K9): Bakanlık tarifesi, TenantId yok.",
-        ["platform.RegimeProfiles"] = "Rejim profili (ADR-0032 K16): platform paketi, TenantId yok; platform yöneticisi yönetir.",
+        ["platform.RegimeProfiles"] = "Rejim profili (ADR-0032 K16): platform paketi, TenantId yok; platform yöneticisi yönetir. Depo modülünün başvuru tablosu (ADR-0046 bölüm 6).",
         ["platform.RegimeProfileVersions"] = "Rejim profili sürümü (ADR-0032 K16): sürümlü paket içeriği, TenantId yok.",
         ["platform.RulePackages"] = "Alan kuralı paketi (ADR-0029 K8): platform kataloğu, TenantId yok.",
         ["platform.RulePackageVersions"] = "Alan kuralı paketi sürümü (ADR-0029 K8): platform kataloğu, TenantId yok.",
@@ -93,6 +94,42 @@ public class TableInventoryTests(ModulixApiFactory factory) : IClassFixture<Modu
             .ToList();
 
         Assert.True(mismatched.Count == 0, "Şeması tenant sınıfıyla uyuşmayan entity: " + string.Join(", ", mismatched));
+    }
+
+    /// <summary>
+    /// Modül başvuru tabloları (ADR-0046 bölüm 6): her tablo ya tenant tablosu, ya platform tablosu, ya da bir modülün başvuru tablosudur. Başvuru
+    /// tablosu (<see cref="IPlatformReferenceEntity"/>) platform şemasındadır, <c>TenantId</c> taşımaz ve muaf listede gerekçesiyle yazılıdır.
+    /// </summary>
+    [Fact]
+    public async Task Module_reference_tables_are_tenantless_platform_tables()
+    {
+        using var scope = factory.OpenScope((await factory.CreateTenantAsync()).Id);
+        var references = scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Model.GetEntityTypes()
+            .Where(t => t.GetTableName() is not null && typeof(IPlatformReferenceEntity).IsAssignableFrom(t.ClrType))
+            .ToList();
+
+        Assert.NotEmpty(references);
+        var problems = new List<string>();
+        foreach (var type in references)
+        {
+            var table = $"{type.GetSchema()}.{type.GetTableName()}";
+            if (type.GetSchema() != DatabaseSchemas.Platform || type.GetSchema() != IPlatformReferenceEntity.Schema)
+            {
+                problems.Add($"{type.ClrType.Name} ({table}): başvuru tablosu platform şemasında olmalı.");
+            }
+
+            if (typeof(ITenantEntity).IsAssignableFrom(type.ClrType) || type.FindProperty(nameof(ITenantEntity.TenantId)) is not null)
+            {
+                problems.Add($"{type.ClrType.Name} ({table}): başvuru tablosu TenantId taşıyamaz.");
+            }
+
+            if (!ExemptTables.ContainsKey(table))
+            {
+                problems.Add($"{type.ClrType.Name} ({table}): muaf listede (ExemptTables) gerekçesiyle yazılı değil.");
+            }
+        }
+
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
 
     /// <summary>

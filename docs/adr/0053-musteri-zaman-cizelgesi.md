@@ -73,4 +73,6 @@ token yoktur. Fırsat ve teklif satırı kendi sayfasına bağlanır; "Daha eski
 - Sözleşme, Destek ve Pazarlama satırları yok (Sipariş dilim 2a ile geldi); firma kartındaki ilişkili sipariş, destek ve kampanya
   listeleri yerinde duruyor.
 - Bir kayıt tek satırdır: fırsatın kazanılması ya da teklifin kabulü ayrı satır üretmez (durum rozeti güncel durumu gösterir).
-- Ekran tarayıcıda açık ve koyu temada gözle doğrulanmadı.
+- Sipariş satırı (dilim 2a) tarayıcıda gözle doğrulanmadı.
+- Ekran 17 Kasım 2026'da açık ve koyu temada, 1440 px ve 390 px genişlikte gözle doğrulandı. Yeni sekmeyle firma detayının sekme çubuğu
+  1440 px'te taşıyordu; "Fırsatlar ve müşteri adayları" sekmesinin adı "Satış" olarak kısaltıldı (kişi detayında da aynı etiket).
