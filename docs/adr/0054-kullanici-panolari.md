@@ -1,6 +1,6 @@
 # ADR-0054: Kullanıcı panoları ve pano bileşenleri
 
-- **Durum:** Kabul edildi, 17 Kasım 2026. Dilim 1a (model, servis, uç noktalar), 1b (ekran) ve 2 (paylaşım, varsayılan pano) teslim edildi.
+- **Durum:** Kabul edildi, 17 Kasım 2026. Dilim 1a (model, servis, uç noktalar), 1b (ekran), 2 (paylaşım, varsayılan pano) ve 3 (aralıklı yenileme) teslim edildi.
 - **Kaynak:** [CRM eksik süreç epikleri](../crm-eksik-surecler-epicleri.md) E2; [öncelik listesi](../oncelikli-isler.md) R2.
 - **İlgili:** ADR-0035 (raporlama ve rapor merkezi), ADR-0020 (tek veritabanı, RLS).
 
@@ -111,7 +111,7 @@ Doğrulama hatası 422 ve alan hatasıyla döner (`name`, `widgets`, `users`). P
 | 1a | Model, servis, uç noktalar, sayı ve çubuk türleri (bu ADR) |
 | 1b | Ekran: pano listesi, pano görünümü, bileşen ekleme ve sıralama |
 | 2 | Paylaşım (özel, seçilen kullanıcılar, firma) ve kişiye özel varsayılan pano (teslim edildi) |
-| 3 | Canlı yenileme (aralıkla ya da iş olayıyla) |
+| 3 | Canlı yenileme: aralıkla (teslim edildi, 17.11.2026); iş olayıyla yenileme (sunucudan itme) ayrı karar ister, kodlanmadı |
 | 4 | Ekip/departman kırılımı (ADR-0035 A-11 ile); rol ve iş birimi hedefli paylaşım (rapor ve pano birlikte, bölüm 6) |
 
 ## Ekran (dilim 1b)
@@ -136,6 +136,14 @@ Doğrulama hatası 422 ve alan hatasıyla döner (`name`, `widgets`, `users`). P
   `report-member-list`) ve paylaşımın raporları paylaşmadığını söyler.
 - Pano listesinde karo, durumunu metin satırıyla verir ("★ Varsayılan", "Paylaşılan · Sahibi: …", kendi panosunda "Paylaşım: …").
   Karo içinde rozet sınıfı kullanılmadı: `.tile span` kuralı rozet rengini ezer, yeni CSS yazmak yerine metin tercih edildi.
+
+## Ekran (dilim 3)
+
+- Pano görünümünde "Otomatik yenileme" seçicisi (Kapalı, her dakika, 5 dakikada bir, 15 dakikada bir). Seçim yalnızca açık sayfa içindir,
+  kaydedilmez; varsayılan kapalıdır. Her turda bileşenler kendi verisini yeniden ister (ayrı istek, bakan kişinin yetkisiyle) ve eski veri
+  yanıt gelene kadar ekranda kalır; son yenileme saati yazılır. Düzenleme açıkken tur atlanır. Sunucu tarafı değişmedi.
+- İş olayıyla yenileme (kayıt değişince pano güncellensin) sunucudan istemciye itme altyapısı gerektirir; bugün böyle bir kanal yok,
+  karar istediği için kodlanmadı.
 
 ## Sonuçlar
 
