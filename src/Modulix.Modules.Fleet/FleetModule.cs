@@ -174,6 +174,19 @@ public sealed class FleetModule : IModule
         new(Entities.Vehicle, CredentialCategories.Vehicle, "Araç", Permissions.VehiclesRead),
     ];
 
+    /// <summary>Araç belgelerinin hazır türleri Core'un süreli belge türü listesine eklenir (H2): sektör sözlüğü Core'da değil, aracın sahibi modüldedir.</summary>
+    IReadOnlyList<ChoiceValueContribution> IModule.ChoiceValueContributions { get; } =
+    [
+        new(CredentialEntities.TypeList,
+        [
+            new("Inspection", "Araç muayenesi", CredentialCategories.Vehicle),
+            new("TrafficInsurance", "Trafik sigortası", CredentialCategories.Vehicle),
+            new("Casco", "Kasko", CredentialCategories.Vehicle),
+            new("ExhaustEmission", "Egzoz emisyon ölçümü", CredentialCategories.Vehicle),
+            new("TachographCalibration", "Takograf kalibrasyonu", CredentialCategories.Vehicle),
+        ]),
+    ];
+
     /// <summary>Araç formunun varsayılan düzeni; firma Form tasarımı ekranından özelleştirir (ADR-0021).</summary>
     IReadOnlyList<FormDefinition> IModule.Forms => FleetForms.All;
 
