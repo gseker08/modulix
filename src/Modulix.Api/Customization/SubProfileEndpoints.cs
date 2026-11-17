@@ -4,6 +4,7 @@ using Modulix.Api.Sectors;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
 using Modulix.Core.Automation;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Customization;
 using Modulix.Core.Modules;
 using Modulix.Shared.Customization;
@@ -60,8 +61,8 @@ public static class SubProfileEndpoints
 
             return await service.SetStatusAsync(id, status, request.Revision, ct) is { } view ? Results.Ok(ToDto(view, modules)) : NotFound();
         }));
-        group.MapGet("/{id:guid}/apply/preview", (Guid id, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>
-            await service.PreviewApplyAsync(id, ct) is { } plan ? Results.Ok(SectorProfileEndpoints.ToDto(plan, modules)) : NotFound()));
+        group.MapGet("/{id:guid}/apply/preview", (Guid id, ISubProfileService service, ModuleCatalog modules, IRequestLanguage language, ITextCatalog texts, CancellationToken ct) => RunAsync(async () =>
+            await service.PreviewApplyAsync(id, ct) is { } plan ? Results.Ok(SectorProfileEndpoints.ToDto(plan, modules, texts.Bundle(await language.GetAsync(ct)))) : NotFound()));
         group.MapPost("/{id:guid}/apply", (Guid id, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>
             await service.ApplyPendingAsync(id, ct) is { } view ? Results.Ok(ToDto(view, modules)) : NotFound()));
         group.MapPost("/{id:guid}/features", (Guid id, SaveSubProfileFeatureRequest request, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>

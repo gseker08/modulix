@@ -82,6 +82,16 @@ public static class MetadataTexts
     /// <summary>Kayıt devrinde sayıyla birlikte gösterilen tür adı (<see cref="OwnedRecordType.Label"/>, ör. "12 firma").</summary>
     public static string OwnedRecordKey(string entityKey) => $"meta.owned.{entityKey}";
 
+    /// <summary>İçe aktarma tanımının adı (<see cref="ImportDefinition.DisplayName"/>).</summary>
+    public static string ImportKey(string entityKey) => $"meta.import.{entityKey}";
+
+    /// <summary>İçe aktarma sütununun etiketi (<see cref="ImportField.Label"/>); şablon başlığı da budur.</summary>
+    public static string ImportFieldKey(string entityKey, string field) => $"meta.import.{entityKey}.field.{field}";
+
+    /// <summary>İçe aktarma sütununda kodda tanımlı sabit seçeneğin adı (<see cref="ImportField.Options"/>).</summary>
+    public static string ImportOptionKey(string entityKey, string field, string value) =>
+        $"meta.import.{entityKey}.field.{field}.option.{KeySegment(value)}";
+
     /// <summary>
     /// Firmanın listesi okurun dilinde: kodda tanımlı hazır değerin adı, firma değiştirmediyse (tanımdaki adla aynıysa) çevrilir; firmanın
     /// verdiği ad ve eklediği değerler firmanın verisidir, olduğu gibi kalır. Anahtar, kategori ve etkinlik değişmez.
