@@ -34,12 +34,14 @@ internal sealed class SatisfactionSurveyConfiguration : IEntityTypeConfiguration
     {
         SupportTables.ConfigureCommon(builder, "Surveys");
         builder.Property(s => s.TokenHash).HasMaxLength(64).IsRequired();
+        builder.Property(s => s.ReminderTokenHash).HasMaxLength(64);
         builder.Property(s => s.RecipientEmail).HasMaxLength(SatisfactionSurvey.EmailMaxLength);
         builder.Property(s => s.Comment).HasMaxLength(SatisfactionSurvey.CommentMaxLength);
 
         builder.HasIndex(s => new { s.TenantId, s.TicketId, s.Cycle }).IsUnique().HasDatabaseName("UX_Surveys_Cycle");
         // Belirteç özeti genel anket uçlarında tenant adı ile birlikte aranır; yine de tenant içinde benzersizdir.
         builder.HasIndex(s => new { s.TenantId, s.TokenHash }).IsUnique().HasDatabaseName("UX_Surveys_Token");
+        builder.HasIndex(s => new { s.TenantId, s.ReminderTokenHash }).IsUnique().HasFilter("[ReminderTokenHash] IS NOT NULL").HasDatabaseName("UX_Surveys_ReminderToken");
         builder.HasIndex(s => new { s.TenantId, s.AnsweredAt, s.Rating });
         builder.ToTable(t => t.HasCheckConstraint("CK_Surveys_Rating", "[Rating] IS NULL OR ([Rating] BETWEEN 1 AND 5)"));
         builder.ToTable(t => t.HasCheckConstraint("CK_Surveys_Answer", "([AnsweredAt] IS NULL AND [Rating] IS NULL) OR ([AnsweredAt] IS NOT NULL AND [Rating] IS NOT NULL)"));

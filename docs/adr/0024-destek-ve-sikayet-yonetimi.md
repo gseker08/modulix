@@ -212,6 +212,16 @@ Renk tek gösterge değildir (durum/öncelik metinli rozet), düğmeler klavye e
 - **Dil ve metin:** firmanın varsayılan dilinde, sözlükten (`email.ticket-received.*`). Metin firma başına düzenlenemez.
 - **Sınırlar:** giden e-postaya `Auto-Submitted` başlığı eklenmez (e-posta kuyruğu özel başlık taşımıyor); karşı tarafın otomatik yanıtlayıcısı başlıksız yanıt verirse o yanıt talebe müşteri mesajı olarak eklenir (yeni talep ya da yeni alındı açmaz, sel sınırı geçerlidir). Metin şablonu ve kanal/kuyruk bazında açıp kapama yoktur.
 
+### 4.13 Anket hatırlatması (17 Kasım 2026; uygulandı)
+
+- **Ne:** yanıtlanmayan memnuniyet anketi için **tek** hatırlatma e-postası. Firma ayarı `support.survey.reminder-days` (0-30; **varsayılan 0 = kapalı**): anket e-postasından bu kadar gün sonra yanıt yoksa ve bağlantının süresi dolmadıysa yazılır. Anket ayarı (`support.survey.enabled`) kapalıysa hatırlatma da çalışmaz.
+- **Nerede:** destek zamanlanmış işinin turunda (`support.jobs`; ihlal, eskalasyon, otomatik kapatmadan sonra). Tur özeti `SurveyReminders` sayısını taşır. Tekrar ve paralel tur ikinci hatırlatmayı yazmaz (`ReminderQueuedAt` dolu anket aday değildir; tenant başına kilit).
+- **Atlananlar:** yanıtlanmış ya da süresi dolmuş anket; e-postası hiç yazılmamış anket (`QueuedAt` boş); talebi o çözüm döngüsünden çıkmış anket (yeniden açıldı, birleştirildi, iptal edildi).
+- **Bağlantı:** ilk bağlantının belirteci saklanmadığı için (yalnızca özeti durur) hatırlatma **ikinci bir belirteç** üretir; özeti `ReminderTokenHash` olarak ankete yazılır. İki bağlantı da aynı anketi açar, ilk bağlantı geçerli kalır, yanıt yine tek kullanımlıdır. Bağlantının süresi uzamaz.
+- **Alıcı ve dil:** anket açılırken kaydedilen adres (`RecipientEmail`); firmanın varsayılan dilinde, sözlükten (`email.survey-reminder.*`).
+- **Şema:** `support.Surveys` tablosuna iki boş geçilebilir sütun ve süzgeçli tekil dizin (`UX_Surveys_ReminderToken`); geriye uyumlu.
+- **Sınırlar:** en çok bir hatırlatma; talep ekranındaki anket panelinde hatırlatma zamanı gösterilmez (API `reminderQueuedAt` döner); genel adres (`App:PublicUrl`) ayarlı değilse hatırlatma yazılmaz.
+
 ## 5. Migration ve geri dönüş yaklaşımı
 
 - Yeni **tek zincir** migration'lar: `SupportManagement` (5 tablo, RLS politikasına `TenantIsolationSql.AddTable`, `modulix_app_role` için idempotent `GRANT`) ve `SupportCustomerName` (tek sütun). Mevcut tablolara dokunulmaz; geriye uyumlu ve kesintisizdir. `docker/sqlserver/init.sql` yeni şemayı ve yetkiyi içerir.
@@ -239,7 +249,7 @@ Renk tek gösterge değildir (durum/öncelik metinli rozet), düğmeler klavye e
 - Eskalasyon e-postası kuyruğa alınır; iç kullanıcıya gider, teslim durumu e-posta kuyruğundan izlenir.
 - Genel dosya deposu, gerçek gelen e-posta alıcısı (IMAP/webhook), müşteri portalı, dosya tarama ve uygulama içi bildirim merkezi yoktur. Ekler geçici olarak veritabanında durur (5 MB sınırı); büyük hacimde genel depoya taşınması gerekir.
 - Gelen kanal girişi bir adaptör sözleşmesidir: gönderen adresinden müşteri (Party) eşleştirilmez; otomatik yanıtlar saklanmaz (yalnızca yok sayılır); kanal adaptörü gönderen doğrulamasını (SPF/DKIM) yapmaz, sunucu yalnızca başvuran adresiyle eşleşmeyi arar. Otomatik "alındı" yanıtı firma ayarıyla üretilir (bölüm 4.12).
-- Anket bağlantısı `App:PublicUrl` ister; ayarsızsa anket oluşur ama e-postası yazılmaz. Anket yalnızca e-posta kanalıyla dağıtılır (SMS/portal yok); anketi yanıtsız bırakma hatırlatması yoktur. Düşük puan yalnızca tarihçe olayıdır (otomatik görev/bildirim açılmaz).
+- Anket bağlantısı `App:PublicUrl` ister; ayarsızsa anket oluşur ama e-postası yazılmaz. Anket yalnızca e-posta kanalıyla dağıtılır (SMS/portal yok); yanıtsız anket için tek hatırlatma firma ayarıyla yazılır (bölüm 4.13). Düşük puan yalnızca tarihçe olayıdır (otomatik görev/bildirim açılmaz).
 - Toplu işlem atomik değildir; yalnızca atama, devir, kapatma ve iptal desteklenir (toplu öncelik/çözüm yok). Dışa aktarma en çok 5000 satırdır.
 - İlişkili kayıt etiketi bağlandığı andaki numara ve başlıktır; kayıt sonradan değişirse etiket güncellenmez, silinirse bağ kendiliğinden kalkmaz. Bağlanabilen türler sözleşme, sipariş ve teslimat'tir; finans (iade/tazmin) ve lojistik sevkiyatı için hedef kayıt türü olmadığından bağ yoktur. Karşı modülün kaydı ancak çağıranın o modülde okuma izni varsa bağlanır; destek yöneticisinin sözleşme okuma izni yoksa sözleşmeye bağlı politika tanımlayamaz.
 - Sözleşmeye bağlı politika, talep açılırken değil bağ kurulunca devreye girer (talep oluşturma isteği bağ taşımaz); arayüzde talep açıldıktan sonra sözleşme bağlanır. Birden çok sözleşme bağlıysa en özel (kısıt sayısı çok), sonra küçük öncelik sırası, sonra ad kazanır.
@@ -361,4 +371,4 @@ Tam entegrasyon paketi (`dotnet test tests/Modulix.IntegrationTests -c Release`,
 
 ## 10. Kalan işler (epic tamamlanmış sayılmaz)
 
-Altı dilimin hepsi uygulandı; epic\'in istek metnindeki şu kalemleri **yapılmadı** ya da kısmen yapıldı: finans iade/tazmin ve lojistik sevkiyat bağları (hedef kayıt türleri oluşunca), kapalı modülde salt okunur talep gösterimi, müşteri portalı; ayrıca: "sonraki müşteri mesajına yanıt" SLA sayacı, kanban (isteğe bağlı), ekip/iş birimi kapsamı testi, kayıtlı görünümler, mesaj düzenleme/geri alma politikası, KVKK saklama politikası, gerçek gelen e-posta alıcısı (IMAP/webhook) ve gönderenden müşteri eşleştirme, dosya taraması ve genel depo, anket hatırlatması, portal. Hiçbiri yapılmış ya da çalışıyormuş gibi sunulmaz.
+Altı dilimin hepsi uygulandı; epic\'in istek metnindeki şu kalemleri **yapılmadı** ya da kısmen yapıldı: finans iade/tazmin ve lojistik sevkiyat bağları (hedef kayıt türleri oluşunca), kapalı modülde salt okunur talep gösterimi, müşteri portalı; ayrıca: "sonraki müşteri mesajına yanıt" SLA sayacı, kanban (isteğe bağlı), ekip/iş birimi kapsamı testi, kayıtlı görünümler, mesaj düzenleme/geri alma politikası, KVKK saklama politikası, gerçek gelen e-posta alıcısı (IMAP/webhook) ve gönderenden müşteri eşleştirme, dosya taraması ve genel depo, portal. Hiçbiri yapılmış ya da çalışıyormuş gibi sunulmaz.

@@ -139,6 +139,21 @@ public class ChannelRulesTests
     }
 
     [Fact]
+    public void A_survey_reminder_is_due_once_after_the_configured_days_while_the_link_is_valid()
+    {
+        var now = new DateTimeOffset(2026, 11, 10, 12, 0, 0, TimeSpan.Zero);
+        var sent = now.AddDays(-3);
+        var expires = now.AddDays(5);
+        Assert.True(SurveyRules.ReminderDue(3, sent, null, null, expires, now)); // tam süre dolduğu an
+        Assert.False(SurveyRules.ReminderDue(4, sent, null, null, expires, now)); // henüz erken
+        Assert.False(SurveyRules.ReminderDue(0, sent, null, null, expires, now)); // ayar kapalı
+        Assert.False(SurveyRules.ReminderDue(3, null, null, null, expires, now)); // anket e-postası hiç gitmedi
+        Assert.False(SurveyRules.ReminderDue(3, sent, now.AddDays(-1), null, expires, now)); // yanıtlandı
+        Assert.False(SurveyRules.ReminderDue(3, sent, null, now.AddDays(-1), expires, now)); // zaten hatırlatıldı
+        Assert.False(SurveyRules.ReminderDue(3, sent, null, null, now, now)); // bağlantının süresi doldu
+    }
+
+    [Fact]
     public void A_survey_can_be_answered_once_and_only_before_it_expires()
     {
         var now = new DateTimeOffset(2026, 11, 1, 12, 0, 0, TimeSpan.Zero);

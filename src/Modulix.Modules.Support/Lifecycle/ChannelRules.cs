@@ -298,4 +298,12 @@ public static class SurveyRules
         answeredAt is not null ? (false, "Bu anket daha önce yanıtlandı.")
         : expiresAt <= now ? (false, "Bu anketin süresi doldu.")
         : (true, null);
+
+    public const int MaxReminderDays = 30;
+
+    /// <summary>
+    /// Hatırlatma zamanı geldi mi: ayar açık (gün &gt; 0), anket e-postası gitmiş, yanıt yok, daha önce hatırlatılmamış, gönderimden bu yana süre dolmuş ve bağlantı hâlâ geçerli.
+    /// </summary>
+    public static bool ReminderDue(int reminderDays, DateTimeOffset? queuedAt, DateTimeOffset? answeredAt, DateTimeOffset? reminderQueuedAt, DateTimeOffset expiresAt, DateTimeOffset now) =>
+        reminderDays > 0 && queuedAt is { } sent && answeredAt is null && reminderQueuedAt is null && sent.AddDays(reminderDays) <= now && expiresAt > now;
 }
