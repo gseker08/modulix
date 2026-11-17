@@ -160,6 +160,7 @@ public static class PersistenceSetup
         services.AddScoped<IReportRunner, ReportRunner>();
         services.AddScoped<IReportCatalog, ReportCatalogService>();
         services.AddScoped<IReportCenter, ReportCenter>();
+        services.AddScoped<IDashboards, Dashboards>();
         services.AddScoped<ReportAccessStamp>();
         services.AddScoped<IReportExports, ReportExports>();
         services.AddScoped<Modulix.Core.Contracts.Reporting.IReportTableExports, ReportTableExports>();

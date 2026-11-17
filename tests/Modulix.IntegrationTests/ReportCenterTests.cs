@@ -19,7 +19,7 @@ namespace Modulix.IntegrationTests;
 /// ADR-0035 dilim 3: ortak rapor merkezi ve sınırlı oluşturucu. Mutlu yol, hata/doğrulama, tenant izolasyonu ve yetki; paylaşım ve sonradan yetki iptali,
 /// hassas alan, veri kapsamı, dinamik alan (yeniden adlandırma/kaldırma) ve kart/özet = ayrıntı tutarlılığı.
 /// </summary>
-public class ReportCenterTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
+public partial class ReportCenterTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
     private const string Reports = "/api/reports";
     private const string Opportunities = "crm.opportunities";
