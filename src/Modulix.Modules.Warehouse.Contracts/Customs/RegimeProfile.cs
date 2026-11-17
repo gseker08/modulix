@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Modulix.Core.Contracts.Customs;
+namespace Modulix.Modules.Warehouse.Contracts.Customs;
 
 /// <summary>Kural ihlalinin sonucu: uyarı kaydı engellemez, engel kaydı reddeder (ADR-0032 K7).</summary>
 public enum RuleEnforcement

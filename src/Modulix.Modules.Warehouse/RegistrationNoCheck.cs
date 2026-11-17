@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Modulix.Core.Contracts.Customs;
+using Modulix.Modules.Warehouse.Contracts.Customs;
 using Modulix.Modules.Warehouse.Domain;
 using Modulix.Modules.Warehouse.Records;
 

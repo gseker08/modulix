@@ -1,4 +1,4 @@
-using Modulix.Core.Contracts.Customs;
+using Modulix.Modules.Warehouse.Contracts.Customs;
 using Modulix.Core.Contracts.Tenancy;
 
 namespace Modulix.Modules.Warehouse.Domain;
