@@ -111,6 +111,20 @@ Aynı anda kayıt silme ve dosya yükleme yarışında yüklenen dosyanın metad
 
 **Kapsam dışı:** olay yayınlamadan silinen alt satırlar (bir modülün ana kaydıyla birlikte toplu sildiği satırlar) ve birleştirilen kayıtların ekleri (birleştirmede ekler hedef kayda taşınmaz). Bu satırların ekleri bağlı kayıt bulunamadığı için erişilemez kalır; taşıma ya da temizlik ilgili modülün dilimidir.
 
+### K9 — Modüle ait dosyalar (17 Kasım 2026)
+
+K2 erişimi bağlı kaydın erişimine bağlar. Bazı eklerin kuralı bundan dardır ve genel uçlarla ifade edilemez. İlk örnek destek talebi ekleridir (ADR-0024 §4.9): iç nota bağlı ek, talebi okuyabilen herkese değil yalnızca iç not izni olana görünür; ek yazmak talebi güncelleme izniyle değil mesaj yazma izniyle yapılır; ek silinemez. Bu ekler genel depoya K2 ile taşınsaydı `/api/files` iç not eklerini talebi okuyabilen herkese açar ve silmeye izin verirdi.
+
+**Karar:** `core.StoredFiles` yeni bir sınıf taşır: `ModuleOwned`. Modül bu sınıftaki dosyayı `IModuleFiles` (`Core.Contracts.Files`) ile yazar ve açar.
+
+- **Genel uçlar bu sınıfı görmez:** `IFileStore` ve `/api/files` modüle ait dosyayı listelemez; indirme ve silme, kayıtta tam yetkisi olan kullanıcı için de 404 döner. Kayıt başına dosya sınırı ve yinelenen içerik denetimi (K3) bu sınıfı saymaz.
+- **Yetki, doğrulama ve sınırlar modüldedir.** `IModuleFiles` erişim denetimi yapmaz; yalnızca aktif tenant içinde çalışır (RLS ve sorgu süzgeci geçerlidir). Modül dosyayı açmadan önce kullanıcının onu görebildiğini kendi kuralıyla denetler. Açarken bağlı kayıt türü de verilir: tür tutmazsa dosya açılmaz (bir modül başka modülün dosyasını kimlikle açamaz).
+- **İşlem:** `AddAsync` içeriği depoya yazar, üst veriyi ve `core.file` denetim satırını çalışan iş birimine ekler; **kaydetmeyi çağıran yapar** (kayıt boru hattı). Böylece dosya modülün kendi satırıyla aynı işlemde oluşur. İşlem geri alınırsa içerik yetim kalır; K8 taraması siler.
+- **Ortak kalanlar:** depolama adaptörü (K4), tarama durumu (indirilemeyen durumlar burada da açılmaz), tenant dışa aktarma ve silme (K6), silinen kaydın ekleri ve yetim içerik temizliği (K8).
+- **Sınırlar:** silme sözleşmede yoktur (ilk tüketicinin ekleri değişmezdir; gerekince eklenir). Modülün kendi tablosu dosya kimliğini tutar; iki satır arasında yabancı anahtar yoktur.
+
+Bu karar yalnızca sözleşmeyi ekler. Destek eklerinin taşınması ayrı dilimlerdir: yeni ekler depoya yazılır ve eski içerik kopyalanır, sonra eski içerik sütunu düşürülür (iki adım, `migration-compat`).
+
 ## Sonuçlar
 
 - Mimari testler: `Modulix.Core` yeni bir proje referansı almaz; arayüz `Modulix.Core.Contracts`'a (modüller ileride kullanır), uygulama `Modulix.Infrastructure`'a girer.

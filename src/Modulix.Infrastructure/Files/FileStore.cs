@@ -29,7 +29,7 @@ internal sealed class FileStore(
     ITenantContextAccessor tenantAccessor,
     IAuditWriter audit,
     IOptions<FileStorageOptions> options,
-    ILogger<FileStore> logger) : IFileStore, IFileLimits
+    ILogger<FileStore> logger) : IFileStore, IFileLimits, IModuleFiles
 {
     public long MaxFileBytes => options.Value.MaxFileBytes;
 
@@ -41,7 +41,7 @@ internal sealed class FileStore(
         }
 
         var rows = await db.StoredFiles.AsNoTracking()
-            .Where(f => f.EntityKey == record.EntityKey && f.RecordId == record.Id)
+            .Where(f => f.EntityKey == record.EntityKey && f.RecordId == record.Id && f.Classification != FileClassification.ModuleOwned)
             .OrderBy(f => f.CreatedAt).ThenBy(f => f.Id)
             .ToListAsync(cancellationToken);
         return RecordResult<IReadOnlyList<StoredFileInfo>>.Ok([.. rows.Select(ToInfo)]);
@@ -81,7 +81,8 @@ internal sealed class FileStore(
             return Invalid(validation);
         }
 
-        var perRecord = db.StoredFiles.Where(f => f.EntityKey == record.EntityKey && f.RecordId == record.Id);
+        // Modüle ait dosyalar (K9) genel sınıra ve yinelenen içerik denetimine girmez: onların sınırını sahibi olan modül koyar.
+        var perRecord = db.StoredFiles.Where(f => f.EntityKey == record.EntityKey && f.RecordId == record.Id && f.Classification != FileClassification.ModuleOwned);
         if (await perRecord.CountAsync(cancellationToken) >= FileRules.MaxPerRecord)
         {
             return Invalid($"Bir kayda en fazla {FileRules.MaxPerRecord} dosya eklenebilir.");
@@ -121,7 +122,8 @@ internal sealed class FileStore(
         }
 
         var file = await db.StoredFiles.AsNoTracking().FirstOrDefaultAsync(f => f.Id == fileId, cancellationToken);
-        if (file is null || await CheckReadAsync(new RecordRef(file.EntityKey, file.RecordId), cancellationToken) is not null)
+        if (file is null || file.Classification == FileClassification.ModuleOwned
+            || await CheckReadAsync(new RecordRef(file.EntityKey, file.RecordId), cancellationToken) is not null)
         {
             return RecordResult<StoredFileContent>.Fail(RecordErrorCode.NotFound, "Dosya bulunamadı.");
         }
@@ -156,7 +158,7 @@ internal sealed class FileStore(
 
         var file = await db.StoredFiles.FirstOrDefaultAsync(f => f.Id == fileId, cancellationToken);
         var record = file is null ? null : new RecordRef(file.EntityKey, file.RecordId);
-        if (file is null || await CheckReadAsync(record!, cancellationToken) is not null)
+        if (file is null || file.Classification == FileClassification.ModuleOwned || await CheckReadAsync(record!, cancellationToken) is not null)
         {
             return RecordResult<bool>.Fail(RecordErrorCode.NotFound, "Dosya bulunamadı.");
         }
@@ -193,6 +195,60 @@ internal sealed class FileStore(
         }
 
         return RecordResult<bool>.Ok(true);
+    }
+
+    // ---- Modüle ait dosyalar (ADR-0040 K9): erişimi çağıran modül denetler; genel yollar yukarıda bu sınıfı dışarıda bırakır.
+
+    async Task<StoredFileInfo> IModuleFiles.AddAsync(RecordRef owner, string fileName, string contentType, ReadOnlyMemory<byte> content, CancellationToken cancellationToken)
+    {
+        var tenant = tenantAccessor.Current ?? throw new InvalidOperationException("Aktif tenant yok.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(contentType);
+        if (content.IsEmpty || content.Length > MaxFileBytes)
+        {
+            throw new ArgumentException($"Dosya boş olamaz ve en fazla {MaxFileBytes} bayt olabilir.", nameof(content));
+        }
+
+        if (owner.EntityKey.Length > StoredFile.EntityKeyMaxLength || fileName.Length > StoredFile.FileNameMaxLength || contentType.Length > StoredFile.ContentTypeMaxLength)
+        {
+            throw new ArgumentException("Kayıt türü, dosya adı ya da içerik türü çok uzun.");
+        }
+
+        var file = new StoredFile(owner.EntityKey, owner.Id, fileName, contentType, content.Length, Convert.ToHexString(SHA256.HashData(content.Span)), tenant.UserId,
+            FileClassification.ModuleOwned);
+        using (var stream = new MemoryStream(content.ToArray(), writable: false))
+        {
+            await blobs.PutAsync(tenant.TenantId, file.StorageKey, stream, cancellationToken);
+        }
+
+        // Üst veri ve denetim satırı çağıranın işlemiyle kesinleşir; işlem geri alınırsa içerik yetim kalır ve temizlik işi siler (K8).
+        db.StoredFiles.Add(file);
+        audit.Add(AuditFor(tenant, file, AuditAction.Created, RecordDiff.Compute(null, Snapshot(file, owner))));
+        return ToInfo(file);
+    }
+
+    async Task<StoredFileContent?> IModuleFiles.OpenAsync(Guid fileId, string ownerEntityKey, CancellationToken cancellationToken)
+    {
+        if (tenantAccessor.Current is not { } tenant)
+        {
+            return null;
+        }
+
+        var file = await db.StoredFiles.AsNoTracking()
+            .FirstOrDefaultAsync(f => f.Id == fileId && f.Classification == FileClassification.ModuleOwned && f.EntityKey == ownerEntityKey, cancellationToken);
+        if (file is null || !FileScanStatus.IsDownloadable(file.ScanStatus))
+        {
+            return null;
+        }
+
+        var stream = await blobs.OpenReadAsync(tenant.TenantId, file.StorageKey, cancellationToken);
+        if (stream is null)
+        {
+            logger.LogError("Modüle ait dosya {FileId} için içerik bulunamadı (tenant {TenantId}).", file.Id, tenant.TenantId);
+            return null;
+        }
+
+        return new StoredFileContent(ToInfo(file), stream);
     }
 
     /// <summary>Kayıt türü bilinmiyorsa ya da kayıt okunamıyorsa hata; izin eksikliği de "bulunamadı"dır (dosyanın varlığı sızmaz).</summary>
