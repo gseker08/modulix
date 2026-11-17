@@ -3208,6 +3208,77 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("TenantSubscriptions", "platform");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Reporting.Dashboard", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "OwnerUserId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Dashboards", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Reporting.DashboardWidget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DashboardId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ReportId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ReportId");
+
+                    b.HasIndex("TenantId", "DashboardId", "Position");
+
+                    b.ToTable("DashboardWidgets", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Reporting.ReportDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -16680,6 +16751,23 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("PlanId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Reporting.DashboardWidget", b =>
+                {
+                    b.HasOne("Modulix.Core.Reporting.Dashboard", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DashboardId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Modulix.Core.Reporting.ReportDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "ReportId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

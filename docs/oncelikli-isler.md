@@ -70,7 +70,7 @@ saklama politikası (E5), yapay zekâ çekirdeği (E6, ADR-0047).
 | Sıra | İş | Kaynak | Durum |
 |------|----|--------|-------|
 | R1 | Müşteri adayı skorlama dilim 2–4 (davranış puanı, azalma/eşik olayı, puan açıklaması) | CRM epik E1 | Dilim 1 PR #417'de; birleşince devam |
-| R2 | Canlı panolar ve pano bileşenleri (A-11 ekip/departman kırılımı ile) | CRM epik E2 | Sırada |
+| R2 | Canlı panolar ve pano bileşenleri (A-11 ekip/departman kırılımı ile) | CRM epik E2 | Sürüyor: [ADR-0054](adr/0054-kullanici-panolari.md) dilim 1a (model, servis, uç noktalar; 17 Kasım); sırada 1b ekran |
 | R3 | Birleşik 360° müşteri zaman çizelgesi | CRM epik E9, [ADR-0053](adr/0053-musteri-zaman-cizelgesi.md) | Dilim 1 (kaynak sözleşmesi, CRM kaynakları, sekme) 17 Kasım'da; kalan: diğer modüllerin kaynakları, süzgeç ve özet şeridi |
 | R4 | Çalışma alanı rengi ve rol bazlı menü | CRM epik E8 | Önce tasarım sisteminde "firmanın değiştirebileceği tokenlar" |
 | R5 | Müşteri yolculukları + görsel süreç tasarımcısı (ortak akış modeli) | CRM epik E4, E6 | `fake` sağlayıcıyla |

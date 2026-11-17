@@ -248,6 +248,9 @@ public sealed class CoreModule : IModule
         /// <summary>Kayıtlı rapor (ADR-0035, dilim 3); kaydın kimliği raporun kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
         public const string Report = "core.report";
 
+        /// <summary>Kullanıcı panosu (CRM epik E2); kaydın kimliği panonun kimliğidir. Bileşenlerin okunabilir özeti yazılır.</summary>
+        public const string Dashboard = "core.dashboard";
+
         /// <summary>Zamanlanmış rapor (ADR-0035, dilim 4); kaydın kimliği zamanlamanın kimliğidir.</summary>
         public const string ReportSchedule = "core.report-schedule";
 
@@ -698,6 +701,10 @@ public sealed class CoreModule : IModule
                 ["visibility"] = new Dictionary<string, string> { ["Private"] = "Özel", ["Users"] = "Seçilen kullanıcılar", ["Tenant"] = "Firma" },
             },
         },
+        new(AuditedEntityKeys.Dashboard, "Pano", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["widgets"] = "Bileşenler",
+        }, "name"),
         new(AuditedEntityKeys.AuditArchive, "Denetim kaydı arşivi", null, new Dictionary<string, string>
         {
             ["period"] = "Dönem", ["rows"] = "Satır sayısı", ["bytes"] = "Boyut (bayt)", ["sha256"] = "SHA-256 özeti",
