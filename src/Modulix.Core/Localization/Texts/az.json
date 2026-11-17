@@ -460,6 +460,8 @@
   "crm.timeline.kind.activity": "Fəaliyyət",
   "crm.timeline.kind.opportunity": "Fürsət",
   "crm.timeline.kind.quote": "Təklif",
+  "crm.timeline.kind.order": "Sifariş",
+  "crm.timeline.kind.other": "Qeyd",
   "crm.company.tabs.aria": "Şirkət bölmələri",
   "crm.company.tickets": "Dəstək müraciətləri",
   "crm.company.won": "Qazanılan",

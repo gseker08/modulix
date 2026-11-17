@@ -460,6 +460,8 @@
   "crm.timeline.kind.activity": "Aktivite",
   "crm.timeline.kind.opportunity": "Fırsat",
   "crm.timeline.kind.quote": "Teklif",
+  "crm.timeline.kind.order": "Sipariş",
+  "crm.timeline.kind.other": "Kayıt",
   "crm.company.tabs.aria": "Firma bölümleri",
   "crm.company.tickets": "Destek talepleri",
   "crm.company.won": "Kazanılan",

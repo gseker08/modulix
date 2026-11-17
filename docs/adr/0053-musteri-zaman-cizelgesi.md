@@ -1,6 +1,7 @@
 # ADR-0053: Birleşik müşteri zaman çizelgesi
 
-- **Durum:** Dilim 1 (kaynak sözleşmesi, CRM kaynakları, uç nokta, firma kartında sekme) 17 Kasım 2026'da teslim edilir. Diğer dilimler öneridir.
+- **Durum:** Dilim 1 (kaynak sözleşmesi, CRM kaynakları, uç nokta, firma kartında sekme) 17 Kasım 2026'da teslim edildi (PR #468).
+  Dilim 2a (Sipariş kaynağı) 17 Kasım 2026'da teslim edilir. Diğer dilimler öneridir.
 - **Kaynak:** [CRM eksik süreç epic listesi](../crm-eksik-surecler-epicleri.md) E9.
 
 ## Bağlam
@@ -57,12 +58,19 @@ token yoktur. Fırsat ve teklif satırı kendi sayfasına bağlanır; "Daha eski
 
 1. **Kaynak sözleşmesi + CRM kaynakları + uç nokta + sekme** (bu teslim).
 2. Sipariş, Sözleşme, Destek ve Pazarlama kaynakları (her modül kendi PR'ında; taraf kimliğiyle).
+   - **2a Sipariş (17 Kasım 2026):** `OrderTimelineSource` (`orders.orders`), Sipariş modülünde. Siparişler ortak taraf kaydına (`partyId`)
+     bağlıdır; satırın anı oluşturulma anıdır, tanıtıcı sipariş numarasıdır. Sipariş deposuna `createdBefore` süzgeci eklendi (varsayılan
+     sıra zaten en yeniden eskiyedir). Modül kapalıysa ya da okuma izni yoksa kaynak `sources` listesinde yoktur.
+   - **Görünen ad kararı:** sözleşme değişmedi; durum ve tür kodlarının görünen adını arayüz verir (`OrderLabels` gibi modül etiket
+     yardımcılarıyla, okurun dilinde). Kaynak görünen ad üretmez: çeviri altyapısı (ADR-0034) arayüzdedir. Arayüzün henüz tanımadığı
+     kayıt türü genel adla ("Kayıt") ve bağlantısız çizilir; satır kaybolmaz.
+   - Kalan: Sözleşme, Destek (Destek modülünün CRM sözleşme projesine başvurusu mimari kural tablosuna eklenecek), Pazarlama.
 3. Kaynak türüne göre süzgeç ve özet şeridi (son temas, açık iş sayısı).
 4. Durum değişikliği satırları (fırsat kazanıldı/kaybedildi, teklif kabul edildi) ve müşteri adayı geçmişi (dönüşen aday).
 
 ## Yapılmadı / sınırlar
 
-- Diğer modüllerin satırları yok; firma kartındaki ilişkili sipariş, destek ve kampanya listeleri yerinde duruyor.
+- Sözleşme, Destek ve Pazarlama satırları yok (Sipariş dilim 2a ile geldi); firma kartındaki ilişkili sipariş, destek ve kampanya
+  listeleri yerinde duruyor.
 - Bir kayıt tek satırdır: fırsatın kazanılması ya da teklifin kabulü ayrı satır üretmez (durum rozeti güncel durumu gösterir).
-- Başka modülün durum kodunun görünen adı sözleşmede yok; dilim 2'de kaynak görünen adı da verecek mi kararı açık.
 - Ekran tarayıcıda açık ve koyu temada gözle doğrulanmadı.
