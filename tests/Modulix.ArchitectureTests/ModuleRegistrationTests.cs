@@ -37,10 +37,10 @@ public partial class ModuleRegistrationTests
 
         var module = Assert.Single(modules);
 
-        var program = File.ReadAllText(Path.Combine(RepositoryLayout.Root.FullName, "src", "Modulix.Api", "Program.cs"));
+        var program = File.ReadAllText(Path.Combine(RepositoryLayout.Root.FullName, "src", "Modulix.Api", "ModulixModules.cs"));
         Assert.True(
             program.Contains($"new {module}()", StringComparison.Ordinal),
-            $"{projectName}: {module} Modulix.Api/Program.cs içinde AddModulixModules(...) ile kaydedilmemiş.");
+            $"{projectName}: {module} Modulix.Api/ModulixModules.cs listesinde kaydedilmemiş.");
     }
 
     private static bool IsBuildOutput(FileInfo file) =>
