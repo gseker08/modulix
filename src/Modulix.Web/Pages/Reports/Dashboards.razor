@@ -61,6 +61,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(ReportAccess.Read))
+        {
+            return;
+        }
+
         var result = await Api.GetAsync<List<DashboardSummaryDto>>("/api/dashboards");
         dashboards = result.Value;
         message = result.Error;

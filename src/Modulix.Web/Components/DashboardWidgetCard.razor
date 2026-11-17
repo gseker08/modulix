@@ -35,7 +35,7 @@ else
         }
         else if (Bars() is { Slices.Count: > 0 } bars)
         {
-            <BarChart Slices="bars.Slices" Title="@Heading" ValueFormat="@bars.Format" />
+            <BarChart Slices="bars.Slices" Title="@Heading" ValueFormat="@bars.Format" WideValues="@(bars.Format != "N0")" />
             @if (bars.Note is not null)
             {
                 <p class="small text-muted mb-0">@bars.Note</p>

@@ -166,6 +166,13 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        // Doğrudan açılışta oturum henüz yüklenmemiş olabilir; istek ondan önce giderse yanıt boş döner ve parametre değişmediği için yeniden denenmez.
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(ReportAccess.Read))
+        {
+            return;
+        }
+
         if (detail?.Summary.Id == Id)
         {
             return;
