@@ -132,6 +132,15 @@ public static class ImportColumns
             byName.TryAdd(Name(field.Key), field);
         }
 
+        // Öteki dillerdeki adlar (ADR-0034 dilim 18c-5) etiket ve anahtardan sonra: başka dilde başlıklı dosya da bağlanır, okurun dilindeki ad önceliklidir.
+        foreach (var field in fields)
+        {
+            foreach (var variant in field.LabelVariants)
+            {
+                byName.TryAdd(Name(variant), field);
+            }
+        }
+
         // Kayıtlı eşleme (Dilim 4c) etiket ve anahtardan sonra eklenir: bir alanın adı hiçbir zaman başka alanın takma adına kaptırılmaz.
         foreach (var field in fields)
         {

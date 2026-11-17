@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Imports;
 using Modulix.Core.Modules;
 using Modulix.Infrastructure.Persistence;
@@ -9,7 +10,7 @@ namespace Modulix.Infrastructure.Imports;
 /// <see cref="IImportLog"/>: içe aktarma günlüğü okuması (ADR-0033, Dilim 1). Sorgular aktif tenant'ta çalışır (sorgu
 /// süzgeci + RLS). Kişi adı firmanın üyesinin (veya eski üyesinin) görünen adıdır; üyeliği olmayan hesabın adı gösterilmez.
 /// </summary>
-internal sealed class ImportLog(ModulixDbContext db, ModuleCatalog catalog) : IImportLog
+internal sealed class ImportLog(ModulixDbContext db, ModuleCatalog catalog, IRequestLanguage language, ITextCatalog texts) : IImportLog
 {
     public const string UnknownUser = "Eski kullanıcı";
 
@@ -127,6 +128,8 @@ internal sealed class ImportLog(ModulixDbContext db, ModuleCatalog catalog) : II
 
     private async Task<List<ImportRunSummary>> SummariesAsync(IReadOnlyCollection<ImportRun> runs, CancellationToken cancellationToken)
     {
+        // Kayıt türünün adı okurun dilinde (ADR-0034, dilim 18c-5).
+        var bundle = texts.Bundle(await language.GetAsync(cancellationToken));
         var userIds = runs.Select(r => r.UserId).Distinct().ToList();
         var tenantIds = runs.Select(r => r.TenantId).Distinct().ToList();
         Dictionary<Guid, string> names = userIds.Count == 0
@@ -144,7 +147,9 @@ internal sealed class ImportLog(ModulixDbContext db, ModuleCatalog catalog) : II
                 r.UserId,
                 names.GetValueOrDefault(r.UserId) ?? UnknownUser,
                 r.EntityKey,
-                catalog.FindAuditedEntity(r.EntityKey)?.DisplayName ?? r.EntityKey,
+                catalog.FindAuditedEntity(r.EntityKey)?.DisplayName is { } entityName
+                    ? MetadataTexts.Text(bundle, MetadataTexts.EntityKey(r.EntityKey), entityName)
+                    : r.EntityKey,
                 r.FileName,
                 r.FileSize,
                 r.Mode,

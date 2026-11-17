@@ -2,6 +2,7 @@ using Modulix.Api.Access;
 using Modulix.Api.Records;
 using Modulix.Api.Tenancy;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Imports;
 using Modulix.Core.Contracts.Modules;
@@ -15,7 +16,8 @@ namespace Modulix.Api.Imports;
 /// <summary>İçe aktarma uçlarının ortak servisleri ve "bu kullanıcı bu türü içe aktarabilir mi" kuralı.</summary>
 public sealed class ImportContext(
     ModuleCatalog catalog, ImportSchema schema, ImportRunner runner, ImportErrorReports reports, IImportLog log, ICurrentAccess access,
-    IModuleLicense license, ITenantContextAccessor tenant, ICompanyContextAccessor company, IImportDesignStore designs)
+    IModuleLicense license, ITenantContextAccessor tenant, ICompanyContextAccessor company, IImportDesignStore designs,
+    IRequestLanguage language, ITextCatalog texts)
 {
     public ModuleCatalog Catalog => catalog;
 
@@ -30,6 +32,10 @@ public sealed class ImportContext(
     public ITenantContextAccessor Tenant => tenant;
 
     public ICompanyContextAccessor Company => company;
+
+    /// <summary>İsteğin dilindeki sözlük: tanım ve kayıt türü adları (ADR-0034, dilim 18c-5).</summary>
+    public async Task<IReadOnlyDictionary<string, string>> BundleAsync(CancellationToken cancellationToken) =>
+        texts.Bundle(await language.GetAsync(cancellationToken));
 
     /// <summary>Modül yazılabilir (ADR-0028: salt okunurda tür listelenmez), tür firmanın tasarımında açık olmalı ve kullanıcının türde oluşturma izni bulunmalı.</summary>
     public async Task<bool> CanRunAsync(string moduleKey, ImportDefinition definition, CancellationToken cancellationToken) =>
@@ -88,13 +94,14 @@ public static class ImportEndpoints
     private static async Task<IResult> ListDefinitionsAsync(ImportContext context, CancellationToken ct)
     {
         var result = new List<ImportDefinitionDto>();
+        var bundle = await context.BundleAsync(ct);
         foreach (var (moduleKey, definition) in context.Catalog.ImportDefinitions)
         {
             if (await context.CanRunAsync(moduleKey, definition, ct))
             {
                 var fields = await context.Schema.FieldsAsync(context.Tenant.Current!, definition, ct);
                 result.Add(new ImportDefinitionDto(
-                    definition.EntityKey, definition.DisplayName, [.. fields.Select(f => new ImportFieldDto(f.Key, f.Label, f.Required))]));
+                    definition.EntityKey, ImportLabels.Name(definition, bundle), [.. fields.Select(f => new ImportFieldDto(f.Key, f.Label, f.Required))]));
             }
         }
 
@@ -109,7 +116,7 @@ public static class ImportEndpoints
         }
 
         var fields = await context.Schema.FieldsAsync(context.Tenant.Current!, found.Definition, ct);
-        return Results.File(ImportErrorReport.Template(fields), "text/csv", ReportCsv.FileSlug(found.Definition.DisplayName) + "-sablon.csv");
+        return Results.File(ImportErrorReport.Template(fields), "text/csv", ReportCsv.FileSlug(ImportLabels.Name(found.Definition, await context.BundleAsync(ct))) + "-sablon.csv");
     }
 
     private static async Task<IResult> StartAsync(
