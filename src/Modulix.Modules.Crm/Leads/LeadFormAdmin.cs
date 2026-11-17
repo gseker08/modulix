@@ -34,6 +34,6 @@ internal sealed class LeadFormAdmin(IRecordPipeline pipeline, LeadWorkflowGate g
 
         return updated.IsSuccess
             ? RecordResult<LeadFormSecretResult>.Ok(new LeadFormSecretResult(updated.Value!, secret))
-            : RecordResult<LeadFormSecretResult>.Fail(updated.Error!.Code, updated.Error.Message, updated.Error.FieldErrors);
+            : RecordResult<LeadFormSecretResult>.Fail(updated.Error!);
     }
 }

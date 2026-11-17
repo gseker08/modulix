@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Domain;
@@ -53,7 +54,7 @@ internal abstract class ActivityChildStore<TChild>(CrmStoreContext context) : Cr
 
         if (!await query.AnyAsync(cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError("activityId", "Aktivite bulunamadı.")]);
+            throw new RecordValidationException([new RecordFieldError("activityId", CrmMessages.Activity.NotFound)]);
         }
     }
 
@@ -97,7 +98,7 @@ internal sealed class ActivityLinkRecordStore(CrmStoreContext context) : Activit
         if (operation == RecordOperation.Create && errors.Count == 0
             && (values["recordId"] is null || ActivityIdOf(values) is null))
         {
-            errors.Add(new RecordFieldError("recordId", "Aktivite ve ilişkilendirilecek kayıt zorunludur."));
+            errors.Add(new RecordFieldError("recordId", CrmMessages.Activity.RelationRequired));
         }
 
         return errors;
@@ -105,7 +106,7 @@ internal sealed class ActivityLinkRecordStore(CrmStoreContext context) : Activit
 
     protected override async Task<(JsonObject Values, bool Linked)> PrepareNewAsync(ActivityLink entity, JsonObject values, CancellationToken cancellationToken)
     {
-        var activityId = ActivityIdOf(values) ?? throw new RecordValidationException([new RecordFieldError("activityId", "Aktivite zorunludur.")]);
+        var activityId = ActivityIdOf(values) ?? throw new RecordValidationException([new RecordFieldError("activityId", CrmMessages.Activity.ActivityRequired)]);
         await EnsureActivityEditableAsync(activityId, cancellationToken);
         entity.ActivityId = activityId;
         return (values, false);
@@ -122,32 +123,32 @@ internal sealed class ActivityLinkRecordStore(CrmStoreContext context) : Activit
             await EnsureActivityEditableAsync(entity.ActivityId, cancellationToken);
             if (stored.EntityKey != entity.EntityKey || stored.RecordId != entity.RecordId)
             {
-                errors.Add(new RecordFieldError("recordId", "Bağlı kayıt değiştirilemez; ilişkiyi silip yenisini ekleyin."));
+                errors.Add(new RecordFieldError("recordId", CrmMessages.Activity.RelationRecordLocked));
             }
         }
         else
         {
             if (Context.LinkTargets.FirstOrDefault(t => t.EntityKey == entity.EntityKey) is not { } target)
             {
-                errors.Add(new RecordFieldError("entityKey", "Bu kayıt türü aktiviteye bağlanamaz."));
+                errors.Add(new RecordFieldError("entityKey", CrmMessages.Activity.RelationTypeNotAllowed));
             }
             else if (!await target.IsVisibleAsync(entity.RecordId, cancellationToken))
             {
                 // Başka tenant'ın ya da erişilemeyen kayıt, var olmayan kayıtla aynı cevabı alır.
-                errors.Add(new RecordFieldError("recordId", "Kayıt bulunamadı."));
+                errors.Add(new RecordFieldError("recordId", ServerMessages.Record.NotFound));
             }
 
             if (await Context.Data.Set<ActivityLink>().AnyAsync(
                     l => l.ActivityId == entity.ActivityId && l.EntityKey == entity.EntityKey && l.RecordId == entity.RecordId, cancellationToken))
             {
-                errors.Add(new RecordFieldError("recordId", "Bu kayıt aktiviteye zaten bağlı."));
+                errors.Add(new RecordFieldError("recordId", CrmMessages.Activity.RelationExists));
             }
         }
 
         if (entity.IsPrimary && (stored is null || !stored.IsPrimary)
             && await Context.Data.Set<ActivityLink>().AnyAsync(l => l.ActivityId == entity.ActivityId && l.IsPrimary && l.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("isPrimary", "Aktivitenin zaten birincil bir ilişkisi var; önce onu birincil olmaktan çıkarın."));
+            errors.Add(new RecordFieldError("isPrimary", CrmMessages.Activity.PrimaryRelationExists));
         }
 
         if (errors.Count > 0)
@@ -173,7 +174,7 @@ internal sealed class ActivityParticipantRecordStore(CrmStoreContext context) : 
     [
         Field.CreateOnlyId<ActivityParticipant>("activityId", p => p.ActivityId),
         Field.Owner<ActivityParticipant>("userId", p => p.UserId, (p, v) => p.UserId = v),
-        Field.Reference<ActivityParticipant, Contact>("contactId", "Kişi bulunamadı.", p => p.ContactId, (p, v) => p.ContactId = v),
+        Field.Reference<ActivityParticipant, Contact>("contactId", CrmMessages.Lookup.ContactNotFound, p => p.ContactId, (p, v) => p.ContactId = v),
         Field.Email<ActivityParticipant>("email", ActivityParticipant.EmailMaxLength, p => p.Email, (p, v) => p.Email = v),
         Field.Text<ActivityParticipant>("displayName", ActivityParticipant.NameMaxLength, p => p.DisplayName, (p, v) => p.DisplayName = v),
         Field.Choice<ActivityParticipant>("role", ParticipantRole.All, p => p.Role, (p, v) => p.Role = v),
@@ -192,7 +193,7 @@ internal sealed class ActivityParticipantRecordStore(CrmStoreContext context) : 
     protected override async Task<(JsonObject Values, bool Linked)> PrepareNewAsync(
         ActivityParticipant entity, JsonObject values, CancellationToken cancellationToken)
     {
-        var activityId = ActivityIdOf(values) ?? throw new RecordValidationException([new RecordFieldError("activityId", "Aktivite zorunludur.")]);
+        var activityId = ActivityIdOf(values) ?? throw new RecordValidationException([new RecordFieldError("activityId", CrmMessages.Activity.ActivityRequired)]);
         await EnsureActivityEditableAsync(activityId, cancellationToken);
         entity.ActivityId = activityId;
         return (values, false);
@@ -204,7 +205,7 @@ internal sealed class ActivityParticipantRecordStore(CrmStoreContext context) : 
         var kinds = (entity.UserId is null ? 0 : 1) + (entity.ContactId is null ? 0 : 1) + (string.IsNullOrWhiteSpace(entity.Email) ? 0 : 1);
         if (kinds != 1)
         {
-            errors.Add(new RecordFieldError("userId", "Katılımcı olarak tam olarak biri verilmelidir: kullanıcı, kişi ya da e-posta."));
+            errors.Add(new RecordFieldError("userId", CrmMessages.Activity.ParticipantOneOf));
         }
 
         entity.NormalizedEmail = ContactNormalization.NormalizeEmail(entity.Email ?? string.Empty);
@@ -220,7 +221,7 @@ internal sealed class ActivityParticipantRecordStore(CrmStoreContext context) : 
             await EnsureActivityEditableAsync(entity.ActivityId, cancellationToken);
             if (stored.UserId != entity.UserId || stored.ContactId != entity.ContactId || stored.NormalizedEmail != entity.NormalizedEmail)
             {
-                errors.Add(new RecordFieldError("userId", "Katılımcı değiştirilemez; silip yenisini ekleyin."));
+                errors.Add(new RecordFieldError("userId", CrmMessages.Activity.ParticipantLocked));
             }
         }
         else
@@ -230,7 +231,7 @@ internal sealed class ActivityParticipantRecordStore(CrmStoreContext context) : 
                 && !(Context.LinkTargets.FirstOrDefault(t => t.EntityKey == CrmModule.Entities.Contact) is { } target
                     && await target.IsVisibleAsync(contactId, cancellationToken)))
             {
-                errors.Add(new RecordFieldError("contactId", "Kişi bulunamadı."));
+                errors.Add(new RecordFieldError("contactId", CrmMessages.Lookup.ContactNotFound));
             }
 
             var existing = Context.Data.Set<ActivityParticipant>().Where(p => p.ActivityId == entity.ActivityId);
@@ -238,7 +239,7 @@ internal sealed class ActivityParticipantRecordStore(CrmStoreContext context) : 
                     || (entity.ContactId != null && p.ContactId == entity.ContactId)
                     || (entity.NormalizedEmail != null && p.NormalizedEmail == entity.NormalizedEmail), cancellationToken))
             {
-                errors.Add(new RecordFieldError("userId", "Bu katılımcı zaten ekli."));
+                errors.Add(new RecordFieldError("userId", CrmMessages.Activity.ParticipantExists));
             }
         }
 

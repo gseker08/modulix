@@ -329,7 +329,7 @@ internal sealed class SalesAnalytics(
             warnings.Any(w => w.StartsWith("Okuma sınırına", StringComparison.Ordinal)), data, warnings, definitions));
 
     private static RecordResult<AnalyticsResult<T>> Forward<T>(RecordError error) =>
-        RecordResult<AnalyticsResult<T>>.Fail(error.Code, error.Message, error.FieldErrors);
+        RecordResult<AnalyticsResult<T>>.Fail(error);
 
     private static QuoteFact ToQuoteFact(RecordData record)
     {

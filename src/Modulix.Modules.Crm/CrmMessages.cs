@@ -291,4 +291,243 @@ internal static class CrmMessages
 
         public static ServerMessage ReportRangeDetail => ServerMessage.Of("crm.server.lead.report-range.detail", "Başlangıç, bitişten önce olmalıdır.");
     }
+
+    /// <summary>Fırsat kayıtları, aşama/kapanış iş akışı ve fırsat raporu iletileri.</summary>
+    public static class Opportunity
+    {
+        public static ServerMessage NotFound => ServerMessage.Of("crm.server.opportunity.not-found", "Fırsat bulunamadı.");
+
+        public static ServerMessage StageOnHold =>
+            ServerMessage.Of("crm.server.opportunity.stage-on-hold", "Beklemedeki fırsatın aşaması değiştirilemez; önce beklemeden çıkarın.");
+
+        public static ServerMessage StageClosed =>
+            ServerMessage.Of("crm.server.opportunity.stage-closed", "Kapanmış fırsatın aşaması değiştirilemez; önce yeniden açın.");
+
+        public static ServerMessage CloseOnHold =>
+            ServerMessage.Of("crm.server.opportunity.close-on-hold", "Beklemedeki fırsat kapatılamaz; önce beklemeden çıkarın.");
+
+        public static ServerMessage AlreadyClosed => ServerMessage.Of("crm.server.opportunity.already-closed", "Fırsat zaten kapanmış.");
+
+        public static ServerMessage AlreadyOnHold => ServerMessage.Of("crm.server.opportunity.already-on-hold", "Fırsat zaten beklemede.");
+
+        public static ServerMessage HoldClosed => ServerMessage.Of("crm.server.opportunity.hold-closed", "Kapanmış fırsat beklemeye alınamaz.");
+
+        public static ServerMessage ResumeOnHoldOnly =>
+            ServerMessage.Of("crm.server.opportunity.resume-on-hold-only", "Yalnızca beklemedeki fırsat beklemeden çıkarılır.");
+
+        public static ServerMessage ReopenClosedOnly =>
+            ServerMessage.Of("crm.server.opportunity.reopen-closed-only",
+                "Yalnızca kapanmış (kazanılan, kaybedilen ya da iptal edilen) fırsat yeniden açılır.");
+
+        public static ServerMessage UnknownStage =>
+            ServerMessage.Of("crm.server.opportunity.unknown-stage", "Listede olmayan ya da kullanılmayan aşama.");
+
+        public static ServerMessage StageNeedsClose =>
+            ServerMessage.Of("crm.server.opportunity.stage-needs-close",
+                "Kazanıldı/kaybedildi aşamasına geçmek için fırsatı kapatın (kazan / kaybet).");
+
+        public static ServerMessage CloseDateInFuture =>
+            ServerMessage.Of("crm.server.opportunity.close-date-in-future", "Gerçek kapanış tarihi gelecekte olamaz.");
+
+        public static ServerMessage WonAmountNegative =>
+            ServerMessage.Of("crm.server.opportunity.won-amount-negative", "Kazanılan tutar negatif olamaz.");
+
+        public static ServerMessage NoWonStage =>
+            ServerMessage.Of("crm.server.opportunity.no-won-stage", "Kazanıldı kategorisinde etkin bir aşama bulunamadı.");
+
+        public static ServerMessage LossReasonRequired =>
+            ServerMessage.Of("crm.server.opportunity.loss-reason-required", "Kaybetme nedeni zorunludur.");
+
+        public static ServerMessage UnknownLossReason =>
+            ServerMessage.Of("crm.server.opportunity.unknown-loss-reason", "Listede olmayan ya da kullanılmayan kaybetme nedeni.");
+
+        public static ServerMessage OtherReasonText =>
+            ServerMessage.Of("crm.server.opportunity.other-reason-text", "\"Diğer\" nedeni için açıklama girin.");
+
+        public static ServerMessage CompetitorReasonOnly =>
+            ServerMessage.Of("crm.server.opportunity.competitor-reason-only",
+                "Kazanan rakip yalnızca \"rakibe kaybedildi\" kategorisindeki nedenlerle belirtilir.");
+
+        public static ServerMessage CompetitorNotListed =>
+            ServerMessage.Of("crm.server.opportunity.competitor-not-listed", "Rakip bu fırsatın rakipleri arasında değil.");
+
+        public static ServerMessage RecontactInFuture =>
+            ServerMessage.Of("crm.server.opportunity.recontact-in-future", "Yeniden iletişim tarihi gelecekte olmalıdır.");
+
+        public static ServerMessage RecontactRequired =>
+            ServerMessage.Of("crm.server.opportunity.recontact-required", "Takip aktivitesi için yeniden iletişim tarihi girin.");
+
+        public static ServerMessage FollowUpPermission =>
+            ServerMessage.Of("crm.server.opportunity.follow-up-permission", "Takip aktivitesi oluşturmak için aktivite yazma izni gerekir.");
+
+        public static ServerMessage NoLostStage =>
+            ServerMessage.Of("crm.server.opportunity.no-lost-stage", "Kaybedildi kategorisinde etkin bir aşama bulunamadı.");
+
+        public static ServerMessage CancelReasonRequired =>
+            ServerMessage.Of("crm.server.opportunity.cancel-reason-required", "İptal gerekçesi zorunludur.");
+
+        public static ServerMessage HoldReasonRequired =>
+            ServerMessage.Of("crm.server.opportunity.hold-reason-required", "Beklemeye alma gerekçesi zorunludur.");
+
+        public static ServerMessage ReviewDateInFuture =>
+            ServerMessage.Of("crm.server.opportunity.review-date-in-future", "Yeniden değerlendirme tarihi gelecekte olmalıdır.");
+
+        public static ServerMessage ReopenReasonRequired =>
+            ServerMessage.Of("crm.server.opportunity.reopen-reason-required", "Yeniden açma gerekçesi zorunludur.");
+
+        public static ServerMessage ReopenStage =>
+            ServerMessage.Of("crm.server.opportunity.reopen-stage", "Yeniden açılan fırsat için etkin, açık bir aşama seçin.");
+
+        public static ServerMessage ExpectedCloseInPast =>
+            ServerMessage.Of("crm.server.opportunity.expected-close-in-past", "Tahmini kapanış tarihi geçmişte olamaz.");
+
+        public static ServerMessage ProbabilityRange =>
+            ServerMessage.Of("crm.server.opportunity.probability-range", "Olasılık 0 ile 100 arasında olmalıdır.");
+
+        public static ServerMessage NewMustBeOpen =>
+            ServerMessage.Of("crm.server.opportunity.new-must-be-open",
+                "Yeni fırsat açık bir aşamada başlamalıdır (kazanıldı/kaybedildi aşaması seçilemez).");
+
+        public static ServerMessage StageByActionOnly =>
+            ServerMessage.Of("crm.server.opportunity.stage-by-action-only",
+                "Aşama ve durum yalnızca aşama değiştirme / kapatma eylemleriyle değişir.");
+
+        public static ServerMessage StageStatusMismatch => ServerMessage.Of("crm.server.opportunity.stage-status-mismatch", "Aşama ile durum çelişiyor.");
+
+        public static ServerMessage WonAmountRequired =>
+            ServerMessage.Of("crm.server.opportunity.won-amount-required", "Kazanılan tutar girilmeli (fırsat tutarı da bilinmiyor).");
+
+        public static ServerMessage StageFieldRequired(string stage) =>
+            ServerMessage.Of("crm.server.opportunity.stage-field-required", "\"{0}\" aşamasına geçmek için bu alan dolu olmalı.", stage);
+
+        public static ServerMessage ContactAlreadyLinked =>
+            ServerMessage.Of("crm.server.opportunity.contact-already-linked", "Bu kişi bu fırsata zaten bağlı.");
+
+        public static ServerMessage PrimaryContactExists =>
+            ServerMessage.Of("crm.server.opportunity.primary-contact-exists", "Bu fırsatta zaten bir ana irtibat var; önce onun işaretini kaldırın.");
+
+        public static ServerMessage AlternativeCurrencyRequired =>
+            ServerMessage.Of("crm.server.opportunity.alternative-currency-required", "Alternatif teklif tutarı için para birimi girin.");
+    }
+
+    /// <summary>Aktivite kayıtları, durum geçişleri, zamanlama, ilişki ve katılımcı iletileri.</summary>
+    public static class Activity
+    {
+        public static ServerMessage NotFound => ServerMessage.Of("crm.server.activity.not-found", "Aktivite bulunamadı.");
+
+        public static ServerMessage LeadNotFound => ServerMessage.Of("crm.server.activity.lead-not-found", "Müşteri adayı bulunamadı.");
+
+        public static ServerMessage AlreadyInStatus => ServerMessage.Of("crm.server.activity.already-in-status", "Aktivite zaten bu durumda.");
+
+        public static ServerMessage StatusNotForType => ServerMessage.Of("crm.server.activity.status-not-for-type", "Bu tür aktivite bu duruma geçemez.");
+
+        public static ServerMessage SentEmailLocked => ServerMessage.Of("crm.server.activity.sent-email-locked", "Gönderilmiş e-posta değiştirilemez.");
+
+        public static ServerMessage TransitionNotAllowed =>
+            ServerMessage.Of("crm.server.activity.transition-not-allowed", "Bu durumdan istenen duruma geçilemez.");
+
+        public static ServerMessage AllDayStartRequired =>
+            ServerMessage.Of("crm.server.activity.all-day-start-required", "Tüm gün etkinliğinde başlangıç tarihi zorunludur.");
+
+        public static ServerMessage AllDayNoTime => ServerMessage.Of("crm.server.activity.all-day-no-time", "Tüm gün etkinliği saat içermez.");
+
+        public static ServerMessage DateRangeAllDayOnly =>
+            ServerMessage.Of("crm.server.activity.date-range-all-day-only", "Tarih aralığı yalnızca tüm gün etkinliğinde kullanılır.");
+
+        public static ServerMessage EndNeedsStart => ServerMessage.Of("crm.server.activity.end-needs-start", "Bitiş verilmişse başlangıç da verilmelidir.");
+
+        public static ServerMessage EndAfterStart => ServerMessage.Of("crm.server.activity.end-after-start", "Bitiş, başlangıçtan sonra olmalıdır.");
+
+        public static ServerMessage BlockReasonRequired => ServerMessage.Of("crm.server.activity.block-reason-required", "Bloke nedeni zorunludur.");
+
+        public static ServerMessage CancelReasonRequired => ServerMessage.Of("crm.server.activity.cancel-reason-required", "İptal gerekçesi zorunludur.");
+
+        public static ServerMessage ReopenReasonRequired =>
+            ServerMessage.Of("crm.server.activity.reopen-reason-required", "Yeniden açma gerekçesi zorunludur.");
+
+        public static ServerMessage AlreadyOpen => ServerMessage.Of("crm.server.activity.already-open", "Aktivite zaten açık.");
+
+        public static ServerMessage RescheduleReasonRequired =>
+            ServerMessage.Of("crm.server.activity.reschedule-reason-required", "Erteleme gerekçesi zorunludur.");
+
+        public static ServerMessage RescheduleClosed =>
+            ServerMessage.Of("crm.server.activity.reschedule-closed", "Kapanmış aktivite ertelenemez; önce yeniden açın.");
+
+        public static ServerMessage Conflicts(int count) =>
+            ServerMessage.Of("crm.server.activity.conflicts", "Bu saatte aynı sorumlunun {0} çakışan aktivitesi var.", count);
+
+        public static ServerMessage ReassignClosed => ServerMessage.Of("crm.server.activity.reassign-closed", "Kapanmış aktivite yeniden atanamaz.");
+
+        public static ServerMessage TaskNoOutcome => ServerMessage.Of("crm.server.activity.task-no-outcome", "Görevin sonuç kodu olmaz.");
+
+        public static ServerMessage OutcomeOneOf(string allowed) =>
+            ServerMessage.Of("crm.server.activity.outcome-one-of", "Sonuç şunlardan biri olmalıdır: {0}.", allowed);
+
+        public static ServerMessage CompletedInFuture =>
+            ServerMessage.Of("crm.server.activity.completed-in-future", "Tamamlanma zamanı gelecekte olamaz.");
+
+        public static ServerMessage BlockedCannotComplete =>
+            ServerMessage.Of("crm.server.activity.blocked-cannot-complete", "Bloke görev tamamlanamaz; önce engeli kaldırın.");
+
+        public static ServerMessage NextStepSubjectRequired =>
+            ServerMessage.Of("crm.server.activity.next-step-subject-required", "Sonraki adımın konusu zorunludur.");
+
+        public static ServerMessage NotBlocked => ServerMessage.Of("crm.server.activity.not-blocked", "Aktivite bloke değil.");
+
+        public static ServerMessage FamilyChangeLocked =>
+            ServerMessage.Of("crm.server.activity.family-change-locked",
+                "Başlamış ya da kapanmış bir aktivitenin türü başka bir aileye değiştirilemez.");
+
+        public static ServerMessage TimedBlockMaxDays(int days) =>
+            ServerMessage.Of("crm.server.activity.timed-block-max-days", "Zaman bloğu en fazla {0} gün olabilir.", days);
+
+        public static ServerMessage AllDayMaxDays(int days) =>
+            ServerMessage.Of("crm.server.activity.all-day-max-days", "Tüm gün etkinliği en fazla {0} gün sürebilir.", days);
+
+        public static ServerMessage InvalidTimeZone =>
+            ServerMessage.Of("crm.server.activity.invalid-time-zone", "Geçerli bir saat dilimi kimliği girin (ör. Europe/Istanbul).");
+
+        public static ServerMessage TimeZoneRequired =>
+            ServerMessage.Of("crm.server.activity.time-zone-required", "Saatli etkinlik için saat dilimi zorunludur.");
+
+        public static ServerMessage ClosedScheduleLocked =>
+            ServerMessage.Of("crm.server.activity.closed-schedule-locked", "Kapanmış aktivitenin zamanı değiştirilemez; önce yeniden açın.");
+
+        public static ServerMessage RelationRequired =>
+            ServerMessage.Of("crm.server.activity.relation-required", "Aktivite ve ilişkilendirilecek kayıt zorunludur.");
+
+        public static ServerMessage ActivityRequired => ServerMessage.Of("crm.server.activity.activity-required", "Aktivite zorunludur.");
+
+        public static ServerMessage RelationRecordLocked =>
+            ServerMessage.Of("crm.server.activity.relation-record-locked", "Bağlı kayıt değiştirilemez; ilişkiyi silip yenisini ekleyin.");
+
+        public static ServerMessage RelationTypeNotAllowed =>
+            ServerMessage.Of("crm.server.activity.relation-type-not-allowed", "Bu kayıt türü aktiviteye bağlanamaz.");
+
+        public static ServerMessage RelationExists => ServerMessage.Of("crm.server.activity.relation-exists", "Bu kayıt aktiviteye zaten bağlı.");
+
+        public static ServerMessage PrimaryRelationExists =>
+            ServerMessage.Of("crm.server.activity.primary-relation-exists",
+                "Aktivitenin zaten birincil bir ilişkisi var; önce onu birincil olmaktan çıkarın.");
+
+        public static ServerMessage ParticipantOneOf =>
+            ServerMessage.Of("crm.server.activity.participant-one-of", "Katılımcı olarak tam olarak biri verilmelidir: kullanıcı, kişi ya da e-posta.");
+
+        public static ServerMessage ParticipantLocked =>
+            ServerMessage.Of("crm.server.activity.participant-locked", "Katılımcı değiştirilemez; silip yenisini ekleyin.");
+
+        public static ServerMessage ParticipantExists => ServerMessage.Of("crm.server.activity.participant-exists", "Bu katılımcı zaten ekli.");
+
+        public static ServerMessage BulkInvalidTitle => ServerMessage.Of("crm.server.activity.bulk-invalid.title", "Geçersiz istek.");
+
+        public static ServerMessage BulkCount(int max) =>
+            ServerMessage.Of("crm.server.activity.bulk-count", "Bir seferde 1 ile {0} arasında kayıt işlenebilir.", max);
+
+        public static ServerMessage BulkUnknownAction => ServerMessage.Of("crm.server.activity.bulk-unknown-action", "Bilinmeyen toplu işlem.");
+
+        public static ServerMessage BulkOwnerRequired => ServerMessage.Of("crm.server.activity.bulk-owner-required", "Yeni sorumlu zorunludur.");
+
+        public static ServerMessage BulkShiftDays =>
+            ServerMessage.Of("crm.server.activity.bulk-shift-days", "Kaydırılacak gün sayısı 1-366 arası olmalıdır.");
+    }
 }

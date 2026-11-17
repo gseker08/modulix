@@ -4,6 +4,7 @@ using Modulix.Core.Contracts.Approvals;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Records;
@@ -112,12 +113,12 @@ internal sealed class OpportunityWorkflow(
         var target = list.Find(stage?.Trim() ?? string.Empty);
         if (target is null || !target.Active)
         {
-            return Invalid("Listede olmayan ya da kullanılmayan aşama.", "stage");
+            return Invalid(CrmMessages.Opportunity.UnknownStage, "stage");
         }
 
         if (target.Category != CrmModule.StageCategories.Open)
         {
-            return Invalid("Kazanıldı/kaybedildi aşamasına geçmek için fırsatı kapatın (kazan / kaybet).", "stage");
+            return Invalid(CrmMessages.Opportunity.StageNeedsClose, "stage");
         }
 
         // Aynı aşamaya geçiş değişiklik üretmez (çift tıklama / yinelenen istek tarihçeyi çoğaltmaz).
@@ -155,17 +156,17 @@ internal sealed class OpportunityWorkflow(
         var closeDate = request.ActualCloseDate ?? today;
         if (closeDate > today)
         {
-            return Invalid("Gerçek kapanış tarihi gelecekte olamaz.", "actualCloseDate");
+            return Invalid(CrmMessages.Opportunity.CloseDateInFuture, "actualCloseDate");
         }
 
         if (request.WonCurrency is { } code && (code.Trim().Length != Opportunity.CurrencyLength || !code.Trim().All(char.IsAsciiLetter)))
         {
-            return Invalid("Üç harfli para birimi kodu girin (ör. TRY).", "wonCurrency");
+            return Invalid(CrmMessages.Field.Currency, "wonCurrency");
         }
 
         if (request.WonAmount is < 0)
         {
-            return Invalid("Kazanılan tutar negatif olamaz.", "wonAmount");
+            return Invalid(CrmMessages.Opportunity.WonAmountNegative, "wonAmount");
         }
 
         var list = await choiceLists.GetAsync(CrmModule.Lists.OpportunityStage, cancellationToken);
@@ -174,7 +175,7 @@ internal sealed class OpportunityWorkflow(
             : list.Values.FirstOrDefault(v => v.Active && v.Category == CrmModule.StageCategories.Won);
         if (stage is null || !stage.Active || stage.Category != CrmModule.StageCategories.Won)
         {
-            return Invalid("Kazanıldı kategorisinde etkin bir aşama bulunamadı.", "stage");
+            return Invalid(CrmMessages.Opportunity.NoWonStage, "stage");
         }
 
         var values = new JsonObject
@@ -216,20 +217,20 @@ internal sealed class OpportunityWorkflow(
 
         if (string.IsNullOrWhiteSpace(request.Reason))
         {
-            return Invalid("Kaybetme nedeni zorunludur.", "lossReason");
+            return Invalid(CrmMessages.Opportunity.LossReasonRequired, "lossReason");
         }
 
         var reasons = await choiceLists.GetAsync(CrmModule.Lists.OpportunityLossReason, cancellationToken);
         var reason = reasons.Find(request.Reason.Trim());
         if (reason is null || !reason.Active)
         {
-            return Invalid("Listede olmayan ya da kullanılmayan kaybetme nedeni.", "lossReason");
+            return Invalid(CrmMessages.Opportunity.UnknownLossReason, "lossReason");
         }
 
         // "Diğer" seçilirse açıklama istenir.
         if (reason.Category == CrmModule.LossCategories.Other && string.IsNullOrWhiteSpace(request.Note))
         {
-            return Invalid("\"Diğer\" nedeni için açıklama girin.", "lostReason");
+            return Invalid(CrmMessages.Opportunity.OtherReasonText, "lostReason");
         }
 
         if (request.WinningCompetitorId is { } competitorId)
@@ -237,38 +238,38 @@ internal sealed class OpportunityWorkflow(
             // Kazanan rakip bu fırsatın rakiplerinden biri olmalı ve nedeni rakibe kaybetmek olmalı; vazgeçme / mevcut çözüm rakibe kayıp değildir.
             if (reason.Category != CrmModule.LossCategories.Competitor)
             {
-                return Invalid("Kazanan rakip yalnızca \"rakibe kaybedildi\" kategorisindeki nedenlerle belirtilir.", "winningCompetitorId");
+                return Invalid(CrmMessages.Opportunity.CompetitorReasonOnly, "winningCompetitorId");
             }
 
             var competitors = await pipeline.QueryAsync(new RecordQuery(CrmModule.Entities.OpportunityCompetitor, 1, RecordQuery.MaxPageSize, null,
                 new Dictionary<string, string> { ["opportunityId"] = id.ToString() }), cancellationToken);
             if (!competitors.IsSuccess || competitors.Value!.Items.All(c => c.Id != competitorId))
             {
-                return Invalid("Rakip bu fırsatın rakipleri arasında değil.", "winningCompetitorId");
+                return Invalid(CrmMessages.Opportunity.CompetitorNotListed, "winningCompetitorId");
             }
         }
 
         var today = await TodayAsync(cancellationToken);
         if (request.RecontactDate is { } recontact && recontact <= today)
         {
-            return Invalid("Yeniden iletişim tarihi gelecekte olmalıdır.", "recontactDate");
+            return Invalid(CrmMessages.Opportunity.RecontactInFuture, "recontactDate");
         }
 
         if (request.CreateFollowUp && request.RecontactDate is null)
         {
-            return Invalid("Takip aktivitesi için yeniden iletişim tarihi girin.", "recontactDate");
+            return Invalid(CrmMessages.Opportunity.RecontactRequired, "recontactDate");
         }
 
         if (request.CreateFollowUp && !await access.HasPermissionAsync(CrmModule.Permissions.ActivitiesWrite, cancellationToken))
         {
-            return Invalid("Takip aktivitesi oluşturmak için aktivite yazma izni gerekir.", "createFollowUp");
+            return Invalid(CrmMessages.Opportunity.FollowUpPermission, "createFollowUp");
         }
 
         var list = await choiceLists.GetAsync(CrmModule.Lists.OpportunityStage, cancellationToken);
         var stage = list.Values.FirstOrDefault(v => v.Active && v.Category == CrmModule.StageCategories.Lost);
         if (stage is null)
         {
-            return Invalid("Kaybedildi kategorisinde etkin bir aşama bulunamadı.", "stage");
+            return Invalid(CrmMessages.Opportunity.NoLostStage, "stage");
         }
 
         var result = await CloseAsync(opp, version, ClosePermissions, null, OpportunityEventReasons.Lost, new JsonObject
@@ -316,7 +317,7 @@ internal sealed class OpportunityWorkflow(
 
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return Invalid("İptal gerekçesi zorunludur.", "statusReason");
+            return Invalid(CrmMessages.Opportunity.CancelReasonRequired, "statusReason");
         }
 
         // İptal edilen fırsat son açık aşamasını korur (aşama kategorisi açık kalır); kaybedilmiş sayılmaz.
@@ -343,12 +344,12 @@ internal sealed class OpportunityWorkflow(
 
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return Invalid("Beklemeye alma gerekçesi zorunludur.", "statusReason");
+            return Invalid(CrmMessages.Opportunity.HoldReasonRequired, "statusReason");
         }
 
         if (reviewDate <= await TodayAsync(cancellationToken))
         {
-            return Invalid("Yeniden değerlendirme tarihi gelecekte olmalıdır.", "holdReviewDate");
+            return Invalid(CrmMessages.Opportunity.ReviewDateInFuture, "holdReviewDate");
         }
 
         return await UpdateAsync(opp, version, StagePermissions, reason.Trim(), OpportunityEventReasons.Held, new JsonObject
@@ -391,24 +392,24 @@ internal sealed class OpportunityWorkflow(
 
         if (string.IsNullOrWhiteSpace(request.Reason))
         {
-            return Invalid("Yeniden açma gerekçesi zorunludur.", "statusReason");
+            return Invalid(CrmMessages.Opportunity.ReopenReasonRequired, "statusReason");
         }
 
         var list = await choiceLists.GetAsync(CrmModule.Lists.OpportunityStage, cancellationToken);
         var stage = list.Find(request.Stage?.Trim() ?? string.Empty);
         if (stage is null || !stage.Active || stage.Category != CrmModule.StageCategories.Open)
         {
-            return Invalid("Yeniden açılan fırsat için etkin, açık bir aşama seçin.", "stage");
+            return Invalid(CrmMessages.Opportunity.ReopenStage, "stage");
         }
 
         if (request.ExpectedCloseDate < await TodayAsync(cancellationToken))
         {
-            return Invalid("Tahmini kapanış tarihi geçmişte olamaz.", "expectedCloseDate");
+            return Invalid(CrmMessages.Opportunity.ExpectedCloseInPast, "expectedCloseDate");
         }
 
         if (request.Probability is < 0 or > 100)
         {
-            return Invalid("Olasılık 0 ile 100 arasında olmalıdır.", "probability");
+            return Invalid(CrmMessages.Opportunity.ProbabilityRange, "probability");
         }
 
         var values = new JsonObject
@@ -454,7 +455,7 @@ internal sealed class OpportunityWorkflow(
         var record = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
         if (!record.IsSuccess)
         {
-            return RecordResult<IReadOnlyList<OpportunityHistoryItem>>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors);
+            return RecordResult<IReadOnlyList<OpportunityHistoryItem>>.Fail(record.Error!);
         }
 
         var showAmounts = await access.HasPermissionAsync(CrmModule.Permissions.OpportunityAmountsRead, cancellationToken);
@@ -483,8 +484,8 @@ internal sealed class OpportunityWorkflow(
     {
         var result = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
         return result.IsSuccess
-            ? RecordResult<OpportunityActionResult>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için şu izinlerden biri gerekir: {string.Join(", ", permissions)}.")
-            : RecordResult<OpportunityActionResult>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
+            ? RecordResult<OpportunityActionResult>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.AnyPermissionRequired(string.Join(", ", permissions)))
+            : RecordResult<OpportunityActionResult>.Fail(result.Error!);
     }
 
     private async Task<RecordResult<OpportunityActionResult>> UpdateAsync(
@@ -498,7 +499,7 @@ internal sealed class OpportunityWorkflow(
 
         return result.IsSuccess
             ? Done(result.Value!)
-            : RecordResult<OpportunityActionResult>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
+            : RecordResult<OpportunityActionResult>.Fail(result.Error!);
     }
 
     // Kapanış: kayıt kapanır; açık aktiviteler silinmez (açık kalır) ve sayıları sonuçta bildirilir. Kazanma ve kaybetme iş olayını
@@ -559,6 +560,6 @@ internal sealed class OpportunityWorkflow(
 
     private static string? Trim(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
-    private static RecordResult<OpportunityActionResult> Invalid(string message, string field) =>
+    private static RecordResult<OpportunityActionResult> Invalid(ServerMessage message, string field) =>
         RecordResult<OpportunityActionResult>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

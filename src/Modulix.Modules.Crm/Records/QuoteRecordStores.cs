@@ -65,7 +65,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
         Field.Text<Quote>("description", Quote.TextMaxLength, q => q.Description, (q, v) => q.Description = v),
         Field.Reference<Quote, Company>("companyId", "Firma bulunamadı.", q => q.CompanyId, (q, v) => q.CompanyId = v!.Value, required: true),
         Field.Reference<Quote, Contact>("contactId", "Kişi bulunamadı.", q => q.ContactId, (q, v) => q.ContactId = v),
-        Field.Reference<Quote, Opportunity>("opportunityId", "Fırsat bulunamadı.", q => q.OpportunityId, (q, v) => q.OpportunityId = v),
+        Field.Reference<Quote, Opportunity>("opportunityId", CrmMessages.Opportunity.NotFound, q => q.OpportunityId, (q, v) => q.OpportunityId = v),
         Field.Reference<Quote, PriceList>("priceListId", "Fiyat listesi bulunamadı.", q => q.PriceListId, (q, v) => q.PriceListId = v),
         Field.Owner<Quote>(OwnerField, q => q.OwnerId, (q, v) => q.OwnerId = v),
         Field.Text<Quote>("status", Quote.StatusMaxLength, q => q.Status, (q, v) => q.Status = v!).AsSystem(),

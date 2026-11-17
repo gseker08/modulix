@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -77,7 +78,7 @@ internal sealed class ActivityWorkflow(
 
     public async Task<RecordResult<RecordData>> BlockAsync(Guid id, long version, string reason, CancellationToken cancellationToken) =>
         string.IsNullOrWhiteSpace(reason)
-            ? Invalid("Bloke nedeni zorunludur.", "statusReason")
+            ? Invalid(CrmMessages.Activity.BlockReasonRequired, "statusReason")
             : await MoveAsync(id, version, ActivityStatus.Blocked, CrmModule.Permissions.ActivitiesWrite, ActivityEventReasons.Blocked,
                 _ => new JsonObject { ["statusReason"] = reason.Trim() }, cancellationToken);
 
@@ -87,7 +88,7 @@ internal sealed class ActivityWorkflow(
 
     public async Task<RecordResult<RecordData>> CancelAsync(Guid id, long version, string reason, CancellationToken cancellationToken) =>
         string.IsNullOrWhiteSpace(reason)
-            ? Invalid("İptal gerekçesi zorunludur.", "statusReason")
+            ? Invalid(CrmMessages.Activity.CancelReasonRequired, "statusReason")
             : await MoveAsync(id, version, ActivityStatus.Cancelled, CrmModule.Permissions.ActivitiesWrite, ActivityEventReasons.Cancelled,
                 _ => new JsonObject { ["statusReason"] = reason.Trim() }, cancellationToken);
 
@@ -95,7 +96,7 @@ internal sealed class ActivityWorkflow(
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return Invalid("Yeniden açma gerekçesi zorunludur.", "statusReason");
+            return Invalid(CrmMessages.Activity.ReopenReasonRequired, "statusReason");
         }
 
         if (await LoadAsync(id, cancellationToken) is not { Activity: { } activity, Family: var family, Error: null })
@@ -106,7 +107,7 @@ internal sealed class ActivityWorkflow(
         var status = ActivityRules.Normalize(family, Text(activity, "status"));
         if (ActivityStatus.IsOpen(status))
         {
-            return Invalid("Aktivite zaten açık.", "status");
+            return Invalid(CrmMessages.Activity.AlreadyOpen, "status");
         }
 
         var initial = ActivityRules.InitialStatus(family);
@@ -127,7 +128,7 @@ internal sealed class ActivityWorkflow(
     {
         if (string.IsNullOrWhiteSpace(command.Reason))
         {
-            return Invalid("Erteleme gerekçesi zorunludur.", "statusReason");
+            return Invalid(CrmMessages.Activity.RescheduleReasonRequired, "statusReason");
         }
 
         if (await LoadAsync(id, cancellationToken) is not { Activity: { } activity, Family: var family, Error: null })
@@ -137,7 +138,7 @@ internal sealed class ActivityWorkflow(
 
         if (!ActivityStatus.IsOpen(ActivityRules.Normalize(family, Text(activity, "status"))))
         {
-            return Invalid("Kapanmış aktivite ertelenemez; önce yeniden açın.", "status");
+            return Invalid(CrmMessages.Activity.RescheduleClosed, "status");
         }
 
         if (ActivityRules.ValidateSchedule(command.IsAllDay, command.StartAt, command.EndAt, command.StartDate, command.EndDate) is { } invalid)
@@ -148,7 +149,7 @@ internal sealed class ActivityWorkflow(
         if (!command.AllowConflict && command.StartAt is { } start && command.EndAt is { } end
             && await ConflictCountAsync(activity, start, end, cancellationToken) is var conflicts and > 0)
         {
-            return Invalid($"Bu saatte aynı sorumlunun {conflicts} çakışan aktivitesi var.", "conflict");
+            return Invalid(CrmMessages.Activity.Conflicts(conflicts), "conflict");
         }
 
         static string? Instant(DateTimeOffset? value) => value?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
@@ -174,7 +175,7 @@ internal sealed class ActivityWorkflow(
 
         if (!ActivityStatus.IsOpen(ActivityRules.Normalize(family, Text(activity, "status"))))
         {
-            return Invalid("Kapanmış aktivite yeniden atanamaz.", "status");
+            return Invalid(CrmMessages.Activity.ReassignClosed, "status");
         }
 
         // Aynı kişiye yeniden atama değişiklik üretmez: tekrar denemelerde bildirim ve audit çoğalmaz.
@@ -194,32 +195,32 @@ internal sealed class ActivityWorkflow(
         if (await LoadAsync(id, cancellationToken) is not { Activity: { } activity, Family: var family, Error: null })
         {
             var failed = await FailAsync(id, cancellationToken);
-            return RecordResult<ActivityCompletion>.Fail(failed.Error!.Code, failed.Error.Message, failed.Error.FieldErrors);
+            return RecordResult<ActivityCompletion>.Fail(failed.Error!);
         }
 
         var outcome = command.Outcome ?? DefaultOutcome(family);
         if (family == ActivityFamily.Task ? outcome is not null : outcome is null || !AllowedOutcomes(family).Contains(outcome))
         {
-            return InvalidCompletion(family == ActivityFamily.Task ? "Görevin sonuç kodu olmaz." : $"Sonuç şunlardan biri olmalıdır: {string.Join(", ", AllowedOutcomes(family))}.", "outcome");
+            return InvalidCompletion(family == ActivityFamily.Task ? CrmMessages.Activity.TaskNoOutcome : CrmMessages.Activity.OutcomeOneOf(string.Join(", ", AllowedOutcomes(family))), "outcome");
         }
 
         var now = time.GetUtcNow();
         var completedAt = command.CompletedAt ?? now;
         if (completedAt > now + FutureTolerance)
         {
-            return InvalidCompletion("Tamamlanma zamanı gelecekte olamaz.", "completedAt");
+            return InvalidCompletion(CrmMessages.Activity.CompletedInFuture, "completedAt");
         }
 
         var target = ActivityRules.CompletionTarget(family, outcome);
         var status = ActivityRules.Normalize(family, Text(activity, "status"));
         if (ActivityRules.CanMove(family, status, target) is { } blocked)
         {
-            return InvalidCompletion(status == ActivityStatus.Blocked ? "Bloke görev tamamlanamaz; önce engeli kaldırın." : blocked, "status");
+            return InvalidCompletion(status == ActivityStatus.Blocked ? CrmMessages.Activity.BlockedCannotComplete : blocked, "status");
         }
 
         if (command.NextStep is { } step && string.IsNullOrWhiteSpace(step.Subject))
         {
-            return InvalidCompletion("Sonraki adımın konusu zorunludur.", "nextStep");
+            return InvalidCompletion(CrmMessages.Activity.NextStepSubjectRequired, "nextStep");
         }
 
         return await pipeline.RunAtomicAsync(async ct =>
@@ -239,7 +240,7 @@ internal sealed class ActivityWorkflow(
             var done = await UpdateAsync(activity, version, CrmModule.Permissions.ActivitiesWrite, ActivityEventReasons.Completed, values, ct);
             if (!done.IsSuccess)
             {
-                return RecordResult<ActivityCompletion>.Fail(done.Error!.Code, done.Error.Message, done.Error.FieldErrors);
+                return RecordResult<ActivityCompletion>.Fail(done.Error!);
             }
 
             if (command.NextStep is null)
@@ -250,7 +251,7 @@ internal sealed class ActivityWorkflow(
             var next = await CreateNextStepAsync(done.Value!, command.NextStep, ct);
             return next.IsSuccess
                 ? RecordResult<ActivityCompletion>.Ok(new ActivityCompletion(done.Value!, next.Value))
-                : RecordResult<ActivityCompletion>.Fail(next.Error!.Code, next.Error.Message, next.Error.FieldErrors);
+                : RecordResult<ActivityCompletion>.Fail(next.Error!);
         }, cancellationToken);
     }
 
@@ -303,7 +304,7 @@ internal sealed class ActivityWorkflow(
             }), cancellationToken);
             if (!copy.IsSuccess)
             {
-                return RecordResult<RecordData>.Fail(copy.Error!.Code, copy.Error.Message, copy.Error.FieldErrors);
+                return RecordResult<RecordData>.Fail(copy.Error!);
             }
         }
 
@@ -337,7 +338,7 @@ internal sealed class ActivityWorkflow(
         var status = ActivityRules.Normalize(family, Text(activity, "status"));
         if (requireFrom is not null && status != requireFrom)
         {
-            return Invalid("Aktivite bloke değil.", "status");
+            return Invalid(CrmMessages.Activity.NotBlocked, "status");
         }
 
         if (ActivityRules.CanMove(family, status, target) is { } blocked)
@@ -387,7 +388,7 @@ internal sealed class ActivityWorkflow(
         var result = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
         return result.IsSuccess
             ? RecordResult<RecordData>.Ok(result.Value!)
-            : RecordResult<RecordData>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
+            : RecordResult<RecordData>.Fail(result.Error!);
     }
 
     private async Task<RecordResult<RecordData>> UpdateAsync(
@@ -399,9 +400,9 @@ internal sealed class ActivityWorkflow(
 
     private static string? Text(RecordData record, string name) => record.Values[name]?.GetValue<string>();
 
-    private static RecordResult<RecordData> Invalid(string message, string field) =>
+    private static RecordResult<RecordData> Invalid(ServerMessage message, string field) =>
         RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 
-    private static RecordResult<ActivityCompletion> InvalidCompletion(string message, string field) =>
+    private static RecordResult<ActivityCompletion> InvalidCompletion(ServerMessage message, string field) =>
         RecordResult<ActivityCompletion>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

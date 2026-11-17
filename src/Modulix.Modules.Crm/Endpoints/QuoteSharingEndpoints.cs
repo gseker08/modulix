@@ -324,7 +324,7 @@ internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvid
         var existing = await sharing.ListDocumentsAsync(quoteId, cancellationToken);
         if (!existing.IsSuccess)
         {
-            return RecordResult<QuoteDocumentInfo>.Fail(existing.Error!.Code, existing.Error.Message, existing.Error.FieldErrors);
+            return RecordResult<QuoteDocumentInfo>.Fail(existing.Error!);
         }
 
         if (existing.Value!.FirstOrDefault() is { } document)
@@ -335,7 +335,7 @@ internal sealed class QuoteDocumentService(IQuoteSharing sharing, IServiceProvid
         var snapshot = await sharing.BuildSnapshotAsync(quoteId, await SellerAsync(cancellationToken), cancellationToken);
         if (!snapshot.IsSuccess)
         {
-            return RecordResult<QuoteDocumentInfo>.Fail(snapshot.Error!.Code, snapshot.Error.Message, snapshot.Error.FieldErrors);
+            return RecordResult<QuoteDocumentInfo>.Fail(snapshot.Error!);
         }
 
         var pdf = QuotePdf.Render(snapshot.Value!, await sharing.CustomerTextsAsync(quoteId, cancellationToken));

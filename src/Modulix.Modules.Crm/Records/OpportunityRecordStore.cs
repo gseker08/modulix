@@ -38,8 +38,8 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
         Field.Text<Opportunity>("opportunityNumber", Opportunity.NumberMaxLength, o => o.OpportunityNumber, (o, v) => o.OpportunityNumber = v!).AsSystem(),
         Field.Text<Opportunity>("title", Opportunity.TitleMaxLength, o => o.Title, (o, v) => o.Title = v!, required: true),
         Field.Text<Opportunity>("description", Opportunity.TextMaxLength, o => o.Description, (o, v) => o.Description = v),
-        Field.Reference<Opportunity, Company>("companyId", "Firma bulunamadı.", o => o.CompanyId, (o, v) => o.CompanyId = v!.Value, required: true),
-        Field.Reference<Opportunity, Contact>("contactId", "Kişi bulunamadı.", o => o.ContactId, (o, v) => o.ContactId = v),
+        Field.Reference<Opportunity, Company>("companyId", CrmMessages.Lookup.CompanyNotFound, o => o.CompanyId, (o, v) => o.CompanyId = v!.Value, required: true),
+        Field.Reference<Opportunity, Contact>("contactId", CrmMessages.Lookup.ContactNotFound, o => o.ContactId, (o, v) => o.ContactId = v),
         // Kaynak Lead yalnızca dönüşüm işleminde (iş akışı kapısı açıkken) yazılır; genel uçlardan gelen değer yok sayılır.
         Field.Id<Opportunity>("sourceLeadId", o => o.SourceLeadId, (o, v) => o.SourceLeadId = v).AsSystem(),
         // Kampanya bağı (ADR-0025): Pazarlama modülünün kaydı; dönüşümde müşteri adayından geçer, elle seçilirse görünürlüğü denetlenir (LookupGuard).
@@ -216,7 +216,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
     {
         if (CategoryOf(entity.Stage) != CrmModule.StageCategories.Open)
         {
-            throw new RecordValidationException([new RecordFieldError("stage", "Yeni fırsat açık bir aşamada başlamalıdır (kazanıldı/kaybedildi aşaması seçilemez).")]);
+            throw new RecordValidationException([new RecordFieldError("stage", CrmMessages.Opportunity.NewMustBeOpen)]);
         }
 
         // Aşama koşulları oluşturmada uygulanmaz (kullanıcı kayıt açarken engellenmez); aşamaya GEÇERKEN uygulanır.
@@ -263,14 +263,14 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
 
         if ((stageChanged || statusChanged) && !GateOpen)
         {
-            throw new RecordValidationException([new RecordFieldError("stage", "Aşama ve durum yalnızca aşama değiştirme / kapatma eylemleriyle değişir.")]);
+            throw new RecordValidationException([new RecordFieldError("stage", CrmMessages.Opportunity.StageByActionOnly)]);
         }
 
         // Aşama–durum tutarlılığı her yazımda denetlenir: çelişkili birleşim hiçbir yoldan kaydedilemez.
         var category = CategoryOf(entity.Stage);
         if (category is null || !OpportunityRules.IsConsistent(entity.Status, category))
         {
-            throw new RecordValidationException([new RecordFieldError("stage", "Aşama ile durum çelişiyor.")]);
+            throw new RecordValidationException([new RecordFieldError("stage", CrmMessages.Opportunity.StageStatusMismatch)]);
         }
 
         if (stageChanged)
@@ -292,12 +292,12 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
 
             if (entity.Status == OpportunityStatus.Won && entity.WonAmount is null)
             {
-                throw new RecordValidationException([new RecordFieldError("wonAmount", "Kazanılan tutar girilmeli (fırsat tutarı da bilinmiyor).")]);
+                throw new RecordValidationException([new RecordFieldError("wonAmount", CrmMessages.Opportunity.WonAmountRequired)]);
             }
 
             if (entity.Status == OpportunityStatus.Lost && string.IsNullOrWhiteSpace(entity.LossReason))
             {
-                throw new RecordValidationException([new RecordFieldError("lossReason", "Kaybetme nedeni zorunludur.")]);
+                throw new RecordValidationException([new RecordFieldError("lossReason", CrmMessages.Opportunity.LossReasonRequired)]);
             }
 
             var wasClosed = OpportunityStatus.IsClosed(stored.Status);
@@ -380,7 +380,7 @@ internal sealed class OpportunityRecordStore(CrmStoreContext context) : CrmRecor
             var field = Fields.FirstOrDefault(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));
             if (field is not null && IsBlank(field.Read(entity)))
             {
-                errors.Add(new RecordFieldError(field.Name, $"\"{stageLabel}\" aşamasına geçmek için bu alan dolu olmalı."));
+                errors.Add(new RecordFieldError(field.Name, CrmMessages.Opportunity.StageFieldRequired(stageLabel)));
             }
         }
 

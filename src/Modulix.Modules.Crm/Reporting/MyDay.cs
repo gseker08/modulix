@@ -268,7 +268,7 @@ internal sealed class MyDay(
             MyDayRules.Suggest(open, leads, quotes, now, policy.TimeZone, accepted, quoteReminderDays, staleDays), MyDayRules.ClosingThisMonth(open, today)));
     }
 
-    private static RecordResult<MyDayResult> Fail(RecordError error) => RecordResult<MyDayResult>.Fail(error.Code, error.Message, error.FieldErrors);
+    private static RecordResult<MyDayResult> Fail(RecordError error) => RecordResult<MyDayResult>.Fail(error);
 
     private static string? Text(JsonObject values, string name) => values[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
 
