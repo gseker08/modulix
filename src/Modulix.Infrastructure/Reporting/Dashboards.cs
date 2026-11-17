@@ -108,7 +108,7 @@ internal sealed class Dashboards(
     }
 
     public async Task<DashboardDetail?> ShareAsync(
-        Guid id, ReportVisibility visibility, IReadOnlyList<Guid> users, long? expectedVersion, CancellationToken cancellationToken)
+        Guid id, ReportVisibility visibility, IReadOnlyList<Guid> users, IReadOnlyList<ShareGroup> groups, long? expectedVersion, CancellationToken cancellationToken)
     {
         var tenant = RequireTenant();
         var dashboard = await Visible(tenant.UserId).SingleOrDefaultAsync(d => d.Id == id, cancellationToken);
@@ -125,11 +125,14 @@ internal sealed class Dashboards(
         }
 
         var wanted = visibility == ReportVisibility.Users ? users.Where(u => u != tenant.UserId).Distinct().ToList() : [];
+        var wantedGroups = visibility == ReportVisibility.Users
+            ? await ShareAudience.NormalizeAsync(db, groups, message => new DashboardException(message, "groups"), cancellationToken)
+            : [];
         if (visibility == ReportVisibility.Users)
         {
-            if (wanted.Count == 0)
+            if (wanted.Count == 0 && wantedGroups.Count == 0)
             {
-                throw new DashboardException("Paylaşmak için en az bir kullanıcı seçin.", "users");
+                throw new DashboardException("Paylaşmak için en az bir kullanıcı ya da grup seçin.", "users");
             }
 
             var active = (await members.ListActiveAsync(cancellationToken)).Select(m => m.UserId).ToHashSet();
@@ -143,21 +146,32 @@ internal sealed class Dashboards(
             await db.DashboardWidgets.AsNoTracking().Where(w => w.DashboardId == dashboard.Id).OrderBy(w => w.Position).ToListAsync(cancellationToken),
             cancellationToken);
         var current = await db.DashboardShares.Where(s => s.DashboardId == dashboard.Id).ToListAsync(cancellationToken);
-        var before = Snapshot(dashboard, dashboard.Name, widgets, [.. current.Select(s => s.UserId)]);
+        var before = Snapshot(
+            dashboard, dashboard.Name, widgets,
+            [.. current.Where(s => s.TargetKind == ShareTargetKind.User).Select(s => s.UserId)],
+            [.. current.Where(s => s.TargetKind != ShareTargetKind.User).Select(s => new ShareGroup(s.TargetKind, s.UserId))]);
         var now = time.GetUtcNow();
-        db.DashboardShares.RemoveRange(current.Where(s => !wanted.Contains(s.UserId)));
-        db.DashboardShares.AddRange(wanted.Where(u => current.All(s => s.UserId != u)).Select(u => new DashboardShare(dashboard.Id, u, tenant.UserId, now)));
+        db.DashboardShares.RemoveRange(current.Where(s => s.TargetKind == ShareTargetKind.User
+            ? !wanted.Contains(s.UserId)
+            : !wantedGroups.Contains(new ShareGroup(s.TargetKind, s.UserId))));
+        db.DashboardShares.AddRange(wanted
+            .Where(u => !current.Any(s => s.TargetKind == ShareTargetKind.User && s.UserId == u))
+            .Select(u => new DashboardShare(dashboard.Id, u, tenant.UserId, now)));
+        db.DashboardShares.AddRange(wantedGroups
+            .Where(g => !current.Any(s => s.TargetKind == g.Kind && s.UserId == g.Id))
+            .Select(g => new DashboardShare(dashboard.Id, g.Kind, g.Id, tenant.UserId, now)));
 
         // Erişimi biten kullanıcının varsayılan işareti kalkar: pano sonradan yeniden paylaşılırsa kendiliğinden varsayılan olmaz.
+        // Grupla erişen kullanıcılar (rol, ekip, iş birimi üyeleri) erişimini koruduğu için işaretleri kalır.
         if (visibility != ReportVisibility.Tenant)
         {
-            var keep = wanted.Append(tenant.UserId).ToList();
+            var keep = wanted.Append(tenant.UserId).Concat(await ShareAudience.UserIdsAsync(db, wantedGroups, cancellationToken)).ToList();
             db.DashboardDefaults.RemoveRange(
                 await db.DashboardDefaults.Where(x => x.DashboardId == dashboard.Id && !keep.Contains(x.UserId)).ToListAsync(cancellationToken));
         }
 
         dashboard.SetVisibility(visibility, now);
-        Audit(tenant, dashboard.Id, AuditAction.Updated, before, Snapshot(dashboard, dashboard.Name, widgets, wanted));
+        Audit(tenant, dashboard.Id, AuditAction.Updated, before, Snapshot(dashboard, dashboard.Name, widgets, wanted, wantedGroups));
         await SaveAsync(cancellationToken);
         return await DetailAsync(dashboard, tenant.UserId, cancellationToken);
     }
@@ -216,12 +230,23 @@ internal sealed class Dashboards(
 
     // ---- Görünürlük
 
-    /// <summary>Çağıranın görebildiği panolar: kendisinin, firmaya açık olanlar ve kendisiyle paylaşılanlar.</summary>
-    private IQueryable<Dashboard> Visible(Guid me) =>
-        db.Dashboards.Where(d =>
+    /// <summary>Çağıranın görebildiği panolar: kendisinin, firmaya açık olanlar, kendisiyle ve üyesi olduğu rol, ekip ya da iş birimiyle paylaşılanlar.</summary>
+    private IQueryable<Dashboard> Visible(Guid me)
+    {
+        // Grup paylaşımları (rol, ekip, iş birimi) çağıranın üyeliğinden her sorguda yeniden hesaplanır (ADR-0054 dilim 4a).
+        var membershipId = RequireTenant().MembershipId;
+        var roles = ShareAudience.RoleIds(db, membershipId);
+        var teams = ShareAudience.TeamIds(db, membershipId);
+        var units = ShareAudience.UnitIds(db, membershipId);
+        return db.Dashboards.Where(d =>
             d.OwnerUserId == me
             || d.Visibility == ReportVisibility.Tenant
-            || (d.Visibility == ReportVisibility.Users && db.DashboardShares.Any(s => s.DashboardId == d.Id && s.UserId == me)));
+            || (d.Visibility == ReportVisibility.Users && db.DashboardShares.Any(s => s.DashboardId == d.Id
+                && ((s.TargetKind == ShareTargetKind.User && s.UserId == me)
+                    || (s.TargetKind == ShareTargetKind.Role && roles.Contains(s.UserId))
+                    || (s.TargetKind == ShareTargetKind.Team && teams.Contains(s.UserId))
+                    || (s.TargetKind == ShareTargetKind.BusinessUnit && units.Contains(s.UserId))))));
+    }
 
     private static void RequireOwner(Dashboard dashboard, Guid me)
     {
@@ -341,14 +366,21 @@ internal sealed class Dashboards(
         var described = await DescribeAsync(widgets, cancellationToken);
         var summary = (await SummariesAsync([dashboard], me, cancellationToken))[0];
         var sharedWith = dashboard.OwnerUserId == me ? await SharedWithAsync(dashboard.Id, cancellationToken) : [];
+        var sharedGroups = dashboard.OwnerUserId == me ? await SharedGroupsAsync(dashboard.Id, cancellationToken) : [];
         return new DashboardDetail(
             summary,
             [.. widgets.Select((w, index) => new DashboardWidgetView(w.Id, w.ReportId, described[index].ReportName, w.Kind, w.Title, w.Position))],
-            sharedWith);
+            sharedWith,
+            sharedGroups);
     }
 
     private async Task<List<Guid>> SharedWithAsync(Guid dashboardId, CancellationToken cancellationToken) =>
-        await db.DashboardShares.AsNoTracking().Where(s => s.DashboardId == dashboardId).Select(s => s.UserId).ToListAsync(cancellationToken);
+        await db.DashboardShares.AsNoTracking().Where(s => s.DashboardId == dashboardId && s.TargetKind == ShareTargetKind.User).Select(s => s.UserId).ToListAsync(cancellationToken);
+
+    private async Task<List<ShareGroup>> SharedGroupsAsync(Guid dashboardId, CancellationToken cancellationToken) =>
+        (await db.DashboardShares.AsNoTracking().Where(s => s.DashboardId == dashboardId && s.TargetKind != ShareTargetKind.User)
+            .Select(s => new { s.TargetKind, Id = s.UserId }).ToListAsync(cancellationToken))
+        .Select(s => new ShareGroup(s.TargetKind, s.Id)).ToList();
 
     /// <summary>Bileşenlerin rapor adları; çağıranın artık göremediği raporun adı boş gelir.</summary>
     private async Task<List<(DashboardWidgetInput Input, string? ReportName)>> DescribeAsync(
@@ -366,8 +398,10 @@ internal sealed class Dashboards(
     // ---- Denetim ve kayıt
 
     private static JsonObject Snapshot(
-        Dashboard dashboard, string name, IEnumerable<(DashboardWidgetInput Input, string? ReportName)> widgets, IReadOnlyList<Guid> sharedWith) =>
-        new()
+        Dashboard dashboard, string name, IEnumerable<(DashboardWidgetInput Input, string? ReportName)> widgets, IReadOnlyList<Guid> sharedWith,
+        IReadOnlyList<ShareGroup>? groups = null)
+    {
+        var snapshot = new JsonObject
         {
             ["name"] = name,
             ["visibility"] = dashboard.Visibility.ToString(),
@@ -375,6 +409,13 @@ internal sealed class Dashboards(
             ["widgets"] = string.Join("; ", widgets.Select(w =>
                 $"{w.Input.Title ?? w.ReportName ?? "(rapor görünmüyor)"} ({(w.Input.Kind == DashboardWidgetKind.Bar ? "çubuk" : "sayı")})")),
         };
+        if (groups is { Count: > 0 })
+        {
+            snapshot["sharedWithGroups"] = string.Join(", ", groups.OrderBy(g => g.Kind).ThenBy(g => g.Id).Select(g => $"{g.Kind}:{g.Id}"));
+        }
+
+        return snapshot;
+    }
 
     private void Audit(TenantContext tenant, Guid dashboardId, AuditAction action, JsonObject? before, JsonObject? after)
     {

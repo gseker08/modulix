@@ -1,0 +1,80 @@
+@* Hedefli paylaşım (ADR-0054 dilim 4a): rapor ve pano paylaşım panellerinin ortak rol / ekip / iş birimi seçicisi. Seçim üst bileşenin listesindedir (yerinde değişir); yetki ve doğrulama sunucudadır. *@
+@inject ApiClient Api
+
+<div class="mb-3">
+    @if (error is not null)
+    {
+        <div class="alert alert-danger" role="alert">
+            @error
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadAsync">@Texts.Get("crm.sales.retry")</button>
+        </div>
+    }
+    else if (options is null)
+    {
+        <LoadingState />
+    }
+    else
+    {
+        @foreach (var (kind, titleKey) in Kinds)
+        {
+            var items = options.Where(o => o.Kind == kind).ToList();
+            if (items.Count == 0)
+            {
+                continue;
+            }
+
+            <fieldset class="mb-2">
+                <legend class="form-label">@Texts.Get(titleKey)</legend>
+                <div class="report-member-list" role="group" aria-label="@Texts.Get(titleKey)">
+                    @foreach (var item in items)
+                    {
+                        var option = item;
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="sg-@option.Kind-@option.Id" checked="@IsSelected(option)" @onchange="e => Toggle(option, e.Value is true)" />
+                            <label class="form-check-label" for="sg-@option.Kind-@option.Id">@option.Name</label>
+                        </div>
+                    }
+                </div>
+            </fieldset>
+        }
+
+        <p class="small text-muted mt-1" role="status">@Texts.Get("reports.share.groupsSelected", Selected.Count)</p>
+    }
+</div>
+
+@code {
+    private static readonly (string Kind, string TitleKey)[] Kinds =
+    [
+        ("role", "reports.share.roles"),
+        ("team", "reports.share.teams"),
+        ("businessUnit", "reports.share.units"),
+    ];
+
+    private List<ShareGroupOptionDto>? options;
+    private string? error;
+
+    /// <summary>Seçili gruplar; bileşen bu listeyi yerinde değiştirir.</summary>
+    [Parameter, EditorRequired] public List<ShareGroupDto> Selected { get; set; } = [];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        var response = await Api.GetAsync<List<ShareGroupOptionDto>>("/api/reports/share-groups");
+        options = response.IsSuccess ? response.Value ?? [] : null;
+        error = response.Error;
+    }
+
+    private bool IsSelected(ShareGroupOptionDto option) =>
+        Selected.Any(s => s.Kind == option.Kind && s.Id == option.Id);
+
+    private void Toggle(ShareGroupOptionDto option, bool selected)
+    {
+        Selected.RemoveAll(s => s.Kind == option.Kind && s.Id == option.Id);
+        if (selected)
+        {
+            Selected.Add(new ShareGroupDto(option.Kind, option.Id));
+        }
+    }
+}

@@ -73,7 +73,8 @@ public sealed record ReportSummary(
 
 public sealed record ReportPage(IReadOnlyList<ReportSummary> Items, int Page, int PageSize, int TotalCount);
 
-public sealed record ReportDetail(ReportSummary Summary, ReportSpec Spec, int DatasetVersion, IReadOnlyList<Guid> SharedWith);
+/// <summary><see cref="SharedWith"/> paylaşılan kullanıcılar, <see cref="SharedWithGroups"/> paylaşılan roller, ekipler ve iş birimleri; ikisi de yalnızca sahibine dolu gelir.</summary>
+public sealed record ReportDetail(ReportSummary Summary, ReportSpec Spec, int DatasetVersion, IReadOnlyList<Guid> SharedWith, IReadOnlyList<ShareGroup> SharedWithGroups);
 
 public sealed record ReportInput(string Name, string? Description, ReportSpec Spec);
 
@@ -109,8 +110,12 @@ public interface IReportCenter
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken);
 
     /// <param name="users">Yalnızca <see cref="ReportVisibility.Users"/> için; tenant'ın etkin üyeleri olmalı.</param>
+    /// <param name="groups">Yalnızca <see cref="ReportVisibility.Users"/> için; firmada var olan rol, ekip ya da (açık) iş birimi olmalı (ADR-0054 dilim 4a).</param>
     Task<ReportDetail?> ShareAsync(
-        Guid id, ReportVisibility visibility, IReadOnlyList<Guid> users, long? expectedVersion, CancellationToken cancellationToken);
+        Guid id, ReportVisibility visibility, IReadOnlyList<Guid> users, IReadOnlyList<ShareGroup> groups, long? expectedVersion, CancellationToken cancellationToken);
+
+    /// <summary>Paylaşım panelinin seçebileceği roller, ekipler ve açık iş birimleri (ad sırasıyla).</summary>
+    Task<IReadOnlyList<ShareGroupOption>> ListShareGroupsAsync(CancellationToken cancellationToken);
 
     /// <summary>Rapor görünmüyorsa null.</summary>
     Task<bool?> SetFavoriteAsync(Guid id, bool favorite, CancellationToken cancellationToken);

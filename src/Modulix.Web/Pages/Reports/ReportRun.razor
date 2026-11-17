@@ -141,6 +141,7 @@
                             <p class="small text-muted mt-1" role="status">@Texts.Get("reports.run.usersSelected", shareUsers.Count)</p>
                         }
                     </div>
+                    <ShareGroupPicker Selected="shareGroups" />
                 }
 
                 @if (shareError is not null)
@@ -231,6 +232,7 @@
     private bool sharing;
     private string shareVisibility = "private";
     private readonly HashSet<Guid> shareUsers = [];
+    private readonly List<ShareGroupDto> shareGroups = [];
     private List<TenantMemberResponse>? members;
     private string? membersError;
     private string memberFilter = string.Empty;
@@ -408,6 +410,9 @@
             shareUsers.Add(user);
         }
 
+        shareGroups.Clear();
+        shareGroups.AddRange(detail.SharedWithGroups ?? []);
+
         if (members is null)
         {
             await LoadMembersAsync();
@@ -449,8 +454,9 @@
         shareError = null;
         shareConflict = false;
         var users = shareVisibility == "users" ? shareUsers.ToList() : [];
+        var groups = shareVisibility == "users" ? shareGroups.ToList() : [];
         var response = await Api.PutAsync<ReportDetailDto>(
-            $"/api/reports/{detail.Summary.Id}/sharing", new ShareReportRequest(shareVisibility, users, detail.Summary.Version));
+            $"/api/reports/{detail.Summary.Id}/sharing", new ShareReportRequest(shareVisibility, users, detail.Summary.Version, groups));
         busy = false;
         if (!response.IsSuccess)
         {

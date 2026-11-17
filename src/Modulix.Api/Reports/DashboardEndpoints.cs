@@ -48,7 +48,13 @@ public static class DashboardEndpoints
                     new Dictionary<string, string[]> { ["visibility"] = ["Paylaşım private, users ya da tenant olmalı."] }, statusCode: StatusCodes.Status400BadRequest);
             }
 
-            return await dashboards.ShareAsync(id, visibility, request.Users ?? [], request.ExpectedVersion, ct) is { } detail ? Results.Ok(ToDto(detail)) : NotFound();
+            if (!ShareGroupMapping.TryRead(request.Groups, out var groups))
+            {
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]> { ["groups"] = ["Paylaşım grubu rol, ekip ya da iş birimi olmalı."] }, statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            return await dashboards.ShareAsync(id, visibility, request.Users ?? [], groups, request.ExpectedVersion, ct) is { } detail ? Results.Ok(ToDto(detail)) : NotFound();
         })).RequirePermission(CoreModule.Permissions.ShareReports);
 
         // Varsayılan pano kişiye özeldir: kullanıcı görebildiği bir panoyu kendi varsayılanı yapar (panoyu değiştirmez).
@@ -99,5 +105,5 @@ public static class DashboardEndpoints
         s.Id, s.Name, s.WidgetCount, s.UpdatedAt, s.Version, Name(s.Visibility), s.OwnerUserId, s.OwnerName, s.IsOwner, s.IsDefault, s.SharedWithCount);
 
     private static DashboardDetailDto ToDto(DashboardDetail d) => new(
-        ToDto(d.Summary), [.. d.Widgets.Select(w => new DashboardWidgetDto(w.Id, w.ReportId, w.ReportName, Name(w.Kind), w.Title, w.Position))], d.SharedWith);
+        ToDto(d.Summary), [.. d.Widgets.Select(w => new DashboardWidgetDto(w.Id, w.ReportId, w.ReportName, Name(w.Kind), w.Title, w.Position))], d.SharedWith, ShareGroupMapping.ToDto(d.SharedWithGroups));
 }

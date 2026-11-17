@@ -30,10 +30,11 @@ public sealed record DashboardSummaryDto(
     int SharedWithCount = 0);
 
 /// <summary><see cref="SharedWith"/>: paylaşılan kullanıcılar; yalnızca sahibine dolu gelir.</summary>
-public sealed record DashboardDetailDto(DashboardSummaryDto Summary, IReadOnlyList<DashboardWidgetDto> Widgets, IReadOnlyList<Guid>? SharedWith = null);
+public sealed record DashboardDetailDto(
+    DashboardSummaryDto Summary, IReadOnlyList<DashboardWidgetDto> Widgets, IReadOnlyList<Guid>? SharedWith = null, IReadOnlyList<ShareGroupDto>? SharedWithGroups = null);
 
 /// <summary><see cref="Visibility"/>: private, users ya da tenant; <see cref="Users"/> yalnızca users için.</summary>
-public sealed record ShareDashboardRequest(string Visibility, IReadOnlyList<Guid>? Users = null, long? ExpectedVersion = null);
+public sealed record ShareDashboardRequest(string Visibility, IReadOnlyList<Guid>? Users = null, long? ExpectedVersion = null, IReadOnlyList<ShareGroupDto>? Groups = null);
 
 public sealed record DefaultDashboardRequest(bool IsDefault);
 

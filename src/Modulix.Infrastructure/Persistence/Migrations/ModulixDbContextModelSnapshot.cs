@@ -3154,6 +3154,13 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("DashboardId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("TargetKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("User");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -3164,9 +3171,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasAlternateKey("TenantId", "Id");
 
-                    b.HasIndex("TenantId", "UserId");
+                    b.HasIndex("TenantId", "TargetKind", "UserId");
 
-                    b.HasIndex("TenantId", "DashboardId", "UserId")
+                    b.HasIndex("TenantId", "DashboardId", "TargetKind", "UserId")
                         .IsUnique();
 
                     b.ToTable("DashboardShares", "core");
@@ -3542,6 +3549,13 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ReportId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("TargetKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("User");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -3552,9 +3566,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
 
                     b.HasAlternateKey("TenantId", "Id");
 
-                    b.HasIndex("TenantId", "UserId");
+                    b.HasIndex("TenantId", "TargetKind", "UserId");
 
-                    b.HasIndex("TenantId", "ReportId", "UserId")
+                    b.HasIndex("TenantId", "ReportId", "TargetKind", "UserId")
                         .IsUnique();
 
                     b.ToTable("ReportShares", "core");

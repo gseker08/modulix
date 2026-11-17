@@ -122,7 +122,7 @@ internal sealed class ReportCenter(
     }
 
     public async Task<ReportDetail?> ShareAsync(
-        Guid id, ReportVisibility visibility, IReadOnlyList<Guid> users, long? expectedVersion, CancellationToken cancellationToken)
+        Guid id, ReportVisibility visibility, IReadOnlyList<Guid> users, IReadOnlyList<ShareGroup> groups, long? expectedVersion, CancellationToken cancellationToken)
     {
         var tenant = RequireTenant();
         var report = await Visible(tenant.UserId).SingleOrDefaultAsync(r => r.Id == id, cancellationToken);
@@ -139,11 +139,14 @@ internal sealed class ReportCenter(
         }
 
         var wanted = visibility == ReportVisibility.Users ? users.Where(u => u != tenant.UserId).Distinct().ToList() : [];
+        var wantedGroups = visibility == ReportVisibility.Users
+            ? await ShareAudience.NormalizeAsync(db, groups, message => new ReportException(message), cancellationToken)
+            : [];
         if (visibility == ReportVisibility.Users)
         {
-            if (wanted.Count == 0)
+            if (wanted.Count == 0 && wantedGroups.Count == 0)
             {
-                throw new ReportException("Paylaşmak için en az bir kullanıcı seçin.");
+                throw new ReportException("Paylaşmak için en az bir kullanıcı ya da grup seçin.");
             }
 
             var active = (await members.ListActiveAsync(cancellationToken)).Select(m => m.UserId).ToHashSet();
@@ -154,12 +157,22 @@ internal sealed class ReportCenter(
         }
 
         var current = await db.ReportShares.Where(s => s.ReportId == report.Id).ToListAsync(cancellationToken);
-        var before = Snapshot(report, catalog.FindDataset(report.DatasetKey)?.Dataset, TryReadSpec(report), [.. current.Select(s => s.UserId)]);
+        var before = Snapshot(
+            report, catalog.FindDataset(report.DatasetKey)?.Dataset, TryReadSpec(report),
+            [.. current.Where(s => s.TargetKind == ShareTargetKind.User).Select(s => s.UserId)],
+            [.. current.Where(s => s.TargetKind != ShareTargetKind.User).Select(s => new ShareGroup(s.TargetKind, s.UserId))]);
         var now = time.GetUtcNow();
-        db.ReportShares.RemoveRange(current.Where(s => !wanted.Contains(s.UserId)));
-        db.ReportShares.AddRange(wanted.Where(u => current.All(s => s.UserId != u)).Select(u => new ReportShare(report.Id, u, tenant.UserId, now)));
+        db.ReportShares.RemoveRange(current.Where(s => s.TargetKind == ShareTargetKind.User
+            ? !wanted.Contains(s.UserId)
+            : !wantedGroups.Contains(new ShareGroup(s.TargetKind, s.UserId))));
+        db.ReportShares.AddRange(wanted
+            .Where(u => !current.Any(s => s.TargetKind == ShareTargetKind.User && s.UserId == u))
+            .Select(u => new ReportShare(report.Id, u, tenant.UserId, now)));
+        db.ReportShares.AddRange(wantedGroups
+            .Where(g => !current.Any(s => s.TargetKind == g.Kind && s.UserId == g.Id))
+            .Select(g => new ReportShare(report.Id, g.Kind, g.Id, tenant.UserId, now)));
         report.SetVisibility(visibility, now);
-        Audit(tenant, report.Id, AuditAction.Updated, before, Snapshot(report, catalog.FindDataset(report.DatasetKey)?.Dataset, TryReadSpec(report), wanted));
+        Audit(tenant, report.Id, AuditAction.Updated, before, Snapshot(report, catalog.FindDataset(report.DatasetKey)?.Dataset, TryReadSpec(report), wanted, wantedGroups));
         await SaveAsync(cancellationToken);
         return await DetailAsync(report, tenant.UserId, cancellationToken);
     }
@@ -207,12 +220,23 @@ internal sealed class ReportCenter(
 
     // ---- Görünürlük
 
-    /// <summary>Çağıranın görebildiği raporlar: kendisinin, firmaya açık olanlar ve kendisiyle paylaşılanlar.</summary>
-    private IQueryable<ReportDefinition> Visible(Guid me) =>
-        db.Reports.Where(r =>
+    /// <summary>Çağıranın görebildiği raporlar: kendisinin, firmaya açık olanlar, kendisiyle ve üyesi olduğu rol, ekip ya da iş birimiyle paylaşılanlar.</summary>
+    private IQueryable<ReportDefinition> Visible(Guid me)
+    {
+        // Grup paylaşımları (rol, ekip, iş birimi) çağıranın üyeliğinden her sorguda yeniden hesaplanır (ADR-0054 dilim 4a).
+        var membershipId = RequireTenant().MembershipId;
+        var roles = ShareAudience.RoleIds(db, membershipId);
+        var teams = ShareAudience.TeamIds(db, membershipId);
+        var units = ShareAudience.UnitIds(db, membershipId);
+        return db.Reports.Where(r =>
             r.OwnerUserId == me
             || r.Visibility == ReportVisibility.Tenant
-            || (r.Visibility == ReportVisibility.Users && db.ReportShares.Any(s => s.ReportId == r.Id && s.UserId == me)));
+            || (r.Visibility == ReportVisibility.Users && db.ReportShares.Any(s => s.ReportId == r.Id
+                && ((s.TargetKind == ShareTargetKind.User && s.UserId == me)
+                    || (s.TargetKind == ShareTargetKind.Role && roles.Contains(s.UserId))
+                    || (s.TargetKind == ShareTargetKind.Team && teams.Contains(s.UserId))
+                    || (s.TargetKind == ShareTargetKind.BusinessUnit && units.Contains(s.UserId))))));
+    }
 
     private static void RequireOwner(ReportDefinition report, Guid me)
     {
@@ -352,11 +376,23 @@ internal sealed class ReportCenter(
         var summary = (await SummariesAsync([report], me, cancellationToken))[0];
         var spec = TryReadSpec(report) ?? new ReportSpec(report.DatasetKey, [], [], [], []);
         var sharedWith = report.OwnerUserId == me ? await SharedWithAsync(report.Id, cancellationToken) : [];
-        return new ReportDetail(summary, spec, report.DatasetVersion, sharedWith);
+        var sharedGroups = report.OwnerUserId == me ? await SharedGroupsAsync(report.Id, cancellationToken) : [];
+        return new ReportDetail(summary, spec, report.DatasetVersion, sharedWith, sharedGroups);
     }
 
     private async Task<List<Guid>> SharedWithAsync(Guid reportId, CancellationToken cancellationToken) =>
-        await db.ReportShares.AsNoTracking().Where(s => s.ReportId == reportId).Select(s => s.UserId).ToListAsync(cancellationToken);
+        await db.ReportShares.AsNoTracking().Where(s => s.ReportId == reportId && s.TargetKind == ShareTargetKind.User).Select(s => s.UserId).ToListAsync(cancellationToken);
+
+    private async Task<List<ShareGroup>> SharedGroupsAsync(Guid reportId, CancellationToken cancellationToken) =>
+        (await db.ReportShares.AsNoTracking().Where(s => s.ReportId == reportId && s.TargetKind != ShareTargetKind.User)
+            .Select(s => new { s.TargetKind, Id = s.UserId }).ToListAsync(cancellationToken))
+        .Select(s => new ShareGroup(s.TargetKind, s.Id)).ToList();
+
+    public Task<IReadOnlyList<ShareGroupOption>> ListShareGroupsAsync(CancellationToken cancellationToken)
+    {
+        RequireTenant();
+        return ShareAudience.OptionsAsync(db, cancellationToken);
+    }
 
     private static ReportSpec? TryReadSpec(ReportDefinition report)
     {
@@ -372,8 +408,10 @@ internal sealed class ReportCenter(
 
     // ---- Denetim
 
-    private static JsonObject Snapshot(ReportDefinition report, DatasetDefinition? dataset, ReportSpec? spec, IReadOnlyList<Guid> sharedWith) =>
-        new()
+    private static JsonObject Snapshot(
+        ReportDefinition report, DatasetDefinition? dataset, ReportSpec? spec, IReadOnlyList<Guid> sharedWith, IReadOnlyList<ShareGroup>? groups = null)
+    {
+        var snapshot = new JsonObject
         {
             ["name"] = report.Name,
             ["description"] = report.Description,
@@ -382,6 +420,13 @@ internal sealed class ReportCenter(
             ["sharedWith"] = string.Join(", ", sharedWith.OrderBy(u => u)),
             ["summary"] = spec is null ? null : Summarize(spec),
         };
+        if (groups is { Count: > 0 })
+        {
+            snapshot["sharedWithGroups"] = string.Join(", ", groups.OrderBy(g => g.Kind).ThenBy(g => g.Id).Select(g => $"{g.Kind}:{g.Id}"));
+        }
+
+        return snapshot;
+    }
 
     private static string Summarize(ReportSpec spec)
     {

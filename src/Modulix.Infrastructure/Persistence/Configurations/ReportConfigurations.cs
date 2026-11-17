@@ -41,9 +41,12 @@ internal sealed class ReportShareConfiguration : IEntityTypeConfiguration<Report
         builder.Property(s => s.TenantId).IsRequired();
         builder.Property(s => s.CreatedAt).IsRequired();
 
+        // Hedef türü (ADR-0054 dilim 4a): varsayılan kullanıcı; UserId sütunu hedef kimliğini taşır (geriye uyum için adı değişmedi).
+        builder.Property(s => s.TargetKind).HasConversion<string>().HasMaxLength(20).HasDefaultValue(ShareTargetKind.User).IsRequired();
+
         builder.HasAlternateKey(s => new { s.TenantId, s.Id });
-        builder.HasIndex(s => new { s.TenantId, s.ReportId, s.UserId }).IsUnique();
-        builder.HasIndex(s => new { s.TenantId, s.UserId });
+        builder.HasIndex(s => new { s.TenantId, s.ReportId, s.TargetKind, s.UserId }).IsUnique();
+        builder.HasIndex(s => new { s.TenantId, s.TargetKind, s.UserId });
 
         // Bileşik yabancı anahtar (ADR-0020): paylaşım ile rapor aynı tenant'ta olmak zorundadır; rapor silinince paylaşımlar da silinir.
         builder.HasOne<ReportDefinition>()
@@ -250,9 +253,12 @@ internal sealed class DashboardShareConfiguration : IEntityTypeConfiguration<Das
         builder.Property(s => s.TenantId).IsRequired();
         builder.Property(s => s.CreatedAt).IsRequired();
 
+        // Hedef türü (ADR-0054 dilim 4a): varsayılan kullanıcı; UserId sütunu hedef kimliğini taşır (geriye uyum için adı değişmedi).
+        builder.Property(s => s.TargetKind).HasConversion<string>().HasMaxLength(20).HasDefaultValue(ShareTargetKind.User).IsRequired();
+
         builder.HasAlternateKey(s => new { s.TenantId, s.Id });
-        builder.HasIndex(s => new { s.TenantId, s.DashboardId, s.UserId }).IsUnique();
-        builder.HasIndex(s => new { s.TenantId, s.UserId });
+        builder.HasIndex(s => new { s.TenantId, s.DashboardId, s.TargetKind, s.UserId }).IsUnique();
+        builder.HasIndex(s => new { s.TenantId, s.TargetKind, s.UserId });
 
         // Bileşik yabancı anahtar (ADR-0020): paylaşım ile pano aynı tenant'ta olmak zorundadır; pano silinince paylaşımlar da silinir.
         builder.HasOne<Dashboard>()
