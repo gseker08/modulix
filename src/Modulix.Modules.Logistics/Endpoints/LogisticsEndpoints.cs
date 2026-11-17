@@ -136,4 +136,8 @@ internal sealed class LogisticsPolicyProvider(IServiceProvider services) : ILogi
             .GetValueAsync(LogisticsModule.SettingKeys.DefaultCountry, cancellationToken);
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
     }
+
+    public async Task<bool> RejectPendingExpensesOnCancelAsync(CancellationToken cancellationToken) =>
+        await services.GetRequiredService<Modulix.Core.Contracts.Settings.ITenantSettingReader>()
+            .GetValueAsync(LogisticsModule.SettingKeys.CancelPendingExpenses, cancellationToken) == LogisticsModule.CancelPendingExpenseModes.Reject;
 }

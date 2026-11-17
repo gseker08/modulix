@@ -325,4 +325,96 @@ public sealed class FileTests(ModulixApiFactory factory) : IClassFixture<Modulix
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync(Url, attach)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.DeleteAsync($"{Url}/{file.Id}?version={file.Version}")).StatusCode);
     }
+
+    // ---- Modüle ait dosyalar (ADR-0040 K9)
+
+    /// <summary>Modülün yaptığı gibi: içerik yazılır, üst veri çağıranın işlemiyle kesinleşir.</summary>
+    private async Task<Modulix.Core.Contracts.Files.StoredFileInfo> AddModuleFileAsync(Guid tenantId, Guid recordId, byte[] content, bool save = true)
+    {
+        using var scope = factory.OpenScope(tenantId);
+        var files = scope.ServiceProvider.GetRequiredService<Modulix.Core.Contracts.Files.IModuleFiles>();
+        var info = await files.AddAsync(new Modulix.Core.Contracts.Records.RecordRef(Entity, recordId), "iç not eki.pdf", "application/pdf", content, CancellationToken.None);
+        if (save)
+        {
+            await scope.ServiceProvider.GetRequiredService<Modulix.Infrastructure.Persistence.ModulixDbContext>().SaveChangesAsync();
+        }
+
+        return info;
+    }
+
+    private async Task<byte[]?> OpenModuleFileAsync(Guid tenantId, Guid fileId, string ownerEntityKey = Entity)
+    {
+        using var scope = factory.OpenScope(tenantId);
+        var files = scope.ServiceProvider.GetRequiredService<Modulix.Core.Contracts.Files.IModuleFiles>();
+        await using var opened = await files.OpenAsync(fileId, ownerEntityKey, CancellationToken.None);
+        if (opened is null)
+        {
+            return null;
+        }
+
+        using var buffer = new MemoryStream();
+        await opened.Content.CopyToAsync(buffer);
+        return buffer.ToArray();
+    }
+
+    [Fact]
+    public async Task A_module_owned_file_is_stored_with_the_callers_transaction_and_read_back_only_through_the_module_contract()
+    {
+        var (tenant, _, _, company) = await StartAsync();
+        var content = Distinct(31);
+
+        var info = await AddModuleFileAsync(tenant.Id, company.Id, content);
+        Assert.Equal(("ModuleOwned", "iç not eki.pdf", "application/pdf", (long)content.Length), (info.Classification, info.FileName, info.ContentType, info.SizeBytes));
+        Assert.Equal(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(content)), info.Sha256);
+        Assert.Equal(content, await OpenModuleFileAsync(tenant.Id, info.Id));
+
+        // Oluşturma denetim kaydına yazılır (çağıranın işlemiyle birlikte).
+        Assert.Equal(1, await factory.ScalarAsync<int>(tenant.Id, "SELECT COUNT(*) FROM core.AuditLog WHERE EntityKey = 'core.file' AND RecordId = @id AND Action = 1", ("@id", info.Id)));
+
+        // Çağıran kaydetmezse üst veri oluşmaz: dosya açılamaz (içerik yetim kalır, temizlik işi siler).
+        var abandoned = await AddModuleFileAsync(tenant.Id, company.Id, Distinct(32), save: false);
+        Assert.Null(await OpenModuleFileAsync(tenant.Id, abandoned.Id));
+
+        // Doğrulama: boş ve sınırı aşan içerik, boş ad reddedilir. Bağlı kayıt türü tutmazsa dosya açılmaz.
+        using var scope = factory.OpenScope(tenant.Id);
+        var files = scope.ServiceProvider.GetRequiredService<Modulix.Core.Contracts.Files.IModuleFiles>();
+        var limits = scope.ServiceProvider.GetRequiredService<Modulix.Core.Contracts.Files.IFileLimits>();
+        var owner = new Modulix.Core.Contracts.Records.RecordRef(Entity, company.Id);
+        await Assert.ThrowsAsync<ArgumentException>(() => files.AddAsync(owner, "boş.pdf", "application/pdf", ReadOnlyMemory<byte>.Empty, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(() => files.AddAsync(owner, "büyük.pdf", "application/pdf", new byte[limits.MaxFileBytes + 1], CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(() => files.AddAsync(owner, " ", "application/pdf", content, CancellationToken.None));
+        Assert.Null(await OpenModuleFileAsync(tenant.Id, info.Id, "crm.contact"));
+    }
+
+    [Fact]
+    public async Task Generic_file_endpoints_never_list_download_or_delete_a_module_owned_file_even_for_a_user_with_full_record_access()
+    {
+        var (tenant, _, client, company) = await StartAsync();
+        var hidden = await AddModuleFileAsync(tenant.Id, company.Id, Distinct(41));
+        var visible = await UploadAsync(client, company.Id, "genel.pdf", Distinct(42));
+
+        // Yetki: kayıtta okuma ve yazma izni olan kullanıcı bile genel uçlardan modüle ait dosyaya ulaşamaz.
+        Assert.Equal(visible.Id, Assert.Single(await ListAsync(client, company.Id)).Id);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"{Url}/{hidden.Id}/content")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync($"{Url}/{hidden.Id}?version={hidden.Version}")).StatusCode);
+        Assert.NotNull(await OpenModuleFileAsync(tenant.Id, hidden.Id));
+
+        // Modüle ait dosya genel yinelenen içerik denetimine ve kayıt başına sınıra girmez: aynı içerik genel uçtan yüklenebilir.
+        await UploadAsync(client, company.Id, "ayni-icerik.pdf", Distinct(41));
+
+        // Genel uçtan yüklenen dosya modül sözleşmesiyle açılamaz (sınıflar karışmaz).
+        Assert.Null(await OpenModuleFileAsync(tenant.Id, visible.Id));
+    }
+
+    [Fact]
+    public async Task A_module_owned_file_is_invisible_to_another_tenant()
+    {
+        var (tenant, _, _, company) = await StartAsync();
+        var (other, _, otherClient, _) = await StartAsync();
+        var info = await AddModuleFileAsync(tenant.Id, company.Id, Distinct(51));
+
+        Assert.Null(await OpenModuleFileAsync(other.Id, info.Id));
+        Assert.Equal(HttpStatusCode.NotFound, (await otherClient.GetAsync($"{Url}/{info.Id}/content")).StatusCode);
+        Assert.NotNull(await OpenModuleFileAsync(tenant.Id, info.Id));
+    }
 }

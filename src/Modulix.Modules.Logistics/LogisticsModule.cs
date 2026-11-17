@@ -240,6 +240,16 @@ public sealed class LogisticsModule : IModule, IModuleEndpoints
 
         /// <summary>Talep ve sevkiyatta ülke gönderilmediğinde kullanılan ülke (ISO 3166-1 alfa-2; ADR-0043 K2).</summary>
         public const string DefaultCountry = "logistics.default-country";
+
+        /// <summary>Sefer iptal edilince bekleyen masraflar ne olur (ADR-0038 bölüm 30): beklemede kalır (varsayılan) ya da reddedilir.</summary>
+        public const string CancelPendingExpenses = "logistics.trips.cancel-pending-expenses";
+    }
+
+    /// <summary>Sefer iptalinde bekleyen masraflar: beklemede kalır, onaylayan karar verir (varsayılan) ya da iptalle aynı işlemde reddedilir.</summary>
+    public static class CancelPendingExpenseModes
+    {
+        public const string Keep = "keep";
+        public const string Reject = "reject";
     }
 
     /// <summary>Belge kuralı değerleri: uyar (onay uyarıyla verilir) ya da engelle (onay verilmez).</summary>
@@ -260,6 +270,11 @@ public sealed class LogisticsModule : IModule, IModuleEndpoints
         {
             Description = "Taşıma talebi ve sevkiyatta yükleme ya da teslim ülkesi girilmediğinde kullanılan ülke. ISO 3166-1 alfa-2 kodu yazın (ör. TR, DE, BG). Geçersiz değer Türkiye (TR) sayılır.",
             MaxLength = 2,
+        },
+        new(SettingKeys.CancelPendingExpenses, "Sefer iptali: bekleyen masraflar", "Lojistik", SettingType.Choice, CancelPendingExpenseModes.Keep)
+        {
+            Description = "Sefer iptal edilince onay bekleyen masraflar ne olsun? Beklemede kalsın: masraf onaylayana kalır; onaylayan gerekçeyle onaylar, reddeder ya da başka sefere aktarır (sefer başlamadan yapılmış gerçek harcama kaybolmaz). Reddedilsin: iptalle aynı işlemde \"Sefer iptal edildi\" gerekçesiyle reddedilir; gerçek bir harcamaysa masraf yeniden onaya gönderilir. Reddedilmiş ve onaylanmış masraflar değişmez.",
+            Options = [new SettingOption(CancelPendingExpenseModes.Keep, "Beklemede kalsın"), new SettingOption(CancelPendingExpenseModes.Reject, "Reddedilsin")],
         },
     ];
 
