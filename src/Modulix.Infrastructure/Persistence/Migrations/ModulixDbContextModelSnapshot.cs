@@ -14327,6 +14327,13 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("nvarchar(254)");
 
+                    b.Property<DateTimeOffset?>("ReminderQueuedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReminderTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -14348,6 +14355,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "ReminderTokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Surveys_ReminderToken")
+                        .HasFilter("[ReminderTokenHash] IS NOT NULL");
 
                     b.HasIndex("TenantId", "TokenHash")
                         .IsUnique()

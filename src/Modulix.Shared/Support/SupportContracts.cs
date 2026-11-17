@@ -250,7 +250,8 @@ public sealed record InboundMessageRequest(
 public sealed record InboundResultDto(string Outcome, Guid? TicketId, Guid? MessageId, string? TicketNumber);
 
 public sealed record SurveyDto(
-    Guid Id, int Cycle, string State, DateTimeOffset? QueuedAt, DateTimeOffset ExpiresAt, DateTimeOffset? AnsweredAt, int? Rating, string? Comment, DateTimeOffset CreatedAt);
+    Guid Id, int Cycle, string State, DateTimeOffset? QueuedAt, DateTimeOffset ExpiresAt, DateTimeOffset? AnsweredAt, int? Rating, string? Comment, DateTimeOffset CreatedAt,
+    DateTimeOffset? ReminderQueuedAt = null);
 
 public sealed record PublicSurveyTokenRequest(string Token);
 

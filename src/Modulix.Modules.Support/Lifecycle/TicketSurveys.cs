@@ -93,9 +93,56 @@ internal sealed class SurveyIssuer(SupportReader reader, IEmailQueue emails, INo
 
         context.Data.Set<SatisfactionSurvey>().Add(survey);
     }
+
+    /// <summary>
+    /// Yanıtlanmayan anket için tek hatırlatma (ADR-0024 §4.13). İlk bağlantının belirteci saklanmadığı için hatırlatma ikinci bir belirteç üretir; özeti ankete yazılır ve iki bağlantı da
+    /// aynı anketi açar. Genel adres ayarlı değilse ya da adres geçersizse hiçbir şey yazılmaz (false). Çağıran satırı izlenen (tracked) olarak verir; kaydı zamanlayıcı yapar.
+    /// </summary>
+    public async Task<bool> RemindAsync(SatisfactionSurvey survey, string ticketNumber, string? recipientName, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (tenant.Current is not { } current || string.IsNullOrWhiteSpace(survey.RecipientEmail))
+        {
+            return false;
+        }
+
+        var token = SurveyTokens.New();
+        if (links.Link($"anket/{current.TenantId:N}#t={token}") is not { } url)
+        {
+            return false;
+        }
+
+        try
+        {
+            var t = await languages.ForExternalAsync(cancellationToken);
+            var name = string.IsNullOrWhiteSpace(recipientName) ? null : recipientName.Trim();
+            var greeting = name is null ? t.Get("email.common.greeting-anonymous") : t.Get("email.common.greeting", name);
+            var body = t.Get("email.survey-reminder.body", ticketNumber);
+            var footer = t.Get("email.survey.footer", survey.ExpiresAt.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture));
+            emails.Enqueue(new EmailMessage(survey.RecipientEmail, t.Get("email.survey-reminder.subject", ticketNumber),
+                $"<p>{WebUtility.HtmlEncode(greeting)}</p><p>{WebUtility.HtmlEncode(body)}</p>"
+                + $"<p><a href=\"{WebUtility.HtmlEncode(url)}\">{WebUtility.HtmlEncode(t.Get("email.survey.action"))}</a></p>"
+                + $"<p style=\"color:#666\">{WebUtility.HtmlEncode(footer)}</p>")
+            {
+                ToName = name,
+                TextBody = $"{greeting}\n\n{body}\n\n{t.Get("email.survey.action-text", url)}\n\n{footer}",
+                Reference = $"support.survey-reminder:{survey.Id}",
+                Language = t.Language,
+            });
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+
+        survey.ReminderTokenHash = SurveyTokens.Hash(token);
+        survey.ReminderQueuedAt = now;
+        survey.Touch();
+        return true;
+    }
 }
 
-public sealed record SurveyItem(Guid Id, int Cycle, string State, DateTimeOffset? QueuedAt, DateTimeOffset ExpiresAt, DateTimeOffset? AnsweredAt, int? Rating, string? Comment, DateTimeOffset CreatedAt);
+public sealed record SurveyItem(Guid Id, int Cycle, string State, DateTimeOffset? QueuedAt, DateTimeOffset ExpiresAt, DateTimeOffset? AnsweredAt, int? Rating, string? Comment, DateTimeOffset CreatedAt,
+    DateTimeOffset? ReminderQueuedAt = null);
 
 /// <summary>Talebin anketleri (personel görünümü). Talep okuma izni ve veri kapsamı geçerlidir; belirteç ve alıcı adresi dönmez.</summary>
 public interface ITicketSurveys
@@ -117,7 +164,7 @@ internal sealed class TicketSurveys(IRecordPipeline pipeline, SupportStoreContex
         var rows = await context.Data.Set<SatisfactionSurvey>().AsNoTracking().Where(s => s.TicketId == ticketId).OrderBy(s => s.Cycle).ToListAsync(cancellationToken);
         return RecordResult<IReadOnlyList<SurveyItem>>.Ok([.. rows.Select(s => new SurveyItem(
             s.Id, s.Cycle, s.AnsweredAt is not null ? "Answered" : s.ExpiresAt <= now ? "Expired" : s.QueuedAt is null ? "NotSent" : "Sent",
-            s.QueuedAt, s.ExpiresAt, s.AnsweredAt, s.Rating, s.Comment, s.CreatedAt))]);
+            s.QueuedAt, s.ExpiresAt, s.AnsweredAt, s.Rating, s.Comment, s.CreatedAt, s.ReminderQueuedAt))]);
     }
 }
 
@@ -233,7 +280,7 @@ internal sealed class SurveyPortal(IRecordPipeline pipeline, TicketWorkflowGate 
         }
 
         var hash = SurveyTokens.Hash(token);
-        var survey = await context.Data.Set<SatisfactionSurvey>().AsNoTracking().FirstOrDefaultAsync(s => s.TokenHash == hash, cancellationToken);
+        var survey = await context.Data.Set<SatisfactionSurvey>().AsNoTracking().FirstOrDefaultAsync(s => s.TokenHash == hash || s.ReminderTokenHash == hash, cancellationToken);
         if (survey is null)
         {
             return null;
