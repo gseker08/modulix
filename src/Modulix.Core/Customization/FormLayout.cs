@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -293,6 +294,56 @@ public static partial class FormLayoutRules
         }
 
         return errors;
+    }
+
+    /// <summary>
+    /// Düzenin okurun dilindeki hali (ADR-0034, dilim 18c-3): form adı ve kodda tanımlı alanların etiketleri her zaman, sekme ve bölüm
+    /// adları yalnızca tanımdaki varsayılan adla aynıysa çevrilir. Firmanın verdiği ad (ya da kendi açtığı sekme/bölüm) firmanın verisidir,
+    /// olduğu gibi kalır. Özel alan etiketleri firmanındır, çevrilmez.
+    /// </summary>
+    public static FormLayoutInfo Localize(FormLayoutInfo layout, FormDefinition definition, IReadOnlyDictionary<string, string> bundle)
+    {
+        ArgumentNullException.ThrowIfNull(layout);
+        ArgumentNullException.ThrowIfNull(definition);
+        var entity = definition.EntityKey;
+        var tabs = definition.Tabs.ToDictionary(t => t.Key, t => t.Label, StringComparer.Ordinal);
+        var sections = definition.Sections.ToDictionary(s => s.Key, s => s.Label, StringComparer.Ordinal);
+        return layout with
+        {
+            DisplayName = MetadataTexts.Text(bundle, MetadataTexts.FormKey(entity), definition.DisplayName),
+            Tabs = [.. layout.Tabs.Select(t => tabs.TryGetValue(t.Key, out var source) && source == t.Label
+                ? t with { Label = MetadataTexts.Text(bundle, MetadataTexts.FormTabKey(entity, t.Key), source) }
+                : t)],
+            Sections = [.. layout.Sections.Select(s => sections.TryGetValue(s.Key, out var source) && source == s.Label
+                ? s with { Label = MetadataTexts.Text(bundle, MetadataTexts.FormSectionKey(entity, s.Key), source) }
+                : s)],
+            Fields = [.. layout.Fields.Select(f => f.IsCustom
+                ? f
+                : f with { Label = MetadataTexts.Text(bundle, MetadataTexts.FormFieldKey(entity, f.Key), f.Label) })],
+        };
+    }
+
+    /// <summary>
+    /// Kaydedilecek düzende okurun dilinde gösterilmiş varsayılan sekme ve bölüm adları Türkçe kaynak metne döner; böylece İngilizce
+    /// çalışan yöneticinin ad değiştirmeden kaydettiği düzen öteki dillerde de çevrilmeye devam eder. Değiştirilmiş ad olduğu gibi saklanır.
+    /// </summary>
+    public static FormLayoutInput Delocalize(FormLayoutInput input, FormDefinition definition, IReadOnlyDictionary<string, string> bundle)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(definition);
+        var entity = definition.EntityKey;
+        var tabs = definition.Tabs.ToDictionary(t => t.Key, t => t.Label, StringComparer.Ordinal);
+        var sections = definition.Sections.ToDictionary(s => s.Key, s => s.Label, StringComparer.Ordinal);
+        string Source(Dictionary<string, string> defaults, string? key, string label, Func<string, string> textKey) =>
+            key is not null && defaults.TryGetValue(key, out var source) && label == MetadataTexts.Text(bundle, textKey(key), source)
+                ? source
+                : label;
+
+        return input with
+        {
+            Tabs = [.. input.Tabs.Select(t => t with { Label = Source(tabs, t.Key, t.Label, k => MetadataTexts.FormTabKey(entity, k)) })],
+            Sections = [.. input.Sections.Select(s => s with { Label = Source(sections, s.Key, s.Label, k => MetadataTexts.FormSectionKey(entity, k)) })],
+        };
     }
 
     /// <summary>Firmanın düzeniyle zorunlu olmuş alanlar (tanımın zaten zorunlu tuttukları hariç); boru hattı bunları denetler.</summary>

@@ -271,6 +271,62 @@ public class QuoteSharingTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.Equal(HttpStatusCode.NotFound, (await foreign.GetAsync($"/api/crm/quotes/{quote.Id}/documents")).StatusCode);
     }
 
+    [Fact]
+    public async Task The_customer_page_speaks_the_language_of_the_quote_contact_then_of_the_company()
+    {
+        var s = await SetUpAsync();
+        using var admin = await LoginAsync(s.Admin);
+
+        // Dil verilmemişse tenant varsayılanı (tr): iletiler ve kabul beyanı Türkçe.
+        var plain = await PresentedQuoteAsync(admin, s.CompanyId);
+        var turkish = await ViewAsync(factory.CreateClient(), s.Slug, (await CreateLinkAsync(admin, plain.Id)).Token);
+        Assert.Equal("tr", turkish.Language);
+        Assert.Contains("kabul ediyorum", turkish.AcceptanceStatement);
+
+        // Firmanın dili İngilizce: beyan, doğrulama ve durum iletileri İngilizce.
+        var company = await PostAsync<CompanyDto>(admin, "/api/crm/companies", new SaveCompanyRequest("London Imports Ltd.", PreferredLanguage: "en"));
+        var english = await PresentedQuoteAsync(admin, company.Id);
+        var link = await CreateLinkAsync(admin, english.Id);
+        using var anonymous = factory.CreateClient();
+        var view = await ViewAsync(anonymous, s.Slug, link.Token);
+        Assert.Equal("en", view.Language);
+        Assert.StartsWith("On behalf of London Imports Ltd.", view.AcceptanceStatement);
+
+        var unconfirmed = await DecideAsync(anonymous, s.Slug, link.Token, "accept", view, confirm: false);
+        Assert.Equal(HttpStatusCode.BadRequest, unconfirmed.StatusCode);
+        Assert.Contains("you must tick the confirmation statement", await unconfirmed.Content.ReadAsStringAsync());
+
+        var accepted = await DecideAsync(anonymous, s.Slug, link.Token, "accept", view);
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        Assert.Equal("This quote has been accepted.", (await accepted.Content.ReadFromJsonAsync<PublicQuoteView>())!.Message);
+
+        // Kişinin kendi dili firmanınkinden önce gelir.
+        var contact = await PostAsync<ContactDto>(admin, "/api/crm/contacts",
+            new SaveContactRequest("Leyla", "Aliyeva", CompanyId: company.Id, PreferredLanguage: "az"));
+        var forContact = await PostAsync<QuoteDto>(admin, "/api/crm/quotes",
+            new SaveQuoteRequest("Teklif", company.Id, ContactId: contact.Id, ValidUntil: DateTimeOffset.UtcNow.AddDays(30)));
+        await AddLineAsync(admin, forContact.Id, price: 100m);
+        await PresentAsync(admin, forContact.Id);
+        Assert.Equal("az", (await ViewAsync(anonymous, s.Slug, (await CreateLinkAsync(admin, forContact.Id)).Token)).Language);
+    }
+
+    [Fact]
+    public async Task Another_tenant_cannot_open_the_link_and_learns_nothing_about_the_customer_language()
+    {
+        var s = await SetUpAsync();
+        using var admin = await LoginAsync(s.Admin);
+        var company = await PostAsync<CompanyDto>(admin, "/api/crm/companies", new SaveCompanyRequest("Baku Partners", PreferredLanguage: "az"));
+        var quote = await PresentedQuoteAsync(admin, company.Id);
+        var token = (await CreateLinkAsync(admin, quote.Id)).Token;
+
+        var other = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(other.Id, "crm", enabled: true);
+        using var anonymous = factory.CreateClient();
+        var foreign = await anonymous.PostAsJsonAsync($"/api/public/quotes/{other.Slug}/view", new PublicQuoteTokenRequest(token));
+        Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
+        Assert.DoesNotContain("\"az\"", await foreign.Content.ReadAsStringAsync());
+    }
+
     // ---- yardımcılar
 
     private async Task<QuoteDto> PresentedQuoteAsync(HttpClient client, Guid companyId)

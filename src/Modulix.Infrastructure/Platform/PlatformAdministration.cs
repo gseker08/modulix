@@ -360,7 +360,7 @@ internal sealed class PlatformAdministration(
 
     public async Task SetModuleAsync(
         Guid tenantId, string moduleKey, bool enabled, Guid actingUserId, CancellationToken cancellationToken,
-        EntitlementTerms? terms = null, string? reason = null)
+        EntitlementTerms? terms = null, string? reason = null, bool checkDependencies = true)
     {
         if (!catalog.ContainsModule(moduleKey) || ModuleCatalog.IsAlwaysEnabled(moduleKey))
         {
@@ -398,6 +398,13 @@ internal sealed class PlatformAdministration(
 
         var tenant = await db.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId, cancellationToken);
         var after = enabled ? before.Append(moduleKey) : before.Where(m => m != moduleKey);
+        if (checkDependencies)
+        {
+            // Zorunlu bağımlılık (ADR-0051): sağlayanı kapalı modül açılmaz, bağımlısı açık modül kapatılmaz. Önceden var olan
+            // ihlal bu değişikliği engellemez.
+            ModuleDependencyRules.EnsureRequiredSatisfied(catalog, after, nameof(moduleKey), ignore: before);
+        }
+
         var beforeAudit = new JsonObject { ["modules"] = ModuleList(before) };
         var afterAudit = new JsonObject { ["modules"] = ModuleList(after) };
         if (terms is not null)
@@ -705,6 +712,26 @@ internal sealed class PlatformAdministration(
             .Select(m => new ModuleUsage(m.Key, counts.GetValueOrDefault(m.Key)))];
     }
 
+    // Platform tablolarından okunur; kural tek yerdedir (ModuleDependencyRules). Kapalı ve askıdaki firmalar raporlanmaz.
+    public async Task<IReadOnlyList<PlatformDependencyGap>> ListDependencyGapsAsync(CancellationToken cancellationToken)
+    {
+        var rows = await (
+            from entitlement in db.ModuleEntitlements.AsNoTracking()
+            join tenant in db.Tenants.AsNoTracking() on entitlement.TenantId equals tenant.Id
+            where entitlement.IsEnabled && TenantStatusRules.Operational.Contains(tenant.Status)
+            select new { tenant.Id, tenant.Name, tenant.Slug, tenant.Status, entitlement.ModuleKey })
+            .ToListAsync(cancellationToken);
+
+        return [.. rows
+            .GroupBy(r => new { r.Id, r.Name, r.Slug, r.Status })
+            .Select(g => new PlatformDependencyGap(
+                g.Key.Id, g.Key.Name, g.Key.Slug, g.Key.Status,
+                ModuleDependencyRules.Missing(catalog, g.Select(r => r.ModuleKey), ModuleDependencyKind.Required)))
+            .Where(g => g.Missing.Count > 0)
+            .OrderBy(g => g.TenantName, StringComparer.CurrentCulture)
+            .ThenBy(g => g.TenantId)];
+    }
+
     public async Task<PlatformOverview> GetOverviewAsync(CancellationToken cancellationToken)
     {
         var counts = await db.Tenants.AsNoTracking()
@@ -804,7 +831,8 @@ internal sealed class PlatformAdministration(
             administratorCount,
             [.. catalog.Modules.Select(m => m.Key).Where(modules.Contains)],
             tenant.ProfileKey,
-            tenant.ProfileAppliedAt);
+            tenant.ProfileAppliedAt,
+            ModuleDependencyRules.Missing(catalog, modules));
     }
 
     /// <summary>
@@ -830,6 +858,9 @@ internal sealed class PlatformAdministration(
         {
             throw new ArgumentException($"Açılamayan modül: {string.Join(", ", unknown)}.", "modules");
         }
+
+        // Yeni firma, zorunlu bağımlılığı eksik modülle kurulmaz (ADR-0051).
+        ModuleDependencyRules.EnsureRequiredSatisfied(catalog, modules, "modules");
 
         // Katalog sırasıyla; tekrarlar bir kez sayılır.
         return [.. catalog.Modules.Select(m => m.Key).Where(modules.Contains)];

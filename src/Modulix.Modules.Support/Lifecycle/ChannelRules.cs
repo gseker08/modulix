@@ -174,8 +174,14 @@ public static class InboundRules
             || from.StartsWith("no-reply@", StringComparison.Ordinal) || from.StartsWith("noreply@", StringComparison.Ordinal);
     }
 
-    /// <summary>"Re:", "RE:", "Ynt:", "Fwd:" gibi ön ekleri ve talep numarası etiketini atar.</summary>
-    public static string CleanSubject(string? subject)
+    /// <summary>Konuda talep numarası olarak denenecek en çok etiket sayısı (konuya etiket doldurarak sorgu büyütülemez).</summary>
+    public const int MaxNumberCandidates = 5;
+
+    /// <summary>
+    /// "Re:", "RE:", "Ynt:", "Fwd:" gibi ön ekleri ve talep numarası etiketini atar. <paramref name="knownNumber"/> konuda bulunan gerçek talep numarasıdır
+    /// (firma öneki değiştirebildiği için kalıpla tanınmaz, ADR-0049 dilim 3b); verilmezse yalnızca eski rastgele sonekli <c>[TK-…]</c> etiketi atılır.
+    /// </summary>
+    public static string CleanSubject(string? subject, string? knownNumber = null)
     {
         var text = (subject ?? string.Empty).Trim();
         var changed = true;
@@ -192,6 +198,17 @@ public static class InboundRules
             }
         }
 
+        if (knownNumber is not null)
+        {
+            foreach (var (start, end, token) in Tags(text))
+            {
+                if (token.Equals(knownNumber, StringComparison.OrdinalIgnoreCase))
+                {
+                    return (text[..start].TrimEnd() + " " + text[(end + 1)..].TrimStart()).Trim();
+                }
+            }
+        }
+
         var open = text.IndexOf("[TK-", StringComparison.Ordinal);
         if (open >= 0 && text.IndexOf(']', open) is var close and > 0)
         {
@@ -201,22 +218,47 @@ public static class InboundRules
         return text;
     }
 
-    /// <summary>Konudaki köşeli parantezli talep numarasını ("[TK-20261101-AB12CD]") döner; yoksa null.</summary>
-    public static string? TicketNumberFromSubject(string? subject)
+    /// <summary>
+    /// Konudaki köşeli parantezli etiketlerden talep numarası olabilecekleri sırasıyla döner ("[DT-2026-00001]", eski "[TK-20261101-AB12CD]", firmanın
+    /// kendi önekiyle "[DESTEK-00042]"). Önek firma başına yapılandırılabildiği için kalıp aranmaz; aday gerçek talep numaralarıyla karşılaştırılır.
+    /// Boş, boşluklu ya da numara alanından uzun etiket aday değildir; en çok <see cref="MaxNumberCandidates"/> aday döner.
+    /// </summary>
+    public static IReadOnlyList<string> TicketNumberCandidates(string? subject)
     {
-        if (string.IsNullOrEmpty(subject))
+        var candidates = new List<string>();
+        foreach (var (_, _, token) in Tags(subject ?? string.Empty))
         {
-            return null;
+            if (token.Length is > 0 and <= Domain.SupportTicket.NumberMaxLength && !token.Any(char.IsWhiteSpace)
+                && !candidates.Contains(token, StringComparer.OrdinalIgnoreCase))
+            {
+                candidates.Add(token);
+                if (candidates.Count == MaxNumberCandidates)
+                {
+                    break;
+                }
+            }
         }
 
-        var open = subject.IndexOf("[TK-", StringComparison.Ordinal);
-        if (open < 0)
-        {
-            return null;
-        }
+        return candidates;
+    }
 
-        var close = subject.IndexOf(']', open);
-        return close < 0 ? null : subject[(open + 1)..close].Trim();
+    /// <summary>Metindeki kapanmış köşeli parantezli etiketler: açılış ve kapanış konumu, içindeki kırpılmış metin.</summary>
+    private static IEnumerable<(int Start, int End, string Token)> Tags(string text)
+    {
+        var from = 0;
+        while (from < text.Length && text.IndexOf('[', from) is var open and >= 0)
+        {
+            var close = text.IndexOf(']', open);
+            if (close < 0)
+            {
+                yield break;
+            }
+
+            // İç içe parantezde en içteki etiket alınır ("[Fwd: [DT-2026-00001]").
+            open = text.LastIndexOf('[', close);
+            yield return (open, close, text[(open + 1)..close].Trim());
+            from = close + 1;
+        }
     }
 
     /// <summary>İlişkili mesaj kimlikleri: In-Reply-To önce, sonra References (en yeniden eskiye), tekrarsız ve sınırlı.</summary>
@@ -256,4 +298,12 @@ public static class SurveyRules
         answeredAt is not null ? (false, "Bu anket daha önce yanıtlandı.")
         : expiresAt <= now ? (false, "Bu anketin süresi doldu.")
         : (true, null);
+
+    public const int MaxReminderDays = 30;
+
+    /// <summary>
+    /// Hatırlatma zamanı geldi mi: ayar açık (gün &gt; 0), anket e-postası gitmiş, yanıt yok, daha önce hatırlatılmamış, gönderimden bu yana süre dolmuş ve bağlantı hâlâ geçerli.
+    /// </summary>
+    public static bool ReminderDue(int reminderDays, DateTimeOffset? queuedAt, DateTimeOffset? answeredAt, DateTimeOffset? reminderQueuedAt, DateTimeOffset expiresAt, DateTimeOffset now) =>
+        reminderDays > 0 && queuedAt is { } sent && answeredAt is null && reminderQueuedAt is null && sent.AddDays(reminderDays) <= now && expiresAt > now;
 }

@@ -83,6 +83,12 @@ public sealed class LogisticsModule : IModule, IModuleEndpoints
 
     public string DisplayName => "Lojistik";
 
+    /// <summary>Filo olmadan sefer açılır; araç ve dorse Filo'dan seçilir (ADR-0051).</summary>
+    public IReadOnlyList<ModuleDependency> Dependencies { get; } =
+    [
+        new ModuleDependency("fleet", ModuleDependencyKind.Optional, "Seferde ve sürücüde araç ve dorse seçimi"),
+    ];
+
     IReadOnlyList<PermissionDefinition> IModule.Permissions { get; } =
     [
         new(Permissions.ShipmentsRead, "Sevkiyatları görüntüler", "Sevkiyatlar"),

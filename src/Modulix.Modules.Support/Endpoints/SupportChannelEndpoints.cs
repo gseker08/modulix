@@ -43,7 +43,7 @@ internal static class SupportChannelEndpoints
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.AddPolicy(SurveyPolicy, context =>
             {
-                var permits = Math.Max(2, context.RequestServices.GetRequiredService<IConfiguration>().GetValue("SupportSurveyPublic:RateLimitPerMinute", 30));
+                var permits = RateLimits.PerNode(context.RequestServices.GetRequiredService<IConfiguration>(), "SupportSurveyPublic:RateLimitPerMinute", 30, minimum: 2);
                 return RateLimitPartition.GetFixedWindowLimiter(
                     $"survey|{context.Connection.RemoteIpAddress}|{context.Request.RouteValues["tenant"]}",
                     _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 });

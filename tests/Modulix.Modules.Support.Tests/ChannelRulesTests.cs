@@ -86,13 +86,36 @@ public class ChannelRulesTests
     [InlineData("  ", "")]
     public void Subjects_lose_reply_prefixes_and_ticket_tags(string subject, string expected) => Assert.Equal(expected, InboundRules.CleanSubject(subject));
 
+    [Theory]
+    [InlineData("Re: [DT-2026-00001] Gecikme", "DT-2026-00001", "Gecikme")]
+    [InlineData("Ynt: [ DESTEK-0042 ] Gecikme [acil]", "destek-0042", "Gecikme [acil]")]
+    [InlineData("[acil] Gecikme [DT-2026-00001]", "DT-2026-00001", "[acil] Gecikme")]
+    // Bilinen numara konuda yoksa eski rastgele sonekli etiket yine atılır; başka etiket konuda kalır.
+    [InlineData("Re: [TK-20261101-AB12CD] Gecikme", "DT-2026-00001", "Gecikme")]
+    [InlineData("[DT-2026-00009] Gecikme", null, "[DT-2026-00009] Gecikme")]
+    public void Subjects_lose_only_the_known_ticket_tag(string subject, string? known, string expected) =>
+        Assert.Equal(expected, InboundRules.CleanSubject(subject, known));
+
     [Fact]
-    public void Ticket_numbers_are_read_from_bracketed_tags_only()
+    public void Ticket_number_candidates_are_bracketed_tags_whatever_the_prefix()
     {
-        Assert.Equal("TK-20261101-AB12CD", InboundRules.TicketNumberFromSubject("Re: [TK-20261101-AB12CD] Gecikme"));
-        Assert.Null(InboundRules.TicketNumberFromSubject("TK-20261101-AB12CD numaralı talep"));
-        Assert.Null(InboundRules.TicketNumberFromSubject("[TK-yarım"));
-        Assert.Null(InboundRules.TicketNumberFromSubject(null));
+        Assert.Equal(["TK-20261101-AB12CD"], InboundRules.TicketNumberCandidates("Re: [TK-20261101-AB12CD] Gecikme"));
+        Assert.Equal(["SLA", "DT-2026-00001", "DESTEK-0042"], InboundRules.TicketNumberCandidates("[SLA] [ DT-2026-00001 ] x [DESTEK-0042] [dt-2026-00001]"));
+        Assert.Equal(["DT-2026-00001"], InboundRules.TicketNumberCandidates("[Fwd: [DT-2026-00001]"));
+
+        // Parantezsiz numara, kapanmamış, boş, boşluklu ya da numara alanından uzun etiket aday değildir.
+        Assert.Empty(InboundRules.TicketNumberCandidates("DT-2026-00001 numaralı talep"));
+        Assert.Empty(InboundRules.TicketNumberCandidates("[DT-yarım"));
+        Assert.Empty(InboundRules.TicketNumberCandidates($"[] [iki kelime] [{new string('A', 31)}]"));
+        Assert.Empty(InboundRules.TicketNumberCandidates(null));
+    }
+
+    [Fact]
+    public void Ticket_number_candidates_are_capped()
+    {
+        var subject = string.Concat(Enumerable.Range(1, 20).Select(i => $"[A-{i}] "));
+
+        Assert.Equal(["A-1", "A-2", "A-3", "A-4", "A-5"], InboundRules.TicketNumberCandidates(subject));
     }
 
     [Fact]
@@ -113,6 +136,21 @@ public class ChannelRulesTests
         Assert.True(SurveyRules.IsLow(1));
         Assert.True(SurveyRules.IsLow(2));
         Assert.False(SurveyRules.IsLow(3));
+    }
+
+    [Fact]
+    public void A_survey_reminder_is_due_once_after_the_configured_days_while_the_link_is_valid()
+    {
+        var now = new DateTimeOffset(2026, 11, 10, 12, 0, 0, TimeSpan.Zero);
+        var sent = now.AddDays(-3);
+        var expires = now.AddDays(5);
+        Assert.True(SurveyRules.ReminderDue(3, sent, null, null, expires, now)); // tam süre dolduğu an
+        Assert.False(SurveyRules.ReminderDue(4, sent, null, null, expires, now)); // henüz erken
+        Assert.False(SurveyRules.ReminderDue(0, sent, null, null, expires, now)); // ayar kapalı
+        Assert.False(SurveyRules.ReminderDue(3, null, null, null, expires, now)); // anket e-postası hiç gitmedi
+        Assert.False(SurveyRules.ReminderDue(3, sent, now.AddDays(-1), null, expires, now)); // yanıtlandı
+        Assert.False(SurveyRules.ReminderDue(3, sent, null, now.AddDays(-1), expires, now)); // zaten hatırlatıldı
+        Assert.False(SurveyRules.ReminderDue(3, sent, null, null, now, now)); // bağlantının süresi doldu
     }
 
     [Fact]

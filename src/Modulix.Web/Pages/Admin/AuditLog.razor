@@ -10,143 +10,156 @@
 
     <div class="page-header">
         <h1>@Texts.Get("nav.app.admin.audit")</h1>
-        <a class="btn btn-outline-primary" href="@ExportUrl" download>@Texts.Get("admin.audit.export")</a>
+        @if (view == EntriesView)
+        {
+            <a class="btn btn-outline-primary" href="@ExportUrl" download>@Texts.Get("admin.audit.export")</a>
+        }
     </div>
-    <p class="text-muted">@Texts.Get("admin.audit.intro")</p>
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseView" Label="@Texts.Get("nav.app.admin.audit")" />
 
     @if (message is not null)
     {
         <div class="alert alert-danger" role="alert">@message</div>
     }
 
-    <form class="audit-filters" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
-        <div>
-            <label class="form-label" for="auditUser">@Texts.Get("admin.lookups.user")</label>
-            <select id="auditUser" class="form-select" @bind="userId">
-                <option value="">@Texts.Get("admin.audit.everyone")</option>
-                @foreach (var user in filters?.Users ?? [])
-                {
-                    <option value="@user.UserId">@user.Name</option>
-                }
-            </select>
-        </div>
-        <div>
-            <label class="form-label" for="auditType">@Texts.Get("admin.automation.entity")</label>
-            <select id="auditType" class="form-select" @bind="entityKey">
-                <option value="">@Texts.Get("admin.subProfiles.all")</option>
-                @foreach (var type in filters?.EntityTypes ?? [])
-                {
-                    <option value="@type.Key">@type.Name</option>
-                }
-            </select>
-        </div>
-        <div>
-            <label class="form-label" for="auditAction">@Texts.Get("admin.automationRun.col.action")</label>
-            <select id="auditAction" class="form-select" @bind="action">
-                <option value="">@Texts.Get("admin.subProfiles.all")</option>
-                @foreach (var value in Enum.GetValues<AuditOperation>())
-                {
-                    <option value="@value">@SettingsLabels.Audit(value)</option>
-                }
-            </select>
-        </div>
-        <div>
-            <label class="form-label" for="auditSource">@Texts.Get("admin.automation.source")</label>
-            <select id="auditSource" class="form-select" @bind="source">
-                <option value="">@Texts.Get("admin.subProfiles.all")</option>
-                @foreach (var value in Enum.GetValues<AuditSource>())
-                {
-                    <option value="@value">@SettingsLabels.Audit(value)</option>
-                }
-            </select>
-        </div>
-        <div>
-            <label class="form-label" for="auditFrom">@Texts.Get("admin.supportAccess.col.start")</label>
-            <input id="auditFrom" class="form-control" type="date" @bind="from" />
-        </div>
-        <div>
-            <label class="form-label" for="auditTo">@Texts.Get("admin.supportAccess.col.end")</label>
-            <input id="auditTo" class="form-control" type="date" @bind="to" />
-        </div>
-        <div class="audit-filter-actions">
-            <button type="submit" class="btn btn-primary">@Texts.Get("common.filter")</button>
-            <button type="button" class="btn btn-outline-secondary" @onclick="ClearAsync">@Texts.Get("admin.audit.clear")</button>
-        </div>
-    </form>
-
-    @if (page is null)
+    @if (view == ArchiveView)
     {
-        @if (message is null)
-        {
-            <LoadingState Kind="LoadingKind.Table" />
-        }
-    }
-    else if (page.Items.Count == 0)
-    {
-        <EmptyState Title="@Texts.Get("admin.audit.empty")" />
+        <AuditArchiveList />
     }
     else
     {
-        <table class="table record-table audit-table">
-            <thead>
-                <tr>
-                    <th scope="col"><SortHeader Label="@Texts.Get("admin.audit.date")" ColumnIcon="calendar" Asc="occurredAt" Desc="-occurredAt" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><SortHeader Label="@Texts.Get("admin.lookups.user")" ColumnIcon="user" Asc="user" Desc="-user" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><SortHeader Label="@Texts.Get("admin.automation.entity")" ColumnIcon="layers" Asc="entityKey" Desc="-entityKey" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
-                    <th scope="col">@Texts.Get("admin.automationRule.record")</th>
-                    <th scope="col"><SortHeader Label="@Texts.Get("admin.automationRun.col.action")" ColumnIcon="activity" Asc="action" Desc="-action" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
-                    <th scope="col"><SortHeader Label="@Texts.Get("admin.automation.source")" ColumnIcon="globe" Asc="source" Desc="-source" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var entry in page.Items)
-                {
-                    var open = expanded.Contains(entry.Id);
-                    <tr class="audit-row @(open ? "is-open" : null)" @onclick="() => Toggle(entry.Id)">
-                        <td data-label="@Texts.Get("admin.audit.date")">
-                            <button type="button" class="link-button" aria-expanded="@(open ? "true" : "false")">@CrmLabels.Time(entry.OccurredAt)</button>
-                        </td>
-                        <td data-label="@Texts.Get("admin.lookups.user")">@entry.UserName</td>
-                        <td data-label="@Texts.Get("admin.automation.entity")">@entry.EntityName</td>
-                        <td data-label="@Texts.Get("admin.automationRule.record")" class="primary">@RecordTitle(entry)</td>
-                        <td data-label="@Texts.Get("admin.automationRun.col.action")">@SettingsLabels.Audit(entry.Action)</td>
-                        <td data-label="@Texts.Get("admin.automation.source")">@SettingsLabels.Audit(entry.Source, entry.Subscription)</td>
-                    </tr>
-                    @if (open)
+        <p class="text-muted">@Texts.Get("admin.audit.intro")</p>
+
+        <form class="audit-filters" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <div>
+                <label class="form-label" for="auditUser">@Texts.Get("admin.lookups.user")</label>
+                <select id="auditUser" class="form-select" @bind="userId">
+                    <option value="">@Texts.Get("admin.audit.everyone")</option>
+                    @foreach (var user in filters?.Users ?? [])
                     {
-                        <tr class="audit-detail">
-                            <td colspan="6">
-                                @if (entry.ValuesHidden)
-                                {
-                                    <p class="text-muted">@Texts.Get("admin.audit.valuesHidden")</p>
-                                }
-                                @if (entry.Changes.Count == 0)
-                                {
-                                    <EmptyState Compact="true" Title="@Texts.Get("admin.audit.noChanges")" />
-                                }
-                                else
-                                {
-                                    <table class="table table-sm audit-changes">
-                                        <thead><tr><th>@Texts.Get("admin.subProfiles.field")</th><th>@Texts.Get("admin.audit.oldValue")</th><th>@Texts.Get("admin.audit.newValue")</th></tr></thead>
-                                        <tbody>
-                                            @foreach (var change in entry.Changes)
-                                            {
-                                                <tr>
-                                                    <td>@change.Label</td>
-                                                    <td>@Value(entry, change, change.Old)</td>
-                                                    <td>@Value(entry, change, change.New)</td>
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                }
-                            </td>
-                        </tr>
+                        <option value="@user.UserId">@user.Name</option>
                     }
-                }
-            </tbody>
-        </table>
-        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="auditType">@Texts.Get("admin.automation.entity")</label>
+                <select id="auditType" class="form-select" @bind="entityKey">
+                    <option value="">@Texts.Get("admin.subProfiles.all")</option>
+                    @foreach (var type in filters?.EntityTypes ?? [])
+                    {
+                        <option value="@type.Key">@type.Name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="auditAction">@Texts.Get("admin.automationRun.col.action")</label>
+                <select id="auditAction" class="form-select" @bind="action">
+                    <option value="">@Texts.Get("admin.subProfiles.all")</option>
+                    @foreach (var value in Enum.GetValues<AuditOperation>())
+                    {
+                        <option value="@value">@SettingsLabels.Audit(value)</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="auditSource">@Texts.Get("admin.automation.source")</label>
+                <select id="auditSource" class="form-select" @bind="source">
+                    <option value="">@Texts.Get("admin.subProfiles.all")</option>
+                    @foreach (var value in Enum.GetValues<AuditSource>())
+                    {
+                        <option value="@value">@SettingsLabels.Audit(value)</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="auditFrom">@Texts.Get("admin.supportAccess.col.start")</label>
+                <input id="auditFrom" class="form-control" type="date" @bind="from" />
+            </div>
+            <div>
+                <label class="form-label" for="auditTo">@Texts.Get("admin.supportAccess.col.end")</label>
+                <input id="auditTo" class="form-control" type="date" @bind="to" />
+            </div>
+            <div class="audit-filter-actions">
+                <button type="submit" class="btn btn-primary">@Texts.Get("common.filter")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="ClearAsync">@Texts.Get("admin.audit.clear")</button>
+            </div>
+        </form>
+
+        @if (page is null)
+        {
+            @if (message is null)
+            {
+                <LoadingState Kind="LoadingKind.Table" />
+            }
+        }
+        else if (page.Items.Count == 0)
+        {
+            <EmptyState Title="@Texts.Get("admin.audit.empty")" />
+        }
+        else
+        {
+            <table class="table record-table audit-table">
+                <thead>
+                    <tr>
+                        <th scope="col"><SortHeader Label="@Texts.Get("admin.audit.date")" ColumnIcon="calendar" Asc="occurredAt" Desc="-occurredAt" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("admin.lookups.user")" ColumnIcon="user" Asc="user" Desc="-user" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("admin.automation.entity")" ColumnIcon="layers" Asc="entityKey" Desc="-entityKey" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                        <th scope="col">@Texts.Get("admin.automationRule.record")</th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("admin.automationRun.col.action")" ColumnIcon="activity" Asc="action" Desc="-action" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                        <th scope="col"><SortHeader Label="@Texts.Get("admin.automation.source")" ColumnIcon="globe" Asc="source" Desc="-source" Value="@sort" Default="-occurredAt" ValueChanged="SortAsync" /></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in page.Items)
+                    {
+                        var open = expanded.Contains(entry.Id);
+                        <tr class="audit-row @(open ? "is-open" : null)" @onclick="() => Toggle(entry.Id)">
+                            <td data-label="@Texts.Get("admin.audit.date")">
+                                <button type="button" class="link-button" aria-expanded="@(open ? "true" : "false")">@CrmLabels.Time(entry.OccurredAt)</button>
+                            </td>
+                            <td data-label="@Texts.Get("admin.lookups.user")">@entry.UserName</td>
+                            <td data-label="@Texts.Get("admin.automation.entity")">@entry.EntityName</td>
+                            <td data-label="@Texts.Get("admin.automationRule.record")" class="primary">@RecordTitle(entry)</td>
+                            <td data-label="@Texts.Get("admin.automationRun.col.action")">@SettingsLabels.Audit(entry.Action)</td>
+                            <td data-label="@Texts.Get("admin.automation.source")">@SettingsLabels.Audit(entry.Source, entry.Subscription)</td>
+                        </tr>
+                        @if (open)
+                        {
+                            <tr class="audit-detail">
+                                <td colspan="6">
+                                    @if (entry.ValuesHidden)
+                                    {
+                                        <p class="text-muted">@Texts.Get("admin.audit.valuesHidden")</p>
+                                    }
+                                    @if (entry.Changes.Count == 0)
+                                    {
+                                        <EmptyState Compact="true" Title="@Texts.Get("admin.audit.noChanges")" />
+                                    }
+                                    else
+                                    {
+                                        <table class="table table-sm audit-changes">
+                                            <thead><tr><th>@Texts.Get("admin.subProfiles.field")</th><th>@Texts.Get("admin.audit.oldValue")</th><th>@Texts.Get("admin.audit.newValue")</th></tr></thead>
+                                            <tbody>
+                                                @foreach (var change in entry.Changes)
+                                                {
+                                                    <tr>
+                                                        <td>@change.Label</td>
+                                                        <td>@Value(entry, change, change.Old)</td>
+                                                        <td>@Value(entry, change, change.New)</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+            <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+        }
     }
 </AuthGate>
 
@@ -162,7 +175,21 @@
     private DateOnly? to;
     private string? message;
 
-    private string ExportUrl => $"api/audit/export?{Filters()}";
+    private const string EntriesView = "entries";
+    private const string ArchiveView = "archive";
+
+    // Kayıtlar sıcak dönemdir; arşiv sekmesi eski ayların dosyalarını listeler (ADR-0052 dilim 3).
+    private static IReadOnlyList<ViewOption> ViewOptions =>
+    [
+        new(EntriesView, Texts.Get("admin.audit.tab.entries"), Icon: "list"),
+        new(ArchiveView, Texts.Get("admin.audit.tab.archive"), Icon: "history"),
+    ];
+
+    private string view = EntriesView;
+
+    private void ChooseView(string value) => view = value;
+
+    private string ExportUrl =>$"api/audit/export?{Filters()}";
 
     protected override async Task OnInitializedAsync()
     {

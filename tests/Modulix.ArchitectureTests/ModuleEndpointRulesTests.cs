@@ -24,6 +24,16 @@ public partial class ModuleEndpointRulesTests
             "Herkese açık memnuniyet anketi: bağlantı belirteciyle, hız sınırı ve gövde sınırıyla; sistem kimliği support.survey yalnızca talebi okur.",
         ["Modulix.Modules.Support/Endpoints/SupportChannelEndpoints.cs: /answer"] =
             "Herkese açık memnuniyet anketi yanıtı: bağlantı belirteciyle, hız sınırıyla; salt okunur lisansta yazılamaz (IPublicTenantScopes write).",
+        ["Modulix.Modules.Crm/Endpoints/LeadIntakeEndpoints.cs: "] =
+            "Herkese açık müşteri adayı formu (gönderim ve CORS ön kontrolü): form anahtarı, izinli kaynak (Origin), isteğe bağlı sır, hız ve gövde sınırı; sistem kimliği crm.lead-intake.",
+        ["Modulix.Modules.Crm/Endpoints/QuoteSharingEndpoints.cs: /view"] =
+            "Herkese açık teklif sayfası: bağlantı belirteciyle, hız ve gövde sınırıyla; sistem kimliği crm.quote-customer yalnızca teklifi okur.",
+        ["Modulix.Modules.Crm/Endpoints/QuoteSharingEndpoints.cs: /pdf"] =
+            "Herkese açık teklif PDF'i: bağlantı belirteciyle, hız ve gövde sınırıyla; yalnızca sabitlenmiş belge döner.",
+        ["Modulix.Modules.Crm/Endpoints/QuoteSharingEndpoints.cs: /decision"] =
+            "Herkese açık teklif kararı: bağlantı belirteci, belge özeti, daha sıkı hız sınırı; salt okunur lisansta yazılamaz (IPublicTenantScopes write).",
+        ["Modulix.Modules.Contracts/Endpoints/ContractSignatureEndpoints.cs: /contracts/signature/{provider}/events"] =
+            "İmza sağlayıcısı webhook'u: kimlik doğrulama HMAC-SHA256 imzası ve zaman damgasıdır; hız ve gövde sınırı var; sistem kimliği contracts.signature-webhook.",
     };
 
     [Fact]

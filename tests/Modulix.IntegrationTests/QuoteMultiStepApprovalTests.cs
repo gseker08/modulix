@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Modulix.Api.Crm;
 using Modulix.Core.Authorization;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;

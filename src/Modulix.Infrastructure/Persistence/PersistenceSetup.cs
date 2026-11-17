@@ -6,10 +6,10 @@ using Modulix.Core.Audit;
 using Modulix.Core.Authorization;
 using Modulix.Core.Automation;
 using Modulix.Core.Communication;
+using Modulix.Core.Contracts.Files;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Communication;
 using Modulix.Core.Contracts.Customization;
-using Modulix.Core.Contracts.Customs;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
@@ -17,7 +17,6 @@ using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.Settings;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Customization;
-using Modulix.Core.Customs;
 using Modulix.Core.FieldRules;
 using Modulix.Core.Imports;
 using Modulix.Core.Sectors;
@@ -39,7 +38,6 @@ using Modulix.Infrastructure.Automation;
 using Modulix.Infrastructure.Authorization;
 using Modulix.Infrastructure.Communication;
 using Modulix.Infrastructure.Customization;
-using Modulix.Infrastructure.Customs;
 using Modulix.Infrastructure.FieldRules;
 using Modulix.Infrastructure.Imports;
 using Modulix.Infrastructure.Sectors;
@@ -97,6 +95,8 @@ public static class PersistenceSetup
         services.AddScoped<IBusinessUnitDirectory, Organization.BusinessUnitDirectory>();
         services.AddScoped<ITenantDataTransfer, TenantDataTransfer>();
         services.AddScoped<IModuleData, ModuleData>();
+        services.AddScoped<IModuleReferenceData, ModuleReferenceData>();
+        services.AddScoped<IPlatformReferenceStore, PlatformReferenceStore>();
         services.AddScoped<ITransactionLock, SqlTransactionLock>();
         services.AddScoped<Modulix.Core.Contracts.Numbering.IDocumentNumbers, Modulix.Infrastructure.Numbering.DocumentNumbers>();
         services.AddScoped<Modulix.Core.Numbering.INumberSeriesAdmin, Modulix.Infrastructure.Numbering.NumberSeriesAdmin>();
@@ -148,6 +148,7 @@ public static class PersistenceSetup
         services.AddScoped<IAutomationRunService, AutomationRunService>();
         services.AddSingleton<AutomationScanner>();
         services.AddScoped<AutomationRetention>();
+        services.AddScoped<Modulix.Infrastructure.Audit.AuditArchiver>();
         services.AddSingleton<AutomationRunner>();
         services.AddScoped<IImportLog, ImportLog>();
         services.AddScoped<ImportSchema>();
@@ -159,8 +160,10 @@ public static class PersistenceSetup
         services.AddScoped<IReportRunner, ReportRunner>();
         services.AddScoped<IReportCatalog, ReportCatalogService>();
         services.AddScoped<IReportCenter, ReportCenter>();
+        services.AddScoped<IDashboards, Dashboards>();
         services.AddScoped<ReportAccessStamp>();
         services.AddScoped<IReportExports, ReportExports>();
+        services.AddScoped<Modulix.Core.Contracts.Reporting.IReportTableExports, ReportTableExports>();
         services.AddScoped<IReportSchedules, ReportSchedules>();
         services.AddScoped<CustomFieldService>();
         services.AddScoped<ICustomFieldService>(sp => sp.GetRequiredService<CustomFieldService>());
@@ -171,6 +174,7 @@ public static class PersistenceSetup
         services.AddScoped<LookupService>();
         services.AddScoped<ILookupSettings>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<ILookupSearch>(sp => sp.GetRequiredService<LookupService>());
+        services.AddScoped<Modulix.Core.Contracts.Records.ILookupLabels, LookupLabels>();
         services.AddScoped<ISectorProfileService, SectorProfileService>();
         services.AddScoped<ISubProfileService, SubProfileService>();
         services.TryAddSingleton<CustomizationLimits>(); // varsayılan: sınırsız (ADR-0041 K7); uygulama yapılandırmadan üzerine yazar
@@ -180,13 +184,7 @@ public static class PersistenceSetup
         services.AddScoped<IndustryService>();
         services.AddScoped<IIndustries>(sp => sp.GetRequiredService<IndustryService>());
         services.AddScoped<IIndustryCatalog>(sp => sp.GetRequiredService<IndustryService>());
-        services.AddScoped<GtipCatalogService>();
-        services.AddScoped<IGtipCatalog>(sp => sp.GetRequiredService<GtipCatalogService>());
-        services.AddScoped<IGtipCatalogAdmin>(sp => sp.GetRequiredService<GtipCatalogService>());
-        services.AddScoped<RegimeProfileService>();
-        services.AddScoped<IRegimeProfileAdmin>(sp => sp.GetRequiredService<RegimeProfileService>());
-        services.AddScoped<IRegimeProfileCatalog>(sp => sp.GetRequiredService<RegimeProfileService>());
-        services.AddSingleton<IGtipFileReader, GtipFileReader>();
+        services.AddSingleton<ITabularFileReader, Modulix.Infrastructure.Files.TabularFileReader>();
         services.AddSingleton<IImportWorkbookReader, ImportWorkbookReader>();
         services.AddScoped<IActivityCodeCatalog, ActivityCodeCatalog>();
         services.AddScoped<ITenantActivitySelection, TenantActivitySelectionService>();
@@ -231,14 +229,19 @@ public static class PersistenceSetup
 
         // Denetim kaydı okuma (Y5).
         services.AddScoped<IAuditLog, AuditLog>();
+        services.AddScoped<IAuditArchives, AuditArchives>();
         services.AddScoped<ITenantSettings, TenantSettings>();
         // Modüllerin ayar okuma sözleşmesi (ADR-0046); aynı kapsamdaki ITenantSettings örneğini verir.
         services.AddScoped<ITenantSettingReader>(provider => provider.GetRequiredService<ITenantSettings>());
         services.AddScoped<ITenantClock, TenantClock>();
+        services.AddScoped<ICurrentTenantInfo, Modulix.Infrastructure.Platform.CurrentTenantInfo>();
         services.AddScoped<ITenantLogo, TenantLogoStore>();
         services.AddScoped<TenantDisplayNames>();
         return services;
     }
+
+    /// <summary>migrate komutunda tek SQL komutunun azami süresi.</summary>
+    public static readonly TimeSpan MigrationCommandTimeout = TimeSpan.FromMinutes(30);
 
     /// <summary>
     /// Bekleyen migration'ları migration kullanıcısıyla uygular ('migrate' komutu). Tek veritabanı bütün tenant'ları
@@ -250,6 +253,9 @@ public static class PersistenceSetup
         ArgumentNullException.ThrowIfNull(modules);
 
         await using var context = CreateContext(migrationsConnectionString, modules);
+
+        // Varsayılan 30 sn büyük tabloda dizin yeniden kurmaya yetmez (ör. denetim kaydının bölümlenmesi, ADR-0052); migration işletmen komutudur.
+        context.Database.SetCommandTimeout(MigrationCommandTimeout);
         await context.Database.MigrateAsync(cancellationToken);
     }
 

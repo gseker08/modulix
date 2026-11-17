@@ -16,6 +16,7 @@ public class ProjectReferenceRulesTests
     private const string FleetContracts = "Modulix.Modules.Fleet.Contracts";
     private const string CrmContracts = "Modulix.Modules.Crm.Contracts";
     private const string MarketingContracts = "Modulix.Modules.Marketing.Contracts";
+    private const string WarehouseContracts = "Modulix.Modules.Warehouse.Contracts";
 
     /// <summary>Her src projesinin referans verebileceği projeler.</summary>
     private static readonly Dictionary<string, string[]> AllowedReferences = new()
@@ -29,13 +30,13 @@ public class ProjectReferenceRulesTests
         [CoreHosting] = [CoreContracts, Shared],
         ["Modulix.Core"] = [CoreContracts],
         ["Modulix.Infrastructure"] = ["Modulix.Core", CoreContracts],
-        ["Modulix.Modules.Crm"] = [CoreContracts, CrmContracts, MarketingContracts],
+        ["Modulix.Modules.Crm"] = [CoreContracts, CoreHosting, Shared, CrmContracts, MarketingContracts],
         ["Modulix.Modules.Logistics"] = [CoreContracts, CoreHosting, Shared, FleetContracts],
-        ["Modulix.Modules.Contracts"] = [CoreContracts, CrmContracts],
+        ["Modulix.Modules.Contracts"] = [CoreContracts, CoreHosting, Shared, CrmContracts],
         ["Modulix.Modules.Orders"] = [CoreContracts, CoreHosting, Shared, CrmContracts],
         ["Modulix.Modules.Support"] = [CoreContracts, CoreHosting, Shared],
         ["Modulix.Modules.Marketing"] = [CoreContracts, CoreHosting, Shared, CrmContracts, MarketingContracts],
-        ["Modulix.Modules.Warehouse"] = [CoreContracts, CoreHosting, Shared],
+        ["Modulix.Modules.Warehouse"] = [CoreContracts, CoreHosting, Shared, WarehouseContracts],
         ["Modulix.Modules.Fleet"] = [CoreContracts, FleetContracts],
         ["Modulix.Modules.Hr"] = [CoreContracts, CoreHosting, Shared],
 
@@ -43,6 +44,7 @@ public class ProjectReferenceRulesTests
         [CrmContracts] = [CoreContracts],
         [FleetContracts] = [CoreContracts],
         [MarketingContracts] = [CoreContracts],
+        [WarehouseContracts] = [CoreContracts],
 
         ["Modulix.AI"] = [CoreContracts],
         ["Modulix.Web"] = ["Modulix.Shared"],

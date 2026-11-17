@@ -17,7 +17,7 @@ public class CrmAutomationTemplateTests
         var keys = Declared.Templates.Select(t => t.Key).ToList();
 
         Assert.Equal(CrmAutomationTemplates.All.Select(t => t.Key), keys);
-        Assert.Equal(4, keys.Count);
+        Assert.Equal(5, keys.Count);
         Assert.Equal(keys.Count, keys.Distinct(StringComparer.Ordinal).Count());
         Assert.All(keys, key => Assert.StartsWith(CrmModule.ModuleKey + ".", key));
     }
@@ -49,6 +49,9 @@ public class CrmAutomationTemplateTests
                     var field = Assert.Single(Declared.Fields, f => f.Key == date.Field);
                     Assert.Equal(template.EntityKey, field.EntityKey);
                     Assert.Equal(AutomationFieldType.Date, field.Type);
+                    break;
+                case FieldChangedTrigger changed:
+                    Assert.All(changed.Fields, key => Assert.Equal(template.EntityKey, Assert.Single(Declared.Fields, f => f.Key == key).EntityKey));
                     break;
                 case InactivityTrigger inactivity:
                     var relation = Assert.Single(Declared.Relations, r => r.Key == inactivity.Relation);
@@ -103,6 +106,21 @@ public class CrmAutomationTemplateTests
             Assert.Equal(AutomationFieldType.Text, field.Type);
             Assert.Null(field.ReadPermission); // seçici herkesin okuyabildiği alanla tanıtır
         }
+    }
+
+    [Fact]
+    public void Score_threshold_template_fires_only_when_the_score_crosses_the_threshold()
+    {
+        var template = Assert.Single(CrmAutomationTemplates.All, t => t.Key == CrmAutomationTemplates.LeadScoreThreshold);
+        var trigger = Assert.IsType<FieldChangedTrigger>(template.Definition.Trigger);
+        Assert.Equal(["crm.lead.score"], trigger.Fields);
+
+        var group = Assert.IsType<ConditionGroup>(template.Definition.Condition);
+        Assert.Equal(ConditionLogic.And, group.Logic);
+        var leaves = group.Items.OfType<ConditionLeaf>().Where(l => l.Field == "crm.lead.score").ToList();
+        Assert.Contains(leaves, l => l.Operator == AutomationOperator.Gte && l.Source == AutomationValueSource.New && l.Values.SequenceEqual(["70"]));
+        Assert.Contains(leaves, l => l.Operator == AutomationOperator.Lt && l.Source == AutomationValueSource.Old && l.Values.SequenceEqual(["70"]));
+        Assert.Equal(AutomationFieldType.Number, Assert.Single(Declared.Fields, f => f.Key == "crm.lead.score").Type);
     }
 
     [Fact]

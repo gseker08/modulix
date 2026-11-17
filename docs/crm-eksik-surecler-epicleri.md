@@ -109,6 +109,7 @@ Bu belge tek başına hiçbir şeyi uygulamaz; her epic başlamadan önce kendi 
 - **Süreç ve kurallar:** her modül kendi sözleşme projesinden bir zaman çizelgesi kaynağı sunar (ADR-0044); kart bunları birleştirir,
   modüller birbirinin tablosunu okumaz. Her satır kullanıcının o modüldeki kapsamıyla süzülür; lisansı olmayan modülün satırı gelmez.
 - **Dilimler:** 1) sözleşme + CRM kaynakları, 2) Sipariş/Sözleşme/Destek/Pazarlama kaynakları, 3) süzgeç ve özet şeridi.
+- **Durum (17 Kasım 2026):** dilim 1 teslim edildi; tasarım [ADR-0053](adr/0053-musteri-zaman-cizelgesi.md)'te.
 
 ## Videoda olmayan ama karşılaştırmada görülen açıklar
 

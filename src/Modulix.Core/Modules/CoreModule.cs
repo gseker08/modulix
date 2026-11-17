@@ -76,7 +76,7 @@ public sealed class CoreModule : IModule
         public const string ManageApprovals = "core.approvals.manage";
 
         /// <summary>Rapor merkezini açar, hazır ve paylaşılan raporları çalıştırır (ADR-0035, dilim 3). Veri erişimi vermez: her rapor çalıştıranın kayıt yetkisiyle çalışır.</summary>
-        public const string ReadReports = "core.reports.read";
+        public const string ReadReports = Modulix.Core.Contracts.Reporting.ReportPermissions.Read;
 
         /// <summary>Kendi raporlarını oluşturur, düzenler ve siler; rapor oluşturucuyu kullanır.</summary>
         public const string ManageReports = "core.reports.manage";
@@ -85,7 +85,7 @@ public sealed class CoreModule : IModule
         public const string ShareReports = "core.reports.share";
 
         /// <summary>Rapor sonucunu CSV olarak dışa aktarır (ADR-0035, dilim 4). Dosya yalnızca sahibine, indirme anında yetki yeniden denetlenerek verilir.</summary>
-        public const string ExportReports = "core.reports.export";
+        public const string ExportReports = Modulix.Core.Contracts.Reporting.ReportPermissions.Export;
 
         /// <summary>Kendi raporlarını zamanlar; zamanlanmış rapor çalışırken sahibinin yetkisi yeniden denetlenir, yetki kaybında teslim durur.</summary>
         public const string ScheduleReports = "core.reports.schedule";
@@ -248,8 +248,14 @@ public sealed class CoreModule : IModule
         /// <summary>Kayıtlı rapor (ADR-0035, dilim 3); kaydın kimliği raporun kimliğidir. Tanımın okunabilir özeti yazılır.</summary>
         public const string Report = "core.report";
 
+        /// <summary>Kullanıcı panosu (CRM epik E2); kaydın kimliği panonun kimliğidir. Bileşenlerin okunabilir özeti yazılır.</summary>
+        public const string Dashboard = "core.dashboard";
+
         /// <summary>Zamanlanmış rapor (ADR-0035, dilim 4); kaydın kimliği zamanlamanın kimliğidir.</summary>
         public const string ReportSchedule = "core.report-schedule";
+
+        /// <summary>Denetim kaydı arşivi dönemi (ADR-0052 dilim 3); kaydın kimliği arşiv satırının kimliğidir. Yalnızca indirme yazılır.</summary>
+        public const string AuditArchive = "core.audit-archive";
 
         /// <summary>Tenant'ın faaliyet seçimi (ADR-0029); kaydın kimliği tenant'ın kimliğidir, seçimin tamamı bir kayıt olarak yazılır.</summary>
         public const string ActivitySelection = "core.activity-selection";
@@ -288,15 +294,15 @@ public sealed class CoreModule : IModule
     /// <summary>Çekirdeğin firma ayarları (Y6): firma profili ve bölgesel ayarlar.</summary>
     public static class SettingKeys
     {
-        public const string DisplayName = "core.profile.display-name";
+        public const string DisplayName = Modulix.Core.Contracts.Settings.ProfileSettingKeys.DisplayName;
         public const string LegalName = "core.profile.legal-name";
         public const string TaxOffice = "core.profile.tax-office";
         public const string TaxNumber = "core.profile.tax-number";
         public const string Address = "core.profile.address";
         public const string Phone = "core.profile.phone";
         public const string Email = "core.profile.email";
-        public const string TimeZone = "core.regional.time-zone";
-        public const string Currency = "core.regional.currency";
+        public const string TimeZone = Modulix.Core.Contracts.Settings.RegionalSettingKeys.TimeZone;
+        public const string Currency = Modulix.Core.Contracts.Settings.RegionalSettingKeys.Currency;
         public const string Format = "core.regional.format";
         public const string Language = "core.regional.language";
         public const string RequireTwoFactor = "core.security.require-two-factor";
@@ -695,6 +701,14 @@ public sealed class CoreModule : IModule
                 ["visibility"] = new Dictionary<string, string> { ["Private"] = "Özel", ["Users"] = "Seçilen kullanıcılar", ["Tenant"] = "Firma" },
             },
         },
+        new(AuditedEntityKeys.Dashboard, "Pano", null, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["widgets"] = "Bileşenler",
+        }, "name"),
+        new(AuditedEntityKeys.AuditArchive, "Denetim kaydı arşivi", null, new Dictionary<string, string>
+        {
+            ["period"] = "Dönem", ["rows"] = "Satır sayısı", ["bytes"] = "Boyut (bayt)", ["sha256"] = "SHA-256 özeti",
+        }, "period"),
         new(AuditedEntityKeys.ReportSchedule, "Zamanlanmış rapor", null, new Dictionary<string, string>
         {
             ["report"] = "Rapor", ["frequency"] = "Sıklık", ["hour"] = "Saat", ["dayOfWeek"] = "Haftanın günü", ["dayOfMonth"] = "Ayın günü",
@@ -758,20 +772,26 @@ public sealed class CoreModule : IModule
             ["kind"] = "Tür", ["name"] = "Ünvan", ["taxOffice"] = "Vergi dairesi", ["taxNumber"] = "Vergi no", ["phone"] = "Telefon",
             ["email"] = "E-posta", ["website"] = "Web sitesi", ["city"] = "Şehir", ["address"] = "Adres",
             ["relationshipRoles"] = "İlişki rolleri", ["customerSectors"] = "Müşteri sektörü", ["serviceNeeds"] = "Hizmet ihtiyacı",
+            ["preferredLanguage"] = "Yazışma dili",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
                 ["kind"] = new Dictionary<string, string> { ["Organization"] = "Tüzel kişi", ["Individual"] = "Gerçek kişi" },
+                ["preferredLanguage"] = new Dictionary<string, string> { ["tr"] = "Türkçe", ["en"] = "English", ["az"] = "Azərbaycanca" },
             },
         },
         new(SharedEntities.Person, "Kişi (ortak kayıt)", null, new Dictionary<string, string>
         {
             ["firstName"] = "Ad", ["lastName"] = "Soyad", ["email"] = "E-posta", ["phone"] = "Telefon", ["title"] = "Unvan",
-            ["partyId"] = "Firma",
+            ["partyId"] = "Firma", ["preferredLanguage"] = "Yazışma dili",
         })
         {
             TitleFields = ["firstName", "lastName"],
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["preferredLanguage"] = new Dictionary<string, string> { ["tr"] = "Türkçe", ["en"] = "English", ["az"] = "Azərbaycanca" },
+            },
             References = new Dictionary<string, string> { ["partyId"] = SharedEntities.Party },
         },
         new(SharedEntities.PartyRelationship, "Firma ilişkisi (ortak kayıt)", null, new Dictionary<string, string>

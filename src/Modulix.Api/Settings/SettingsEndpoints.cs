@@ -2,6 +2,7 @@ using Modulix.Api.Access;
 using Modulix.Api.Records;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Modules;
 using Modulix.Core.Settings;
 using Modulix.Shared.Settings;
@@ -21,8 +22,8 @@ public static class SettingsEndpoints
             .AddEndpointFilter<RequireTenantFilter>()
             .WithTags("Settings");
 
-        settings.MapGet("/", async (ITenantSettings tenantSettings, ITenantLogo logo, CancellationToken ct) =>
-            ToResponse(await tenantSettings.GetAsync(ct), await logo.GetInfoAsync(ct)));
+        settings.MapGet("/", async (ITenantSettings tenantSettings, ITenantLogo logo, IRequestLanguage language, ITextCatalog texts, CancellationToken ct) =>
+            ToResponse(await tenantSettings.GetAsync(ct), await logo.GetInfoAsync(ct), await BundleAsync(language, texts, ct)));
         settings.MapPut("/", SaveAsync).RequirePermission(CoreModule.Permissions.ManageSettings);
 
         // Logo (Y6b): gövde dosyanın kendisidir (PNG veya JPEG, en fazla 256 KB); tür dosyanın içeriğinden belirlenir.
@@ -77,7 +78,8 @@ public static class SettingsEndpoints
         }
     }
 
-    private static async Task<IResult> SaveAsync(SaveSettingsRequest request, ITenantSettings tenantSettings, ITenantLogo logo, CancellationToken ct)
+    private static async Task<IResult> SaveAsync(
+        SaveSettingsRequest request, ITenantSettings tenantSettings, ITenantLogo logo, IRequestLanguage language, ITextCatalog texts, CancellationToken ct)
     {
         try
         {
@@ -85,7 +87,7 @@ public static class SettingsEndpoints
                 .ToDictionary(v => v.Key, v => new SettingWrite(v.Value?.Value ?? string.Empty, v.Value?.Version ?? 0), StringComparer.Ordinal);
             var result = await tenantSettings.SaveAsync(values, ct);
             return result.IsSuccess
-                ? Results.Ok(ToResponse(result.Value!, await logo.GetInfoAsync(ct)))
+                ? Results.Ok(ToResponse(result.Value!, await logo.GetInfoAsync(ct), await BundleAsync(language, texts, ct)))
                 : RecordEndpoints.ToProblem(result.Error!);
         }
         catch (ArgumentException ex)
@@ -96,17 +98,21 @@ public static class SettingsEndpoints
 
     private static TenantLogoDto ToDto(TenantLogoInfo info) => new(info.ContentType, info.Size, info.Version);
 
-    private static SettingsResponse ToResponse(IReadOnlyList<TenantSettingValue> values, TenantLogoInfo? logo) =>
+    private static async ValueTask<IReadOnlyDictionary<string, string>> BundleAsync(IRequestLanguage language, ITextCatalog texts, CancellationToken ct) =>
+        texts.Bundle(await language.GetAsync(ct));
+
+    // Ayarın adı, bölümü, açıklaması ve seçenek adları okurun dilinde (ADR-0034, dilim 18c-3); anahtar, değer ve varsayılan değer değişmez.
+    private static SettingsResponse ToResponse(IReadOnlyList<TenantSettingValue> values, TenantLogoInfo? logo, IReadOnlyDictionary<string, string> bundle) =>
         new([.. values.Select(v => new SettingDto(
             v.Definition.Key,
             v.ModuleKey,
-            v.Definition.Group,
-            v.Definition.DisplayName,
-            v.Definition.Description,
+            MetadataTexts.Text(bundle, MetadataTexts.SettingGroupKey(v.Definition.Key), v.Definition.Group),
+            MetadataTexts.Text(bundle, MetadataTexts.SettingKey(v.Definition.Key), v.Definition.DisplayName),
+            v.Definition.Description is null ? null : MetadataTexts.Text(bundle, MetadataTexts.SettingDescriptionKey(v.Definition.Key), v.Definition.Description),
             (SettingKind)v.Definition.Type,
             v.Definition.MaxLength,
             v.Definition.Required,
-            [.. v.Definition.Options.Select(o => new SettingOptionDto(o.Value, o.Label))],
+            [.. v.Definition.Options.Select(o => new SettingOptionDto(o.Value, MetadataTexts.Text(bundle, MetadataTexts.SettingOptionKey(v.Definition.Key, o.Value), o.Label)))],
             v.Definition.DefaultValue,
             v.Value,
             v.Version))], logo is null ? null : ToDto(logo));

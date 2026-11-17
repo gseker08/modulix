@@ -24,12 +24,16 @@ public sealed record MyAccessResponse(
     RecordScope Scope = RecordScope.All,
     IReadOnlyList<OperatingCompanyDto>? Companies = null,
     Guid? ActiveCompanyId = null,
-    IReadOnlyList<ModuleLicenseDto>? Licenses = null)
+    IReadOnlyList<ModuleLicenseDto>? Licenses = null,
+    IReadOnlyList<TenantMissingDependencyDto>? MissingDependencies = null)
 {
     public IReadOnlyList<OperatingCompanyDto> Companies { get; init; } = Companies ?? [];
 
     /// <summary>Süresi dolmuş, ek sürede ya da yakında dolacak modül hakları (ADR-0028); yöneticiye uyarı için.</summary>
     public IReadOnlyList<ModuleLicenseDto> Licenses { get; init; } = Licenses ?? [];
+
+    /// <summary>Firmada karşılanmayan modül bağımlılıkları (ADR-0051); yalnızca yöneticiye, bilgi için. Hakkı platform yönetir.</summary>
+    public IReadOnlyList<TenantMissingDependencyDto> MissingDependencies { get; init; } = MissingDependencies ?? [];
 }
 
 /// <summary>Modül hakkının süre evresi: ek sürede yazma açık, salt okunurda kapalıdır.</summary>
@@ -42,6 +46,13 @@ public enum LicensePhase
 
 /// <summary>Bir modül hakkının bitişi ve evresi. <see cref="GraceEndsAt"/>: ek sürenin bittiği, yani salt okunura geçilen an.</summary>
 public sealed record ModuleLicenseDto(string ModuleKey, string DisplayName, LicensePhase Phase, DateTimeOffset ValidUntil, DateTimeOffset GraceEndsAt);
+
+/// <summary>
+/// Açık bir modülün kapalı bağımlılığı (ADR-0051): <see cref="ModuleName"/> açık, <see cref="DependencyName"/> kapalı.
+/// <see cref="Required"/> değilse modül çalışır, <see cref="Reason"/>'daki özellik eksik kalır.
+/// </summary>
+public sealed record TenantMissingDependencyDto(
+    string ModuleKey, string ModuleName, string DependencyKey, string DependencyName, bool Required, string Reason);
 
 /// <summary>
 /// Erişilebilir bir işletici şirket (ADR-0008); müşteri firma (CRM <c>CompanyDto</c>, Taraf) değildir.

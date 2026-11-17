@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Automation;
@@ -6,6 +7,8 @@ using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Reporting;
 using Modulix.Core.Contracts.SharedRecords;
+using Modulix.Core.Hosting;
+using Modulix.Modules.Crm.Endpoints;
 using Modulix.Modules.Crm.Activities;
 using Modulix.Modules.Crm.Leads;
 using Modulix.Modules.Crm.Opportunities;
@@ -25,7 +28,7 @@ namespace Modulix.Modules.Crm;
 ///   <item>Uç noktalar ve ekranlar modülü değil, yalnızca bu sınıftaki anahtarları ve izinleri bilir.</item>
 /// </list>
 /// </summary>
-public sealed class CrmModule : IModule
+public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoints
 {
     public const string ModuleKey = "crm";
 
@@ -732,21 +735,23 @@ public sealed class CrmModule : IModule
         {
             ["name"] = "Ad", ["kind"] = "Tür", ["taxOffice"] = "Vergi dairesi", ["taxNumber"] = "Vergi no", ["phone"] = "Telefon", ["email"] = "E-posta", ["website"] = "Web sitesi",
             ["city"] = "Şehir", ["address"] = "Adres", ["industry"] = "Sektör", ["status"] = "Durum", ["source"] = "Kaynak",
-            ["tags"] = "Etiketler", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar", ["partyId"] = "Ortak firma kaydı",
+            ["tags"] = "Etiketler", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar", ["partyId"] = "Ortak firma kaydı", ["preferredLanguage"] = "Yazışma dili",
         }, "name")
         {
             UserFields = ["ownerId"],
             References = new Dictionary<string, string> { ["partyId"] = SharedEntities.Party },
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["preferredLanguage"] = new Dictionary<string, string> { ["tr"] = "Türkçe", ["en"] = "English", ["az"] = "Azərbaycanca" } },
         },
         new(Entities.Contact, "Kişi (CRM)", Permissions.ContactsRead, new Dictionary<string, string>
         {
             ["firstName"] = "Ad", ["lastName"] = "Soyad", ["companyId"] = "Firma", ["title"] = "Unvan", ["email"] = "E-posta",
-            ["phone"] = "Telefon", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar", ["personId"] = "Ortak kişi kaydı",
+            ["phone"] = "Telefon", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar", ["personId"] = "Ortak kişi kaydı", ["preferredLanguage"] = "Yazışma dili",
         })
         {
             TitleFields = ["firstName", "lastName"],
             UserFields = ["ownerId"],
             References = new Dictionary<string, string> { ["companyId"] = Entities.Company, ["personId"] = SharedEntities.Person },
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["preferredLanguage"] = new Dictionary<string, string> { ["tr"] = "Türkçe", ["en"] = "English", ["az"] = "Azərbaycanca" } },
         },
         new(Entities.CompanyContact, "Firma–kişi ilişkisi (CRM)", Permissions.ContactsRead, new Dictionary<string, string>
         {
@@ -1053,10 +1058,12 @@ public sealed class CrmModule : IModule
     /// <summary>
     /// Zamanlanmış iş (ADR-0046): host'taki tek zamanlayıcı 5 dakikada bir, CRM modülü yazılabilir olan her tenant için teklif süre dolumu turunu çalıştırır.
     /// Yapılandırma <c>Jobs:crm.quote-expiry</c>; eski <c>QuoteExpiry</c> bölümü okunmaya devam eder.
+    /// Müşteri adayı puanlarını kural değişikliğinden sonra yeniden hesaplayan iş (ADR-0050 dilim 1b) de 5 dakikada bir çalışır; yapılandırma <c>Jobs:crm.lead-scoring</c>.
     /// </summary>
     IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
     [
         ModuleJobDefinition.For<QuoteExpiryJob>(QuoteExpiryJob.JobKey, TimeSpan.FromSeconds(300), QuoteExpiryJob.Identity) with { LegacySection = "QuoteExpiry" },
+        ModuleJobDefinition.For<LeadScoreJob>(LeadScoreJob.JobKey, TimeSpan.FromMinutes(5), LeadScoreJob.Identity),
     ];
 
     IReadOnlyList<EventSubscription> IModule.EventSubscriptions { get; } =
@@ -1103,6 +1110,20 @@ public sealed class CrmModule : IModule
             [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated],
             [Entities.Activity],
             [Permissions.ActivitiesRead, Permissions.ActivitiesViewPrivate, Permissions.OpportunitiesRead, Permissions.OpportunitiesWrite]),
+        // Toplu yeniden puanlama işinin (ADR-0050 dilim 1b) sistem kimliği: olay işlemez. Atama izni yalnızca sorumlusu boş adayları
+        // (atama havuzu) görmek içindir; iş sorumlu ya da durum yazmaz, boş değerli güncellemeyle puanı yeniden hesaplatır.
+        EventSubscription.For<LeadScoreJobAnchor>(
+            LeadScoreJob.Identity,
+            [DomainEventTypes.RecordDeleted],
+            [Entities.LeadScoreRule],
+            [Permissions.LeadsRead, Permissions.LeadsUpdate, Permissions.LeadsAssign]),
+        // Davranış puanı (ADR-0050 dilim 2): adaya bağlı aktivite değişince adayın puanını hemen yeniden hesaplar; yalnızca puan değişecekse
+        // boş değerli güncelleme yazar. İzinler toplu işle aynıdır (havuzdaki aday için atama izni).
+        EventSubscription.For<LeadBehaviorScoreSubscriber>(
+            LeadBehaviorScoreSubscriber.Key,
+            [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated, DomainEventTypes.RecordDeleted],
+            [Entities.Activity],
+            [Permissions.LeadsRead, Permissions.LeadsUpdate, Permissions.LeadsAssign]),
     ];
 
     /// <summary>Tenant ayar anahtarları.</summary>
@@ -1129,8 +1150,32 @@ public sealed class CrmModule : IModule
         public const string ForecastBestCaseMinProbability = "crm.forecast.best-case-min-probability";
     }
 
+    /// <summary>CRM uç noktaları (<c>/api/crm</c>) modüldedir (ADR-0046); grup host tarafından açılır.</summary>
+    public void MapEndpoints(IEndpointRouteBuilder routes) => CrmEndpoints.MapEndpoints(routes);
+
+    /// <summary>
+    /// Herkese açık uçlar: müşteri adayı formu (<c>/api/public/lead-forms/{tenant}/{formKey}</c>; form anahtarı, izinli kaynak, sır, hız sınırı) ve teklif
+    /// müşteri sayfası (<c>/api/public/quotes/{tenant}</c>; bağlantı belirteci, hız ve gövde sınırı).
+    /// </summary>
+    public void MapPublicEndpoints(IEndpointRouteBuilder routes)
+    {
+        LeadIntakeEndpoints.MapPublic(routes);
+        QuoteSharingEndpoints.MapPublic(routes);
+    }
+
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<Modulix.Modules.Crm.Opportunities.IOpportunityPolicyProvider, OpportunityPolicyProvider>();
+        services.AddLeadIntakeRateLimit();
+        services.AddQuotePublicRateLimit();
+        services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, QuotePolicyProvider>();
+        services.AddScoped<QuoteDocumentService>();
+        services.AddScoped<QuoteDelivery>();
+        services.AddScoped<Modulix.Modules.Crm.Reporting.ISalesReportingPolicyProvider, SalesReportingPolicyProvider>();
+        services.AddScoped<LeadScoreJob>();
+        services.AddScoped<LeadScoreJobAnchor>();
+        services.AddScoped<LeadScoreReader>();
+        services.AddScoped<LeadBehaviorScoreSubscriber>();
         services.AddScoped<CrmStoreContext>();
         services.AddScoped<ISharedRecordVisibility, CrmSharedRecordVisibility>();
         services.AddScoped<IRecordStore, CompanyRecordStore>();
@@ -1204,6 +1249,10 @@ public sealed class CrmModule : IModule
         services.AddScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, CrmFollowUpActivities>();
         // Ana bilgisayarın (API) sistem kimliği köprüsü bu doğrudan uygulamayı kendi CRM sistem kimliği altında çağırır (aşağıdaki "crm.follow-up" aboneliği).
         services.AddKeyedScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, CrmFollowUpActivities>("direct");
+        // Müşteri zaman çizelgesinin CRM kaynakları (E9); başka modüller kendi kaynağını aynı sözleşmeyle kaydeder.
+        services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, ActivityTimelineSource>();
+        services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, OpportunityTimelineSource>();
+        services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, QuoteTimelineSource>();
         services.AddScoped<CrmFollowUpAnchor>();
         services.AddScoped<CrmFollowUpActivities>();
         services.AddScoped<CrmAutomationRecordSource>();

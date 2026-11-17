@@ -350,6 +350,13 @@
                     </div>
                 }
 
+                @if (tabs.Rendered(TabTimeline))
+                {
+                    <div role="tabpanel" id="tabpanel-@TabTimeline" aria-labelledby="tab-@TabTimeline" class="record-tabpanel" hidden="@tabs.Hidden(TabTimeline)">
+                        <CustomerTimeline CompanyId="Id" Lookups="Lookups" Version="timelineVersion" />
+                    </div>
+                }
+
                 @if (tabs.Rendered(TabHistory))
                 {
                     <div role="tabpanel" id="tabpanel-@TabHistory" aria-labelledby="tab-@TabHistory" class="record-tabpanel" hidden="@tabs.Hidden(TabHistory)">
@@ -379,7 +386,11 @@
     private const string TabRelations = "iliskiler";
     private const string TabSales = "satis";
     private const string TabActivities = "aktiviteler";
+    private const string TabTimeline = "zaman-cizelgesi";
     private const string TabHistory = "gecmis";
+
+    // Aktivite ya da fırsat kaydedilince artar; açık zaman çizelgesi yeniden yüklenir.
+    private long timelineVersion;
 
     private readonly TabState tabs = new(TabGeneral);
 
@@ -456,6 +467,8 @@
                 list.Add(new(TabActivities, Texts.Get("crm.activities.title"), activityTotal));
             }
 
+            // Zaman çizelgesi her zaman vardır: kullanıcı yalnızca okuyabildiği kaynakların satırlarını görür (sunucuda süzülür).
+            list.Add(new(TabTimeline, Texts.Get("crm.company.tab.timeline")));
             list.Add(new(TabHistory, Texts.Get("common.history.tab")));
             return list;
         }
@@ -578,6 +591,7 @@
     private async Task ActivitySaved()
     {
         editingActivity = false;
+        timelineVersion++;
         await Task.WhenAll(LoadActivitiesAsync(), LoadSummaryAsync());
     }
 
@@ -590,6 +604,7 @@
     private async Task OpportunitySaved()
     {
         editingOpportunity = false;
+        timelineVersion++;
         await Task.WhenAll(LoadOpportunitiesAsync(), LoadSummaryAsync());
     }
 

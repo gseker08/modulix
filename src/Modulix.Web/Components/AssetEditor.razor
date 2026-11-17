@@ -9,7 +9,7 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@(Asset is null ? "Yeni demirbaş" : "Demirbaş")</h2>
+            <h2>@(Asset is null ? Texts.Get("hr.asset-form.new") : Texts.Get("hr.asset-form.title"))</h2>
             @if (Asset is not null)
             {
                 <p>@form.AssetTag · @HrLabels.AssetStatus(form.Status)@(WarehouseLabels.Text(Asset, "currentEmployeeName") is { Length: > 0 } holder ? $" · {holder}" : "")</p>
@@ -17,10 +17,10 @@
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@(CanWrite ? "İptal" : "Kapat")</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@(CanWrite ? Texts.Get("common.cancel") : Texts.Get("common.close"))</button>
             @if (CanWrite)
             {
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">Kaydet</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : null)">@Texts.Get("common.save")</button>
             }
         </div>
     </div>
@@ -35,7 +35,7 @@
     }
 
     <fieldset disabled="@(!CanWrite)">
-    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="Demirbaş bölümleri">
+    <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("hr.asset-form.sections")">
         <Field Context="f">
             @switch (f.Key)
             {
@@ -64,12 +64,12 @@
                     @if (form.Status == "assigned")
                     {
                         <p class="mb-0"><span class="badge @HrLabels.AssetStatusBadge("assigned")">@HrLabels.AssetStatus("assigned")</span></p>
-                        <small class="text-muted">Zimmetteki demirbaşın durumu iade ya da kayıp kaydıyla değişir.</small>
+                        <small class="text-muted">@Texts.Get("hr.asset-form.status-help")</small>
                     }
                     else
                     {
                         <select id="asset-status" class="form-select" @bind="form.Status">
-                            @foreach (var (key, label) in HrAccess.AssetStatuses.Where(s => s.Key != "assigned"))
+                            @foreach (var (key, label) in HrLabels.AssetStatuses.Where(s => s.Key != "assigned"))
                             {
                                 <option value="@key">@label</option>
                             }
@@ -148,7 +148,7 @@
     protected override async Task OnInitializedAsync()
     {
         layout = await Layouts.ForAsync(EntityKey);
-        layoutError = layout is null ? "Form düzeni yüklenemedi; sayfayı yenileyip yeniden deneyin." : null;
+        layoutError = layout is null ? Texts.Get("common.form.loadFailed") : null;
     }
 
     protected override void OnParametersSet()

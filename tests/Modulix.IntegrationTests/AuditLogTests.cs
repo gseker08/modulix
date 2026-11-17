@@ -66,7 +66,7 @@ public class AuditLogTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
     }
 
     [Fact]
-    public async Task Type_and_field_names_and_the_csv_come_in_the_readers_language_while_the_firms_list_values_stay_as_entered()
+    public async Task Type_field_and_built_in_list_value_names_and_the_csv_come_in_the_readers_language()
     {
         var (tenant, editor, company) = await TenantWithCompanyChangeAsync();
         var auditor = await factory.CreateUserAsync(tenant);
@@ -74,13 +74,13 @@ public class AuditLogTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
         using var english = await LoginAsync(editor);
         Assert.Equal(HttpStatusCode.OK, (await english.PutAsJsonAsync("/api/account/language", new UpdateLanguageRequest("en"))).StatusCode);
 
-        // İngilizce okur: kayıt türü ve alan adı çevrilir; firmanın seçim listesi değeri (veri) olduğu gibi kalır.
+        // İngilizce okur: kayıt türü, alan adı ve firmanın değiştirmediği hazır liste değeri çevrilir (18c-4; firmanın verdiği ad çevrilmez, ChoiceListTests).
         var page = await english.GetFromJsonAsync<AuditPageResponse>("/api/audit?entityKey=crm.company");
         var updated = page!.Items[0];
         Assert.Equal("Company (CRM)", updated.EntityName);
         var status = Assert.Single(updated.Changes, c => c.Field == "status");
         Assert.Equal("Status", status.Label);
-        Assert.Equal("Potansiyel", status.Old);
+        Assert.Equal("Potential", status.Old);
         var filters = await english.GetFromJsonAsync<AuditFiltersResponse>("/api/audit/filters");
         Assert.Contains(filters!.EntityTypes, t => t.Key == "crm.company" && t.Name == "Company (CRM)");
         var history = await english.GetFromJsonAsync<AuditPageResponse>($"/api/records/crm.company/{company}/history");
@@ -169,6 +169,46 @@ public class AuditLogTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
             db.Database.ExecuteSqlAsync($"DELETE FROM core.AuditLog WHERE RecordId = {company}"));
         Assert.Equal(2, await db.AuditLog.CountAsync(a => a.RecordId == company));
     }
+
+    /// <summary>
+    /// ADR-0052: tablo aylık bölümlüdür ve bütün dizinleri bölüm şemasına hizalıdır (hizalanmamış bir dizin bölüm boşaltmayı engeller;
+    /// EF modelinde bölüm şeması olmadığı için yeni dizin bu testle yakalanır). Uygulama bölüm de boşaltamaz.
+    /// </summary>
+    [Fact]
+    public async Task Audit_log_is_partitioned_by_month_and_every_index_is_aligned()
+    {
+        var (tenant, _, company) = await TenantWithCompanyChangeAsync();
+        using var scope = factory.OpenScope(tenant.Id);
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+
+        var indexes = await db.Database.SqlQuery<IndexPlacement>($"""
+            SELECT i.name AS Name, ds.name AS DataSpace
+            FROM sys.indexes i JOIN sys.data_spaces ds ON ds.data_space_id = i.data_space_id
+            WHERE i.object_id = OBJECT_ID(N'core.AuditLog')
+            """).ToListAsync();
+        Assert.Contains(indexes, i => i.Name == "PK_AuditLog");
+        Assert.True(indexes.Count >= 4, string.Join(", ", indexes.Select(i => i.Name)));
+        Assert.All(indexes, i => Assert.Equal(AuditPartitionSql.SchemeName, i.DataSpace));
+
+        var occurredAt = await db.AuditLog.Where(a => a.RecordId == company).Select(a => a.OccurredAt).FirstAsync();
+        var partition = await db.Database.SqlQuery<int>(
+            $"SELECT $PARTITION.AuditLogMonthly({occurredAt}) AS Value").SingleAsync();
+        // Arşiv komutu eski boş sınırları birleştirdiği için bölüm numarası sabit değildir; komşu aylar ayrı bölümdedir.
+        var monthStart = new DateTimeOffset(occurredAt.UtcDateTime.Year, occurredAt.UtcDateTime.Month, 1, 0, 0, 0, TimeSpan.Zero);
+        var previousMonth = monthStart.AddTicks(-1);
+        var nextMonth = monthStart.AddMonths(1);
+        Assert.Equal(partition, await db.Database.SqlQuery<int>($"SELECT $PARTITION.AuditLogMonthly({monthStart}) AS Value").SingleAsync());
+        Assert.Equal(partition - 1, await db.Database.SqlQuery<int>($"SELECT $PARTITION.AuditLogMonthly({previousMonth}) AS Value").SingleAsync());
+        Assert.Equal(partition + 1, await db.Database.SqlQuery<int>($"SELECT $PARTITION.AuditLogMonthly({nextMonth}) AS Value").SingleAsync());
+
+        await Assert.ThrowsAsync<SqlException>(() =>
+#pragma warning disable EF1003 // Bölüm numarası sorgudan gelen tamsayıdır; TRUNCATE parametre almaz.
+            db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE core.AuditLog WITH (PARTITIONS (" + partition.ToString(System.Globalization.CultureInfo.InvariantCulture) + "))"));
+#pragma warning restore EF1003
+        Assert.Equal(2, await db.AuditLog.CountAsync(a => a.RecordId == company));
+    }
+
+    private sealed record IndexPlacement(string Name, string DataSpace);
 
     [Fact]
     public async Task Platform_administrator_appears_with_a_fixed_name()

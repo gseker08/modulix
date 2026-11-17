@@ -29,6 +29,8 @@ internal sealed class RecordHandover(
     INotificationRecipients recipients,
     IEmailQueue emails,
     IRecipientLanguage languages,
+    IRequestLanguage requestLanguage,
+    ITextCatalog textCatalog,
     ModulixDbContext db)
 {
     private const int BatchSize = RecordQuery.MaxPageSize;
@@ -36,12 +38,15 @@ internal sealed class RecordHandover(
     public async Task<IReadOnlyList<OwnedRecordSummary>> CountAsync(Guid ownerId, CancellationToken cancellationToken)
     {
         var counts = new List<OwnedRecordSummary>();
+        // Tür adı okurun dilinde (ADR-0034, dilim 18c-4).
+        var bundle = textCatalog.Bundle(await requestLanguage.GetAsync(cancellationToken));
         foreach (var type in await EnabledTypesAsync(cancellationToken))
         {
             var page = await pipeline.QueryAsync(Query(type, ownerId, pageSize: 1), cancellationToken);
 
             // Bu kayıtları göremeyen kullanıcıya sayı verilmez; devir de bu kişi için yapılamaz.
-            counts.Add(new OwnedRecordSummary(type.EntityKey, type.Label, page.IsSuccess ? page.Value!.TotalCount : null));
+            var label = MetadataTexts.Text(bundle, MetadataTexts.OwnedRecordKey(type.EntityKey), type.Label);
+            counts.Add(new OwnedRecordSummary(type.EntityKey, label, page.IsSuccess ? page.Value!.TotalCount : null));
         }
 
         return counts;
@@ -51,7 +56,7 @@ internal sealed class RecordHandover(
     public async Task<int> TransferAsync(Guid fromUserId, Guid toUserId, CancellationToken cancellationToken)
     {
         var moved = 0;
-        var counts = new List<(string Label, int Count)>();
+        var counts = new List<(OwnedRecordType Type, int Count)>();
         var values = new JsonObject { [OwnedRecordType.OwnerField] = toUserId.ToString() };
 
         foreach (var type in await EnabledTypesAsync(cancellationToken))
@@ -94,7 +99,7 @@ internal sealed class RecordHandover(
 
             if (movedOfType > 0)
             {
-                counts.Add((type.Label, movedOfType));
+                counts.Add((type, movedOfType));
                 moved += movedOfType;
             }
         }
@@ -104,7 +109,7 @@ internal sealed class RecordHandover(
     }
 
     // Devri yapan kendine devrettiyse e-posta yok; alıcı etkin üye değilse yazılmaz.
-    private async Task NotifyReceiverAsync(Guid fromUserId, Guid toUserId, IReadOnlyList<(string Label, int Count)> counts, CancellationToken cancellationToken)
+    private async Task NotifyReceiverAsync(Guid fromUserId, Guid toUserId, IReadOnlyList<(OwnedRecordType Type, int Count)> counts, CancellationToken cancellationToken)
     {
         var actorId = tenantAccessor.Current?.UserId;
         if (counts.Count == 0 || toUserId == actorId || await recipients.FindAsync(toUserId, cancellationToken) is not { } recipient)
@@ -122,7 +127,8 @@ internal sealed class RecordHandover(
             recipient.DisplayName,
             actorId is { } actor && names.TryGetValue(actor, out var actorName) ? actorName : texts.Get("email.user.records-transferred.default-actor"),
             names.GetValueOrDefault(fromUserId) ?? texts.Get("email.common.someone"),
-            string.Join(", ", counts.Select(c => $"{c.Count} {c.Label}")),
+            // Özetteki tür adları alıcının dilinde (ADR-0034, dilim 18c-4).
+            string.Join(", ", counts.Select(c => $"{c.Count} {MetadataTexts.Text(texts.Bundle, MetadataTexts.OwnedRecordKey(c.Type.EntityKey), c.Type.Label)}")),
             recipients.Link(string.Empty)));
         await db.SaveChangesAsync(cancellationToken);
     }

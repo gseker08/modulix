@@ -11,12 +11,12 @@
         <div id="action-warning" class="alert alert-warning" role="status">@warning</div>
     }
 
-    <section class="list-toolbar" aria-label="İş akışı eylemleri">
+    <section class="list-toolbar" aria-label="@Texts.Get("logistics.actions.group")">
         @if (pending is { } asking)
         {
-            <label class="visually-hidden" for="action-reason">Gerekçe</label>
-            <input id="action-reason" class="form-control" maxlength="500" placeholder="Gerekçe yazın" aria-describedby="@(asking.Warning is { Length: > 0 } ? "action-warning" : null)" @bind="reason" @bind:event="oninput" />
-            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => pending = null">Vazgeç</button>
+            <label class="visually-hidden" for="action-reason">@Texts.Get("logistics.actions.reason")</label>
+            <input id="action-reason" class="form-control" maxlength="500" placeholder="@Texts.Get("logistics.actions.reason-write")" aria-describedby="@(asking.Warning is { Length: > 0 } ? "action-warning" : null)" @bind="reason" @bind:event="oninput" />
+            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => pending = null">@Texts.Get("common.confirm.cancel")</button>
             <button type="button" class="@(asking.Destructive ? "btn btn-outline-danger" : "btn btn-tonal")" disabled="@(busy || string.IsNullOrWhiteSpace(reason))"
                     aria-busy="@(busy ? "true" : null)" @onclick="() => RunAsync(asking)">@asking.Label</button>
         }

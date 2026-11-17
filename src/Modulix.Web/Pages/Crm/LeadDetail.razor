@@ -160,6 +160,36 @@
             </dl>
         </FormSection>
 
+        @if (score is not null)
+        {
+            <FormSection Title="@Texts.Get("crm.lead.score.title", score.Score)" Icon="trending-up">
+                @if (score.Calculated != score.Score)
+                {
+                    <p class="text-muted small">@Texts.Get(LeadStatus.IsOpen(lead.Status) ? "crm.lead.score.pending" : "crm.lead.score.frozen", score.Calculated)</p>
+                }
+                @if (score.Reasons.Count == 0)
+                {
+                    <EmptyState Compact="true" Title="@Texts.Get("crm.lead.score.none")" />
+                }
+                else
+                {
+                    <p class="text-muted small">@Texts.Get("crm.lead.score.help")</p>
+                    <ul class="item-list">
+                        @foreach (var reason in score.Reasons)
+                        {
+                            <li>
+                                <div class="item-main">
+                                    <strong>@reason.Name</strong>
+                                    <span class="text-muted">@LeadScoreCatalog.ConditionText(reason.Field, reason.Operator, reason.Value)</span>
+                                </div>
+                                <span class="badge @(reason.Points > 0 ? "stage-won" : "stage-lost")">@LeadScoreCatalog.PointsText(reason.Points)</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </FormSection>
+        }
+
         <section class="detail-section lead-actions">
             <div class="section-header"><h2>@Texts.Get("crm.lead.actions")</h2></div>
             @if (!anyAction)
@@ -325,6 +355,7 @@
     private LeadDto? lead;
     private IReadOnlyList<ActivityDto>? activities;
     private IReadOnlyList<LeadMatchDto>? matches;
+    private LeadScoreExplanationDto? score;
     private IReadOnlyDictionary<string, string[]>? actionErrors;
     private string? message;
     private string? panel;
@@ -401,6 +432,7 @@
         }
 
         matches = (await Api.GetAsync<List<LeadMatchDto>>($"/api/crm/leads/{Id}/duplicates")).Value;
+        score = (await Api.GetAsync<LeadScoreExplanationDto>($"/api/crm/leads/{Id}/score")).Value;
         await LoadActivitiesAsync();
     }
 

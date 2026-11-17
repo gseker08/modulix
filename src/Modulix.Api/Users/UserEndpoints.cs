@@ -1,6 +1,7 @@
 using Modulix.Api.Access;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Modules;
 using Modulix.Core.Organization;
 using Modulix.Core.Platform;
@@ -104,14 +105,15 @@ public static class UserEndpoints
 
     /// <summary>"Bu kullanıcı neye erişebilir": geçerli izinler, veren rollerle; matris için açık modüllerin izinleri.</summary>
     private static async Task<IResult> GetAccessAsync(
-        Guid membershipId, IUserAdministration admin, ModuleCatalog catalog, ICurrentAccess access, CancellationToken ct)
+        Guid membershipId, IUserAdministration admin, ModuleCatalog catalog, ICurrentAccess access, IRequestLanguage language, ITextCatalog texts,
+        CancellationToken ct)
     {
         try
         {
             var result = await admin.GetAccessAsync(membershipId, ct);
             return Results.Ok(new UserAccessDto(
                 result.IsAdministrator,
-                await AccessEndpoints.AssignablePermissionsAsync(catalog, access, ct),
+                await AccessEndpoints.AssignablePermissionsAsync(catalog, access, language, texts, ct),
                 result.Permissions.Select(p => new PermissionGrantDto(p.Key, p.GrantedBy.Select(r => new UserRoleDto(r.Id, r.Name, r.IsSystem, r.ViaBusinessUnit)).ToList())).ToList(),
                 (Shared.Access.RecordScope)result.Scope,
                 result.Teams,
@@ -212,37 +214,4 @@ public static class UserEndpoints
     // Başka tenant'ın üyeliği de "bulunamadı" döner; varlığı belli edilmez.
     private static IResult NotFound() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Kullanıcı bulunamadı.");
-}
-
-/// <summary>
-/// E-postadaki bağlantıların kökü: <c>App:PublicUrl</c> (ör. https://app.modulix.com.tr). Geliştirmede boşsa isteğin
-/// adresi kullanılır. Üretimde zorunludur: isteğin Host başlığına güvenilirse saldırgan, kendi adresine giden şifre
-/// sıfırlama bağlantıları ürettirebilir.
-/// </summary>
-public static class PublicUrl
-{
-    public const string ConfigurationKey = "App:PublicUrl";
-
-    public static string Resolve(HttpContext http)
-    {
-        var configured = http.RequestServices.GetRequiredService<IConfiguration>()[ConfigurationKey];
-        if (!string.IsNullOrWhiteSpace(configured))
-        {
-            return configured.TrimEnd('/');
-        }
-
-        // Host başlığı istemciden gelir: yalnızca geliştirmede ve yerel adreste kullanılır. Aksi halde saldırgan
-        // "şifremi unuttum" isteğine kendi alan adını yazıp gerçek sıfırlama bağlantısını kendine yönlendirebilir.
-        if (http.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment() && IsLoopbackHost(http.Request.Host.Host))
-        {
-            return $"{http.Request.Scheme}://{http.Request.Host}";
-        }
-
-        throw new InvalidOperationException($"{ConfigurationKey} ayarı gerekli: e-postadaki bağlantılar bu adresle oluşturulur.");
-    }
-
-    private static bool IsLoopbackHost(string host) =>
-        string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
-        || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
-        || (System.Net.IPAddress.TryParse(host, out System.Net.IPAddress? address) && System.Net.IPAddress.IsLoopback(address));
 }

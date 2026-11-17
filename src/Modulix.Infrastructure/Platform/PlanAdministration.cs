@@ -79,6 +79,22 @@ internal sealed class PlanAdministration(
         var before = Describe(plan);
         var modulesBefore = plan.Modules.Select(m => m.ModuleKey).ToHashSet(StringComparer.Ordinal);
         plan.Update(input.Name, ValidateModules(input.Modules), input.Limits, input.IsActive);
+        if (!modulesBefore.SetEquals(plan.Modules.Select(m => m.ModuleKey)))
+        {
+            // Plan kaydedilmeden önce: değişiklik hiçbir geçerli abonede zorunlu bağımlılığı bozmamalı (ADR-0051).
+            var planModules = plan.Modules.Select(m => m.ModuleKey).ToHashSet(StringComparer.Ordinal);
+            var checkedAt = time.GetUtcNow();
+            var subscriberIds = await db.TenantSubscriptions.AsNoTracking()
+                .Where(s => s.PlanId == plan.Id && s.EndedAt == null && (s.ValidUntil == null || s.ValidUntil > checkedAt))
+                .Select(s => s.TenantId)
+                .ToListAsync(cancellationToken);
+            var rows = await db.ModuleEntitlements.AsNoTracking().Where(e => subscriberIds.Contains(e.TenantId)).ToListAsync(cancellationToken);
+            foreach (var tenantRows in rows.GroupBy(e => e.TenantId))
+            {
+                EnsureFits([.. tenantRows], planModules);
+            }
+        }
+
         Audit(actingUserId, PlatformAuditActions.PlanUpdated, null, null, new JsonObject { ["before"] = before, ["after"] = Describe(plan) });
         await db.SaveChangesAsync(cancellationToken);
 
@@ -166,6 +182,7 @@ internal sealed class PlanAdministration(
     {
         var current = await db.ModuleEntitlements.AsNoTracking().Where(e => e.TenantId == tenantId).ToListAsync(cancellationToken);
         var planModules = plan.Modules.Select(m => m.ModuleKey).ToHashSet(StringComparer.Ordinal);
+        EnsureFits(current, planModules);
         var terms = new EntitlementTerms(EntitlementSource.Plan, validUntil, $"Plan: {plan.Name}");
         var changed = new JsonArray();
         foreach (var module in catalog.Modules.Select(m => m.Key).Where(planModules.Contains))
@@ -176,17 +193,31 @@ internal sealed class PlanAdministration(
                 continue;
             }
 
-            await platform.SetModuleAsync(tenantId, module, true, actingUserId, cancellationToken, terms, reason);
+            await platform.SetModuleAsync(tenantId, module, true, actingUserId, cancellationToken, terms, reason, checkDependencies: false);
             changed.Add($"+{module}");
         }
 
         foreach (var stale in current.Where(e => e is { IsEnabled: true, Source: EntitlementSource.Plan } && !planModules.Contains(e.ModuleKey)))
         {
-            await platform.SetModuleAsync(tenantId, stale.ModuleKey, false, actingUserId, cancellationToken, reason: reason);
+            await platform.SetModuleAsync(tenantId, stale.ModuleKey, false, actingUserId, cancellationToken, reason: reason, checkDependencies: false);
             changed.Add($"-{stale.ModuleKey}");
         }
 
         return changed;
+    }
+
+    /// <summary>
+    /// Plan uygulanınca firmada oluşacak modül kümesi zorunlu bağımlılıklara uymalıdır (ADR-0051): plandaki modüller açılır, önceki plandan
+    /// kalıp yeni planda olmayanlar kapanır, elle ya da istisna olarak verilmiş haklar kalır. Önceden var olan ihlal atamayı engellemez.
+    /// </summary>
+    private void EnsureFits(IReadOnlyList<ModuleEntitlement> current, IReadOnlySet<string> planModules)
+    {
+        var before = current.Where(e => e.IsEnabled).Select(e => e.ModuleKey).ToList();
+        var after = current
+            .Where(e => e.IsEnabled && (e.Source != EntitlementSource.Plan || planModules.Contains(e.ModuleKey)))
+            .Select(e => e.ModuleKey)
+            .Concat(planModules);
+        ModuleDependencyRules.EnsureRequiredSatisfied(catalog, after, "planKey", ignore: before);
     }
 
     public async Task SetLimitOverrideAsync(
@@ -236,6 +267,9 @@ internal sealed class PlanAdministration(
         {
             throw new ArgumentException($"Plana eklenemeyen modül: {string.Join(", ", unknown)}.", "modules");
         }
+
+        // Plan, zorunlu bağımlılığı eksik modül kümesiyle tanımlanamaz (ADR-0051).
+        ModuleDependencyRules.EnsureRequiredSatisfied(catalog, requested, "modules");
 
         return [.. catalog.Modules.Select(m => m.Key).Where(requested.Contains)];
     }

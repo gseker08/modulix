@@ -9,9 +9,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Platform;
 using Modulix.Core.Records;
+using Modulix.Infrastructure.Email;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Numbering;
 using Modulix.Shared.Settings;
 using Modulix.Shared.Support;
 using static Modulix.Modules.Support.SupportModule.Permissions;
@@ -301,6 +303,7 @@ public class SupportChannelTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         var intruder = await IngestAsync(integration, Email("<x1@baska.test>", "saldirgan@baska.example.test", $"[{ticket.Number}] Benim de talebim", "Sızma denemesi."), HttpStatusCode.Created);
         Assert.Equal("Created", intruder.Outcome);
         Assert.NotEqual(ticket.Id, intruder.TicketId);
+        Assert.Equal("Benim de talebim", (await GetAsync(lead, intruder.TicketId!.Value)).Subject);
         Assert.Equal(3, (await MessagesAsync(lead, ticket.Id)).Count);
         var chain = await IngestAsync(integration, Email("<x2@baska.test>", "saldirgan@baska.example.test", "Re: konu", "Zincir tahmini.", inReplyTo: "<m1@mail.firma.test>"), HttpStatusCode.Created);
         Assert.NotEqual(ticket.Id, chain.TicketId);
@@ -352,6 +355,52 @@ public class SupportChannelTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         Assert.Equal(HttpStatusCode.Forbidden, (await writer.PostAsJsonAsync("/api/support/inbound", Email("<p2>", from))).StatusCode);
         using var anonymous = Anonymous();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync("/api/support/inbound", Email("<p3>", from))).StatusCode);
+    }
+
+    /// <summary>
+    /// ADR-0049 dilim 3b: konudaki numara önekten bağımsız eşleşir. Seriye geçişten önce açılmış talep rastgele sonekli <c>TK-…</c> numarasını korur,
+    /// firma öneki ekrandan değiştirebilir; ikisinde de yanıt talebine bağlanır ve gönderen denetimi sürer.
+    /// </summary>
+    [Fact]
+    public async Task Inbound_matches_legacy_and_tenant_configured_ticket_numbers_in_the_subject()
+    {
+        var s = await SetUpAsync();
+        var admin = await factory.CreateUserAsync(s.Tenant);
+        await factory.MakeAdministratorAsync(s.Tenant.Id, admin);
+        using var integration = await LoginAsync(s.Integration);
+        using var lead = await LoginAsync(s.Lead);
+        using var numbering = await LoginAsync(admin);
+        const string from = "musteri@firma.example.test";
+        const string legacyNumber = "TK-20261101-AB12CD";
+        const string series = "/api/numbering/series";
+
+        // Geçişten önce açılmış talep: numarası eski biçimde durur.
+        var legacy = await IngestAsync(integration, Email("<e1@mail.firma.test>", from, "Eski talep"), HttpStatusCode.Created);
+        Assert.Matches(@"^DT-\d{4}-00001$", legacy.TicketNumber);
+        using (var scope = factory.OpenScope(s.Tenant.Id))
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+            Assert.Equal(1, await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE support.Tickets SET Number = {legacyNumber} WHERE Id = {legacy.TicketId!.Value}"));
+        }
+
+        var legacyReply = await IngestAsync(integration, Email("<e2@mail.firma.test>", from, $"Re: [{legacyNumber}] Eski talep", "Eski numarayla yanıt."));
+        Assert.Equal(("Appended", legacy.TicketId), (legacyReply.Outcome, legacyReply.TicketId));
+
+        // Firma öneki değiştirir: yeni talep o önekle numaralanır ve yanıtı yine eşleşir.
+        var current = Assert.Single((await numbering.GetFromJsonAsync<List<NumberSeriesDto>>(series))!, x => x.Key == "support.ticket");
+        var configured = await numbering.PutAsJsonAsync($"{series}/support.ticket", new ConfigureNumberSeriesRequest("DESTEK", 4, "Never", current.Version));
+        Assert.True(configured.StatusCode == HttpStatusCode.OK, await configured.Content.ReadAsStringAsync());
+
+        var custom = await IngestAsync(integration, Email("<e3@mail.firma.test>", from, "Yeni talep"), HttpStatusCode.Created);
+        Assert.Equal("DESTEK-0001", custom.TicketNumber);
+        var customReply = await IngestAsync(integration, Email("<e4@mail.firma.test>", from, "Ynt: [acil] [DESTEK-0001] Yeni talep", "Yeni numarayla yanıt."));
+        Assert.Equal(("Appended", custom.TicketId), (customReply.Outcome, customReply.TicketId));
+
+        // Numarayı bilen yabancı gönderen yine giremez; açılan talebin konusundan numara etiketi atılır, başka etiket kalır.
+        var intruder = await IngestAsync(integration, Email("<e5@baska.test>", "saldirgan@baska.example.test", "[acil] [DESTEK-0001] Benim talebim", "Sızma denemesi."), HttpStatusCode.Created);
+        Assert.NotEqual(custom.TicketId, intruder.TicketId);
+        Assert.Equal("[acil] Benim talebim", (await GetAsync(lead, intruder.TicketId!.Value)).Subject);
+        Assert.Equal(2, (await MessagesAsync(lead, custom.TicketId!.Value)).Count);
     }
 
     [Fact]
@@ -474,6 +523,40 @@ public class SupportChannelTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
     }
 
     [Fact]
+    public async Task The_survey_email_and_page_use_the_customer_companys_correspondence_language()
+    {
+        // ADR-0034 §6, dilim 22d: talebin firmasının yazışma dili (en) tenant varsayılanından (tr) önce gelir.
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        using var lead = await LoginAsync(s.Lead);
+        using var anonymous = Anonymous();
+        await SqlAsync(s.Tenant.Id, "UPDATE core.Parties SET PreferredLanguage = 'en' WHERE Id = {0}", s.PartyId);
+        await SetSettingAsync(manager, "support.survey.enabled", "true");
+        var address = $"dil-{Guid.NewGuid():N}@musteri.example.test";
+        await ResolveAsync(lead, await StartAsync(lead, await TakeAsync(lead, await TicketAsync(lead, s, "Language", address))));
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var mail = await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().EmailMessages.AsNoTracking()
+                .Where(e => e.TenantId == s.Tenant.Id && e.ToAddress == address).SingleAsync();
+            Assert.Equal("en", mail.Language);
+        }
+
+        var (tenantKey, token) = await SurveyLinkAsync(s.Tenant.Id, address);
+        var view = await (await SurveyAsync(anonymous, tenantKey, "view", new PublicSurveyTokenRequest(token))).Content.ReadFromJsonAsync<PublicSurveyView>();
+        Assert.Equal("en", view!.Language);
+
+        var invalid = await SurveyAsync(anonymous, tenantKey, "answer", new PublicSurveyAnswerRequest(token, 9));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        Assert.Contains("The rating must be between 1 and 5.", await invalid.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, (await SurveyAsync(anonymous, tenantKey, "answer", new PublicSurveyAnswerRequest(token, 4))).StatusCode);
+        var again = await SurveyAsync(anonymous, tenantKey, "answer", new PublicSurveyAnswerRequest(token, 2));
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        Assert.Contains("This survey has already been answered.", await again.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Reopened_tickets_get_a_new_survey_cycle_and_survey_results_respect_scope_and_tenant()
     {
         var s = await SetUpAsync();
@@ -592,6 +675,280 @@ public class SupportChannelTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         await BulkAsync(lead, new BulkTicketsRequest("assign", [.. Enumerable.Range(0, 51).Select(_ => Guid.NewGuid())], OwnerId: s.Agent.Id), HttpStatusCode.UnprocessableEntity);
         using var anonymous = Anonymous();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync("/api/support/tickets/bulk", new BulkTicketsRequest("close", [a.Id]))).StatusCode);
+    }
+
+    // ---- Otomatik alındı yanıtı (ADR-0024 §4.12)
+
+    private async Task<List<QueuedEmail>> AcknowledgementMailsAsync(Guid ticketId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        return await db.EmailMessages.AsNoTracking().Where(e => e.Reference == $"support.ack:{ticketId}").ToListAsync();
+    }
+
+    [Fact]
+    public async Task A_new_ticket_is_acknowledged_by_email_when_enabled_and_the_acknowledgement_is_not_a_first_response()
+    {
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        using var lead = await LoginAsync(s.Lead);
+        var address = $"alindi-{Guid.NewGuid():N}@musteri.example.test";
+
+        // Ayar kapalıyken (varsayılan) ne mesaj ne e-posta yazılır.
+        var quiet = await TicketAsync(lead, s, "Sessiz", address);
+        Assert.Empty(await MessagesAsync(lead, quiet.Id));
+        Assert.Empty(await AcknowledgementMailsAsync(quiet.Id));
+
+        // Doğrulama: ayar yalnızca evet/hayır alır.
+        var current = (await manager.GetFromJsonAsync<SettingsResponse>("/api/settings"))!;
+        var version = current.Settings.FirstOrDefault(x => x.Key == "support.acknowledgement.enabled")?.Version ?? 0;
+        var invalid = await manager.PutAsJsonAsync("/api/settings",
+            new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { ["support.acknowledgement.enabled"] = new("belki", version) }));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+
+        await SetSettingAsync(manager, "support.acknowledgement.enabled", "true");
+        var ticket = await TicketAsync(lead, s, "Faturam hatalı", address);
+
+        var message = Assert.Single(await MessagesAsync(lead, ticket.Id));
+        Assert.Equal(("Public", "Outbound", true, "Queued", (Guid?)null), (message.Visibility, message.Direction, message.IsAutomatic, message.DeliveryStatus, message.AuthorId));
+        Assert.Contains(ticket.Number, message.Body);
+
+        var mail = Assert.Single(await AcknowledgementMailsAsync(ticket.Id));
+        Assert.Equal((s.Tenant.Id, address, $"[{ticket.Number}] Faturam hatalı"), (mail.TenantId, mail.ToAddress, mail.Subject));
+        Assert.Contains(ticket.Number, mail.TextBody);
+
+        // Otomatik yanıt ilk insan yanıtı değildir; personelin yanıtı öyledir.
+        Assert.Null((await GetAsync(lead, ticket.Id)).FirstResponseAt);
+        await MessageAsync(lead, ticket.Id, "reply", "İnceliyoruz.");
+        Assert.NotNull((await GetAsync(lead, ticket.Id)).FirstResponseAt);
+
+        // Başvuran e-postası yoksa yanıtlarla aynı alıcı kullanılır (müşterinin e-postası).
+        var fallback = await TicketAsync(lead, s, "Telefonla açıldı");
+        Assert.Equal("kanal@musteri.example.test", Assert.Single(await AcknowledgementMailsAsync(fallback.Id)).ToAddress);
+
+        // Tekrar sayılan istek (aynı clientKey) ikinci kez alındı göndermez.
+        var key = Guid.NewGuid().ToString("N");
+        var first = await TicketAsync(lead, s, "Çift tık", address, key);
+        var repeat = await lead.PostAsJsonAsync("/api/support/tickets", new SaveTicketRequest(Subject: "Çift tık", PartyId: s.PartyId, ReporterEmail: address, ClientKey: key));
+        Assert.NotEqual(HttpStatusCode.Created, repeat.StatusCode);
+        Assert.Single(await AcknowledgementMailsAsync(first.Id));
+    }
+
+    [Fact]
+    public async Task Inbound_tickets_are_acknowledged_and_the_reply_to_the_acknowledgement_joins_the_ticket_while_automatic_mail_gets_none()
+    {
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        using var integration = await LoginAsync(s.Integration);
+        using var lead = await LoginAsync(s.Lead);
+        await SetSettingAsync(manager, "support.acknowledgement.enabled", "true");
+        var from = $"gelen-{Guid.NewGuid():N}@musteri.example.test";
+
+        var created = await IngestAsync(integration, Email($"<{Guid.NewGuid():N}@mx.test>", from, "Kargom gelmedi"));
+        var ticketId = created.TicketId!.Value;
+        var mail = Assert.Single(await AcknowledgementMailsAsync(ticketId));
+        Assert.Equal((from, $"[{created.TicketNumber}] Kargom gelmedi"), (mail.ToAddress, mail.Subject));
+
+        // Müşteri alındı e-postasını yanıtlar: konu etiketi talebe eşlenir, yeni talep ve yeni alındı yazılmaz.
+        var reply = await IngestAsync(integration, Email($"<{Guid.NewGuid():N}@mx.test>", from, $"Re: {mail.Subject}", "Ek bilgi: sipariş no 42."));
+        Assert.Equal(ticketId, reply.TicketId);
+        Assert.Single(await AcknowledgementMailsAsync(ticketId));
+        var messages = await MessagesAsync(lead, ticketId);
+        Assert.Single(messages, m => m.IsAutomatic);
+        Assert.Equal(2, messages.Count(m => m.Direction == "Inbound"));
+
+        // Otomatik gelen e-posta talep açmaz; alındı da gitmez (döngü olmaz).
+        var robot = $"robot-{Guid.NewGuid():N}@musteri.example.test";
+        var ignored = await IngestAsync(integration, Email($"<{Guid.NewGuid():N}@mx.test>", robot, "Ofis dışındayım", autoSubmitted: "auto-replied"));
+        Assert.Null(ignored.TicketId);
+        using var scope = factory.Services.CreateScope();
+        Assert.False(await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().EmailMessages.AnyAsync(e => e.ToAddress == robot));
+    }
+
+    [Fact]
+    public async Task Acknowledgements_follow_each_tenants_own_setting_and_only_settings_managers_can_switch_them_on()
+    {
+        var s = await SetUpAsync();
+        var other = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        using var lead = await LoginAsync(s.Lead);
+        using var viewer = await LoginAsync(s.Viewer);
+        using var otherLead = await LoginAsync(other.Lead);
+        var address = $"kiraci-{Guid.NewGuid():N}@musteri.example.test";
+
+        // Yetki: ayar yönetme izni olmayan kullanıcı alındı yanıtını açamaz.
+        var forbidden = await lead.PutAsJsonAsync("/api/settings",
+            new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { ["support.acknowledgement.enabled"] = new("true", 0) }));
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.Empty(await AcknowledgementMailsAsync((await TicketAsync(lead, s, "Henüz kapalı", address)).Id));
+
+        await SetSettingAsync(manager, "support.acknowledgement.enabled", "true");
+        var ticket = await TicketAsync(lead, s, "Açık", address);
+        Assert.Single(await AcknowledgementMailsAsync(ticket.Id));
+
+        // Tenant izolasyonu: öteki firmanın ayarı kapalıdır, onun talebine alındı gitmez; bu firmanın mesajını da göremez.
+        var foreign = await TicketAsync(otherLead, other, "Öteki firma", address);
+        Assert.Empty(await AcknowledgementMailsAsync(foreign.Id));
+        Assert.Empty(await MessagesAsync(otherLead, foreign.Id));
+        Assert.Equal(HttpStatusCode.NotFound, (await otherLead.GetAsync($"/api/support/tickets/{ticket.Id}/messages")).StatusCode);
+
+        // Otomatik yanıt müşteriye görünen mesajdır: iç not izni olmayan kullanıcı da görür.
+        Assert.True(Assert.Single(await MessagesAsync(viewer, ticket.Id)).IsAutomatic);
+    }
+
+    // ---- Anket hatırlatması (ADR-0024 §4.13)
+
+    private async Task<Modulix.Modules.Support.Lifecycle.SlaSchedulerRun> RunJobsAsync(Guid tenantId)
+    {
+        // Anket bağlantısı genel adres ister; iş, adresi ayarlı host üzerinden çalıştırılır.
+        var (run, skipped) = await new SupportJobsRunner(host.Services).RunTenantAsync(tenantId, CancellationToken.None);
+        Assert.False(skipped);
+        return run!;
+    }
+
+    private async Task<List<QueuedEmail>> ReminderMailsAsync(Guid surveyId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
+        return await db.EmailMessages.AsNoTracking().Where(e => e.Reference == $"support.survey-reminder:{surveyId}").ToListAsync();
+    }
+
+    private Task AgeSurveyAsync(Guid tenantId, Guid ticketId, int days) =>
+        SqlAsync(tenantId, "UPDATE support.Surveys SET QueuedAt = DATEADD(DAY, {1}, SYSDATETIMEOFFSET()) WHERE TicketId = {0}", ticketId, -days);
+
+    [Fact]
+    public async Task An_unanswered_survey_is_reminded_once_after_the_configured_days_and_both_links_answer_the_same_survey()
+    {
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        using var lead = await LoginAsync(s.Lead);
+        using var anonymous = Anonymous();
+        await SetSettingAsync(manager, "support.survey.enabled", "true");
+
+        // Doğrulama: gün sayısı yalnızca rakamdır.
+        var current = (await manager.GetFromJsonAsync<SettingsResponse>("/api/settings"))!;
+        var version = current.Settings.FirstOrDefault(x => x.Key == "support.survey.reminder-days")?.Version ?? 0;
+        var invalid = await manager.PutAsJsonAsync("/api/settings",
+            new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { ["support.survey.reminder-days"] = new("üç", version) }));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+
+        var address = $"hatirlat-{Guid.NewGuid():N}@musteri.example.test";
+        var ticket = await ResolveAsync(lead, await StartAsync(lead, await TakeAsync(lead, await TicketAsync(lead, s, "Hatırlatılacak", address))));
+        var (tenantKey, firstToken) = await SurveyLinkAsync(s.Tenant.Id, address);
+        var survey = Assert.Single(await SurveysAsync(lead, ticket.Id));
+        await AgeSurveyAsync(s.Tenant.Id, ticket.Id, 4);
+
+        // Ayar kapalıyken (varsayılan 0) hatırlatma yazılmaz.
+        Assert.Equal(0, (await RunJobsAsync(s.Tenant.Id)).SurveyReminders);
+
+        // Süre dolmadan da yazılmaz.
+        await SetSettingAsync(manager, "support.survey.reminder-days", "5");
+        Assert.Equal(0, (await RunJobsAsync(s.Tenant.Id)).SurveyReminders);
+
+        await SetSettingAsync(manager, "support.survey.reminder-days", "3");
+        Assert.Equal(1, (await RunJobsAsync(s.Tenant.Id)).SurveyReminders);
+        var mail = Assert.Single(await ReminderMailsAsync(survey.Id));
+        Assert.Equal((s.Tenant.Id, address), (mail.TenantId, mail.ToAddress));
+        Assert.Contains(ticket.Number, mail.Subject);
+        Assert.NotNull(Assert.Single(await SurveysAsync(lead, ticket.Id)).ReminderQueuedAt);
+
+        // Tek hatırlatma: tekrar ve paralel turlar ikinci e-postayı yazmaz.
+        Assert.Equal(0, (await RunJobsAsync(s.Tenant.Id)).SurveyReminders);
+        await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => new SupportJobsRunner(host.Services).RunTenantAsync(s.Tenant.Id, CancellationToken.None)));
+        Assert.Single(await ReminderMailsAsync(survey.Id));
+
+        // Hatırlatmadaki bağlantı yenidir ama aynı anketi açar; ilk bağlantı da geçerli kalır. Yanıt yine tek kullanımlıdır.
+        var match = SurveyLink.Match(mail.TextBody!);
+        Assert.True(match.Success, mail.TextBody);
+        var secondToken = match.Groups["token"].Value;
+        Assert.NotEqual(firstToken, secondToken);
+        Assert.Equal(tenantKey, match.Groups["tenant"].Value);
+        var view = await (await SurveyAsync(anonymous, tenantKey, "view", new PublicSurveyTokenRequest(firstToken))).Content.ReadFromJsonAsync<PublicSurveyView>();
+        Assert.True(view!.CanAnswer);
+        Assert.Equal(HttpStatusCode.OK, (await SurveyAsync(anonymous, tenantKey, "answer", new PublicSurveyAnswerRequest(secondToken, 4))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await SurveyAsync(anonymous, tenantKey, "answer", new PublicSurveyAnswerRequest(firstToken, 1))).StatusCode);
+        Assert.Equal(("Answered", 4), ((await SurveysAsync(lead, ticket.Id))[0].State, (await SurveysAsync(lead, ticket.Id))[0].Rating));
+    }
+
+    [Fact]
+    public async Task Survey_reminders_skip_answered_expired_and_reopened_tickets()
+    {
+        var s = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        using var lead = await LoginAsync(s.Lead);
+        using var anonymous = Anonymous();
+        await SetSettingAsync(manager, "support.survey.enabled", "true");
+        await SetSettingAsync(manager, "support.survey.reminder-days", "2");
+
+        async Task<(TicketDto Ticket, string Address)> ResolvedAsync(string subject)
+        {
+            var address = $"atla-{Guid.NewGuid():N}@musteri.example.test";
+            return (await ResolveAsync(lead, await StartAsync(lead, await TakeAsync(lead, await TicketAsync(lead, s, subject, address)))), address);
+        }
+
+        var answered = await ResolvedAsync("Yanıtlandı");
+        var (tenantKey, token) = await SurveyLinkAsync(s.Tenant.Id, answered.Address);
+        Assert.Equal(HttpStatusCode.OK, (await SurveyAsync(anonymous, tenantKey, "answer", new PublicSurveyAnswerRequest(token, 5))).StatusCode);
+
+        var expired = await ResolvedAsync("Süresi doldu");
+        await SqlAsync(s.Tenant.Id, "UPDATE support.Surveys SET ExpiresAt = DATEADD(DAY, -1, SYSDATETIMEOFFSET()) WHERE TicketId = {0}", expired.Ticket.Id);
+
+        var reopened = await ResolvedAsync("Yeniden açıldı");
+        await MessageAsync(lead, reopened.Ticket.Id, "customer-message", "Sorun sürüyor.");
+        Assert.Equal("Reopened", (await GetAsync(lead, reopened.Ticket.Id)).Status);
+
+        foreach (var ticket in new[] { answered.Ticket, expired.Ticket, reopened.Ticket })
+        {
+            await AgeSurveyAsync(s.Tenant.Id, ticket.Id, 3);
+        }
+
+        Assert.Equal(0, (await RunJobsAsync(s.Tenant.Id)).SurveyReminders);
+        foreach (var ticket in new[] { answered.Ticket, expired.Ticket, reopened.Ticket })
+        {
+            Assert.Null(Assert.Single(await SurveysAsync(lead, ticket.Id)).ReminderQueuedAt);
+        }
+    }
+
+    [Fact]
+    public async Task Survey_reminders_follow_each_tenants_own_setting_and_the_reminder_link_is_bound_to_its_tenant()
+    {
+        var s = await SetUpAsync();
+        var other = await SetUpAsync();
+        using var manager = await LoginAsync(s.Manager);
+        using var otherManager = await LoginAsync(other.Manager);
+        using var lead = await LoginAsync(s.Lead);
+        using var otherLead = await LoginAsync(other.Lead);
+        using var anonymous = Anonymous();
+        await SetSettingAsync(manager, "support.survey.enabled", "true");
+        await SetSettingAsync(otherManager, "support.survey.enabled", "true");
+
+        // Yetki: ayar yönetme izni olmayan kullanıcı hatırlatmayı açamaz.
+        var forbidden = await lead.PutAsJsonAsync("/api/settings",
+            new SaveSettingsRequest(new Dictionary<string, SettingWriteDto> { ["support.survey.reminder-days"] = new("1", 0) }));
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        await SetSettingAsync(manager, "support.survey.reminder-days", "1");
+
+        var address = $"kiraci-{Guid.NewGuid():N}@musteri.example.test";
+        var mine = await ResolveAsync(lead, await StartAsync(lead, await TakeAsync(lead, await TicketAsync(lead, s, "Bizim", address))));
+        var foreign = await ResolveAsync(otherLead, await StartAsync(otherLead, await TakeAsync(otherLead, await TicketAsync(otherLead, other, "Öteki", address))));
+        await AgeSurveyAsync(s.Tenant.Id, mine.Id, 2);
+        await AgeSurveyAsync(other.Tenant.Id, foreign.Id, 2);
+
+        // Tenant izolasyonu: öteki firmanın ayarı kapalıdır; kendi turunda da bu firmanın turunda da hatırlatılmaz.
+        Assert.Equal(1, (await RunJobsAsync(s.Tenant.Id)).SurveyReminders);
+        Assert.Equal(0, (await RunJobsAsync(other.Tenant.Id)).SurveyReminders);
+        var foreignSurvey = Assert.Single(await SurveysAsync(otherLead, foreign.Id));
+        Assert.Null(foreignSurvey.ReminderQueuedAt);
+        Assert.Empty(await ReminderMailsAsync(foreignSurvey.Id));
+
+        // Hatırlatma bağlantısı yalnızca kendi firmasının adresinde çalışır.
+        var mail = Assert.Single(await ReminderMailsAsync(Assert.Single(await SurveysAsync(lead, mine.Id)).Id));
+        var token = SurveyLink.Match(mail.TextBody!).Groups["token"].Value;
+        Assert.Equal(HttpStatusCode.OK, (await SurveyAsync(anonymous, s.Tenant.Id.ToString("N"), "view", new PublicSurveyTokenRequest(token))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await SurveyAsync(anonymous, other.Tenant.Id.ToString("N"), "view", new PublicSurveyTokenRequest(token))).StatusCode);
+
+        // Öteki firma bu firmanın anketini göremez.
+        Assert.Equal(HttpStatusCode.NotFound, (await otherLead.GetAsync($"/api/support/tickets/{mine.Id}/surveys")).StatusCode);
     }
 
     private sealed record RecordPage(int TotalCount);

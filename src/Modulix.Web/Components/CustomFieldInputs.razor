@@ -6,7 +6,7 @@
 {
     @if (Only is null)
     {
-        <h3 class="span-all form-section">Ek bilgiler</h3>
+        <h3 class="span-all form-section">@Texts.Get("custom-fields.section")</h3>
     }
     @foreach (var field in Shown)
     {
@@ -49,8 +49,8 @@
                     case CustomFieldType.YesNo:
                         <select id="@id" class="form-select" value="@Text(field)" @onchange="e => SetYesNo(field, e.Value as string)">
                             <option value="">—</option>
-                            <option value="true">Evet</option>
-                            <option value="false">Hayır</option>
+                            <option value="true">@Texts.Get("common.yes")</option>
+                            <option value="false">@Texts.Get("common.no")</option>
                         </select>
                         break;
                     case CustomFieldType.Choice:

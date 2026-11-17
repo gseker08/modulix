@@ -57,6 +57,12 @@ public sealed class SatisfactionSurvey : SupportEntity
     /// <summary>Anket e-postasının kuyruğa alındığı an; müşteriye ulaştı demek değildir.</summary>
     public DateTimeOffset? QueuedAt { get; internal set; }
 
+    /// <summary>Hatırlatma e-postasındaki ikinci bağlantının belirteç özeti; hatırlatma gitmediyse boş. İki bağlantı da aynı anketi açar (yanıt yine tek kullanımlıdır).</summary>
+    public string? ReminderTokenHash { get; internal set; }
+
+    /// <summary>Hatırlatma e-postasının kuyruğa alındığı an (en çok bir hatırlatma).</summary>
+    public DateTimeOffset? ReminderQueuedAt { get; internal set; }
+
     public DateTimeOffset? AnsweredAt { get; internal set; }
 
     /// <summary>1 (çok memnuniyetsiz) - 5 (çok memnun); yanıtlanmadıysa boş.</summary>

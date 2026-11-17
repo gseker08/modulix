@@ -2,9 +2,9 @@
    (tamamlandı, atla, yeniden aç) sunucudan gelir; "zimmet iadesi" görevi çalışanın açık zimmeti varken tamamlanamaz (neden gösterilir). *@
 @inject ApiClient Api
 
-<section aria-label="@Title">
+<section aria-label="@TitleText">
     <div class="list-toolbar mt-3">
-        <h3 class="h6 mb-0 me-auto">@Title</h3>
+        <h3 class="h6 mb-0 me-auto">@TitleText</h3>
     </div>
 
     @if (message is not null)
@@ -18,23 +18,23 @@
     }
     else if (items.Count == 0)
     {
-        <p class="text-muted" role="status">@EmptyText</p>
+        <EmptyState Compact="true" Title="@EmptyTextOrDefault" />
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">@Title</caption>
+            <caption class="visually-hidden">@TitleText</caption>
             <thead>
                 <tr>
-                    <th scope="col"><AppIcon Name="check-circle" Size="14" /> Görev</th>
+                    <th scope="col"><AppIcon Name="check-circle" Size="14" /> @Texts.Get("hr.tasks.col.task")</th>
                     @if (ShowEmployee)
                     {
-                        <th scope="col"><AppIcon Name="user" Size="14" /> Çalışan</th>
+                        <th scope="col"><AppIcon Name="user" Size="14" /> @Texts.Get("hr.leave.col.employee")</th>
                     }
-                    <th scope="col"><AppIcon Name="user-check" Size="14" /> Sorumlu</th>
-                    <th scope="col"><AppIcon Name="calendar" Size="14" /> Son tarih</th>
-                    <th scope="col"><AppIcon Name="tag" Size="14" /> Durum</th>
-                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                    <th scope="col"><AppIcon Name="user-check" Size="14" /> @Texts.Get("hr.checklist-templates.col.responsible")</th>
+                    <th scope="col"><AppIcon Name="calendar" Size="14" /> @Texts.Get("hr.tasks.col.due")</th>
+                    <th scope="col"><AppIcon Name="tag" Size="14" /> @Texts.Get("common.field.status")</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -43,23 +43,23 @@
                     var due = FleetLabels.Day(WarehouseLabels.Text(task, "dueDate"));
                     var late = due is { } d && d < DateOnly.FromDateTime(DateTime.Today) && WarehouseLabels.Text(task, "status") == "open";
                     <tr>
-                        <td data-label="Görev" class="primary">@WarehouseLabels.Text(task, "title")</td>
+                        <td data-label="@Texts.Get("hr.tasks.col.task")" class="primary">@WarehouseLabels.Text(task, "title")</td>
                         @if (ShowEmployee)
                         {
-                            <td data-label="Çalışan">@WarehouseLabels.Text(task, "employeeName") · @HrLabels.ChecklistKind(WarehouseLabels.Text(task, "checklistKind"))</td>
+                            <td data-label="@Texts.Get("hr.leave.col.employee")">@WarehouseLabels.Text(task, "employeeName") · @HrLabels.ChecklistKind(WarehouseLabels.Text(task, "checklistKind"))</td>
                         }
-                        <td data-label="Sorumlu">@HrLabels.Responsible(WarehouseLabels.Text(task, "responsibleRole"))</td>
-                        <td data-label="Son tarih">
+                        <td data-label="@Texts.Get("hr.checklist-templates.col.responsible")">@HrLabels.Responsible(WarehouseLabels.Text(task, "responsibleRole"))</td>
+                        <td data-label="@Texts.Get("hr.tasks.col.due")">
                             @HrLabels.Date(WarehouseLabels.Text(task, "dueDate"))
                             @if (late)
                             {
-                                <span class="badge stage-lost">Gecikti</span>
+                                <span class="badge stage-lost">@Texts.Get("hr.tasks.late")</span>
                             }
                         </td>
-                        <td data-label="Durum"><span class="badge @HrLabels.TaskStatusBadge(WarehouseLabels.Text(task, "status"))">@HrLabels.TaskStatus(WarehouseLabels.Text(task, "status"))</span></td>
+                        <td data-label="@Texts.Get("common.field.status")"><span class="badge @HrLabels.TaskStatusBadge(WarehouseLabels.Text(task, "status"))">@HrLabels.TaskStatus(WarehouseLabels.Text(task, "status"))</span></td>
                         <td class="row-menu-cell">
-                            <RowMenu Label="@($"{WarehouseLabels.Text(task, "title")} eylemleri")">
-                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => selected = task"><AppIcon Name="eye" Size="16" /> <span>Aç</span></button>
+                            <RowMenu Label="@Texts.Get("hr.content.row-actions", WarehouseLabels.Text(task, "title"))">
+                                <button type="button" class="view-menu-item" role="menuitem" @onclick="() => selected = task"><AppIcon Name="eye" Size="16" /> <span>@Texts.Get("common.open")</span></button>
                             </RowMenu>
                         </td>
                     </tr>
@@ -73,19 +73,19 @@
         <div class="summary-card mt-2">
             <h4 class="summary-heading">@WarehouseLabels.Text(selected, "title")</h4>
             <dl class="summary-facts">
-                <div><dt>Süreç</dt><dd>@WarehouseLabels.Text(selected, "checklistName") · @WarehouseLabels.Text(selected, "employeeName")</dd></div>
-                <div><dt>Görev türü</dt><dd>@HrLabels.TaskType(WarehouseLabels.Text(selected, "taskType"))</dd></div>
+                <div><dt>@Texts.Get("hr.checklists.process")</dt><dd>@WarehouseLabels.Text(selected, "checklistName") · @WarehouseLabels.Text(selected, "employeeName")</dd></div>
+                <div><dt>@Texts.Get("hr.tasks.type")</dt><dd>@HrLabels.TaskType(WarehouseLabels.Text(selected, "taskType"))</dd></div>
                 @if (WarehouseLabels.Text(selected, "description") is { Length: > 0 } description)
                 {
-                    <div><dt>Açıklama</dt><dd>@description</dd></div>
+                    <div><dt>@Texts.Get("common.field.description")</dt><dd>@description</dd></div>
                 }
                 @if (WarehouseLabels.Text(selected, "note") is { Length: > 0 } note)
                 {
-                    <div><dt>Not</dt><dd>@note</dd></div>
+                    <div><dt>@Texts.Get("hr.tasks.note")</dt><dd>@note</dd></div>
                 }
             </dl>
             <LeaveActionsBar Record="selected" BaseUrl="/api/hr/checklist-tasks" Changed="ChangedAsync" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="() => selected = null">Kapat</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="() => selected = null">@Texts.Get("common.close")</button>
         </div>
     }
 </section>
@@ -96,9 +96,13 @@
     private string? message;
     private string? loadedFor;
 
-    [Parameter] public string Title { get; set; } = "Görevler";
+    [Parameter] public string? Title { get; set; }
 
-    [Parameter] public string EmptyText { get; set; } = "Görev yok.";
+    [Parameter] public string? EmptyText { get; set; }
+
+    private string TitleText => Title ?? Texts.Get("hr.tasks.title");
+
+    private string EmptyTextOrDefault => EmptyText ?? Texts.Get("hr.tasks.empty");
 
     /// <summary>Liste süzgeci (ör. <c>checklistId=…</c>, <c>assigneeUserId=…&amp;status=open</c>).</summary>
     [Parameter, EditorRequired] public string Query { get; set; } = string.Empty;

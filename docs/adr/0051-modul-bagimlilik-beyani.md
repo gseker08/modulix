@@ -1,6 +1,6 @@
 # ADR-0051: Modül bağımlılık beyanı
 
-- **Durum:** Öneri (16 Kasım 2026). Kod yazılmadı; aşağıdaki açık sorular karara bağlanınca dilim 1 başlar.
+- **Durum:** Kabul edildi, 16 Kasım 2026 (açık sorular aynı gün karara bağlandı, aşağıda). Dilim 1 (beyan, katalog doğrulaması, ilk beyanlar, mimari test) ve dilim 2 (zorunlu bağımlılığın hak yazılırken denetimi) teslim edildi. Dilim 3a (platform: bağımlılık bilgisi, eksik bağımlılık uyarısı, rapor) ve dilim 3b (firma yöneticisine bilgi) teslim edildi.
 - **Kaynak:** [Core mimari değerlendirmesi](../core-mimari-degerlendirme-2026-11.md) H7; [öncelik listesi](../oncelikli-isler.md) C6.
 - **İlgili:** ADR-0028 (lisans ve tenant yönetimi), ADR-0044 (modül sözleşme projeleri).
 
@@ -51,8 +51,10 @@ public enum ModuleDependencyKind
 `Reason` arayüzde gösterilen Türkçe cümledir (ör. "Kabul edilmiş tekliften sipariş oluşturma"). Beyan kodda sabittir; firma ya da platform
 yöneticisi değiştiremez (bağımlılık kodun özelliğidir, yapılandırma değildir).
 
-Açılışta `ModuleCatalog` doğrular: bilinmeyen modül anahtarı, modülün kendisi, `core` (her zaman açıktır, beyan edilmez), aynı modüle iki
-beyan ve `Required` bağımlılıklarda döngü açılışı durdurur.
+Açılışta `ModuleCatalog` doğrular: biçimi bozuk modül anahtarı, modülün kendisi, `core` (her zaman açıktır, beyan edilmez), boş gerekçe,
+aynı modüle iki beyan ve `Required` bağımlılıklarda döngü açılışı durdurur. Sağlayan modülün katalogda bulunmaması açılış hatası değildir
+(dilim 1'de görüldü: entegrasyon testleri kataloğu modüllerin alt kümesiyle kurar, ör. CRM'siz Pazarlama); beyanın gerçek bir modülü
+gösterdiğini mimari test denetler.
 
 ### 2. Beyan ile proje başvurusu eşleşir
 
@@ -77,6 +79,17 @@ eksik isteğe bağlı bağımlılıkları döndürür. Hak yazan her yol onu ça
 Zorunlu bağımlılık kendiliğinden açılmaz: modül hakkı ticari bir karardır (kaynak, bitiş, gerekçe taşır), platform yöneticisi bilerek
 açar. Reddetme 400 ve alan hatasıyla döner; denetim kaydı değişmez (başarısız işlem yazılmaz).
 
+Dilim 2'de netleşenler:
+
+- **Yalnızca değişikliğin yarattığı ihlal reddedilir.** Önceden var olan ihlal (karar 4) ilgisiz bir hak değişikliğini engellemez; ör.
+  CRM'siz açık Pazarlama'sı olan firmada Destek yine açılır.
+- **Plan uygulaması toplu denetlenir.** Plan atama ve plan güncelleme, firmada oluşacak sonuç kümesini yazmadan önce denetler; modüller
+  tek tek açılıp kapanırken ara durumlar denetlenmez (`SetModuleAsync(..., checkDependencies: false)`). Plan güncellemesi geçerli
+  abonelerden birini bozacaksa plan kaydedilmez.
+- **Denetim platform katmanındadır**, `IModuleEntitlements.SetEnabledAsync` düzeyinde değil: demo verisi ve testler hakkı doğrudan yazar.
+- **İsteğe bağlı bağımlılık uyarısı dilim 3'e kaydı.** Uyarı yanıt sözleşmelerini ve platform ekranını birlikte değiştirir; kural
+  (`ModuleDependencyRules.Missing`) isteğe bağlı eksikleri şimdiden döndürür.
+
 ### 4. Değişmeyenler
 
 - **Çalışma zamanı:** ADR-0044'teki `Unavailable` kalıbı aynen kalır. Beyan çalışma zamanında modülü kapatmaz, istek reddetmez.
@@ -87,14 +100,14 @@ açar. Reddetme 400 ve alan hatasıyla döner; denetim kaydı değişmez (başar
   değişikliğinde denetim devreye girer.
 - **Otomasyon:** `AutomationActionDefinition.RequiredModules` aksiyon düzeyinde kalır; modül düzeyindeki beyanın yerine geçmez.
 
-### 5. İlk beyanlar (öneri)
+### 5. İlk beyanlar
 
 | Modül | Bağımlılık | Tür | Gerekçe |
 |---|---|---|---|
 | Sipariş | CRM | İsteğe bağlı | Tekliften sipariş, takip aktivitesi; sipariş elle de açılır |
 | Sözleşme | CRM | İsteğe bağlı | Tekliften sözleşme taslağı, takip aktivitesi |
 | Lojistik | Filo | İsteğe bağlı | Seferde araç ve dorse seçimi |
-| Pazarlama | CRM | Zorunlu (açık soru 1) | Alıcı ve segment alanlarını yalnızca CRM sağlar |
+| Pazarlama | CRM | Zorunlu | Alıcı ve segment alanlarını yalnızca CRM sağlar |
 
 ## Seçenekler
 
@@ -104,22 +117,38 @@ açar. Reddetme 400 ve alan hatasıyla döner; denetim kaydı değişmez (başar
 3. **Zorunlu bağımlılığı kendiliğinden açmak.** Lisans kaydını (kaynak, bitiş, gerekçe) kimin adına yazacağı belirsiz. Reddedildi.
 4. **Bu ADR:** kodda beyan, açılışta doğrulama, hak yazılırken denetim.
 
-## Açık sorular
+## Açık soruların kararı (16 Kasım 2026)
 
-1. **Pazarlama → CRM zorunlu mu?** Öneri: zorunlu. Alternatif: isteğe bağlı bırakıp Pazarlama'yı CRM'siz "alıcısız" açılabilir tutmak;
-   bugün başka alıcı kaynağı olmadığı için satılabilir bir birleşim değil.
-2. **Kapama reddi mi, zincirleme kapama mı?** Öneri: ret (bağımlıları listeler); platform yöneticisi önce bağımlı modülü kapatır.
-3. **Firma yöneticisi görsün mü?** Öneri: dilim 3'te firma Modüller ekranında yalnızca bilgi olarak ("CRM açık olmadığı için tekliften
-   sipariş kullanılamaz"). Hak değişikliği yine yalnızca platformdadır.
-4. **Mevcut ihlaller:** yalnızca rapor (öneri) mi, yoksa platform yöneticisine düzeltme görevi mi?
+1. **Pazarlama → CRM zorunludur.** Bugün başka alıcı kaynağı yok; ikinci bir alıcı kaynağı gelirse beyan isteğe bağlıya çevrilir.
+2. **Bağımlısı olan modülü kapatma reddedilir**, zincirleme kapama yapılmaz. Yanıt bağımlı modülleri listeler; platform yöneticisi önce
+   onları kapatır.
+3. **Firma yöneticisi bağımlılığı yalnızca bilgi olarak görür** (dilim 3, firma Modüller ekranı: "CRM açık olmadığı için tekliften sipariş
+   kullanılamaz"). Hak değişikliği yalnızca platformdadır.
+4. **Mevcut ihlaller yalnızca raporlanır**; kendiliğinden düzeltme ya da görev açma yoktur.
 
 ## Dilimler
 
 | Dilim | İçerik | Test |
 |---|---|---|
 | 1 | `IModule.Dependencies`, katalog doğrulaması, ilk beyanlar, başvuru-beyan eşleşme testi | Birim (doğrulama), mimari |
-| 2 | `ModuleDependencyRules` ve altı hak yolunda denetim; platform yanıtlarında uyarı | Mutlu yol, ret, tenant izolasyonu, yetki (platform rolü) |
-| 3 | Platform arayüzü: modül satırında bağımlılık bilgisi, ret iletisi, "bağımlılığı eksik firmalar" raporu; firma Modüller ekranında bilgi | Entegrasyon + arayüz görsel kontrolü |
+| 2 | `ModuleDependencyRules` ve altı hak yolunda zorunlu bağımlılık denetimi | Mutlu yol, ret, tenant izolasyonu, yetki (platform rolü) |
+| 3 | İsteğe bağlı bağımlılık uyarısı (yanıt + ekran); platform arayüzü: modül satırında bağımlılık bilgisi, ret iletisi, "bağımlılığı eksik firmalar" raporu; firma Modüller ekranında bilgi | Entegrasyon + arayüz görsel kontrolü |
+
+Dilim 3 ikiye bölündü:
+
+- **3a (platform, teslim edildi).** `GET /api/platform/modules` ve `/catalog` modülün bağımlılıklarını döndürür; firma yanıtı
+  `missingDependencies` taşır (zorunlu ve isteğe bağlı eksikler, gerekçesiyle); `GET /api/platform/dependency-gaps` zorunlu bağımlılığı
+  eksik, erişime açık firmaları listeler. Ekran: firma detayında modülün altında bağımlılık satırı ve eksikler için uyarı/bilgi kutusu,
+  katalogda bağımlılık satırı, platform ana sayfasında "Bağımlılığı eksik firmalar".
+- **3b (firma tarafı, teslim edildi).** Firma tarafında modülleri listeleyen ayrı bir ekran olmadığı için bilgi Yönetim ana sayfasına
+  ("Modül bağımlılıkları" bölümü, yalnızca eksik varsa) kondu. Veri `GET /api/tenant/access` yanıtındaki `missingDependencies` ile gelir
+  (lisans uyarısıyla aynı kalıp); yalnızca firma yöneticisine dolar. Her sayfada görünen bant yapılmadı: isteğe bağlı eksik kalıcı bir
+  durumdur, uyarı değil bilgidir.
+
+Karar 3'teki tablodan sapma: isteğe bağlı eksik için uyarı, hak yazan altı işlemin yanıtında değil firma yanıtında
+(`missingDependencies`) döner. Modül açma/kapama ve plan atama gövdesiz 204 döndürür; ekran işlemden sonra firmayı zaten yeniden okur.
+Böylece yanıt sözleşmeleri değişmez ve uyarı işlemden sonra da görünür kalır. Rapor yalnızca zorunlu eksikleri listeler: isteğe bağlı
+eksik (ör. CRM'siz Sipariş) geçerli bir ticari durumdur. Gerekçe metni (`Reason`) kodda Türkçe yazılıdır ve çevrilmeden gösterilir.
 
 ## Sonuçlar
 

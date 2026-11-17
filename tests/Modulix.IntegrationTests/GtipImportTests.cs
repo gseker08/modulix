@@ -6,8 +6,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MiniExcelLibs;
-using Modulix.Core.Contracts.Customs;
-using Modulix.Core.Customs;
+using Modulix.Modules.Warehouse.Contracts.Customs;
+using Modulix.Modules.Warehouse.Customs;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Shared.Auth;
@@ -54,7 +54,7 @@ public class GtipImportTests(ModulixApiFactory factory) : IClassFixture<ModulixA
             using (var scope = factory.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-                Assert.False(await db.GtipCatalogVersions.AsNoTracking().AnyAsync(v => v.EffectiveFrom == first));
+                Assert.False(await db.Set<GtipCatalogVersion>().AsNoTracking().AnyAsync(v => v.EffectiveFrom == first));
             }
 
             var v1 = await ImportAsync(platform, xlsx, "tarife.xlsx", "2026 cetveli (xlsx)", first);
@@ -132,7 +132,7 @@ public class GtipImportTests(ModulixApiFactory factory) : IClassFixture<ModulixA
             using (var scope = factory.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-                Assert.False(await db.GtipCatalogVersions.AsNoTracking().AnyAsync(v => v.EffectiveFrom == day));
+                Assert.False(await db.Set<GtipCatalogVersion>().AsNoTracking().AnyAsync(v => v.EffectiveFrom == day));
             }
 
             // Aynı yürürlük tarihine ikinci yükleme 409'dur ve ilk sürümü bozmaz.
@@ -164,7 +164,7 @@ public class GtipImportTests(ModulixApiFactory factory) : IClassFixture<ModulixA
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ModulixDbContext>();
-        Assert.False(await db.GtipCatalogVersions.AsNoTracking().AnyAsync(v => v.EffectiveFrom == day));
+        Assert.False(await db.Set<GtipCatalogVersion>().AsNoTracking().AnyAsync(v => v.EffectiveFrom == day));
     }
 
     private static byte[] Workbook(params Dictionary<string, object?>[] rows)
@@ -200,7 +200,7 @@ public class GtipImportTests(ModulixApiFactory factory) : IClassFixture<ModulixA
 
     private static async Task<GtipCheckDto> CheckAsync(HttpClient client, string code, DateOnly day)
     {
-        var response = await client.GetAsync($"/api/gtip/check?code={Uri.EscapeDataString(code)}&date={day:yyyy-MM-dd}");
+        var response = await client.GetAsync($"/api/warehouse/gtip/check?code={Uri.EscapeDataString(code)}&date={day:yyyy-MM-dd}");
         Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<GtipCheckDto>())!;
     }

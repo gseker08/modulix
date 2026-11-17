@@ -1,0 +1,141 @@
+@* Müşteri zaman çizelgesi (CRM eksik süreçler E9, dilim 1): firmanın aktivite, fırsat ve teklifleri tek akışta, en yeniden eskiye. Satırlar sunucuda
+   kullanıcının izni ve veri kapsamıyla süzülür; okunamayan kaynağın satırı gelmez. Sayfalama imleçlidir ("Daha eski kayıtları göster"). *@
+@inject ApiClient Api
+
+<section class="detail-section" aria-labelledby="customer-timeline-title">
+    <div class="section-header">
+        <h2 id="customer-timeline-title">@Texts.Get("crm.company.tab.timeline")</h2>
+    </div>
+    @if (error is not null)
+    {
+        <p class="text-muted" role="status">@error</p>
+    }
+    else if (items is null)
+    {
+        <LoadingState />
+    }
+    else if (items.Count == 0)
+    {
+        <EmptyState Compact="true" Title="@Texts.Get("crm.timeline.empty")" />
+    }
+    else
+    {
+        <ol class="activity-timeline">
+            @foreach (var item in items)
+            {
+                var family = item.EntityKey == CrmEntityKeys.Activity && item.Type is { } type ? ActivityLabels.Family(Lookups, type) : null;
+                <li class="timeline-item @(family is null ? null : $"fam-{family}")">
+                    <span class="timeline-icon" aria-hidden="true"><AppIcon Name="@Icon(item, family)" Size="16" /></span>
+                    <div class="timeline-body">
+                        @if (Href(item) is { } href)
+                        {
+                            <a href="@href"><strong>@item.Title</strong></a>
+                        }
+                        else
+                        {
+                            <strong>@item.Title</strong>
+                        }
+                        <span class="timeline-meta">
+                            @Kind(item)
+                            @if (item.Reference is { Length: > 0 } reference) { <text> · @reference</text> }
+                            @if (item.OwnerId is not null) { <text> · @Lookups.MemberName(item.OwnerId)</text> }
+                        </span>
+                        <span class="timeline-meta">@CrmLabels.Time(item.OccurredAt)</span>
+                        @if (item.Status is { } status)
+                        {
+                            @if (item.EntityKey == CrmEntityKeys.Opportunity)
+                            {
+                                <span class="badge stage-@status.ToLowerInvariant()">@CrmText.OpportunityStatusName(status)</span>
+                            }
+                            else if (item.EntityKey == CrmEntityKeys.Quote)
+                            {
+                                <span class="badge stage-@QuoteLabels.StatusBadge(status)">@QuoteLabels.Label(QuoteLabels.Statuses, status)</span>
+                            }
+                            else if (family is not null)
+                            {
+                                <span class="timeline-meta">@ActivityLabels.Status(family, status)</span>
+                            }
+                        }
+                    </div>
+                </li>
+            }
+        </ol>
+        @if (nextBefore is not null)
+        {
+            <button type="button" class="btn btn-tonal btn-sm" disabled="@loading" aria-busy="@(loading ? "true" : null)" @onclick="LoadMoreAsync">
+                @Texts.Get("crm.timeline.more")
+            </button>
+        }
+        <p class="small text-muted">@Texts.Get("crm.timeline.note")</p>
+    }
+</section>
+
+@code {
+    private List<CustomerTimelineItemDto>? items;
+    private DateTimeOffset? nextBefore;
+    private string? error;
+    private bool loading;
+    private (Guid Company, long Version)? loadedFor;
+
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+
+    [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
+
+    /// <summary>Firma detayındaki bir değişiklikten (yeni aktivite, fırsat) sonra çizelgeyi yeniden yüklemek için artırılan sayaç.</summary>
+    [Parameter] public long Version { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (CompanyId, Version))
+        {
+            return;
+        }
+
+        loadedFor = (CompanyId, Version);
+        items = null;
+        nextBefore = null;
+        await LoadAsync(null);
+    }
+
+    private Task LoadMoreAsync() => LoadAsync(nextBefore);
+
+    private async Task LoadAsync(DateTimeOffset? before)
+    {
+        loading = true;
+        var cursor = before is { } time ? $"?before={Uri.EscapeDataString(time.ToString("O", System.Globalization.CultureInfo.InvariantCulture))}" : string.Empty;
+        var result = await Api.GetAsync<CustomerTimelineDto>($"/api/crm/companies/{CompanyId}/timeline{cursor}");
+        loading = false;
+        if (result.Value is not { } page)
+        {
+            error = result.Error;
+            return;
+        }
+
+        error = null;
+        items ??= [];
+        items.AddRange(page.Items);
+        nextBefore = page.NextBefore;
+    }
+
+    private static string Icon(CustomerTimelineItemDto item, string? family) => item.EntityKey switch
+    {
+        CrmEntityKeys.Opportunity => "target",
+        CrmEntityKeys.Quote => "file-text",
+        _ => ActivityLabels.Icon(family),
+    };
+
+    private static string Kind(CustomerTimelineItemDto item) => item.EntityKey switch
+    {
+        CrmEntityKeys.Opportunity => Texts.Get("crm.timeline.kind.opportunity"),
+        CrmEntityKeys.Quote => Texts.Get("crm.timeline.kind.quote"),
+        _ => Texts.Get("crm.timeline.kind.activity"),
+    };
+
+    // Aktivitenin kendi sayfası yoktur (firma detayındaki Aktiviteler sekmesinden açılır).
+    private static string? Href(CustomerTimelineItemDto item) => item.EntityKey switch
+    {
+        CrmEntityKeys.Opportunity => $"crm/firsatlar/{item.RecordId}",
+        CrmEntityKeys.Quote => $"crm/teklifler/{item.RecordId}",
+        _ => null,
+    };
+}

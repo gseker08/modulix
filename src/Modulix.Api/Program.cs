@@ -10,7 +10,6 @@ using Modulix.Api.Automation;
 using Modulix.Api.Reports;
 using Modulix.Api.Auth;
 using Modulix.Api.Communication;
-using Modulix.Api.Crm;
 using Modulix.Api.Customization;
 using Modulix.Api.Files;
 using Modulix.Api.Views;
@@ -24,7 +23,6 @@ using Modulix.Api.Platform;
 using Modulix.Api.Records;
 using Modulix.Api.Settings;
 using Modulix.Api.Numbering;
-using Modulix.Api.Customs;
 using Modulix.Api.Sectors;
 using Modulix.Api.Tenancy;
 using Modulix.Api.Users;
@@ -42,7 +40,6 @@ using Modulix.Modules.Crm;
 using Modulix.Modules.Logistics;
 using Modulix.Modules.Contracts;
 using Modulix.Modules.Orders;
-using Modulix.Api.Contracts;
 using Modulix.Modules.Marketing;
 using Modulix.Modules.Warehouse;
 using Modulix.Modules.Fleet;
@@ -79,17 +76,13 @@ builder.Services.AddModulixTenancy();
 builder.Services.AddModulixServerLocalization();
 
 builder.Services.AddModulixModules(ModulixModules.Create());
-builder.Services.AddScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, Modulix.Api.Contracts.HostFollowUpActivities>();
+builder.Services.AddScoped<Modulix.Modules.Crm.Contracts.Activities.IFollowUpActivities, Modulix.Api.HostFollowUpActivities>();
 
 // Sektör profilleri (Y9c): tanımlar açılışta modül kataloğuna göre doğrulanır.
 builder.Services.AddSingleton(sp => new SectorProfileCatalog(SectorProfiles.Create(), sp.GetRequiredService<ModuleCatalog>()));
 builder.Services.AddSingleton(sp => new SubProfileStarterCatalog(SubProfileStarters.Create(), sp.GetRequiredService<ModuleCatalog>()));
 
 builder.Services.AddModulixRecords();
-builder.Services.AddScoped<Modulix.Modules.Crm.Opportunities.IOpportunityPolicyProvider, Modulix.Api.Crm.OpportunityPolicyProvider>();
-builder.Services.AddScoped<Modulix.Modules.Crm.Quotes.IQuotePolicyProvider, Modulix.Api.Crm.QuotePolicyProvider>();
-builder.Services.AddScoped<Modulix.Modules.Crm.Reporting.ISalesReportingPolicyProvider, Modulix.Api.Crm.SalesReportingPolicyProvider>();
-builder.Services.AddScoped<Modulix.Modules.Contracts.Lifecycle.IContractPolicyProvider, Modulix.Api.Contracts.ContractPolicyProvider>();
 builder.Services.Configure<Modulix.Api.Communication.CommunicationCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Communication.CommunicationCleanupOptions.SectionName));
 builder.Services.AddSingleton<Modulix.Api.Imports.ImportErrorReports>();
 builder.Services.Configure<Modulix.Api.Imports.ImportReportCleanupOptions>(builder.Configuration.GetSection(Modulix.Api.Imports.ImportReportCleanupOptions.SectionName));
@@ -108,12 +101,10 @@ builder.Services.Configure<Modulix.Api.Reports.ReportJobsOptions>(builder.Config
 builder.Services.AddSingleton<Modulix.Api.Reports.ReportScheduleRunner>();
 builder.Services.AddHostedService<Modulix.Api.Reports.ReportScheduleWorker>();
 builder.Services.Configure<Modulix.Infrastructure.Automation.AutomationOptions>(builder.Configuration.GetSection(Modulix.Infrastructure.Automation.AutomationOptions.SectionName));
+builder.Services.Configure<Modulix.Infrastructure.Audit.AuditArchiveOptions>(builder.Configuration.GetSection(Modulix.Infrastructure.Audit.AuditArchiveOptions.SectionName));
 builder.Services.Configure<Modulix.Core.Files.FileStorageOptions>(builder.Configuration.GetSection(Modulix.Core.Files.FileStorageOptions.SectionName));
 builder.Services.AddHostedService<Modulix.Api.Automation.AutomationWorker>();
 builder.Services.AddHostedService<ApprovalEscalationWorker>();
-builder.Services.AddSingleton<Modulix.Modules.Contracts.Lifecycle.IContractPdfRenderer, Modulix.Api.Contracts.ContractPdfRenderer>();
-builder.Services.AddScoped<Modulix.Api.Crm.QuoteDocumentService>();
-builder.Services.AddScoped<Modulix.Api.Crm.QuoteDelivery>();
 
 // E-posta: kuyruk + arka plan gönderici. Ayarlar "Email" bölümünde; SMTP şifresi user-secrets veya ortam değişkeninde.
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
@@ -124,11 +115,8 @@ builder.Services.AddHostedService<EmailDispatchWorker>();
 builder.Services.Configure<EventOptions>(builder.Configuration.GetSection(EventOptions.SectionName));
 builder.Services.AddModulixEvents();
 builder.Services.AddModulixHardening(builder.Configuration);
-builder.Services.AddLeadIntakeRateLimit(builder.Configuration);
-builder.Services.AddQuotePublicRateLimit(builder.Configuration);
 builder.Services.AddScoped<IPublicTenantScopes, Modulix.Api.PublicTenantScopes>();
 builder.Services.AddCommunicationPublicRateLimit(builder.Configuration);
-builder.Services.AddContractSignatureRateLimit(builder.Configuration);
 builder.Services.AddHostedService<EventDispatchWorker>();
 builder.Services.Configure<Modulix.Api.Platform.PlatformOptions>(builder.Configuration.GetSection(Modulix.Api.Platform.PlatformOptions.SectionName));
 builder.Services.Configure<Modulix.Infrastructure.Modules.LicenseOptions>(builder.Configuration.GetSection(Modulix.Infrastructure.Modules.LicenseOptions.SectionName));
@@ -180,6 +168,20 @@ if (args.Contains(PlatformAdministratorCommand.Name, StringComparer.OrdinalIgnor
 if (TenantDataCommand.Matches(args))
 {
     Console.WriteLine(await TenantDataCommand.RunAsync(app.Services, args));
+    return;
+}
+
+// "audit-archive" komutu: sıcak saklama süresinden eski denetim kaydı aylarını nesne deposuna arşivler ve bölümü boşaltır (ADR-0052).
+//   dotnet run --project src/Modulix.Api -- audit-archive
+if (AuditArchiveCommand.Matches(args))
+{
+    var (archiveOutput, archived) = await AuditArchiveCommand.RunAsync(app.Services);
+    Console.WriteLine(archiveOutput);
+    if (!archived)
+    {
+        Environment.ExitCode = 1;
+    }
+
     return;
 }
 
@@ -261,18 +263,12 @@ app.MapFileEndpoints();
 app.MapSectorProfileEndpoints();
 app.MapSubProfileEndpoints();
 app.MapSectorEndpoints();
-app.MapGtipEndpoints();
+app.MapGtipCatalogEndpoints();
 app.MapRegimeProfileEndpoints();
-app.MapRegimeCheckEndpoints();
 app.MapModuleEndpoints();
 app.MapRuleEndpoints();
 app.MapRecordEndpoints();
-app.MapCrmEndpoints();
-app.MapContractsEndpoints();
-app.MapLeadIntakeEndpoints();
-app.MapQuotePublicEndpoints();
 app.MapCommunicationPublicEndpoints();
-app.MapContractSignatureWebhook();
 app.MapPlatformEndpoints();
 app.MapPlatformEventEndpoints();
 app.MapPlatformPlanEndpoints();

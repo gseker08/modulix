@@ -184,3 +184,55 @@ internal sealed class ReportScheduleRecipientConfiguration : IEntityTypeConfigur
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+internal sealed class DashboardConfiguration : IEntityTypeConfiguration<Dashboard>
+{
+    public void Configure(EntityTypeBuilder<Dashboard> builder)
+    {
+        // Tenant verisi (CRM epik E2): core şemasında; Row-Level Security ile korunur (migration: TenantIsolationSql).
+        builder.ToTable("Dashboards", DatabaseSchemas.Core);
+        builder.HasKey(d => d.Id);
+        builder.Property(d => d.Id).ValueGeneratedNever();
+        builder.Property(d => d.TenantId).IsRequired();
+        builder.Property(d => d.OwnerUserId).IsRequired();
+        builder.Property(d => d.Name).HasMaxLength(Dashboard.NameMaxLength).IsRequired();
+        builder.Property(d => d.CreatedAt).IsRequired();
+        builder.Property(d => d.UpdatedAt).IsRequired();
+        builder.Property(d => d.Version).IsConcurrencyToken();
+
+        builder.HasAlternateKey(d => new { d.TenantId, d.Id });
+
+        // Ad kullanıcı içinde tekildir (benzersizlik tenant ile birlikte).
+        builder.HasIndex(d => new { d.TenantId, d.OwnerUserId, d.Name }).IsUnique();
+    }
+}
+
+internal sealed class DashboardWidgetConfiguration : IEntityTypeConfiguration<DashboardWidget>
+{
+    public void Configure(EntityTypeBuilder<DashboardWidget> builder)
+    {
+        builder.ToTable("DashboardWidgets", DatabaseSchemas.Core);
+        builder.HasKey(w => w.Id);
+        builder.Property(w => w.Id).ValueGeneratedNever();
+        builder.Property(w => w.TenantId).IsRequired();
+        builder.Property(w => w.Kind).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(w => w.Title).HasMaxLength(DashboardWidget.TitleMaxLength);
+
+        builder.HasAlternateKey(w => new { w.TenantId, w.Id });
+        builder.HasIndex(w => new { w.TenantId, w.DashboardId, w.Position });
+        builder.HasIndex(w => new { w.TenantId, w.ReportId });
+
+        // Bileşik yabancı anahtarlar (ADR-0020): bileşen, pano ve rapor aynı tenant'ta olmak zorundadır. Pano ya da rapor silinince
+        // bileşen de silinir.
+        builder.HasOne<Dashboard>()
+            .WithMany()
+            .HasForeignKey(w => new { w.TenantId, w.DashboardId })
+            .HasPrincipalKey(d => new { d.TenantId, d.Id })
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<ReportDefinition>()
+            .WithMany()
+            .HasForeignKey(w => new { w.TenantId, w.ReportId })
+            .HasPrincipalKey(r => new { r.TenantId, r.Id })
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}

@@ -43,7 +43,7 @@ komutu içindir.
 ## Gizli ve yetki yapılandırması
 
 - `modulix_app`: yalnızca `SELECT/INSERT/UPDATE/DELETE/EXECUTE`; DDL yok, güvenlik politikasını kapatamaz.
-  `core.AuditLog` üzerinde `UPDATE/DELETE` ayrıca reddedilir (append-only; baseline migration'ı).
+  `core.AuditLog` üzerinde `UPDATE/DELETE` ayrıca reddedilir (append-only; baseline migration'ı). Tablo aylık bölümlüdür (ADR-0052); bölüm boşaltma `ALTER` ister, uygulama rolünde yoktur.
 - `modulix_migrator`: `db_owner`. Sunucu düzeyinde `dbcreator` gerekmez.
 - Şifreler `.env` + user-secrets/ortam değişkeninde; kodda, logda veya PR'da yer almaz. Üretimde secret yöneticisi
   (ör. Key Vault) referansı tercih edilir; yerel ve üretim yapılandırması ayrıdır.
@@ -113,6 +113,49 @@ Platform yöneticisi bir firma için kayıt türü başına görünürlük tavan
 - **Ekran:** Platform → Firmalar → firma detayı → "Kayıt görünürlüğü" bölümü bu `GET`/`PUT`'i kullanır (tür başına seçici, gerekçe zorunlu, kayıtta etkilenen rol sayısı gösterilir). Modülü sonradan kapanan türün mevcut tavanı listede görünmez ama kümeyle birlikte korunur; yeni tür için tavan konamaz. Yetki: Operasyon rolü (`PlatformAccessRules`).
 - **Dışa aktarma ve silme:** tablolar katalogdan okunur; `tenant-export` ve `tenant-delete` `platform.TenantScopeLimits` ve `core.RoleScopeOverrides` satırlarını kendiliğinden kapsar.
 
+## Hız sınırları ve ters vekil (ADR-0054)
+
+Uygulamanın hız sınırı sayaçları her sunucunun belleğindedir. Tek sunucuda başka bir şey gerekmez. Birden çok sunucuda iki ayar yapılır:
+
+1. **Sunucu payı:** `RateLimiting:Nodes` sunucu sayısına ayarlanır (ör. ortam değişkeni `RateLimiting__Nodes=3`). Dakikalık ayarlar küme toplamıdır ve her sunucu `ceil(ayar / Nodes)` kadarını uygular:
+   - `Auth:RateLimitPerMinute` (30)
+   - `RateLimiting:UserPerMinute` (600) ve `RateLimiting:TenantPerMinute` (3000)
+   - `CommunicationPublic:RateLimitPerMinute` (30)
+   - `LeadIntake:RateLimitPerMinute` (20)
+   - `QuotePublic:RateLimitPerMinute` (60)
+   - `SupportSurveyPublic:RateLimitPerMinute` (30)
+   - `ContractSignature:RateLimitPerMinute` (120)
+
+   Otomatik ölçeklemede en büyük sunucu sayısı yazılır; sınır daha sıkı olur, gevşemez.
+2. **Ortak IP sınırı ters vekilde:** vekil bütün istekleri gördüğü için IP başına sınırı tek yerde ve kesin uygular. Uygulamanın IP sınırları ikinci hattır. Kişi ve firma başına sınır yalnızca uygulamadadır (vekil oturumu çözemez).
+
+Vekil arkasında uygulamaya gerçek istemci IP'si bildirilir: `ForwardedHeaders:Enabled=true` ve vekilin adresi `ForwardedHeaders:KnownProxies` (IP) ya da `ForwardedHeaders:KnownNetworks` (CIDR) ile verilir. Verilmezse bütün istekler vekilin IP'sinden sayılır ve IP sınırı bütün kullanıcıları birlikte keser.
+
+Örnek nginx yapılandırması (değerler uygulama varsayılanlarıyla aynıdır; vekil tek katmanlı olmalıdır, birden çok nginx örneği kendi sayacını tutar):
+
+```nginx
+# http bloğu
+limit_req_zone $binary_remote_addr zone=modulix_auth:10m   rate=30r/m;   # oturumsuz kimlik uçları
+limit_req_zone $binary_remote_addr zone=modulix_public:10m rate=60r/m;   # herkese açık form, teklif, anket, tercih sayfası
+limit_req_zone $binary_remote_addr zone=modulix_api:20m    rate=1200r/m; # bir IP'den gelen bütün API (ofis NAT'ı için geniş)
+limit_req_status 429;
+
+upstream modulix { server 10.0.0.11:8080; server 10.0.0.12:8080; server 10.0.0.13:8080; }
+
+# server bloğu
+location /api/auth/   { limit_req zone=modulix_auth burst=10 nodelay;  proxy_pass http://modulix; include modulix_proxy.conf; }
+location /api/public/ { limit_req zone=modulix_public burst=20 nodelay; proxy_pass http://modulix; include modulix_proxy.conf; }
+location /api/        { limit_req zone=modulix_api burst=200 nodelay;   proxy_pass http://modulix; include modulix_proxy.conf; }
+location /            { proxy_pass http://modulix; include modulix_proxy.conf; }
+
+# modulix_proxy.conf
+proxy_set_header Host              $host;
+proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+Bulut ağ geçidinde (Azure Front Door, AWS WAF, Cloudflare) aynı üç kural hız sınırı kuralı olarak tanımlanır: `/api/auth/`, `/api/public/` ve `/api/` için IP başına. Ofislerden çıkan istekler tek IP'yi paylaşabilir (NAT). `/api/` kuralı bu yüzden geniş tutulur; dar sınır uygulamanın kişi başına sınırıdır.
+
 ## Arka plan işleri
 
 E-posta işleyicisi platform kuyruğunu işler. Olay işleyicisi her turda tek sorguyla işi olan tenant'ları bulur (outbox/teslim tabloları RLS dışıdır) ve yalnızca
@@ -144,6 +187,16 @@ Yerelden S3'e geçişte mevcut içerik `{kök}/{tenantId}/…` dizininden aynı 
 `tenant-delete` veritabanı işlemi kesinleştikten sonra tenant'ın içerik dizinini de siler. İçerik silinemezse komut hata verir ve tekrar çalıştırılmalıdır.
 
 **Sözleşme verisi (dilim 9):** kullanıcıların kaydettiği liste görünümleri ortak `core.GridViews` tablosundadır (ADR-0036; eski `contracts.ContractSavedViews` tablosu `ContractSavedViewsToGridViews` migration'ıyla taşınıp kaldırıldı), `TenantId` taşır; tenant dışa aktarma ve silme kapsamındadır. Sözleşme listesi CSV çıkışı (`contracts.contracts.export` izni) uygulama içinden yapılır ve her çıkış denetim kaydına (`Exported`: kim, kaç satır, hangi süzgeç) yazılır; tenant verisinin bütünüyle alınması için `tenant-export` kullanılır.
+
+**Denetim kaydı arşivi (`audit-archive`, ADR-0052):** `core.AuditLog` aylık bölümlüdür. Komut ayda bir zamanlanmış görev olarak çalıştırılır (ör. her ayın 2'si gece). Migrator bağlantısıyla çalışır ve şu işleri yapar:
+- Sıcak saklama süresinden (`AuditArchive:HotMonths`, varsayılan 24) eski her dolu bölüm için tenant başına gzip'li JSON Lines dosyasını nesne deposuna, kaydını `core.AuditArchives`'e yazar ve bölümü boşaltır.
+- Boş eski sınırları birleştirir, ileriye `AuditArchive:FutureMonths` (24) ay sınır açar.
+
+Sayı tutmayan dönem (örneğin tenant kaydı olmayan satır) boşaltılmaz; komut çıkış kodu 1 ile biter ve günlüğe hata yazar. Neden giderilip komut yeniden çalıştırılır; tekrar çalıştırmak güvenlidir. Aynı anda tek çalışma olur. Arşiv dosyaları uygulama düzeyinde şifrelenmez: nesne deposunda sunucu tarafı şifreleme ve sürümleme açık, kova kapalı olmalıdır. Arşiv dosyaları tenant'ın depo kökünde durduğu için `tenant-export` ve `tenant-delete` onları da kapsar. Komut hiç çalıştırılmazsa veri kaybolmaz; yalnızca tablo büyür.
+
+```bash
+dotnet run --project src/Modulix.Api -- audit-archive
+```
 
 **Dışa aktarma (`tenant-export`):** bir tenant'ın bütün satırlarını `TenantId` ile tablo başına bir JSON dosyasına yazar.
 Tablolar koddan değil veritabanı kataloğundan bulunur (`TenantId` kolonu taşıyan her tablo: tenant şemaları ve platform

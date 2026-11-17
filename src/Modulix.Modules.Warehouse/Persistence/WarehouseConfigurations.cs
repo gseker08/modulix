@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Modulix.Core.Contracts.Customization;
-using Modulix.Core.Contracts.Customs;
+using Modulix.Modules.Warehouse.Contracts.Customs;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Warehouse.Domain;
 

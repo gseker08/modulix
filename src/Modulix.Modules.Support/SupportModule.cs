@@ -21,6 +21,17 @@ public sealed class SupportModule : IModule, IModuleEndpoints, IModulePublicEndp
 {
     public const string ModuleKey = "support";
 
+    /// <summary>
+    /// Talep numarası ortak belge serisinden verilir (ADR-0049 dilim 3b): <c>önek-yıl-sıra</c>. Önek <c>DT</c>'dir (<c>TK</c> teklifin önekidir); önceki
+    /// talepler rastgele sonekli <c>TK-…</c> numarasını korur. Gelen e-posta eşleştirmesi önekten bağımsızdır (<c>InboundRules.TicketNumberCandidates</c>).
+    /// </summary>
+    public const string TicketNumberSeries = "support.ticket";
+
+    IReadOnlyList<Modulix.Core.Contracts.Numbering.NumberSeriesDefinition> IModule.NumberSeries { get; } =
+    [
+        new(TicketNumberSeries, "Destek talebi", "DT"),
+    ];
+
     public static class Permissions
     {
         public const string TicketsRead = "support.tickets.read";
@@ -94,6 +105,8 @@ public sealed class SupportModule : IModule, IModuleEndpoints, IModulePublicEndp
         public const string AutoCloseDays = "support.auto-close-days";
         public const string SurveyEnabled = "support.survey.enabled";
         public const string SurveyValidDays = "support.survey.valid-days";
+        public const string SurveyReminderDays = "support.survey.reminder-days";
+        public const string AcknowledgementEnabled = "support.acknowledgement.enabled";
     }
 
     /// <summary>Kayıt türleri (boru hattındaki EntityKey).</summary>
@@ -181,7 +194,19 @@ public sealed class SupportModule : IModule, IModuleEndpoints, IModulePublicEndp
             PatternMessage = "1-90 arası tam sayı girin.",
             MaxLength = 2,
         },
-        new(SettingKeys.RequireRootCause, "Destek: şikâyet çözümünde kök neden zorunlu", "Destek", SettingType.Choice, "true")
+        new(SettingKeys.SurveyReminderDays, "Destek: yanıtlanmayan anket için hatırlatma (gün)", "Destek", SettingType.Text, "0")
+        {
+            Description = "Anket e-postasından bu kadar gün sonra yanıt gelmediyse ve bağlantının süresi dolmadıysa bir kez hatırlatma e-postası gönderilir (zamanlanmış iş). 0 kapalıdır (varsayılan). 0-30 arası.",
+            Pattern = @"^[0-9]{1,2}$",
+            PatternMessage = "0-30 arası tam sayı girin.",
+            MaxLength = 2,
+        },
+        new(SettingKeys.AcknowledgementEnabled, "Destek: talep açılınca otomatik alındı yanıtı gönder", "Destek", SettingType.Choice, "false")
+        {
+            Description = "Evet seçilirse talep açıldığında, başvuranın e-postası varsa talep numarasını bildiren otomatik yanıt e-posta kuyruğuna yazılır. Otomatik yanıt ilk yanıt sayılmaz ve SLA sayacını durdurmaz. Varsayılan hayırdır.",
+            Options = [new SettingOption("true", "Evet"), new SettingOption("false", "Hayır")],
+        },
+        new(SettingKeys.RequireRootCause,"Destek: şikâyet çözümünde kök neden zorunlu", "Destek", SettingType.Choice, "true")
         {
             Description = "Evet seçilirse şikâyet türündeki talep, kök neden ve düzeltici aksiyon yazılmadan çözülemez.",
             Options = [new SettingOption("true", "Evet"), new SettingOption("false", "Hayır")],
@@ -445,6 +470,7 @@ public sealed class SupportModule : IModule, IModuleEndpoints, IModulePublicEndp
         services.AddScoped<ISupportReports, SupportReports>();
         services.AddScoped<ITicketInbound, TicketInbound>();
         services.AddScoped<SurveyIssuer>();
+        services.AddScoped<AcknowledgementSender>();
         services.AddScoped<ITicketSurveys, TicketSurveys>();
         services.AddScoped<ISurveyPortal, SurveyPortal>();
         services.AddScoped<ITicketBulk, TicketBulk>();

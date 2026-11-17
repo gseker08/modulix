@@ -11,8 +11,12 @@ namespace Modulix.Modules.Support.Records;
 /// <summary>Kayıt depolarının ihtiyaç duyduğu servisler: veri, tenant üyeleri, seçim listeleri, isteği yapan kullanıcı ve iş akışı kapısı.</summary>
 internal sealed class SupportStoreContext(
     IModuleData data, ITenantMembers members, IChoiceLists choiceLists, ITenantContextAccessor tenant, IRecordAccess access,
-    ICurrentAccess permissions, TicketWorkflowGate gate, TimeProvider time, IServiceProvider services, IRecordCommandContext? command = null)
+    ICurrentAccess permissions, TicketWorkflowGate gate, TimeProvider time, IServiceProvider services,
+    Modulix.Core.Contracts.Numbering.IDocumentNumbers numbers, IRecordCommandContext? command = null)
 {
+    /// <summary>Ortak belge serileri (ADR-0049): talep numarası buradan alınır.</summary>
+    public Modulix.Core.Contracts.Numbering.IDocumentNumbers Numbers => numbers;
+
     /// <summary>
     /// Başka bir modülün kaydını kayıt boru hattından <b>çağıranın yetkisi ve veri kapsamıyla</b> okur (destek karşı modülün tablosunu görmez). Kayıt yoksa, okunamıyorsa, modül kapalıysa ya da
     /// yetki yoksa aynı sonuç (null) döner. Boru hattı yazma sırasında geç çözülür (depolar boru hattına bağlı olduğundan döngüsel bağımlılık oluşmaz).
@@ -51,6 +55,9 @@ internal sealed class SupportStoreContext(
 
     /// <summary>Firmanın resmî tatil listesi (Core, ADR-0049 dilim 6b); SLA takvimi isterse anlık görüntüye eklenir. Yalnızca SLA seçiminde gerektiği için geç çözülür.</summary>
     public Modulix.Core.Contracts.Calendar.IHolidayCalendar Holidays => services.GetRequiredService<Modulix.Core.Contracts.Calendar.IHolidayCalendar>();
+
+    /// <summary>Otomatik alındı yanıtı (ADR-0024 §4.12); e-posta ve ayar servisleri yalnızca talep açılırken gerektiği için geç çözülür.</summary>
+    public Lifecycle.AcknowledgementSender Acknowledgements => services.GetRequiredService<Lifecycle.AcknowledgementSender>();
 
     /// <summary>Çalışan yazma komutunun nedeni (yalnızca güvenilir iç çağıranlar verir, ör. kayıt devri).</summary>
     public string? CommandReason => command?.Reason;

@@ -40,14 +40,10 @@ public partial class CoreContractsNamespaceRulesTests
     ];
 
     /// <summary>
-    /// Modüle özel olduğu hâlde henüz taşınmamış ad alanları. Taşınınca buradan silinir; bu listeye yeni ad alanı eklenmez.
+    /// Modüle özel olduğu hâlde henüz taşınmamış ad alanları. Taşınınca buradan silinir; bu listeye yeni ad alanı eklenmez. Son satır
+    /// (Gümrük, <c>Modulix.Core.Contracts.Customs</c>) <c>Modulix.Modules.Warehouse.Contracts</c>'a taşındı (ADR-0046 Dilim 7).
     /// </summary>
-    private static readonly string[] PendingMoves =
-    [
-        // Gümrük (GTİP, rejim profili): uygulaması platform tablolarında olduğu için sözleşmeyle birlikte, uç noktaların ve
-        // platform tablolarının modüle taşınmasını ele alacak ADR'de taşınır (ADR-0044 karar 3).
-        "Modulix.Core.Contracts.Customs",
-    ];
+    private static readonly string[] PendingMoves = [];
 
     [Fact]
     public void Core_contracts_declares_only_listed_namespaces()

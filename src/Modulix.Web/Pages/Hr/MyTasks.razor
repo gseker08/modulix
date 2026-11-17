@@ -1,18 +1,18 @@
 @page "/ik/gorevlerim"
 @inject SessionState Session
 
-<PageTitle>Görevlerim · Modulix</PageTitle>
+<PageTitle>@Texts.Get("nav.app.hr.my-tasks") · Modulix</PageTitle>
 
 @* Kullanıcıya atanan işe giriş/çıkış görevleri (ADR-0042 dilim 5); süreç yönetimi izni olana ayrıca İK görevleri. Görünürlük sunucudadır. *@
 <AuthGate Module="@HrAccess.ModuleKey" Permission="@HrAccess.ChecklistsRead">
-    <PageHeader Title="Görevlerim" Icon="check-circle" Subtitle="İşe giriş ve işten çıkış süreçlerinde size düşen görevler." />
+    <PageHeader Title="@Texts.Get("nav.app.hr.my-tasks")" Icon="check-circle" Subtitle="@Texts.Get("hr.my-tasks.intro")" />
 
     @if (Session.User is { } user)
     {
-        <ChecklistTaskList Title="Bana atanan açık görevler" EmptyText="Size atanmış açık görev yok." Query="@($"assigneeUserId={user.UserId}&status=open&sort=dueDate")" ShowEmployee="true" />
+        <ChecklistTaskList Title="@Texts.Get("hr.my-tasks.mine")" EmptyText="@Texts.Get("hr.my-tasks.mine-empty")" Query="@($"assigneeUserId={user.UserId}&status=open&sort=dueDate")" ShowEmployee="true" />
         @if (Session.Can(HrAccess.ChecklistsManage))
         {
-            <ChecklistTaskList Title="İK görevleri" EmptyText="Açık İK görevi yok." Query="responsibleRole=hr&status=open&sort=dueDate" ShowEmployee="true" />
+            <ChecklistTaskList Title="@Texts.Get("hr.my-tasks.hr")" EmptyText="@Texts.Get("hr.my-tasks.hr-empty")" Query="responsibleRole=hr&status=open&sort=dueDate" ShowEmployee="true" />
         }
     }
 </AuthGate>

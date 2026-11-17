@@ -17,49 +17,21 @@ public partial class ApiModuleFolderRulesTests
 {
     private const string ModulesPrefix = "Modulix.Modules.";
 
-    /// <summary>Adı modül projesiyle aynı olmayan modül klasörleri (klasör → sahibi olacak modül projesi).</summary>
-    private static readonly Dictionary<string, string> FoldersOwnedByAnotherName = new()
-    {
-        // Gümrük (GTİP, rejim profili) Warehouse modülüne taşınacak (ADR-0046 karar 3, Dilim 7).
-        ["Customs"] = "Modulix.Modules.Warehouse",
-    };
+    /// <summary>
+    /// Adı modül projesiyle aynı olmayan modül klasörleri (klasör → sahibi olacak modül projesi). Gümrük (<c>Customs</c>) Warehouse modülüne
+    /// taşındı (ADR-0046 Dilim 7); bugün böyle bir klasör yok.
+    /// </summary>
+    private static readonly Dictionary<string, string> FoldersOwnedByAnotherName = new();
 
     /// <summary>Modüle taşınınca <c>Modulix.Core.Hosting</c>'e gidecek Api klasörleri; modül klasörü bunlara başvurabilir.</summary>
     private static readonly string[] HostingFolders = ["Access", "Records"];
 
     /// <summary>
     /// Modül klasörlerinin bugünkü host içi başvuruları (14 Kasım 2026 envanteri). Klasör modüle taşınmadan önce
-    /// bunlar temizlenir (ADR-0046 bölüm 4). Bu listeye yeni satır eklenmez; temizlenen satır silinir.
+    /// bunlar temizlenir (ADR-0046 bölüm 4). Bu listeye yeni satır eklenmez; temizlenen satır silinir. Son satır (Customs) Dilim 7'de
+    /// kapandı; liste boştur ve boş kalır.
     /// </summary>
-    private static readonly Dictionary<string, string[]> PendingCleanup = new()
-    {
-        ["Contracts"] =
-        [
-            "Modulix.Core.Events",
-            "Modulix.Core.Lookups",
-            "Modulix.Core.Modules",
-            "Modulix.Core.Platform",
-            "Modulix.Infrastructure",
-        ],
-        ["Crm"] =
-        [
-            "Modulix.Api.Users",
-            "Modulix.Core.Events",
-            "Modulix.Core.Modules",
-            "Modulix.Core.Platform",
-            "Modulix.Core.Records",
-            "Modulix.Core.Reporting",
-            "Modulix.Core.Settings",
-            "Modulix.Infrastructure",
-        ],
-        ["Customs"] =
-        [
-            "Modulix.Api.Imports",
-            "Modulix.Api.Platform",
-            "Modulix.Api.Users",
-            "Modulix.Core.Customs",
-        ],
-    };
+    private static readonly Dictionary<string, string[]> PendingCleanup = new();
 
     [Fact]
     public void Module_folder_does_not_reference_another_modules_main_project()

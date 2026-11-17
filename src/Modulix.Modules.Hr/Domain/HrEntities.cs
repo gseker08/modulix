@@ -239,21 +239,6 @@ public sealed class LeaveRequest : HrEntity
 }
 
 /// <summary>
-/// Eski resmî tatil tablosu (ADR-0042 dilim 2). Liste Core'a taşındı (ADR-0049 dilim 6a, <c>core.Holidays</c>): satırlar taşıma migration'ında
-/// kopyalandı, artık okunmaz ve yazılmaz. Tablo geriye uyumluluk için (kesintisiz dağıtım) bir sonraki sürüme kadar durur, sonra kaldırılır.
-/// </summary>
-public sealed class Holiday : HrEntity
-{
-    public const int NameMaxLength = 150;
-
-    public DateOnly Date { get; internal set; }
-
-    public string Name { get; internal set; } = string.Empty;
-
-    public bool HalfDay { get; internal set; }
-}
-
-/// <summary>
 /// Masraf beyanı (ADR-0042 dilim 3): çalışanın bir dönemdeki harcamalarını topladığı belge; tutarlar satırlardadır, toplam sunucuda tutulur.
 /// Durum yalnızca komutla değişir: taslak → onaya gönderildi → onaylandı → ödendi; onaya gönderilen beyan düzeltme için taslağa iade edilebilir,
 /// reddedilebilir; taslak ve onay bekleyen beyan iptal edilebilir. Onaylayan, gönderim anındaki yöneticinin kullanıcısıdır ve değişmez (M4.2).

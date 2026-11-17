@@ -3,8 +3,8 @@
    İndirme her zaman "attachment" olarak sunulur (tarayıcıda çalıştırılmaz). Tür, boyut ve çift yükleme kuralları sunucudadır. *@
 @inject ApiClient Api
 
-<section class="settings-group" aria-label="@Title">
-    <h3>@Title</h3>
+<section class="settings-group" aria-label="@TitleText">
+    <h3>@TitleText</h3>
 
     @if (message is not null)
     {
@@ -17,28 +17,28 @@
     }
     else if (files.Count == 0)
     {
-        <p class="text-muted" role="status">@EmptyText</p>
+        <EmptyState Compact="true" Title="@(EmptyText ?? Texts.Get("files.empty"))" />
     }
     else
     {
         <table class="table record-table">
-            <caption class="visually-hidden">@Title</caption>
+            <caption class="visually-hidden">@TitleText</caption>
             <thead>
-                <tr><th scope="col">Dosya</th><th scope="col">Boyut</th><th scope="col">Eklenme</th><th scope="col"></th></tr>
+                <tr><th scope="col">@Texts.Get("files.col.file")</th><th scope="col">@Texts.Get("files.col.size")</th><th scope="col">@Texts.Get("files.col.added")</th><th scope="col"></th></tr>
             </thead>
             <tbody>
                 @foreach (var file in files)
                 {
                     <tr>
-                        <td data-label="Dosya" class="primary">
+                        <td data-label="@Texts.Get("files.col.file")" class="primary">
                             <a href="@($"/api/files/{file.Id}/content")" download="@file.FileName"><AppIcon Name="file-text" Size="16" /> @file.FileName</a>
                         </td>
-                        <td data-label="Boyut">@CredentialLabels.Size(file.SizeBytes)</td>
-                        <td data-label="Eklenme">@file.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        <td data-label="@Texts.Get("files.col.size")">@CredentialLabels.Size(file.SizeBytes)</td>
+                        <td data-label="@Texts.Get("files.col.added")">@file.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
                         <td class="actions">
                             @if (CanWrite)
                             {
-                                <ConfirmAction Disabled="@busy" OnConfirm="() => DeleteAsync(file)">Sil</ConfirmAction>
+                                <ConfirmAction Disabled="@busy" OnConfirm="() => DeleteAsync(file)">@Texts.Get("common.delete")</ConfirmAction>
                             }
                         </td>
                     </tr>
@@ -60,10 +60,10 @@
                 {
                     <AppIcon Name="plus" Size="16" />
                 }
-                Dosya ekle
+                @Texts.Get("files.add")
             </label>
             <InputFile id="@inputId" class="visually-hidden" accept="@Accept" OnChange="UploadAsync" disabled="@busy" />
-            <small class="text-muted">PDF, görüntü ya da Office belgesi; en fazla 10 MB.</small>
+            <small class="text-muted">@Texts.Get("files.help")</small>
         </div>
     }
 </section>
@@ -84,9 +84,11 @@
 
     [Parameter] public bool CanWrite { get; set; }
 
-    [Parameter] public string Title { get; set; } = "Dosyalar";
+    [Parameter] public string? Title { get; set; }
 
-    [Parameter] public string EmptyText { get; set; } = "Henüz dosya eklenmedi.";
+    [Parameter] public string? EmptyText { get; set; }
+
+    private string TitleText => Title ?? Texts.Get("files.title");
 
     /// <summary>Dosya sayısı değişince (yükleme, silme) çağrılır.</summary>
     [Parameter] public EventCallback<int> CountChanged { get; set; }
@@ -115,7 +117,7 @@
         var file = e.File;
         if (file.Size > MaxBytes)
         {
-            message = "Dosya en fazla 10 MB olabilir.";
+            message = Texts.Get("files.too-large");
             return;
         }
 

@@ -242,13 +242,13 @@ public class ContractTemplateTests(ModulixApiFactory factory) : IClassFixture<Mo
                 new Modulix.Modules.Contracts.Lifecycle.SignatureBlock([new("Müşteri adına", "Çağlayan"), new("Hizmet veren adına", "Modül")]),
             ]);
 
-        var pdf = Modulix.Api.Contracts.ContractPdf.Render(model);
+        var pdf = Modulix.Modules.Contracts.Endpoints.ContractPdf.Render(model);
         Assert.StartsWith("%PDF-", System.Text.Encoding.ASCII.GetString(pdf, 0, 5));
-        var images = Modulix.Api.Contracts.ContractPdf.Build(model).GenerateImages().ToList();
+        var images = Modulix.Modules.Contracts.Endpoints.ContractPdf.Build(model).GenerateImages().ToList();
         Assert.True(images.Count >= 4, $"150 satırlık tablo ve sayfa sonu en az 4 sayfa üretmeli, üretilen: {images.Count}.");
 
         // Aynı girdiden iki kez üretim aynı sayfa sayısını verir (üst bilgi sabit).
-        Assert.Equal(images.Count, Modulix.Api.Contracts.ContractPdf.Build(model).GenerateImages().Count());
+        Assert.Equal(images.Count, Modulix.Modules.Contracts.Endpoints.ContractPdf.Build(model).GenerateImages().Count());
     }
 
     private static async Task<ContractDto> RunAsync(HttpClient client, Guid id, string action, long version)

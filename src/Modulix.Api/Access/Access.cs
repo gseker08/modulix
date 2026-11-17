@@ -4,6 +4,7 @@ using Modulix.Api.Users;
 using Modulix.Core.Authorization;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Localization;
+using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Platform;
@@ -82,6 +83,7 @@ public static class AccessEndpoints
 
         var permissions = (await access.GetPermissionsAsync(ct)).Order(StringComparer.Ordinal).ToList();
         var myRoles = await roles.GetMembershipRolesAsync(tenant.Current!.MembershipId, ct) ?? [];
+        var isAdministrator = myRoles.Any(r => r.IsSystem);
 
         // Erişilebilir işletici şirketler ve aktif olanı (ADR-0008): şirket seçici ve kapsam göstergesi bunu kullanır.
         var companyAccess = await directory.GetAccessibleCompaniesAsync(tenant.Current!.MembershipId, ct);
@@ -90,11 +92,12 @@ public static class AccessEndpoints
         return Results.Ok(new MyAccessResponse(
             enabled,
             permissions,
-            myRoles.Any(r => r.IsSystem),
+            isAdministrator,
             (Shared.Access.RecordScope)await access.GetScopeAsync(ct),
             companies,
             company.Current?.ActiveCompanyId,
-            await LicenseWarningsAsync(catalog, license, tenant.Current!.TenantId, time.GetUtcNow(), ct)));
+            await LicenseWarningsAsync(catalog, license, tenant.Current!.TenantId, time.GetUtcNow(), ct),
+            isAdministrator ? MissingDependencies(catalog, enabled) : []));
     }
 
     /// <summary>Uyarı penceresi: bitişe bu kadar gün kala yönetici uyarılır; bitmiş haklar (ek süre, salt okunur) her zaman listelenir.</summary>
@@ -117,22 +120,34 @@ public static class AccessEndpoints
         return warnings;
     }
 
+    // ADR-0051: yalnızca bilgi; hak platformdadır. Kural tek yerdedir (ModuleDependencyRules).
+    private static List<TenantMissingDependencyDto> MissingDependencies(ModuleCatalog catalog, IReadOnlyList<string> enabled) =>
+        [.. ModuleDependencyRules.Missing(catalog, enabled).Select(m => new TenantMissingDependencyDto(
+            m.ModuleKey,
+            catalog.Find(m.ModuleKey)?.DisplayName ?? m.ModuleKey,
+            m.DependencyKey,
+            catalog.Find(m.DependencyKey)?.DisplayName ?? m.DependencyKey,
+            m.Kind == ModuleDependencyKind.Required,
+            m.Reason))];
+
     private static async Task<IResult> ListRolesAsync(IRoleService roles, CancellationToken ct) =>
         Results.Ok((await roles.ListAsync(ct)).Select(ToDto).ToList());
 
-    private static async Task<IResult> ListAssignablePermissionsAsync(ModuleCatalog catalog, ICurrentAccess access, CancellationToken ct) =>
-        Results.Ok(await AssignablePermissionsAsync(catalog, access, ct));
+    private static async Task<IResult> ListAssignablePermissionsAsync(
+        ModuleCatalog catalog, ICurrentAccess access, IRequestLanguage language, ITextCatalog texts, CancellationToken ct) =>
+        Results.Ok(await AssignablePermissionsAsync(catalog, access, language, texts, ct));
 
     /// <summary>Rollere atanabilecek izinler: yalnızca tenant için açık modüllerinkiler.</summary>
-    internal static async Task<List<PermissionDto>> AssignablePermissionsAsync(ModuleCatalog catalog, ICurrentAccess access, CancellationToken ct)
+    internal static async Task<List<PermissionDto>> AssignablePermissionsAsync(
+        ModuleCatalog catalog, ICurrentAccess access, IRequestLanguage language, ITextCatalog texts, CancellationToken ct)
     {
+        var bundle = await MetadataLabels.BundleAsync(language, texts, ct);
         var permissions = new List<PermissionDto>();
         foreach (var module in catalog.Modules)
         {
             if (await access.IsModuleEnabledAsync(module.Key, ct))
             {
-                permissions.AddRange(module.Permissions.Select(p =>
-                    new PermissionDto(p.Key, p.DisplayName, module.Key, module.DisplayName, p.ResourceName ?? AccessKeys.ResourceOf(p.Key))));
+                permissions.AddRange(module.Permissions.Select(p => MetadataLabels.Permission(p, module, bundle)));
             }
         }
 
@@ -140,18 +155,24 @@ public static class AccessEndpoints
     }
 
     /// <summary>Kapsamı ayarlanabilen kayıt türleri ve platform tavanları (ADR-0030 K9); rol ekranı seçenekleri buna göre kapatır.</summary>
-    private static async Task<IResult> ListScopeTypesAsync(IRoleService roles, CancellationToken ct) =>
-        Results.Ok((await roles.GetScopeTypesAsync(ct))
-            .Select(t => new RoleScopeTypeDto(t.EntityKey, t.ModuleKey, t.Label, (Shared.Access.RecordScope?)t.MaxScope))
+    private static async Task<IResult> ListScopeTypesAsync(
+        IRoleService roles, IRequestLanguage language, ITextCatalog texts, CancellationToken ct)
+    {
+        var bundle = await MetadataLabels.BundleAsync(language, texts, ct);
+        return Results.Ok((await roles.GetScopeTypesAsync(ct))
+            .Select(t => new RoleScopeTypeDto(t.EntityKey, t.ModuleKey, MetadataLabels.Entity(t.EntityKey, t.Label, bundle), (Shared.Access.RecordScope?)t.MaxScope))
             .ToList());
+    }
 
     /// <summary>Hazır roller (ADR-0005): açık modüllerin şablonları ve "Salt okur".</summary>
     private static async Task<IResult> ListTemplatesAsync(
-        ModuleCatalog catalog, IModuleEntitlements entitlements, ITenantContextAccessor tenant, CancellationToken ct)
+        ModuleCatalog catalog, IModuleEntitlements entitlements, ITenantContextAccessor tenant, IRequestLanguage language, ITextCatalog texts,
+        CancellationToken ct)
     {
         var enabled = await entitlements.GetEnabledAsync(tenant.Current!.TenantId, ct);
+        var bundle = await MetadataLabels.BundleAsync(language, texts, ct);
         return Results.Ok(catalog.TemplatesFor(enabled)
-            .Select(t => new RoleTemplateDto(t.Key, t.Name, t.Description, t.Permissions, (Shared.Access.RecordScope)t.Scope))
+            .Select(t => MetadataLabels.Template(t, bundle) with { Scope = (Shared.Access.RecordScope)t.Scope })
             .ToList());
     }
 

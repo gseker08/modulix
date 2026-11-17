@@ -56,8 +56,8 @@ public sealed record PublicQuoteDecisionInfo(string Decision, string SignerName,
 
 /// <summary>
 /// Müşteri sayfasının durumu. <c>State</c>: open (karar verilebilir), accepted, rejected, expired, superseded, cancelled, link-expired,
-/// link-revoked. <see cref="Content"/> yalnızca açık ve sonuçlanmış tekliflerde dolu gelir.
+/// link-revoked. <see cref="Content"/> yalnızca açık ve sonuçlanmış tekliflerde dolu gelir. <c>Language</c> müşterinin dilidir (teklifin kişisi → firması → tenant varsayılanı; ADR-0034 §6): iletiler ve kabul beyanı bu dildedir, sayfa da bu dilin sözlüğünü yükler.
 /// </summary>
 public sealed record PublicQuoteView(
     string State, bool CanDecide, string? Message, string QuoteNumber, int RevisionNo, string DocumentSha256, DateTimeOffset LinkExpiresAt,
-    PublicQuoteContent? Content, string? AcceptanceStatement, PublicQuoteDecisionInfo? Decision);
+    PublicQuoteContent? Content, string? AcceptanceStatement, PublicQuoteDecisionInfo? Decision, string Language = "tr");

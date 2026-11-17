@@ -119,6 +119,9 @@ public sealed class Party : SharedEntity
 
     /// <summary>Tarafın aldığı/ihtiyaç duyduğu hizmetler: faaliyet ağacından düğüm kodları, virgülle. Rolden bağımsızdır.</summary>
     public string? ServiceNeeds { get; set; }
+
+    /// <summary>Yazışma dili (<see cref="Localization.CorrespondenceLanguages"/>); boşsa tenant varsayılanı. Kişinin dili yoksa firmanınki kullanılır.</summary>
+    public string? PreferredLanguage { get; set; }
 }
 
 public enum PartyRelationshipStatus
@@ -185,6 +188,9 @@ public sealed class Person : SharedEntity
 
     /// <summary>Çalıştığı taraf; aynı tenant'ta olmak zorundadır.</summary>
     public Guid? PartyId { get; set; }
+
+    /// <summary>Yazışma dili (<see cref="Localization.CorrespondenceLanguages"/>); boşsa çalıştığı firmanın dili, o da yoksa tenant varsayılanı.</summary>
+    public string? PreferredLanguage { get; set; }
 }
 
 /// <summary>

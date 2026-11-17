@@ -8,13 +8,13 @@
 
 @* Müşteri adayı puan kuralları (ADR-0050, dilim 1). Ayar ekranı; sekmeli form kuralının dışındadır, düzenleme formu FormTabs ile çizilir.
    Kurallar genel kayıt uçlarındadır (/api/records/crm.lead-score-rule); okumak ve yazmak crm.lead-scoring.manage ister. Puan, aday
-   kaydedilirken sunucuda hesaplanır; bu ekran yalnızca kuralları yönetir. *@
+   kaydedilirken sunucuda hesaplanır, kural değişince zamanlanmış iş (crm.lead-scoring, dilim 1b) açık adayları yeniden puanlar. *@
 <AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.LeadScoringManage">
     <PageHeader Title="Müşteri adayı puanı" Icon="trending-up"
-                Subtitle="Koşulu sağlayan her etkin kuralın puanı toplanır; toplam 0 ile 100 arasında tutulur. Puan, müşteri adayı kaydedildiğinde hesaplanır." />
+                Subtitle="Koşulu sağlayan her etkin kuralın puanı toplanır; toplam 0 ile 100 arasında tutulur. Puan, müşteri adayı kaydedildiğinde ve adaya bağlı aktivite değiştiğinde hesaplanır; hareketsizlik puanı her gün kendiliğinden güncellenir." />
 
     <p class="text-muted">
-        Kural değişikliği mevcut müşteri adaylarına, aday bir sonraki kaydedilişinde yansır. Tahmini bütçe gizli alan olduğu için puanlanamaz.
+        Kural değişikliği açık müşteri adaylarına birkaç dakika içinde arka planda yansır; elenmiş ve dönüştürülmüş adayların puanı değişmez. Tahmini bütçe gizli alan olduğu için puanlanamaz.
     </p>
 
     @if (message is not null)
@@ -58,9 +58,18 @@
                     {
                         <div>
                             <label class="form-label" for="s-value">Değer *</label>
-                            <input id="s-value" class="form-control" maxlength="200" @bind="form.Value" />
-                            <FieldError Field="value" Errors="errors" />
-                            <div class="form-text">Kaynak, sektör, ülke ve öncelikte kayıttaki kodu yazın (ör. ülke için TR). Karşılaştırma büyük/küçük harfe duyarlı değildir.</div>
+                            @if (form.Operator == LeadScoreCatalog.AtLeast)
+                            {
+                                <input id="s-value" class="form-control" type="number" min="1" max="1000" step="1" inputmode="numeric" @bind="form.Value" />
+                                <FieldError Field="value" Errors="errors" />
+                                <div class="form-text">Sayı bu değere ulaşınca ya da geçince puan verilir. Temas ve toplantı yalnızca adaya bağlı, tamamlanmış ve gizli olmayan aktivitelerden sayılır; tekrar başvuru aynı e-posta ya da telefonla gelen diğer müşteri adaylarıdır. Hareketsiz gün sayısı son gerçekleşen temastan (yoksa adayın oluşturulmasından) bu yana geçen gündür; zamanla azalma için bu alana eksi puan verin.</div>
+                            }
+                            else
+                            {
+                                <input id="s-value" class="form-control" maxlength="200" @bind="form.Value" />
+                                <FieldError Field="value" Errors="errors" />
+                                <div class="form-text">Kaynak, sektör, ülke ve öncelikte kayıttaki kodu yazın (ör. ülke için TR). Karşılaştırma büyük/küçük harfe duyarlı değildir.</div>
+                            }
                         </div>
                     }
                     <div>
@@ -141,7 +150,7 @@
                         <td class="row-menu-cell">
                             <RowMenu Label="@($"{WarehouseLabels.Text(rule, "name")} eylemleri")">
                                 <button type="button" class="dropdown-item" role="menuitem" @onclick="() => Edit(rule)">Düzenle</button>
-                                <RowMenuDelete Question="Puan kuralı silinsin mi? Mevcut adayların puanı, aday bir sonraki kaydedilişinde güncellenir." OnConfirm="() => DeleteAsync(rule)" />
+                                <RowMenuDelete Question="Puan kuralı silinsin mi? Açık adayların puanı birkaç dakika içinde güncellenir." OnConfirm="() => DeleteAsync(rule)" />
                             </RowMenu>
                         </td>
                     </tr>
@@ -188,17 +197,10 @@
         message = result.Error;
     }
 
-    private static string Condition(RecordResponse rule)
-    {
-        var field = WarehouseLabels.Text(rule, "field");
-        var op = WarehouseLabels.Text(rule, "operator");
-        var label = LeadScoreCatalog.Find(field)?.Label ?? field;
-        return LeadScoreCatalog.NeedsValue(op)
-            ? $"{label} {LeadScoreCatalog.OperatorLabel(op)} \"{WarehouseLabels.Text(rule, "value")}\""
-            : $"{label} {LeadScoreCatalog.OperatorLabel(op)}";
-    }
+    private static string Condition(RecordResponse rule) =>
+        LeadScoreCatalog.ConditionText(WarehouseLabels.Text(rule, "field"), WarehouseLabels.Text(rule, "operator"), WarehouseLabels.Text(rule, "value"));
 
-    private static string PointsText(int points) => points > 0 ? "+" + points : points.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    private static string PointsText(int points) => LeadScoreCatalog.PointsText(points);
 
     private void NewRule()
     {

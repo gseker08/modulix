@@ -91,6 +91,7 @@ public static class CrmEntityKeys
     public const string OpportunityCompetitor = "crm.opportunity-competitor";
     public const string Activity = "crm.activity";
     public const string Lead = "crm.lead";
+    public const string Quote = "crm.quote";
 }
 
 /// <summary>CRM'in düzenlenebilir seçim listeleri (Y9b) ve kategorileri; sunucudaki CrmModule ile aynıdır.</summary>
@@ -175,7 +176,8 @@ public sealed record CompanyDto(
     string? Kind = null,
     string? TaxOffice = null,
     string? IndustryName = null,
-    string? LegacyIndustry = null);
+    string? LegacyIndustry = null,
+    string? PreferredLanguage = null);
 
 /// <summary>
 /// Sorumlu boş bırakılırsa kaydı oluşturan kullanıcı atanır. Liste alanları (durum, aşama, tip) boş bırakılırsa yeni
@@ -200,7 +202,8 @@ public sealed record SaveCompanyRequest(
     JsonObject? Custom = null,
     Guid? PartyId = null,
     string? Kind = null,
-    string? TaxOffice = null);
+    string? TaxOffice = null,
+    string? PreferredLanguage = null);
 
 public sealed record ContactDto(
     Guid Id,
@@ -214,8 +217,10 @@ public sealed record ContactDto(
     string? Notes,
     JsonObject? Custom = null,
     Guid? PersonId = null,
-    Guid? OwnerId = null);
+    Guid? OwnerId = null,
+    string? PreferredLanguage = null);
 
+/// <summary>Yazışma dili (<see cref="PreferredLanguage"/>) boşsa kişinin firmasının dili, o da yoksa tenant varsayılanı kullanılır (ADR-0034 §6).</summary>
 public sealed record SaveContactRequest(
     string FirstName,
     string LastName,
@@ -227,7 +232,8 @@ public sealed record SaveContactRequest(
     long? Version = null,
     JsonObject? Custom = null,
     Guid? PersonId = null,
-    Guid? OwnerId = null);
+    Guid? OwnerId = null,
+    string? PreferredLanguage = null);
 
 /// <summary>Fırsat aşamasının hazır değerleri. Kapalı aşamayı kategoriden anlayın (<see cref="CrmLists.StageCategories"/>).</summary>
 public static class OpportunityStage
@@ -462,6 +468,35 @@ public sealed record CompanySummaryDto(
     IReadOnlyList<CurrencyTotal>? WonTotals,
     int? OpenActivities,
     int? OverdueActivities);
+
+/// <summary>
+/// Müşteri zaman çizelgesindeki satır (CRM eksik süreçler E9). <see cref="EntityKey"/> kaydın türüdür (ör. <c>crm.activity</c>); <see cref="Status"/>
+/// ve <see cref="Type"/> o türün teknik kodlarıdır, görünen adı arayüz verir. <see cref="Reference"/> belge numarası gibi kısa tanıtıcıdır.
+/// </summary>
+public sealed record CustomerTimelineItemDto(
+    string EntityKey,
+    Guid RecordId,
+    DateTimeOffset OccurredAt,
+    string Title,
+    string? Status,
+    string? Type,
+    Guid? OwnerId,
+    string? Reference);
+
+/// <summary>
+/// Müşteri zaman çizelgesi sayfası: en yeniden eskiye satırlar. <see cref="NextBefore"/> doluysa daha eski satır vardır ve sonraki sayfa
+/// <c>?before=</c> ile istenir. <see cref="Sources"/> çağıranın okuyabildiği kaynakların anahtarlarıdır; izni ya da lisansı olmayan kaynak
+/// listede yoktur ve satırı gelmez (erişim olmayan veri "kayıt yok" gibi gösterilmez).
+/// </summary>
+public sealed record CustomerTimelineDto(
+    IReadOnlyList<CustomerTimelineItemDto> Items,
+    DateTimeOffset? NextBefore,
+    IReadOnlyList<string> Sources)
+{
+    public const int DefaultTake = 20;
+
+    public const int MaxTake = 100;
+}
 
 /// <summary>
 /// Firma–kişi ilişki rolleri (ADR-0011). Kişinin müşteri firmadaki iş rolüdür; uygulamadaki güvenlik rolleriyle ilgisi yoktur.

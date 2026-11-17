@@ -347,6 +347,7 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
         SharedField.CodeList<Party>("relationshipRoles", p => p.RelationshipRoles, (p, v) => p.RelationshipRoles = v),
         SharedField.CodeList<Party>("customerSectors", p => p.CustomerSectors, (p, v) => p.CustomerSectors = v),
         SharedField.CodeList<Party>("serviceNeeds", p => p.ServiceNeeds, (p, v) => p.ServiceNeeds = v),
+        SharedField.Language<Party>("preferredLanguage", p => p.PreferredLanguage, (p, v) => p.PreferredLanguage = v),
     ];
 
     /// <summary>"taxNumber": aynı numaralı taraf (oluşturmadan önce mevcut kaydı bulmak için).</summary>
@@ -480,6 +481,7 @@ internal sealed class PersonRecordStore(ModulixDbContext db, ModuleCatalog catal
         SharedField.Text<Person>("phone", Person.PhoneMaxLength, p => p.Phone, (p, v) => p.Phone = v),
         SharedField.Text<Person>("title", Person.TitleMaxLength, p => p.Title, (p, v) => p.Title = v),
         SharedField.PartyReference<Person>("partyId", p => p.PartyId, (p, v) => p.PartyId = v),
+        SharedField.Language<Person>("preferredLanguage", p => p.PreferredLanguage, (p, v) => p.PreferredLanguage = v),
     ];
 
     protected override IReadOnlyDictionary<string, Func<IQueryable<Person>, string, IQueryable<Person>?>> Filters { get; } =
@@ -697,6 +699,22 @@ internal static class SharedField
                     : (null, "Organization veya Individual olmalıdır."),
             e => get(e).ToString(),
             (e, v) => set(e, v is PartyKind kind ? kind : PartyKind.Organization));
+
+    /// <summary>Yazışma dili (<see cref="CorrespondenceLanguages"/>): desteklenen dil kodu; boş değer temizler (tenant varsayılanı kullanılır).</summary>
+    public static SharedField<T> Language<T>(string name, Func<T, string?> get, Action<T, string?> set) =>
+        new(name, required: false,
+            node =>
+            {
+                var text = ParseText(node, 20);
+                if (text.Error is not null || text.Value is not string { Length: > 0 } value)
+                {
+                    return (null, text.Error);
+                }
+
+                return CorrespondenceLanguages.Normalize(value) is { } code ? (code, null) : (null, ServerMessages.Validation.InvalidChoice);
+            },
+            e => get(e),
+            (e, v) => set(e, (string?)v));
 
     /// <summary>Aynı tenant'taki bir taraf.</summary>
     public static SharedField<T> PartyReference<T>(string name, Func<T, Guid?> get, Action<T, Guid?> set, bool required = false) =>

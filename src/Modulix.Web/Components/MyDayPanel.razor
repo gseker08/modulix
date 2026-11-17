@@ -8,7 +8,7 @@
 {
     <div class="alert alert-danger" role="alert">
         @error
-        <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadAsync">Tekrar dene</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadAsync">@Texts.Get("crm.sales.retry")</button>
     </div>
 }
 
@@ -16,8 +16,8 @@
     <div class="dash-day-col">
         <section class="dash-card" aria-labelledby="day-steps">
             <div class="dash-card-head">
-                <h2 id="day-steps" class="dash-card-title"><span class="dash-kpi-icon" aria-hidden="true"><AppIcon Name="zap" Size="18" /></span>Sıradaki en iyi adımlar</h2>
-                <span class="badge tag" title="@RulesHint">Otomatik öneri</span>
+                <h2 id="day-steps" class="dash-card-title"><span class="dash-kpi-icon" aria-hidden="true"><AppIcon Name="zap" Size="18" /></span>@Texts.Get("crm.my-day.steps")</h2>
+                <span class="badge tag" title="@RulesHint">@Texts.Get("crm.my-day.auto")</span>
             </div>
             @if (day is null)
             {
@@ -25,7 +25,7 @@
             }
             else if (day.Suggestions.Count == 0)
             {
-                <p class="text-muted mb-0">Şu an öneri yok: bekleyen aday, gecikmiş fırsat ya da yanıtsız teklif görünmüyor.</p>
+                <EmptyState Compact="true" Title="@Texts.Get("crm.my-day.steps-empty")" />
             }
             else
             {
@@ -59,9 +59,9 @@
             var amounts = t.AmountsVisible;
             var progress = (amounts ? t.AmountTarget : t.CountTarget)?.Progress;
             var tempo = SalesLabels.PeriodElapsedPercent(t.PeriodStart, t.PeriodEnd, t.Today);
-            <section class="dash-hero dash-hero-solo dash-hero-compact" aria-label="Kişisel hedef">
+            <section class="dash-hero dash-hero-solo dash-hero-compact" aria-label="@Texts.Get("crm.my-day.target")">
                 <div>
-                    <p class="dash-hero-kicker">Bu çeyrekteki hedefim · @t.PeriodLabel</p>
+                    <p class="dash-hero-kicker">@Texts.Get("crm.my-day.target-kicker", t.PeriodLabel)</p>
                     <div class="dash-hero-headline">
                         <span class="dash-hero-value">@(amounts ? SalesLabels.Compact(t.Realized.Amount, t.Currency) : SalesLabels.Count(t.WonCount))</span>
                         @if (progress is not null)
@@ -72,19 +72,19 @@
                     @if (progress is not null)
                     {
                         var share = Share(progress.Realized, progress);
-                        <GoalMeter Realized="share" Weighted="0m" Tempo="tempo" Label="@($"Hedefin {SalesLabels.Percent(Math.Round(share))} gerçekleşti")" />
+                        <GoalMeter Realized="share" Weighted="0m" Tempo="tempo" Label="@Texts.Get("crm.dashboard.meter", SalesLabels.Percent(Math.Round(share)))" />
                         <div class="dash-hero-legend dash-hero-split">
-                            <span>@SalesLabels.Percent(Math.Round(share)) gerçekleşti</span>
+                            <span>@Texts.Get("crm.my-day.realized", SalesLabels.Percent(Math.Round(share)))</span>
                             @if (tempo is { } pace)
                             {
                                 var gap = Math.Round(share - pace);
-                                <span>Tempo @SalesLabels.Percent(Math.Round(pace)) · @Math.Abs(gap).ToString("0", Regional.Numbers) puan @(gap < 0 ? "geride" : "önde")</span>
+                                <span>@Texts.Get(gap < 0 ? "crm.my-day.tempo-behind" : "crm.my-day.tempo-ahead", SalesLabels.Percent(Math.Round(pace)), Math.Abs(gap).ToString("0", Regional.Numbers))</span>
                             }
                         </div>
                     }
                     else
                     {
-                        <p class="dash-hero-note mb-0">Bu çeyrek için kişisel hedef tanımlı değil; gerçekleşen kazanılan fırsatlarınızdır.</p>
+                        <p class="dash-hero-note mb-0">@Texts.Get("crm.my-day.no-target")</p>
                     }
                 </div>
             </section>
@@ -94,12 +94,12 @@
         {
             <section class="dash-card" aria-labelledby="day-closing">
                 <div class="dash-card-head">
-                    <h2 id="day-closing" class="dash-card-title"><span class="dash-kpi-icon tone-warning" aria-hidden="true"><AppIcon Name="trending-up" Size="18" /></span>Bu ay kapanabilecekler</h2>
-                    <a href="crm/firsatlar">Fırsatlarım</a>
+                    <h2 id="day-closing" class="dash-card-title"><span class="dash-kpi-icon tone-warning" aria-hidden="true"><AppIcon Name="trending-up" Size="18" /></span>@Texts.Get("crm.my-day.closing")</h2>
+                    <a href="crm/firsatlar">@Texts.Get("crm.my-day.my-opportunities")</a>
                 </div>
                 @if (day.ClosingThisMonth.Count == 0)
                 {
-                    <EmptyState Compact="true" Title="Beklenen kapanışı bu ay olan açık fırsatınız yok." />
+                    <EmptyState Compact="true" Title="@Texts.Get("crm.my-day.closing-empty")" />
                 }
                 else
                 {
@@ -117,7 +117,7 @@
                                     </div>
                                     @if (item.Probability is { } probability)
                                     {
-                                        <div class="dash-closing-track" role="img" aria-label="@($"Olasılık {SalesLabels.Percent(probability)}")">
+                                        <div class="dash-closing-track" role="img" aria-label="@Texts.Get("crm.my-day.probability", SalesLabels.Percent(probability))">
                                             <i style="width:@Math.Clamp(probability, 0, 100).ToString(CultureInfo.InvariantCulture)%"></i>
                                         </div>
                                     }
@@ -131,19 +131,19 @@
         }
 
         <section class="dash-card" aria-labelledby="day-week">
-            <div class="dash-card-head"><h2 id="day-week">Bu hafta</h2></div>
+            <div class="dash-card-head"><h2 id="day-week">@Texts.Get("crm.act.kpi.week")</h2></div>
             <dl class="dash-week">
                 @if (Session.Can(CrmAccess.ActivitiesRead))
                 {
-                    <div><dd>@Number(weekDone)</dd><dt>Tamamlanan aktivite</dt></div>
+                    <div><dd>@Number(weekDone)</dd><dt>@Texts.Get("crm.my-day.week-activities")</dt></div>
                 }
                 @if (day?.QuotesAvailable != false)
                 {
-                    <div><dd>@Number(day?.QuotesPresentedThisWeek)</dd><dt>Sunulan teklif</dt></div>
+                    <div><dd>@Number(day?.QuotesPresentedThisWeek)</dd><dt>@Texts.Get("crm.my-day.week-quotes")</dt></div>
                 }
                 @if (day?.OpportunitiesAvailable != false)
                 {
-                    <div><dd>@Number(day?.WonThisWeek)</dd><dt>Kazanılan fırsat</dt></div>
+                    <div><dd>@Number(day?.WonThisWeek)</dd><dt>@Texts.Get("crm.dashboard.won")</dt></div>
                 }
             </dl>
         </section>
@@ -151,14 +151,14 @@
 </div>
 
 @* Aktivite ayrıntısı ve yeni aktivite, Aktiviteler ekranındaki çekmecelerle aynıdır. *@
-<Drawer Open="@(selected is not null && !editing)" Label="Aktivite detayı" OnClose="() => selected = null">
+<Drawer Open="@(selected is not null && !editing)" Label="@Texts.Get("crm.act.detail")" OnClose="() => selected = null">
     @if (selected is not null)
     {
         <ActivityActions Activity="selected" Lookups="Lookups" Changed="ChangedAsync" Closed="() => selected = null" EditRequested="Edit" />
     }
 </Drawer>
 
-<Drawer Open="editing" Label="@(editTarget is null ? "Yeni aktivite" : "Aktiviteyi düzenle")" OnClose="() => editing = false">
+<Drawer Open="editing" Label="@(editTarget is null ? Texts.Get("crm.activities.new") : Texts.Get("crm.activities.edit"))" OnClose="() => editing = false">
     <ActivityEditor Activity="editTarget" InitialDay="TodayDate" Lookups="Lookups" Saved="SavedAsync" Deleted="SavedAsync" Cancelled="() => editing = false" />
 </Drawer>
 
@@ -180,12 +180,24 @@
     private ActivityDto? editTarget;
     private bool editing;
 
-    private string RulesHint => day is null
-        ? "Öneriler kurallarla üretilir."
-        : "Öneriler kurallarla üretilir (yapay zekâ değil): teklifi kabul edilen açık fırsatlar, ilk teması bekleyen müşteri adayları, kapanış tarihi geçen fırsatlar"
-            + (day.QuoteReminderDays > 0 ? $", {day.QuoteReminderDays} gündür yanıtsız teklifler" : string.Empty)
-            + (day.StaleDays > 0 ? $" ve {day.StaleDays} gündür temas olmayan fırsatlar." : ".")
-            + " Süreler firma ayarlarından değiştirilir.";
+    private string RulesHint => day is null ? Texts.Get("crm.my-day.rules-short") : Texts.Get("crm.my-day.rules", RuleList(day)) + " " + Texts.Get("crm.my-day.rules-settings");
+
+    // Kural listesi: süresi tanımlı olan kurallar eklenir; son öğe "ve" ile bağlanır.
+    private static string RuleList(MyDayDto day)
+    {
+        List<string> rules = [Texts.Get("crm.my-day.rule.accepted"), Texts.Get("crm.my-day.rule.new-lead"), Texts.Get("crm.my-day.rule.overdue")];
+        if (day.QuoteReminderDays > 0)
+        {
+            rules.Add(Texts.Get("crm.my-day.rule.quotes", day.QuoteReminderDays));
+        }
+
+        if (day.StaleDays > 0)
+        {
+            rules.Add(Texts.Get("crm.my-day.rule.stale", day.StaleDays));
+        }
+
+        return string.Join(", ", rules.GetRange(0, rules.Count - 1)) + " " + Texts.Get("crm.my-day.and") + " " + rules[^1];
+    }
 
     private static DateOnly TodayDate => DateOnly.FromDateTime(Regional.Now.DateTime);
 
@@ -261,11 +273,11 @@
 
     private static string StepTitle(MyDaySuggestionDto step) => step.Kind switch
     {
-        MyDayKinds.AcceptedQuote => $"Teklif kabul edildi, fırsatı kazanıldı olarak kapatın: {step.Title}",
-        MyDayKinds.NewLead => $"Yeni müşteri adayına ilk temas: {step.Title}",
-        MyDayKinds.OverdueOpportunity => $"Kapanış tarihi geçti, müşteriyi arayın: {step.Title}",
-        MyDayKinds.QuoteFollowUp => $"Teklifi hatırlatın: {(string.IsNullOrWhiteSpace(step.Title) ? step.Number : step.Title)}",
-        _ => $"Yeniden temas kurun: {step.Title}",
+        MyDayKinds.AcceptedQuote => Texts.Get("crm.my-day.step.accepted-quote", step.Title),
+        MyDayKinds.NewLead => Texts.Get("crm.my-day.step.new-lead", step.Title),
+        MyDayKinds.OverdueOpportunity => Texts.Get("crm.my-day.step.overdue", step.Title),
+        MyDayKinds.QuoteFollowUp => Texts.Get("crm.my-day.step.quote-follow-up", string.IsNullOrWhiteSpace(step.Title) ? step.Number : step.Title),
+        _ => Texts.Get("crm.my-day.step.stale", step.Title),
     };
 
     private string StepDetail(MyDaySuggestionDto step)
@@ -274,7 +286,7 @@
         if (step.Kind == MyDayKinds.NewLead)
         {
             parts.Add(step.Subtitle);
-            parts.Add(step.Since is { } since ? $"{Ago(since)} geldi" : null);
+            parts.Add(step.Since is { } since ? Texts.Get("crm.my-day.arrived", Ago(since)) : null);
             return Join(parts);
         }
 
@@ -283,33 +295,33 @@
         parts.Add(step.Stage is { Length: > 0 } stage ? Lookups.Label(CrmLists.OpportunityStage, stage) : null);
         parts.Add(step.DaysWaiting is { } waiting
             ? step.Kind == MyDayKinds.AcceptedQuote
-                ? (waiting == 0 ? "teklif bugün kabul edildi" : $"teklif {waiting} gün önce kabul edildi")
-                : $"{waiting} gün önce sunuldu, yanıt yok"
+                ? (waiting == 0 ? Texts.Get("crm.my-day.accepted-today") : Texts.Get("crm.my-day.accepted-ago", waiting))
+                : Texts.Get("crm.my-day.presented-ago", waiting)
             : null);
-        parts.Add(step.DaysSinceContact is { } quiet ? $"{quiet} gündür temas yok" : null);
-        parts.Add(step.DaysOverdue is { } late ? (late == 0 ? "kapanış tarihi bugün" : $"kapanış tarihi {late} gün önce geçti") : null);
+        parts.Add(step.DaysSinceContact is { } quiet ? Texts.Get("crm.my-day.no-contact", quiet) : null);
+        parts.Add(step.DaysOverdue is { } late ? (late == 0 ? Texts.Get("crm.my-day.closes-today") : Texts.Get("crm.my-day.closed-ago", late)) : null);
         return Join(parts);
     }
 
     private static (string Icon, string Tone, string Cta, string Href) StepAction(MyDaySuggestionDto step) => step.Kind switch
     {
-        MyDayKinds.AcceptedQuote => ("check-circle", "success", "Fırsatı aç", $"crm/firsatlar/{step.RecordId}"),
-        MyDayKinds.NewLead => ("inbox", "teal", "Adayı aç", $"crm/leadler/{step.RecordId}"),
-        MyDayKinds.OverdueOpportunity => ("phone", "danger", "Fırsatı aç", $"crm/firsatlar/{step.RecordId}"),
-        MyDayKinds.QuoteFollowUp => ("file-text", "warning", "Teklifi aç", $"crm/teklifler/{step.RecordId}"),
-        _ => ("hourglass", "brand", "Fırsatı aç", $"crm/firsatlar/{step.RecordId}"),
+        MyDayKinds.AcceptedQuote => ("check-circle", "success", Texts.Get("crm.my-day.open-opportunity"), $"crm/firsatlar/{step.RecordId}"),
+        MyDayKinds.NewLead => ("inbox", "teal", Texts.Get("crm.my-day.open-lead"), $"crm/leadler/{step.RecordId}"),
+        MyDayKinds.OverdueOpportunity => ("phone", "danger", Texts.Get("crm.my-day.open-opportunity"), $"crm/firsatlar/{step.RecordId}"),
+        MyDayKinds.QuoteFollowUp => ("file-text", "warning", Texts.Get("crm.my-day.open-quote"), $"crm/teklifler/{step.RecordId}"),
+        _ => ("hourglass", "brand", Texts.Get("crm.my-day.open-opportunity"), $"crm/firsatlar/{step.RecordId}"),
     };
 
     private static string Ago(DateTimeOffset at)
     {
         var span = DateTimeOffset.UtcNow - at;
-        return span.TotalMinutes < 60 ? $"{Math.Max(1, (int)span.TotalMinutes)} dk önce"
-            : span.TotalHours < 24 ? $"{(int)span.TotalHours} saat önce"
-            : $"{(int)span.TotalDays} gün önce";
+        return span.TotalMinutes < 60 ? Texts.Get("crm.my-day.minutes-ago", Math.Max(1, (int)span.TotalMinutes))
+            : span.TotalHours < 24 ? Texts.Get("crm.my-day.hours-ago", (int)span.TotalHours)
+            : Texts.Get("crm.my-day.days-ago", (int)span.TotalDays);
     }
 
     private static string ClosingDetail(MyDayClosingDto item) =>
-        Join([item.Probability is { } p ? $"Olasılık {SalesLabels.Percent(p)}" : null, item.Overdue ? $"{CrmLabels.Date(item.ExpectedCloseDate)} · gecikti" : CrmLabels.Date(item.ExpectedCloseDate)]);
+        Join([item.Probability is { } p ? Texts.Get("crm.my-day.probability", SalesLabels.Percent(p)) : null, item.Overdue ? Texts.Get("crm.my-day.date-late", CrmLabels.Date(item.ExpectedCloseDate)) : CrmLabels.Date(item.ExpectedCloseDate)]);
 
     private static string Join(IEnumerable<string?> parts) => string.Join(" · ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
 }

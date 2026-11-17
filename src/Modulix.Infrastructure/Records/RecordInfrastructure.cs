@@ -160,7 +160,10 @@ internal sealed class AuditLogEntryConfiguration : IEntityTypeConfiguration<Audi
     public void Configure(EntityTypeBuilder<AuditLogEntry> builder)
     {
         builder.ToTable("AuditLog", DatabaseSchemas.Core);
-        builder.HasKey(a => a.Id);
+
+        // Aylık bölümleme (ADR-0052): bölümlenmiş tabloda birincil anahtar bölüm sütununu içermek zorundadır; kümelenmiş anahtar zaman sıralıdır.
+        // Bölüm şeması EF modelinde yoktur; dizinler migration'da şemaya hizalanır (AuditPartitionSql). Dizin eklenirse hizalamayı unutmayın.
+        builder.HasKey(a => new { a.OccurredAt, a.Id });
         builder.Property(a => a.Id).ValueGeneratedNever();
         builder.Property(a => a.EntityKey).HasMaxLength(AuditLogEntry.EntityKeyMaxLength).IsRequired();
         builder.Property(a => a.Changes).IsRequired();

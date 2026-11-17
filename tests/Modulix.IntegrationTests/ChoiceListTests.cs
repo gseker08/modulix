@@ -160,6 +160,43 @@ public class ChoiceListTests(ModulixApiFactory factory) : IClassFixture<ModulixA
             "/api/crm/activities", new SaveActivityRequest("Görev aç", ActivityType.Task))).StatusCode);
     }
 
+    [Fact]
+    public async Task List_lookup_type_and_handover_names_follow_the_readers_language_while_the_firms_own_value_names_stay()
+    {
+        var (tenant, admin, rep) = await SetUpAsync();
+        using var english = await LoginAsync(admin);
+        using var turkish = await LoginAsync(rep);
+        Assert.Equal(HttpStatusCode.OK, (await english.PutAsJsonAsync("/api/account/language", new Modulix.Shared.Account.UpdateLanguageRequest("en"))).StatusCode);
+
+        var stages = (await english.GetFromJsonAsync<List<ChoiceListDto>>("/api/customization/lists"))!.Single(l => l.Key == CrmLists.OpportunityStage);
+        Assert.Equal("Opportunity stages", stages.Name);
+        Assert.Equal("Won", stages.Values.Single(v => v.Key == "Won").Label);
+
+        // İngilizce yönetici yalnızca "Proposal" değerini yeniden adlandırıp öteki (İngilizce gösterilen) adlara dokunmadan kaydeder.
+        var saved = await english.PutAsJsonAsync($"/api/customization/lists/{CrmLists.OpportunityStage}", new SaveChoiceListRequest(
+            [.. stages.Values.Select(v => new SaveChoiceValue(v.Key, v.Key == "Proposal" ? "Teklif aşaması" : v.Label, v.Category, v.Active))]));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        Assert.Equal("Won", (await saved.Content.ReadFromJsonAsync<ChoiceListDto>())!.Values.Single(v => v.Key == "Won").Label);
+
+        // Türkçe kullanıcı: varsayılan adlar Türkçe kalmış, yeniden adlandırılan değer firmanın verdiği adla.
+        var turkishStages = (await turkish.GetFromJsonAsync<List<ChoiceListDto>>("/api/choice-lists"))!.Single(l => l.Key == CrmLists.OpportunityStage);
+        Assert.Equal("Kazanıldı", turkishStages.Values.Single(v => v.Key == "Won").Label);
+        Assert.Equal("Teklif aşaması", turkishStages.Values.Single(v => v.Key == "Proposal").Label);
+        var englishProposal = (await english.GetFromJsonAsync<List<ChoiceListDto>>("/api/choice-lists"))!
+            .Single(l => l.Key == CrmLists.OpportunityStage).Values.Single(v => v.Key == "Proposal");
+        Assert.Equal("Teklif aşaması", englishProposal.Label);
+
+        // Lookup başlığı ve açıklaması, özel alan eklenebilen tür adı, kayıt devri tür adı.
+        var lookup = (await english.GetFromJsonAsync<List<Modulix.Shared.Lookups.LookupDto>>("/api/lookups"))!.Single(l => l.Key == "crm.opportunity.company");
+        Assert.Equal("Company", lookup.Title);
+        Assert.Equal("Firma", (await turkish.GetFromJsonAsync<List<Modulix.Shared.Lookups.LookupDto>>("/api/lookups"))!.Single(l => l.Key == "crm.opportunity.company").Title);
+        var entities = (await english.GetFromJsonAsync<List<CustomizableEntityDto>>("/api/customization/entities"))!;
+        Assert.Contains(entities, e => e.Key == "crm.company" && e.Name == "Company");
+        var membership = await factory.GetMembershipIdAsync(rep.Id, tenant.Id);
+        var owned = (await english.GetFromJsonAsync<List<Modulix.Shared.Users.OwnedRecordsDto>>($"/api/users/{membership}/owned-records"))!;
+        Assert.Contains(owned, o => o.EntityKey == "crm.company" && o.Label == "company");
+    }
+
     private async Task<(Core.Platform.Tenant Tenant, ModulixUser Admin, ModulixUser Rep)> SetUpAsync()
     {
         var tenant = await factory.CreateTenantAsync();
