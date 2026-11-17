@@ -129,10 +129,16 @@ public sealed class ReportShare : ITenantEntity, ICompanyShared
     }
 
     public ReportShare(Guid reportId, Guid userId, Guid createdBy, DateTimeOffset now)
+        : this(reportId, ShareTargetKind.User, userId, createdBy, now)
+    {
+    }
+
+    public ReportShare(Guid reportId, ShareTargetKind kind, Guid targetId, Guid createdBy, DateTimeOffset now)
     {
         Id = Guid.CreateVersion7();
         ReportId = reportId;
-        UserId = userId;
+        TargetKind = kind;
+        UserId = targetId;
         CreatedBy = createdBy;
         CreatedAt = now;
     }
@@ -143,6 +149,13 @@ public sealed class ReportShare : ITenantEntity, ICompanyShared
 
     public Guid ReportId { get; private set; }
 
+    /// <summary>Hedefin türü; eski satırlar ve varsayılan <see cref="ShareTargetKind.User"/>.</summary>
+    public ShareTargetKind TargetKind { get; private set; }
+
+    /// <summary>
+    /// Hedefin kimliği: <see cref="TargetKind"/> kullanıcıysa kullanıcı, değilse rol/ekip/iş birimi kimliği. Sütun adı geriye uyum için
+    /// <c>UserId</c> kaldı (önceki sürümün kodu yeni şemada çalışmalı).
+    /// </summary>
     public Guid UserId { get; private set; }
 
     public Guid CreatedBy { get; private set; }

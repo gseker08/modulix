@@ -140,6 +140,8 @@
                         }
                         <FieldError Field="users" Errors="shareErrors" />
                     </div>
+                    <ShareGroupPicker Selected="shareGroups" />
+                    <FieldError Field="groups" Errors="shareErrors" />
                 }
 
                 @if (shareError is not null)
@@ -290,6 +292,7 @@
     private bool sharing;
     private string shareVisibility = "private";
     private readonly HashSet<Guid> shareUsers = [];
+    private readonly List<ShareGroupDto> shareGroups = [];
     private List<TenantMemberResponse>? members;
     private string? membersError;
     private string memberFilter = string.Empty;
@@ -365,6 +368,9 @@
             shareUsers.Add(user);
         }
 
+        shareGroups.Clear();
+        shareGroups.AddRange(detail.SharedWithGroups ?? []);
+
         if (members is null)
         {
             await LoadMembersAsync();
@@ -405,8 +411,9 @@
         busy = true;
         (shareError, shareErrors) = (null, null);
         var users = shareVisibility == "users" ? shareUsers.ToList() : [];
+        var groups = shareVisibility == "users" ? shareGroups.ToList() : [];
         var result = await Api.PutAsync<DashboardDetailDto>(
-            $"/api/dashboards/{detail.Summary.Id}/sharing", new ShareDashboardRequest(shareVisibility, users, detail.Summary.Version));
+            $"/api/dashboards/{detail.Summary.Id}/sharing", new ShareDashboardRequest(shareVisibility, users, detail.Summary.Version, groups));
         busy = false;
         if (result.Value is { } saved)
         {

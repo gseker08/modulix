@@ -60,8 +60,19 @@ public static class ReportEndpoints
                     new Dictionary<string, string[]> { ["visibility"] = ["Paylaşım private, users ya da tenant olmalı."] }, statusCode: StatusCodes.Status400BadRequest);
             }
 
-            return await center.ShareAsync(id, visibility, request.Users ?? [], request.ExpectedVersion, ct) is { } detail ? Results.Ok(ToDto(detail)) : NotFound();
+            if (!ShareGroupMapping.TryRead(request.Groups, out var groups))
+            {
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]> { ["groups"] = ["Paylaşım grubu rol, ekip ya da iş birimi olmalı."] }, statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            return await center.ShareAsync(id, visibility, request.Users ?? [], groups, request.ExpectedVersion, ct) is { } detail ? Results.Ok(ToDto(detail)) : NotFound();
         })).RequirePermission(CoreModule.Permissions.ShareReports);
+
+        // Paylaşım panelinin grup seçenekleri (rol, ekip, iş birimi); rol/ekip yönetimi izni gerekmeden yalnızca paylaşım izniyle okunur.
+        group.MapGet("/share-groups", async (IReportCenter center, CancellationToken ct) =>
+            Results.Ok(ShareGroupMapping.ToDto(await center.ListShareGroupsAsync(ct))))
+            .RequirePermission(CoreModule.Permissions.ShareReports);
 
         group.MapPut("/{id:guid}/favorite", async (Guid id, FavoriteReportRequest request, IReportCenter center, CancellationToken ct) =>
             await center.SetFavoriteAsync(id, request.Favorite, ct) is { } favorite ? Results.Ok(new { favorite }) : NotFound())
@@ -298,7 +309,7 @@ public static class ReportEndpoints
         s.Id, s.Name, s.Description, s.DatasetKey, s.DatasetName, Name(s.Visibility), s.OwnerUserId, s.OwnerName, s.IsOwner, s.IsFavorite,
         s.SharedWithCount, s.UpdatedAt, s.Version, Name(s.Health), s.HealthMessage);
 
-    private static ReportDetailDto ToDto(ReportDetail d) => new(ToDto(d.Summary), ToDto(d.Spec), d.DatasetVersion, d.SharedWith);
+    private static ReportDetailDto ToDto(ReportDetail d) => new(ToDto(d.Summary), ToDto(d.Spec), d.DatasetVersion, d.SharedWith, ShareGroupMapping.ToDto(d.SharedWithGroups));
 
     private static ReportIssueDto ToDto(ReportIssue i) => new(Name(i.Code), i.Field, i.Message, i.Blocking);
 

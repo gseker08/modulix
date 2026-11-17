@@ -119,11 +119,21 @@ public sealed record ReportSummaryDto(
 
 public sealed record ReportPageDto(IReadOnlyList<ReportSummaryDto> Items, int Page, int PageSize, int TotalCount);
 
-public sealed record ReportDetailDto(ReportSummaryDto Summary, ReportSpecDto Spec, int DatasetVersion, IReadOnlyList<Guid> SharedWith);
+/// <summary>
+/// Paylaşım grubu (ADR-0054 dilim 4a): <see cref="Kind"/> role, team ya da businessUnit; iş birimi paylaşımı alt birimlerin üyelerine de açılır.
+/// </summary>
+public sealed record ShareGroupDto(string Kind, Guid Id);
+
+/// <summary>Paylaşım panelinin seçebileceği grup (ad ile).</summary>
+public sealed record ShareGroupOptionDto(string Kind, Guid Id, string Name);
+
+/// <summary><see cref="SharedWith"/> paylaşılan kullanıcılar, <see cref="SharedWithGroups"/> paylaşılan gruplar; ikisi de yalnızca sahibine dolu gelir.</summary>
+public sealed record ReportDetailDto(
+    ReportSummaryDto Summary, ReportSpecDto Spec, int DatasetVersion, IReadOnlyList<Guid> SharedWith, IReadOnlyList<ShareGroupDto>? SharedWithGroups = null);
 
 public sealed record SaveReportRequest(string Name, string? Description, ReportSpecDto Spec, long? ExpectedVersion = null);
 
-public sealed record ShareReportRequest(string Visibility, IReadOnlyList<Guid>? Users, long? ExpectedVersion = null);
+public sealed record ShareReportRequest(string Visibility, IReadOnlyList<Guid>? Users, long? ExpectedVersion = null, IReadOnlyList<ShareGroupDto>? Groups = null);
 
 public sealed record FavoriteReportRequest(bool Favorite);
 

@@ -148,10 +148,16 @@ public sealed class DashboardShare : ITenantEntity, ICompanyShared
     }
 
     public DashboardShare(Guid dashboardId, Guid userId, Guid createdBy, DateTimeOffset now)
+        : this(dashboardId, ShareTargetKind.User, userId, createdBy, now)
+    {
+    }
+
+    public DashboardShare(Guid dashboardId, ShareTargetKind kind, Guid targetId, Guid createdBy, DateTimeOffset now)
     {
         Id = Guid.CreateVersion7();
         DashboardId = dashboardId;
-        UserId = userId;
+        TargetKind = kind;
+        UserId = targetId;
         CreatedBy = createdBy;
         CreatedAt = now;
     }
@@ -162,6 +168,10 @@ public sealed class DashboardShare : ITenantEntity, ICompanyShared
 
     public Guid DashboardId { get; private set; }
 
+    /// <summary>Hedefin türü; eski satırlar ve varsayılan <see cref="ShareTargetKind.User"/>.</summary>
+    public ShareTargetKind TargetKind { get; private set; }
+
+    /// <summary>Hedefin kimliği (kullanıcı, rol, ekip ya da iş birimi); sütun adı geriye uyum için <c>UserId</c> kaldı (<see cref="ReportShare.UserId"/>).</summary>
     public Guid UserId { get; private set; }
 
     public Guid CreatedBy { get; private set; }
@@ -224,7 +234,7 @@ public sealed record DashboardSummary(
     int SharedWithCount);
 
 /// <summary><see cref="SharedWith"/>: paylaşım listesini yalnızca sahibi görür; başkasına boş gelir.</summary>
-public sealed record DashboardDetail(DashboardSummary Summary, IReadOnlyList<DashboardWidgetView> Widgets, IReadOnlyList<Guid> SharedWith);
+public sealed record DashboardDetail(DashboardSummary Summary, IReadOnlyList<DashboardWidgetView> Widgets, IReadOnlyList<Guid> SharedWith, IReadOnlyList<ShareGroup> SharedWithGroups);
 
 /// <summary>Girdi geçersiz (ad, sınır, bileşen). <see cref="Field"/> alan hatası olarak döner.</summary>
 public sealed class DashboardException(string message, string field = "name") : Exception(message)
@@ -261,9 +271,10 @@ public interface IDashboards
 
     /// <summary>Paylaşım ayarını değiştirir (yalnızca sahibi). Erişimi biten kullanıcının varsayılan işareti de kalkar.</summary>
     /// <param name="users">Yalnızca <see cref="ReportVisibility.Users"/> için; tenant'ın etkin üyeleri olmalı.</param>
+    /// <param name="groups">Yalnızca <see cref="ReportVisibility.Users"/> için; firmada var olan rol, ekip ya da (açık) iş birimi olmalı (ADR-0054 dilim 4a).</param>
     /// <exception cref="DashboardForbiddenException">Çağıran panoyu görüyor ama sahibi değil.</exception>
     Task<DashboardDetail?> ShareAsync(
-        Guid id, ReportVisibility visibility, IReadOnlyList<Guid> users, long? expectedVersion, CancellationToken cancellationToken);
+        Guid id, ReportVisibility visibility, IReadOnlyList<Guid> users, IReadOnlyList<ShareGroup> groups, long? expectedVersion, CancellationToken cancellationToken);
 
     /// <summary>
     /// Panoyu çağıranın varsayılanı yapar ya da işareti kaldırır (kişiye özel; önceki varsayılanın yerine geçer). Pano görünmüyorsa null.

@@ -112,10 +112,10 @@ Doğrulama hatası 422 ve alan hatasıyla döner (`name`, `widgets`, `users`). P
 | 1b | Ekran: pano listesi, pano görünümü, bileşen ekleme ve sıralama |
 | 2 | Paylaşım (özel, seçilen kullanıcılar, firma) ve kişiye özel varsayılan pano (teslim edildi) |
 | 3 | Canlı yenileme: aralıkla (teslim edildi, 17.11.2026); iş olayıyla yenileme (sunucudan itme) ayrı karar ister, kodlanmadı |
-| 4a | Rol, ekip ve iş birimi hedefli paylaşım (rapor ve pano birlikte, bölüm 6); tasarım yazıldı, kodlanmadı (aşağıda "Dilim 4a") |
+| 4a | Rol, ekip ve iş birimi hedefli paylaşım (rapor ve pano birlikte, bölüm 6); kodlandı (17 Kasım 2026; aşağıda "Dilim 4a") |
 | 4b | Ekip/departman kırılımı (ADR-0035 A-11 ile); çift sayım kararı bekliyor |
 
-## Dilim 4a: rol, ekip ve iş birimi hedefli paylaşım (tasarım, 17 Kasım 2026; kodlanmadı)
+## Dilim 4a: rol, ekip ve iş birimi hedefli paylaşım (tasarım ve uygulama, 17 Kasım 2026)
 
 Kapsam kararı (kullanıcı, 17 Kasım): önce yalnızca hedefli paylaşım; ekip/departman kırılımı (ADR-0035 A-11) çift sayım kararı gelene kadar
 bekler. İş birimi hedefinde **alt birimler dahildir**.
@@ -127,19 +127,20 @@ bekler. İş birimi hedefinde **alt birimler dahildir**.
 - **Görünürlük her okumada yeniden hesaplanır** (önbellek yok, bölüm 6 ile aynı): çağıranın etkin üyeliğinin rolleri (`MembershipRole`), ekipleri
   (`TeamMember`) ve iş birimi (üst birimleri dahil, yani çağıranın birimi hedef birimin kendisi ya da altındaysa) paylaşım satırlarıyla eşlenir.
   Bu eşleme tek bir ortak sorgu yardımcısındadır; `ReportCenter` ve `Dashboards` ikisi de onu çağırır, kural iki yerde yazılmaz.
-- **Hedef doğrulaması yazarken:** hedef firmada var ve etkin olmalı (destek üyeliği sayılmaz), sahibin kendisi kullanıcı hedefi olarak
-  yazılmaz, aynı hedef iki kez yazılmaz, bir paylaşımda en fazla 50 hedef. Hedef silinirse (rol, ekip, birim) paylaşım satırı da düşer.
+- **Hedef doğrulaması yazarken:** hedef firmada var ve (birim için) etkin olmalı, kullanıcı türü `groups` ile yazılamaz (kullanıcılar `users` ile
+  gelir), aynı hedef iki kez yazılmaz (tekrar yok sayılır), bir paylaşımda en fazla 50 grup, kullanıcı ve grup birlikte boş olamaz. Hedef silinirse
+  (rol, ekip, birim) paylaşım satırı yabancı anahtarla düşmez; görünürlük sorgusu hedef kimliğini üyelikten çözdüğü için artık satır etkisizdir.
 - **Veri erişimi yine verilmez:** hedefli paylaşım yalnızca raporu ya da panoyu görme hakkıdır; bileşen verisi bakan kişinin kendi yetkisiyle
   gelir (bölüm 6).
 - **Yetki:** değişmez; paylaşmak `core.reports.share` ve sahiplik ister. Hedef listesi (rol, ekip, birim) paylaşım panelinde yalnızca
   sahibine ve yalnızca paylaşım iznine sahip olana sunulur.
 - **Denetim:** paylaşım değişikliği mevcut `core.report` ve `core.dashboard` denetim kayıtlarında hedef türü ve kimlikleriyle yazılır.
-- **Neden kodlanmadı:** değişiklik EF migration'ı ve model anlık görüntüsü ister; bu oturumda .NET SDK yoktu (`dotnet ef` çalıştırılamadı),
-  elle yazılan migration ve anlık görüntü doğrulanamayacağı için riskli bulundu. SDK'lı ortamda ya da CI'da üretilecek migration ile
-  uygulanır.
+- **Uygulama notu:** migration (`TargetedSharing`), model anlık görüntüsü ve tasarım dosyası bu oturumda .NET SDK olmadığı için elle yazıldı
+  (`dotnet ef` çalıştırılamadı); doğrulayıcı CI'dır (derleme, migration uygulama, `migration-compat`). Sütun `TargetKind` (`nvarchar(20)`,
+  varsayılan `User`) eklenir, `UserId` hedef kimliği olarak kalır; benzersiz indeks `(TenantId, ReportId|DashboardId, TargetKind, UserId)` olur.
 - **Testler (dört test kuralı):** mutlu yol (ekip üyesi panoyu görür, alt birimdeki üye görür), doğrulama (bilinmeyen hedef, tekrar,
   50 sınırı), tenant izolasyonu (başka firmanın rol/ekip/birimi hedef olamaz), yetki (paylaşım izni olmayan ya da sahibi olmayan
-  hedef yazamaz; hedef grubunun dışındaki kullanıcı 404 alır).
+  hedef yazamaz; hedef grubunun dışındaki kullanıcı 404 alır). Testler `ReportCenterTests.TargetedSharing.cs` içindedir.
 
 ## Ekran (dilim 1b)
 
