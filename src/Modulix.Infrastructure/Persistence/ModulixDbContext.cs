@@ -9,7 +9,6 @@ using Modulix.Core.Notifications;
 using Modulix.Core.Automation;
 using Modulix.Core.Communication;
 using Modulix.Core.Customization;
-using Modulix.Core.Customs;
 using Modulix.Core.Imports;
 using Modulix.Core.Lookups;
 using Modulix.Core.Teams;
@@ -41,7 +40,9 @@ namespace Modulix.Infrastructure.Persistence;
 /// (<see cref="TenantIsolationSql"/>); filtre unutulsa bile veri sızmaz.
 ///
 /// Modül tabloları: kayıtlı her modülün projesindeki <c>IEntityTypeConfiguration</c> sınıfları modele eklenir
-/// (<see cref="ApplyModuleModels"/>). Modüller bu tablolara <see cref="IModuleData"/> üzerinden erişir.
+/// (<see cref="ApplyModuleModels"/>). Modüller bu tablolara <see cref="IModuleData"/> üzerinden erişir. Modülün tenant'sız başvuru tabloları
+/// (<see cref="IPlatformReferenceEntity"/>, ADR-0046 bölüm 6) platform şemasındadır; okuma <see cref="IModuleReferenceData"/>, platform yönetiminden
+/// yazma <see cref="IPlatformReferenceStore"/> iledir.
 /// </summary>
 public class ModulixDbContext(
     DbContextOptions<ModulixDbContext> options,
@@ -221,14 +222,6 @@ public class ModulixDbContext(
 
     public DbSet<Industry> Industries => Set<Industry>();
 
-    public DbSet<GtipCatalogVersion> GtipCatalogVersions => Set<GtipCatalogVersion>();
-
-    public DbSet<GtipCatalogEntry> GtipCatalogEntries => Set<GtipCatalogEntry>();
-
-    public DbSet<RegimeProfile> RegimeProfiles => Set<RegimeProfile>();
-
-    public DbSet<RegimeProfileVersion> RegimeProfileVersions => Set<RegimeProfileVersion>();
-
     public DbSet<RulePackage> RulePackages => Set<RulePackage>();
     public DbSet<RulePackageVersion> RulePackageVersions => Set<RulePackageVersion>();
     public DbSet<TenantRuleAdaptation> RuleAdaptations => Set<TenantRuleAdaptation>();
@@ -313,10 +306,28 @@ public class ModulixDbContext(
 
             foreach (var entityType in modelBuilder.Model.GetEntityTypes().Where(t => t.ClrType.Assembly == assembly))
             {
+                // Başvuru tablosu (ADR-0046 bölüm 6): tenant'sız, RLS dışı, platform şemasında; tenant sütunu taşıyamaz.
+                if (typeof(IPlatformReferenceEntity).IsAssignableFrom(entityType.ClrType))
+                {
+                    if (typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType) || entityType.FindProperty(nameof(ITenantEntity.TenantId)) is not null)
+                    {
+                        throw new InvalidOperationException(
+                            $"{module.Key} modülünün başvuru tablosu {entityType.ClrType.Name} tenant verisi taşıyamaz (TenantId).");
+                    }
+
+                    if (entityType.GetSchema() != IPlatformReferenceEntity.Schema)
+                    {
+                        throw new InvalidOperationException(
+                            $"{module.Key} modülünün başvuru tablosu {entityType.GetTableName()} '{entityType.GetSchema()}' şemasında; '{IPlatformReferenceEntity.Schema}' olmalı.");
+                    }
+
+                    continue;
+                }
+
                 if (!typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType))
                 {
                     throw new InvalidOperationException(
-                        $"{module.Key} modülünün entity'si {entityType.ClrType.Name} ITenantEntity uygulamıyor.");
+                        $"{module.Key} modülünün entity'si {entityType.ClrType.Name} ITenantEntity ya da IPlatformReferenceEntity uygulamıyor.");
                 }
 
                 if (entityType.GetSchema() != module.Key)

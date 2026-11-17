@@ -65,4 +65,5 @@ token yoktur. Fırsat ve teklif satırı kendi sayfasına bağlanır; "Daha eski
 - Diğer modüllerin satırları yok; firma kartındaki ilişkili sipariş, destek ve kampanya listeleri yerinde duruyor.
 - Bir kayıt tek satırdır: fırsatın kazanılması ya da teklifin kabulü ayrı satır üretmez (durum rozeti güncel durumu gösterir).
 - Başka modülün durum kodunun görünen adı sözleşmede yok; dilim 2'de kaynak görünen adı da verecek mi kararı açık.
-- Ekran tarayıcıda açık ve koyu temada gözle doğrulanmadı.
+- Ekran 17 Kasım 2026'da açık ve koyu temada, 1440 px ve 390 px genişlikte gözle doğrulandı. Yeni sekmeyle firma detayının sekme çubuğu
+  1440 px'te taşıyordu; "Fırsatlar ve müşteri adayları" sekmesinin adı "Satış" olarak kısaltıldı (kişi detayında da aynı etiket).

@@ -105,6 +105,7 @@ public sealed class SupportModule : IModule, IModuleEndpoints, IModulePublicEndp
         public const string AutoCloseDays = "support.auto-close-days";
         public const string SurveyEnabled = "support.survey.enabled";
         public const string SurveyValidDays = "support.survey.valid-days";
+        public const string SurveyReminderDays = "support.survey.reminder-days";
         public const string AcknowledgementEnabled = "support.acknowledgement.enabled";
     }
 
@@ -191,6 +192,13 @@ public sealed class SupportModule : IModule, IModuleEndpoints, IModulePublicEndp
             Description = "Anket bağlantısı bu süre sonunda geçersiz olur. 1-90 arası.",
             Pattern = @"^[0-9]{1,2}$",
             PatternMessage = "1-90 arası tam sayı girin.",
+            MaxLength = 2,
+        },
+        new(SettingKeys.SurveyReminderDays, "Destek: yanıtlanmayan anket için hatırlatma (gün)", "Destek", SettingType.Text, "0")
+        {
+            Description = "Anket e-postasından bu kadar gün sonra yanıt gelmediyse ve bağlantının süresi dolmadıysa bir kez hatırlatma e-postası gönderilir (zamanlanmış iş). 0 kapalıdır (varsayılan). 0-30 arası.",
+            Pattern = @"^[0-9]{1,2}$",
+            PatternMessage = "0-30 arası tam sayı girin.",
             MaxLength = 2,
         },
         new(SettingKeys.AcknowledgementEnabled, "Destek: talep açılınca otomatik alındı yanıtı gönder", "Destek", SettingType.Choice, "false")

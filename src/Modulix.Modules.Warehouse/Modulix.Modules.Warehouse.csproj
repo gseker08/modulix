@@ -4,6 +4,7 @@
     <ProjectReference Include="..\Modulix.Core.Contracts\Modulix.Core.Contracts.csproj" />
     <ProjectReference Include="..\Modulix.Core.Hosting\Modulix.Core.Hosting.csproj" />
     <ProjectReference Include="..\Modulix.Shared\Modulix.Shared.csproj" />
+    <ProjectReference Include="..\Modulix.Modules.Warehouse.Contracts\Modulix.Modules.Warehouse.Contracts.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

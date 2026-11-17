@@ -1,21 +1,19 @@
-using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
-using Modulix.Core.Contracts.Customs;
-using Modulix.Core.Customs;
-using Modulix.Core.Platform;
-using Modulix.Infrastructure.Persistence;
+using Modulix.Core.Contracts.Persistence;
+using Modulix.Modules.Warehouse.Contracts.Customs;
 
-namespace Modulix.Infrastructure.Customs;
+namespace Modulix.Modules.Warehouse.Customs;
 
 /// <summary>
-/// Rejim profili yönetimi (ADR-0032 K16). Tablolar <c>platform</c> şemasındadır, RLS dışıdır ve tenant verisi içermez. Profil başına en çok bir
+/// Rejim profili yönetimi (ADR-0032 K16). Tablolar modülün başvuru tablolarıdır (ADR-0046 bölüm 6): <c>platform</c> şemasındadır, RLS dışıdır ve tenant
+/// verisi içermez; okuma <see cref="IModuleReferenceData"/>, yazma <see cref="IPlatformReferenceStore"/> iledir. Profil başına en çok bir
 /// taslak ve bir yayın vardır (filtreli benzersiz dizin); yayın, önceki yayını "yerini bıraktı" yapar ve geçmiş olarak kalır. Her yazma
 /// değiştiren yönetici ile birlikte <c>PlatformAuditLog</c>'a aynı işlemde yazılır.
 /// </summary>
-internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfileAdmin, IRegimeProfileCatalog
+internal sealed class RegimeProfileService(IModuleReferenceData reads, IPlatformReferenceStore store) : IRegimeProfileAdmin, IRegimeProfileCatalog
 {
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
 
@@ -36,8 +34,8 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
 
     // Süzgeç projeksiyondan önce uygulanır (EF kayıt tipine projeksiyondan sonraki koşulu çeviremez).
     private IQueryable<PublishedRow> PublishedQuery(Guid? profileId) =>
-        from profile in db.RegimeProfiles.AsNoTracking()
-        join version in db.RegimeProfileVersions.AsNoTracking() on profile.Id equals version.ProfileId
+        from profile in reads.Query<RegimeProfile>()
+        join version in reads.Query<RegimeProfileVersion>() on profile.Id equals version.ProfileId
         where profile.IsActive && version.State == RegimeProfileVersionState.Published && (profileId == null || profile.Id == profileId)
         select new PublishedRow(profile, version);
 
@@ -53,8 +51,8 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
 
     public async Task<IReadOnlyList<RegimeProfileSummary>> ListAsync(CancellationToken cancellationToken)
     {
-        var profiles = await db.RegimeProfiles.AsNoTracking().OrderBy(p => p.Name).ToListAsync(cancellationToken);
-        var versions = await db.RegimeProfileVersions.AsNoTracking()
+        var profiles = await reads.Query<RegimeProfile>().OrderBy(p => p.Name).ToListAsync(cancellationToken);
+        var versions = await reads.Query<RegimeProfileVersion>()
             .Where(v => v.State != RegimeProfileVersionState.Superseded)
             .Select(v => new { v.ProfileId, v.Number, v.State, v.IsVerified }).ToListAsync(cancellationToken);
         return [.. profiles.Select(p => Summarize(p, versions.Where(v => v.ProfileId == p.Id)
@@ -64,7 +62,7 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
     public async Task<RegimeProfileDetail> GetAsync(Guid profileId, CancellationToken cancellationToken)
     {
         var profile = await FindAsync(profileId, cancellationToken);
-        var versions = await db.RegimeProfileVersions.AsNoTracking().Where(v => v.ProfileId == profileId)
+        var versions = await reads.Query<RegimeProfileVersion>().Where(v => v.ProfileId == profileId)
             .OrderByDescending(v => v.Number).ToListAsync(cancellationToken);
         return new RegimeProfileDetail(
             Summarize(profile, versions.Where(v => v.State != RegimeProfileVersionState.Superseded).Select(v => (v.Number, v.State, v.IsVerified))),
@@ -74,14 +72,14 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
     public async Task<RegimeProfileSummary> CreateAsync(Guid actingUserId, string code, string name, CancellationToken cancellationToken)
     {
         var profile = new RegimeProfile(code, name);
-        if (await db.RegimeProfiles.AnyAsync(p => p.Code == profile.Code, cancellationToken))
+        if (await store.Set<RegimeProfile>().AnyAsync(p => p.Code == profile.Code, cancellationToken))
         {
             throw new RegimeProfileConflictException($"Bu kodla bir rejim profili zaten var: '{profile.Code}'.");
         }
 
-        db.RegimeProfiles.Add(profile);
+        store.Set<RegimeProfile>().Add(profile);
         Audit(actingUserId, "regime-profile.created", new JsonObject { ["code"] = profile.Code, ["name"] = profile.Name });
-        await db.SaveChangesAsync(cancellationToken);
+        await store.SaveChangesAsync(cancellationToken);
         return Summarize(profile, []);
     }
 
@@ -94,12 +92,12 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
         }
 
         var json = JsonSerializer.Serialize(content, Json);
-        var draft = await db.RegimeProfileVersions.SingleOrDefaultAsync(v => v.ProfileId == profileId && v.State == RegimeProfileVersionState.Draft, cancellationToken);
+        var draft = await store.Set<RegimeProfileVersion>().SingleOrDefaultAsync(v => v.ProfileId == profileId && v.State == RegimeProfileVersionState.Draft, cancellationToken);
         if (draft is null)
         {
-            var next = (await db.RegimeProfileVersions.Where(v => v.ProfileId == profileId).MaxAsync(v => (int?)v.Number, cancellationToken) ?? 0) + 1;
+            var next = (await store.Set<RegimeProfileVersion>().Where(v => v.ProfileId == profileId).MaxAsync(v => (int?)v.Number, cancellationToken) ?? 0) + 1;
             draft = new RegimeProfileVersion(profileId, next, json, actingUserId);
-            db.RegimeProfileVersions.Add(draft);
+            store.Set<RegimeProfileVersion>().Add(draft);
         }
         else
         {
@@ -109,7 +107,7 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
         Audit(actingUserId, "regime-profile.draft-saved", new JsonObject { ["code"] = profile.Code, ["version"] = draft.Number });
         try
         {
-            await db.SaveChangesAsync(cancellationToken);
+            await store.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException)
         {
@@ -123,11 +121,11 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
     public async Task DiscardDraftAsync(Guid actingUserId, Guid profileId, CancellationToken cancellationToken)
     {
         var profile = await FindAsync(profileId, cancellationToken);
-        var draft = await db.RegimeProfileVersions.SingleOrDefaultAsync(v => v.ProfileId == profileId && v.State == RegimeProfileVersionState.Draft, cancellationToken)
+        var draft = await store.Set<RegimeProfileVersion>().SingleOrDefaultAsync(v => v.ProfileId == profileId && v.State == RegimeProfileVersionState.Draft, cancellationToken)
             ?? throw new RegimeProfileNotFoundException("Silinecek taslak yok.");
-        db.RegimeProfileVersions.Remove(draft);
+        store.Set<RegimeProfileVersion>().Remove(draft);
         Audit(actingUserId, "regime-profile.draft-discarded", new JsonObject { ["code"] = profile.Code, ["version"] = draft.Number });
-        await db.SaveChangesAsync(cancellationToken);
+        await store.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<RegimeProfileVersionView> PublishAsync(Guid actingUserId, Guid profileId, bool verified, string? note, CancellationToken cancellationToken)
@@ -143,7 +141,7 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
             throw new ArgumentException("Doğrulanmış olarak yayınlarken kimin/neye göre doğruladığını not olarak yazın.", nameof(note));
         }
 
-        var draft = await db.RegimeProfileVersions.SingleOrDefaultAsync(v => v.ProfileId == profileId && v.State == RegimeProfileVersionState.Draft, cancellationToken)
+        var draft = await store.Set<RegimeProfileVersion>().SingleOrDefaultAsync(v => v.ProfileId == profileId && v.State == RegimeProfileVersionState.Draft, cancellationToken)
             ?? throw new RegimeProfileConflictException("Yayınlanacak taslak yok; önce içeriği taslak olarak kaydedin.");
 
         // Taslağın içeriği yayın anında yeniden doğrulanır (kural paketi bir kez yazılıp sonra bozulmuş olamaz).
@@ -154,12 +152,12 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
         }
 
         // Önce eski yayın yerini bırakır, sonra taslak yayına çıkar: "profil başına tek yayın" dizini iki adımda da korunur.
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var previous = await db.RegimeProfileVersions.SingleOrDefaultAsync(v => v.ProfileId == profileId && v.State == RegimeProfileVersionState.Published, cancellationToken);
+        await using var transaction = await store.BeginTransactionAsync(cancellationToken);
+        var previous = await store.Set<RegimeProfileVersion>().SingleOrDefaultAsync(v => v.ProfileId == profileId && v.State == RegimeProfileVersionState.Published, cancellationToken);
         if (previous is not null)
         {
             previous.Supersede();
-            await db.SaveChangesAsync(cancellationToken);
+            await store.SaveChangesAsync(cancellationToken);
         }
 
         draft.Publish(verified, note, actingUserId);
@@ -168,7 +166,7 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
             ["code"] = profile.Code, ["version"] = draft.Number, ["verified"] = verified, ["note"] = draft.VerificationNote,
             ["previousVersion"] = previous?.Number,
         });
-        await db.SaveChangesAsync(cancellationToken);
+        await store.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return ToView(draft);
     }
@@ -180,7 +178,7 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
         {
             profile.SetActive(active);
             Audit(actingUserId, "regime-profile.active", new JsonObject { ["code"] = profile.Code, ["active"] = active });
-            await db.SaveChangesAsync(cancellationToken);
+            await store.SaveChangesAsync(cancellationToken);
         }
 
         return (await GetAsync(profileId, cancellationToken)).Summary;
@@ -188,7 +186,7 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
 
     private async Task<RegimeProfile> FindAsync(Guid profileId, CancellationToken cancellationToken, bool track = false)
     {
-        var query = track ? db.RegimeProfiles : db.RegimeProfiles.AsNoTracking();
+        var query = track ? store.Set<RegimeProfile>() : reads.Query<RegimeProfile>();
         return await query.SingleOrDefaultAsync(p => p.Id == profileId, cancellationToken)
             ?? throw new RegimeProfileNotFoundException("Rejim profili bulunamadı.");
     }
@@ -207,6 +205,5 @@ internal sealed class RegimeProfileService(ModulixDbContext db) : IRegimeProfile
         new(v.Id, v.Number, v.State, v.IsVerified, v.VerificationNote, v.CreatedAt, v.PublishedAt,
             JsonSerializer.Deserialize<RegimeProfileContent>(v.ContentJson, Json) ?? new RegimeProfileContent(RegimeProfileContent.CurrentSchemaVersion, null, null));
 
-    private void Audit(Guid actingUserId, string action, JsonObject details) =>
-        db.PlatformAuditLog.Add(new PlatformAuditEntry(actingUserId, action, null, null, details.ToJsonString(), Activity.Current?.TraceId.ToString()));
+    private void Audit(Guid actingUserId, string action, JsonObject details) => store.Audit(actingUserId, action, details.ToJsonString());
 }

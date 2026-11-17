@@ -1,6 +1,6 @@
-using Modulix.Core.Contracts.Customs;
+using Modulix.Modules.Warehouse.Contracts.Customs;
 
-namespace Modulix.Core.Tests.Customs;
+namespace Modulix.Modules.Warehouse.Tests.Customs;
 
 /// <summary>Rejim profili içeriği ve tescil no kuralı (ADR-0032 K7, K16): doğrulama, değerlendirme ve tenant sıkılaştırması.</summary>
 public class RegimeProfileRulesTests

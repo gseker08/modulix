@@ -735,21 +735,23 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         {
             ["name"] = "Ad", ["kind"] = "Tür", ["taxOffice"] = "Vergi dairesi", ["taxNumber"] = "Vergi no", ["phone"] = "Telefon", ["email"] = "E-posta", ["website"] = "Web sitesi",
             ["city"] = "Şehir", ["address"] = "Adres", ["industry"] = "Sektör", ["status"] = "Durum", ["source"] = "Kaynak",
-            ["tags"] = "Etiketler", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar", ["partyId"] = "Ortak firma kaydı",
+            ["tags"] = "Etiketler", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar", ["partyId"] = "Ortak firma kaydı", ["preferredLanguage"] = "Yazışma dili",
         }, "name")
         {
             UserFields = ["ownerId"],
             References = new Dictionary<string, string> { ["partyId"] = SharedEntities.Party },
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["preferredLanguage"] = new Dictionary<string, string> { ["tr"] = "Türkçe", ["en"] = "English", ["az"] = "Azərbaycanca" } },
         },
         new(Entities.Contact, "Kişi (CRM)", Permissions.ContactsRead, new Dictionary<string, string>
         {
             ["firstName"] = "Ad", ["lastName"] = "Soyad", ["companyId"] = "Firma", ["title"] = "Unvan", ["email"] = "E-posta",
-            ["phone"] = "Telefon", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar", ["personId"] = "Ortak kişi kaydı",
+            ["phone"] = "Telefon", ["ownerId"] = "Sorumlu", ["notes"] = "Notlar", ["personId"] = "Ortak kişi kaydı", ["preferredLanguage"] = "Yazışma dili",
         })
         {
             TitleFields = ["firstName", "lastName"],
             UserFields = ["ownerId"],
             References = new Dictionary<string, string> { ["companyId"] = Entities.Company, ["personId"] = SharedEntities.Person },
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["preferredLanguage"] = new Dictionary<string, string> { ["tr"] = "Türkçe", ["en"] = "English", ["az"] = "Azərbaycanca" } },
         },
         new(Entities.CompanyContact, "Firma–kişi ilişkisi (CRM)", Permissions.ContactsRead, new Dictionary<string, string>
         {

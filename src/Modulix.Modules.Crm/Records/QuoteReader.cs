@@ -19,6 +19,16 @@ internal sealed record QuoteDocumentMeta(Guid Id, Guid QuoteId, int RevisionNo, 
 /// </summary>
 internal sealed class QuoteReader(IModuleData data)
 {
+    /// <summary>Teklifin müşteri tarafı ortak kayıtları (yazışma dili için): kişinin ortak kişisi ve firmanın tarafı.</summary>
+    public async Task<(Guid? PersonId, Guid? PartyId)> RecipientAsync(Quote quote, CancellationToken cancellationToken)
+    {
+        var party = await data.Set<Company>().AsNoTracking().Where(c => c.Id == quote.CompanyId).Select(c => (Guid?)c.PartyId).FirstOrDefaultAsync(cancellationToken);
+        var person = quote.ContactId is { } contactId
+            ? await data.Set<Contact>().AsNoTracking().Where(c => c.Id == contactId).Select(c => (Guid?)c.PersonId).FirstOrDefaultAsync(cancellationToken)
+            : null;
+        return (person, party);
+    }
+
     public async Task<List<QuoteEvent>> HistoryAsync(Guid quoteId, CancellationToken cancellationToken) =>
         await data.Set<QuoteEvent>().AsNoTracking().Where(e => e.QuoteId == quoteId)
             .OrderBy(e => e.CreatedAt).ThenBy(e => e.Id).ToListAsync(cancellationToken);

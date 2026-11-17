@@ -18,8 +18,8 @@ internal sealed class SupportJobs(ISlaScheduler scheduler) : IModuleJob
     public async Task<ModuleJobResult> RunAsync(ModuleJobContext context, CancellationToken cancellationToken)
     {
         var run = await scheduler.RunAsync(cancellationToken);
-        string? summary = run.Breaches + run.Escalations + run.AutoClosed > 0
-            ? $"{run.Breaches} ihlal işaretlendi, {run.Escalations} eskalasyon eylemi uygulandı, {run.AutoClosed} talep otomatik kapatıldı."
+        string? summary = run.Breaches + run.Escalations + run.AutoClosed + run.SurveyReminders > 0
+            ? $"{run.Breaches} ihlal işaretlendi, {run.Escalations} eskalasyon eylemi uygulandı, {run.AutoClosed} talep otomatik kapatıldı, {run.SurveyReminders} anket hatırlatıldı."
             : null;
         return new ModuleJobResult(summary, run);
     }

@@ -410,7 +410,9 @@ public sealed class CoreModule : IModule
 
     /// <summary>
     /// Süreli belge türü (ADR-0038 K3, Y9b): hazır değerler örnektir; tenant kendi türlerini ekler, yeni türde kategori seçilir. Kategori
-    /// belgenin hangi kayda eklenebileceğini belirler (araç, sürücü, firma, tesis, çalışan; sahip türünü modül bildirir).
+    /// belgenin hangi kayda eklenebileceğini belirler (araç, sürücü, firma, tesis, çalışan; sahip türünü modül bildirir). Core yalnızca sektörden
+    /// bağımsız belgeleri tanımlar; araç belgeleri Filo'dan, sürücü belgeleri Lojistik'ten, antrepo yer türü Depo'dan katkı olarak gelir
+    /// (<see cref="IModule.ChoiceValueContributions"/>, H2).
     /// </summary>
     IReadOnlyList<ChoiceListDefinition> IModule.ChoiceLists { get; } =
     [
@@ -428,16 +430,6 @@ public sealed class CoreModule : IModule
                 new(CredentialCategories.Employee, "Özlük belgesi"),
             ],
             [
-                new("Inspection", "Araç muayenesi", CredentialCategories.Vehicle),
-                new("TrafficInsurance", "Trafik sigortası", CredentialCategories.Vehicle),
-                new("Casco", "Kasko", CredentialCategories.Vehicle),
-                new("ExhaustEmission", "Egzoz emisyon ölçümü", CredentialCategories.Vehicle),
-                new("TachographCalibration", "Takograf kalibrasyonu", CredentialCategories.Vehicle),
-                new("DrivingLicense", "Sürücü belgesi (ehliyet)", CredentialCategories.Driver),
-                new("Src", "SRC belgesi", CredentialCategories.Driver),
-                new("Psychotechnical", "Psikoteknik belgesi", CredentialCategories.Driver),
-                new("AdrCertificate", "ADR sertifikası", CredentialCategories.Driver),
-                new("TachographCard", "Takograf sürücü kartı", CredentialCategories.Driver),
                 new("AuthorizationCertificate", "Yetki belgesi", CredentialCategories.Party),
                 new("PowerOfAttorney", "Vekâletname", CredentialCategories.Party),
                 new("OperatingPermit", "Faaliyet izni", CredentialCategories.Facility),
@@ -464,7 +456,6 @@ public sealed class CoreModule : IModule
             [
                 new("Depot", "Depo", PlaceKindCategories.Site),
                 new("Factory", "Fabrika", PlaceKindCategories.Site),
-                new("BondedWarehouse", "Antrepo", PlaceKindCategories.Site),
                 new("Port", "Liman", PlaceKindCategories.Port),
                 new("BorderGate", "Sınır kapısı", PlaceKindCategories.Border),
                 new("CustomsOffice", "Gümrük müdürlüğü", PlaceKindCategories.Customs),
@@ -772,20 +763,26 @@ public sealed class CoreModule : IModule
             ["kind"] = "Tür", ["name"] = "Ünvan", ["taxOffice"] = "Vergi dairesi", ["taxNumber"] = "Vergi no", ["phone"] = "Telefon",
             ["email"] = "E-posta", ["website"] = "Web sitesi", ["city"] = "Şehir", ["address"] = "Adres",
             ["relationshipRoles"] = "İlişki rolleri", ["customerSectors"] = "Müşteri sektörü", ["serviceNeeds"] = "Hizmet ihtiyacı",
+            ["preferredLanguage"] = "Yazışma dili",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
                 ["kind"] = new Dictionary<string, string> { ["Organization"] = "Tüzel kişi", ["Individual"] = "Gerçek kişi" },
+                ["preferredLanguage"] = new Dictionary<string, string> { ["tr"] = "Türkçe", ["en"] = "English", ["az"] = "Azərbaycanca" },
             },
         },
         new(SharedEntities.Person, "Kişi (ortak kayıt)", null, new Dictionary<string, string>
         {
             ["firstName"] = "Ad", ["lastName"] = "Soyad", ["email"] = "E-posta", ["phone"] = "Telefon", ["title"] = "Unvan",
-            ["partyId"] = "Firma",
+            ["partyId"] = "Firma", ["preferredLanguage"] = "Yazışma dili",
         })
         {
             TitleFields = ["firstName", "lastName"],
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["preferredLanguage"] = new Dictionary<string, string> { ["tr"] = "Türkçe", ["en"] = "English", ["az"] = "Azərbaycanca" },
+            },
             References = new Dictionary<string, string> { ["partyId"] = SharedEntities.Party },
         },
         new(SharedEntities.PartyRelationship, "Firma ilişkisi (ortak kayıt)", null, new Dictionary<string, string>

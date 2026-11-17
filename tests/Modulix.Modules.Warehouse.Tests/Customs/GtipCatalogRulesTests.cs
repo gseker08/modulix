@@ -1,6 +1,7 @@
-using Modulix.Core.Customs;
+using Modulix.Modules.Warehouse.Contracts.Customs;
+using Modulix.Modules.Warehouse.Customs;
 
-namespace Modulix.Core.Tests.Customs;
+namespace Modulix.Modules.Warehouse.Tests.Customs;
 
 /// <summary>GTİP katalog satırı ve sürümü için saf kurallar (ADR-0032 K9).</summary>
 public class GtipCatalogRulesTests

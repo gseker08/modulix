@@ -126,7 +126,7 @@ internal sealed partial class CustomsDeclarationRecordStore(WarehouseStoreContex
         if (errors.All(e => e.Field != "registrationNo") && (stored is null || stored.RegistrationNo != entity.RegistrationNo || stored.RegimeKey != entity.RegimeKey))
         {
             var check = await new RegistrationNoCheck(Context).CheckAsync(entity.RegimeKey, entity.RegistrationNo, cancellationToken);
-            if (check.HasRule && check.Violations.Count > 0 && check.Enforcement == nameof(Modulix.Core.Contracts.Customs.RuleEnforcement.Block))
+            if (check.HasRule && check.Violations.Count > 0 && check.Enforcement == nameof(Modulix.Modules.Warehouse.Contracts.Customs.RuleEnforcement.Block))
             {
                 errors.Add(new RecordFieldError("registrationNo", $"{string.Join(" ", check.Violations)} (rejim profili: {check.ProfileName}, sürüm {check.VersionNumber})"));
             }

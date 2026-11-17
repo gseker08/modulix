@@ -250,13 +250,16 @@ public sealed record InboundMessageRequest(
 public sealed record InboundResultDto(string Outcome, Guid? TicketId, Guid? MessageId, string? TicketNumber);
 
 public sealed record SurveyDto(
-    Guid Id, int Cycle, string State, DateTimeOffset? QueuedAt, DateTimeOffset ExpiresAt, DateTimeOffset? AnsweredAt, int? Rating, string? Comment, DateTimeOffset CreatedAt);
+    Guid Id, int Cycle, string State, DateTimeOffset? QueuedAt, DateTimeOffset ExpiresAt, DateTimeOffset? AnsweredAt, int? Rating, string? Comment, DateTimeOffset CreatedAt,
+    DateTimeOffset? ReminderQueuedAt = null);
 
 public sealed record PublicSurveyTokenRequest(string Token);
 
 public sealed record PublicSurveyAnswerRequest(string Token, int Rating, string? Comment = null);
 
-public sealed record PublicSurveyView(string State, bool CanAnswer, string? Message, string TicketNumber, string Subject, DateTimeOffset ExpiresAt, int? Rating);
+/// <summary>Herkese açık anket; <c>Language</c> müşterinin dilidir (talebin kişisi → firması → tenant varsayılanı; ADR-0034 §6).</summary>
+public sealed record PublicSurveyView(
+    string State, bool CanAnswer, string? Message, string TicketNumber, string Subject, DateTimeOffset ExpiresAt, int? Rating, string Language = "tr");
 
 public sealed record BulkTicketsRequest(string Action, IReadOnlyList<Guid> Ids, string? Reason = null, Guid? OwnerId = null, Guid? QueueId = null);
 
