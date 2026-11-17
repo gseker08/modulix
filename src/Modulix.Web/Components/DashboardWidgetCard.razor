@@ -56,23 +56,34 @@ else
 
     [Parameter, EditorRequired] public DashboardWidgetDto Widget { get; set; } = default!;
 
+    /// <summary>Pano her yenileme turunda artırır (ADR-0054 dilim 3); değişince bileşen verisini yeniden alır.</summary>
+    [Parameter] public int RefreshToken { get; set; }
+
     private ReportResultDto? result;
     private bool loading = true;
     private bool hidden;
     private string? error;
     private Guid loadedFor;
+    private int loadedToken;
 
     private string Heading => Widget.Title ?? Widget.ReportName ?? Texts.Get("reports.dashboards.widget.hidden");
 
     protected override async Task OnParametersSetAsync()
     {
-        if (loadedFor == Widget.Id)
+        bool refresh = loadedFor == Widget.Id;
+        if (refresh && loadedToken == RefreshToken)
         {
             return;
         }
 
         loadedFor = Widget.Id;
-        (loading, hidden, error, result) = (true, false, null, null);
+        loadedToken = RefreshToken;
+        if (!refresh)
+        {
+            // İlk yüklemede bekleme durumu; yenilemede eski veri ekranda kalır, yanıt gelince yer değiştirir (titreme olmasın).
+            (loading, hidden, error, result) = (true, false, null, null);
+        }
+
         var response = await Api.GetAsync<ReportResultDto>($"/api/dashboards/{DashboardId}/widgets/{Widget.Id}/data");
         loading = false;
         result = response.Value;

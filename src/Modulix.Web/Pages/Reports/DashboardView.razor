@@ -5,6 +5,7 @@
 @inject SessionState Session
 @inject NavigationManager Navigation
 @inject ToastService Toasts
+@implements IDisposable
 
 <PageTitle>@(detail?.Summary.Name ?? Texts.Get("reports.dashboards.title")) · Modulix</PageTitle>
 
@@ -66,6 +67,23 @@
         {
             @* Paylaşılan pano salt görüntülenir: düzenleme, silme ve paylaşım yalnızca sahibindedir (sunucu da 403 döner). *@
             <p class="text-muted" role="note">@Texts.Get("reports.dashboards.readOnly")</p>
+        }
+
+        @if (!editing)
+        {
+            <div class="list-toolbar mb-1">
+                <label class="form-label mb-0" for="dash-refresh">@Texts.Get("reports.dashboards.refresh")</label>
+                <select id="dash-refresh" class="form-select" value="@refreshSeconds" @onchange="OnRefreshChanged">
+                    <option value="0">@Texts.Get("reports.dashboards.refresh.off")</option>
+                    <option value="60">@Texts.Get("reports.dashboards.refresh.1m")</option>
+                    <option value="300">@Texts.Get("reports.dashboards.refresh.5m")</option>
+                    <option value="900">@Texts.Get("reports.dashboards.refresh.15m")</option>
+                </select>
+                @if (refreshSeconds > 0 && lastRefresh is { } at)
+                {
+                    <span class="small text-muted" role="status">@Texts.Get("reports.dashboards.refresh.last", CrmLabels.Time(at))</span>
+                }
+            </div>
         }
 
         <Notice Text="@message" Failed="true" />
@@ -213,7 +231,7 @@
                 <div class="dash-kpis">
                     @foreach (var widget in detail.Widgets.Where(w => w.Kind == "number"))
                     {
-                        <DashboardWidgetCard @key="widget.Id" DashboardId="detail.Summary.Id" Widget="widget" />
+                        <DashboardWidgetCard @key="widget.Id" DashboardId="detail.Summary.Id" Widget="widget" RefreshToken="refreshToken" />
                     }
                 </div>
             }
@@ -223,7 +241,7 @@
                 <div class="dash-grid">
                     @foreach (var widget in detail.Widgets.Where(w => w.Kind != "number"))
                     {
-                        <DashboardWidgetCard @key="widget.Id" DashboardId="detail.Summary.Id" Widget="widget" />
+                        <DashboardWidgetCard @key="widget.Id" DashboardId="detail.Summary.Id" Widget="widget" RefreshToken="refreshToken" />
                     }
                 </div>
             }
@@ -253,6 +271,12 @@
     }
 
     private DashboardDetailDto? detail;
+
+    // Aralıklı yenileme (ADR-0054 dilim 3): seçim yalnızca bu açılış içindir, kaydedilmez; düzenleme sırasında yenileme durur.
+    private int refreshSeconds;
+    private int refreshToken;
+    private DateTimeOffset? lastRefresh;
+    private CancellationTokenSource? refreshStop;
     private List<ReportSummaryDto>? reports;
     private readonly List<EditWidget> widgets = [];
     private string name = string.Empty;
@@ -497,5 +521,49 @@
         {
             message = result.Error;
         }
+    }
+
+    // ---- Aralıklı yenileme
+
+    private void OnRefreshChanged(ChangeEventArgs e)
+    {
+        refreshStop?.Cancel();
+        refreshStop?.Dispose();
+        refreshStop = null;
+        refreshSeconds = int.TryParse(e.Value?.ToString(), out int seconds) && seconds is 60 or 300 or 900 ? seconds : 0;
+        if (refreshSeconds > 0)
+        {
+            refreshStop = new CancellationTokenSource();
+            _ = RefreshLoopAsync(TimeSpan.FromSeconds(refreshSeconds), refreshStop.Token);
+        }
+    }
+
+    private async Task RefreshLoopAsync(TimeSpan interval, CancellationToken stop)
+    {
+        using PeriodicTimer timer = new(interval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stop))
+            {
+                if (editing)
+                {
+                    continue;
+                }
+
+                refreshToken++;
+                lastRefresh = DateTimeOffset.Now;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Seçim değişti ya da sayfa kapandı.
+        }
+    }
+
+    public void Dispose()
+    {
+        refreshStop?.Cancel();
+        refreshStop?.Dispose();
     }
 }
