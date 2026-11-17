@@ -3094,12 +3094,82 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
 
+                    b.Property<string>("Visibility")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Private");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Visibility");
 
                     b.HasIndex("TenantId", "OwnerUserId", "Name")
                         .IsUnique();
 
                     b.ToTable("Dashboards", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Reporting.DashboardDefault", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("DashboardId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "DashboardId");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("DashboardDefaults", "core");
+                });
+
+            modelBuilder.Entity("Modulix.Core.Reporting.DashboardShare", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DashboardId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("TenantId", "Id");
+
+                    b.HasIndex("TenantId", "UserId");
+
+                    b.HasIndex("TenantId", "DashboardId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("DashboardShares", "core");
                 });
 
             modelBuilder.Entity("Modulix.Core.Reporting.DashboardWidget", b =>
@@ -16755,6 +16825,26 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("PlanId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Reporting.DashboardDefault", b =>
+                {
+                    b.HasOne("Modulix.Core.Reporting.Dashboard", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DashboardId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Reporting.DashboardShare", b =>
+                {
+                    b.HasOne("Modulix.Core.Reporting.Dashboard", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "DashboardId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

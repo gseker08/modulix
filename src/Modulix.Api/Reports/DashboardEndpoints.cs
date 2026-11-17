@@ -7,8 +7,9 @@ using Modulix.Shared.Reporting;
 namespace Modulix.Api.Reports;
 
 /// <summary>
-/// Kullanıcı panoları (CRM epik E2, dilim 1). Panoyu açmak ve bileşen verisini okumak <c>core.reports.read</c>, pano oluşturmak, düzenlemek
-/// ve silmek <c>core.reports.manage</c> ister. Pano yalnızca sahibine görünür; başkasının ya da başka firmanın panosu "bulunamadı" döner.
+/// Kullanıcı panoları (CRM epik E2). Panoyu açmak, bileşen verisini okumak ve kendi varsayılanını seçmek <c>core.reports.read</c>, pano
+/// oluşturmak, düzenlemek ve silmek <c>core.reports.manage</c>, paylaşmak <c>core.reports.share</c> ister. Pano sahibine, paylaşıldığı
+/// kullanıcılara ya da firmaya görünür; görünmeyen ya da başka firmanın panosu "bulunamadı", görünen ama başkasının panosunu değiştirmek 403 döner.
 /// Bileşen verisi kayıtlı raporun çalıştırma sonucudur: çağıranın kayıt izni, veri kapsamı ve hassas alan kurallarıyla üretilir.
 /// </summary>
 public static class DashboardEndpoints
@@ -39,6 +40,22 @@ public static class DashboardEndpoints
             await dashboards.DeleteAsync(id, ct) ? Results.NoContent() : NotFound()))
             .RequirePermission(CoreModule.Permissions.ManageReports);
 
+        group.MapPut("/{id:guid}/sharing", (Guid id, ShareDashboardRequest request, IDashboards dashboards, CancellationToken ct) => RunAsync(async () =>
+        {
+            if (!Enum.TryParse<ReportVisibility>(request.Visibility, ignoreCase: true, out var visibility) || !Enum.IsDefined(visibility))
+            {
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]> { ["visibility"] = ["Paylaşım private, users ya da tenant olmalı."] }, statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            return await dashboards.ShareAsync(id, visibility, request.Users ?? [], request.ExpectedVersion, ct) is { } detail ? Results.Ok(ToDto(detail)) : NotFound();
+        })).RequirePermission(CoreModule.Permissions.ShareReports);
+
+        // Varsayılan pano kişiye özeldir: kullanıcı görebildiği bir panoyu kendi varsayılanı yapar (panoyu değiştirmez).
+        group.MapPut("/{id:guid}/default", (Guid id, DefaultDashboardRequest request, IDashboards dashboards, CancellationToken ct) => RunAsync(async () =>
+            await dashboards.SetDefaultAsync(id, request.IsDefault, ct) is { } isDefault ? Results.Ok(new DefaultDashboardResponse(isDefault)) : NotFound()))
+            .RequirePermission(CoreModule.Permissions.ReadReports);
+
         // Bileşen verisi: bağlı raporun çalıştırma sonucu (durum `status` alanında, HTTP 200). Rapor çağırana görünmüyorsa 404.
         group.MapGet("/{id:guid}/widgets/{widgetId:guid}/data", async (Guid id, Guid widgetId, IDashboards dashboards, CancellationToken ct) =>
             await dashboards.RunWidgetAsync(id, widgetId, ct) is { } result ? Results.Ok(ReportEndpoints.ToDto(result)) : NotFound())
@@ -61,6 +78,10 @@ public static class DashboardEndpoints
         {
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Message);
         }
+        catch (DashboardForbiddenException ex)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: ex.Message);
+        }
     }
 
     private static IResult NotFound() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Pano bulunamadı.");
@@ -74,8 +95,9 @@ public static class DashboardEndpoints
 
     private static string Name(Enum value) => JsonNamingPolicy.CamelCase.ConvertName(value.ToString());
 
-    private static DashboardSummaryDto ToDto(DashboardSummary s) => new(s.Id, s.Name, s.WidgetCount, s.UpdatedAt, s.Version);
+    private static DashboardSummaryDto ToDto(DashboardSummary s) => new(
+        s.Id, s.Name, s.WidgetCount, s.UpdatedAt, s.Version, Name(s.Visibility), s.OwnerUserId, s.OwnerName, s.IsOwner, s.IsDefault, s.SharedWithCount);
 
     private static DashboardDetailDto ToDto(DashboardDetail d) => new(
-        ToDto(d.Summary), [.. d.Widgets.Select(w => new DashboardWidgetDto(w.Id, w.ReportId, w.ReportName, Name(w.Kind), w.Title, w.Position))]);
+        ToDto(d.Summary), [.. d.Widgets.Select(w => new DashboardWidgetDto(w.Id, w.ReportId, w.ReportName, Name(w.Kind), w.Title, w.Position))], d.SharedWith);
 }

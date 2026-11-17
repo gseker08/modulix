@@ -1,6 +1,6 @@
 # ADR-0054: Kullanıcı panoları ve pano bileşenleri
 
-- **Durum:** Kabul edildi, 17 Kasım 2026. Dilim 1a (model, servis, uç noktalar) ve 1b (ekran) teslim edildi.
+- **Durum:** Kabul edildi, 17 Kasım 2026. Dilim 1a (model, servis, uç noktalar), 1b (ekran) ve 2 (paylaşım, varsayılan pano) teslim edildi.
 - **Kaynak:** [CRM eksik süreç epikleri](../crm-eksik-surecler-epicleri.md) E2; [öncelik listesi](../oncelikli-isler.md) R2.
 - **İlgili:** ADR-0035 (raporlama ve rapor merkezi), ADR-0020 (tek veritabanı, RLS).
 
@@ -19,6 +19,11 @@ ikinci bir yetki yolu açılmaz.
 - `core.Dashboards`: sahibi, adı (sahibi içinde tekil), sürüm (eşzamanlılık).
 - `core.DashboardWidgets`: pano, kayıtlı rapor, gösterim türü (`Number`, `Bar`), isteğe bağlı başlık, sıra. Pano ve rapora bileşik
   yabancı anahtarla bağlıdır; pano ya da rapor silinince bileşen de silinir.
+- `core.Dashboards.Visibility` (dilim 2): `Private`, `Users`, `Tenant`; kayıtlı raporlarla aynı enum (`ReportVisibility`). Var olan
+  panolar `Private` kalır (sütun varsayılanı).
+- `core.DashboardShares` (dilim 2): pano + kullanıcı (pano içinde tekil), paylaşan, zaman. Panoya bileşik yabancı anahtarla bağlıdır.
+- `core.DashboardDefaults` (dilim 2): kullanıcı + pano; `UNIQUE(TenantId, UserId)` ile kullanıcı başına tek satır. Pano silinince satır da
+  silinir.
 
 Bileşen kendi sorgusunu taşımaz, **kayıtlı bir rapora** bağlanır. Süzgeç, gruplama ve ölçü raporun tanımındadır; kullanıcı raporu
 oluşturucuda bir kez kurar, panoya koyar. Böylece doğrulama, hassas alan ve kapsam kuralları tek yerde (rapor çalıştırıcı) kalır.
@@ -30,6 +35,7 @@ oluşturucuda bir kez kurar, panoya koyar. Böylece doğrulama, hassas alan ve k
 - Yeni izin yok: panoyu açmak ve bileşen verisini okumak `core.reports.read`, pano oluşturmak, düzenlemek ve silmek
   `core.reports.manage` ister.
 - Dilim 1'de pano yalnızca sahibine görünür. Başkasının ya da başka firmanın panosu "bulunamadı" döner (iki durum ayırt edilmez).
+  Dilim 2 ile görünürlük bölüm 6'daki gibidir.
 
 ### 3. Gösterim türleri
 
@@ -47,18 +53,49 @@ gibidir). Bileşen verisi bileşen başına ayrı istekle gelir; ekran bileşenl
 
 Pano oluşturma, güncelleme ve silme `core.dashboard` kaydı olarak denetime yazılır (ad ve bileşenlerin okunabilir özeti).
 
+### 6. Paylaşım (dilim 2)
+
+- Sahibi panoyu **özel**, **seçilen kullanıcılar** ya da **firma** olarak paylaşır. Kalıp kayıtlı raporlarınkiyle aynıdır (ADR-0035 dilim 3:
+  `ReportVisibility`, paylaşım tablosu, her okumada yeniden hesaplanan görünürlük sorgusu). Yeni izin yok: paylaşmak mevcut
+  `core.reports.share` iznini ister; izin tek başına yetmez, çağıran panonun sahibi de olmalıdır.
+- Paylaşılan kişi panoyu **görür**; adı, bileşenleri, paylaşımı yalnızca sahibi değiştirir ve yalnızca sahibi siler. Görünen ama başkasına
+  ait panoda yazma 403, görünmeyen panoda 404 döner. Paylaşım listesini (kimlerle) yalnızca sahibi görür.
+- Paylaşım **veri erişimi vermez** ve raporu da paylaşmaz: bileşen verisi bakan kişinin yetkisiyle gelir; bakan kişi bileşenin raporunu
+  göremiyorsa bileşen veri vermez (rapor adı boş, veri ucu 404). Ekip panosu kuran kişi raporlarını da ayrıca paylaşır; ekran bunu paylaşım
+  panelinde söyler. Panoyu paylaşınca raporları kendiliğinden paylaşmak bilerek yapılmadı: bir raporun kimlere açıldığı tek yerden
+  (rapor paylaşımı) okunabilmeli.
+- Paylaşım kaldırılınca ya da pano özel yapılınca erişim bir sonraki istekte biter (önbellek yok). Seçilen kullanıcılar firmanın etkin
+  üyesi olmalıdır (destek üyeliği sayılmaz); sahibin kendisi listeye yazılmaz.
+- **Rol/departman ile paylaşım bu dilimde yok.** Epik "rol/departman" diyor, ama kayıtlı raporlarda da yalnızca kullanıcı ve firma
+  düzeyi var: `ReportShare` yalnızca `UserId` taşır, role ya da iş birimine göre görünürlük hesaplayan ortak bir altyapı yok. Panoya
+  özel bir rol/birim paylaşımı yazmak aynı kuralı iki yerde iki ayrı biçimde tutmak olurdu. Rol ve iş birimi (BusinessUnit/Team) hedefli
+  paylaşım, rapor ve pano için **birlikte** ve tek altyapıyla dilim 4'te (ADR-0035 A-11 ekip/departman kırılımıyla) ele alınır.
+
+### 7. Varsayılan pano (dilim 2)
+
+- Kullanıcı **görebildiği** panolardan birini kendi varsayılanı yapar (kendisinin ya da kendisiyle paylaşılan). Kişiye özeldir: panoyu ve
+  sürümünü değiştirmez, başkasının varsayılanını etkilemez; `core.reports.read` yeter. Kullanıcı başına tek varsayılan vardır, yenisi
+  eskisinin yerine geçer.
+- Pano listesi varsayılanı başta, kalanları ada göre verir; ekran varsayılanı işaretler.
+- Kullanıcının erişimi bitince (paylaşım kaldırıldı) varsayılan işareti de silinir; pano yeniden paylaşılırsa kendiliğinden varsayılan
+  olmaz.
+- Varsayılan seçimi de `core.dashboard` denetim kaydına yazılır (`isDefault`; kaydın kullanıcısı seçimi yapandır).
+
 ## Uç noktalar
 
 | Uç | İzin | Not |
 |---|---|---|
-| `GET /api/dashboards` | `core.reports.read` | Çağıranın panoları |
+| `GET /api/dashboards` | `core.reports.read` | Çağıranın görebildiği panolar (kendisinin, paylaşılan, firmaya açık); varsayılanı başta |
 | `GET /api/dashboards/{id}` | `core.reports.read` | Bileşenler sırasıyla; görünmeyen raporun adı boş |
 | `POST /api/dashboards` | `core.reports.manage` | Ad + bileşen listesi |
-| `PUT /api/dashboards/{id}` | `core.reports.manage` | Adı ve bileşen listesini bütün olarak değiştirir; `expectedVersion` uyuşmazsa 409 |
-| `DELETE /api/dashboards/{id}` | `core.reports.manage` | |
+| `PUT /api/dashboards/{id}` | `core.reports.manage` | Adı ve bileşen listesini bütün olarak değiştirir; `expectedVersion` uyuşmazsa 409; sahibi değilse 403 |
+| `DELETE /api/dashboards/{id}` | `core.reports.manage` | Sahibi değilse 403 |
+| `PUT /api/dashboards/{id}/sharing` | `core.reports.share` | `{ visibility: private\|users\|tenant, users, expectedVersion }`; sahibi değilse 403, geçersiz `visibility` 400, kullanıcı hatası 422 (`users`) |
+| `PUT /api/dashboards/{id}/default` | `core.reports.read` | `{ isDefault }`; çağıranın kendi varsayılanı; pano görünmüyorsa 404 |
 | `GET /api/dashboards/{id}/widgets/{widgetId}/data` | `core.reports.read` | Raporun çalıştırma sonucu; rapor görünmüyorsa 404 |
 
-Doğrulama hatası 422 ve alan hatasıyla döner (`name`, `widgets`).
+Doğrulama hatası 422 ve alan hatasıyla döner (`name`, `widgets`, `users`). Pano özeti `visibility`, `ownerUserId`, `ownerName`, `isOwner`,
+`isDefault` ve (yalnızca sahibine) `sharedWithCount` taşır; ayrıntıda `sharedWith` yalnızca sahibine dolu gelir.
 
 ## Seçenekler
 
@@ -73,9 +110,9 @@ Doğrulama hatası 422 ve alan hatasıyla döner (`name`, `widgets`).
 |---|---|
 | 1a | Model, servis, uç noktalar, sayı ve çubuk türleri (bu ADR) |
 | 1b | Ekran: pano listesi, pano görünümü, bileşen ekleme ve sıralama |
-| 2 | Paylaşım (kullanıcı, rol/departman) ve varsayılan pano |
+| 2 | Paylaşım (özel, seçilen kullanıcılar, firma) ve kişiye özel varsayılan pano (teslim edildi) |
 | 3 | Canlı yenileme (aralıkla ya da iş olayıyla) |
-| 4 | Ekip/departman kırılımı (ADR-0035 A-11 ile) |
+| 4 | Ekip/departman kırılımı (ADR-0035 A-11 ile); rol ve iş birimi hedefli paylaşım (rapor ve pano birlikte, bölüm 6) |
 
 ## Ekran (dilim 1b)
 
@@ -88,8 +125,29 @@ Doğrulama hatası 422 ve alan hatasıyla döner (`name`, `widgets`).
   seçicisi çağıranın görebildiği ilk 100 raporu listeler.
 - Bakan kişinin artık göremediği raporun bileşeni "Bu rapor artık size görünmüyor" yazar ve düzenlemeye alınmaz; kaydedince panodan düşer.
 
+## Ekran (dilim 2)
+
+- Pano görünümünde başlığın altında rozetler: "Varsayılan", (sahibi değilse) "Paylaşılan", "Sahibi: …" ve (sahibine) "Paylaşım: …".
+  Rozetler mevcut `header-meta` ve `badge` sınıflarıyla çizilir; yeni sınıf ya da token eklenmedi.
+- "Varsayılan yap / Varsayılanı kaldır" düğmesi panoyu görebilen herkese açıktır. "Paylaş" yalnızca sahibine ve `core.reports.share` izni
+  olana, "Düzenle" yalnızca sahibine görünür; paylaşılan pano salt görüntülenir ve bunu bir satırla söyler. Arayüzde gizlemek yetki
+  değildir: aynı kural sunucudadır (403).
+- Paylaşım paneli rapor çalıştırma ekranındakiyle aynıdır (üç seçenek, kullanıcı arama ve işaretleme; `report-builder-section`,
+  `report-member-list`) ve paylaşımın raporları paylaşmadığını söyler.
+- Pano listesinde karo, durumunu metin satırıyla verir ("★ Varsayılan", "Paylaşılan · Sahibi: …", kendi panosunda "Paylaşım: …").
+  Karo içinde rozet sınıfı kullanılmadı: `.tile span` kuralı rozet rengini ezer, yeni CSS yazmak yerine metin tercih edildi.
+
 ## Sonuçlar
 
 - Geriye uyumlu migration: yalnızca iki yeni tablo.
 - Rapor silmek, o rapora bağlı pano bileşenlerini de siler.
-- Paylaşım gelene kadar pano kişiseldir; ekip panosu dilim 2'yi bekler.
+- Dilim 2 migration'ı da yalnızca ekler: `Dashboards.Visibility` sütunu (varsayılan `Private`) ve iki yeni tablo; önceki sürümün kodu yeni
+  şemada çalışır.
+- Ekip panosu için pano ve raporları ayrı ayrı paylaşılır; rol ya da departmana göre paylaşım dilim 4'ü bekler.
+
+## Açık sorular
+
+- **Firma geneli varsayılan pano gerekli mi?** Bugün varsayılan yalnızca kişiseldir. Yöneticinin firmadaki herkes (ya da bir rol) için
+  varsayılan pano belirlemesi istenirse kararlar gerekir: kim belirler (hangi izin), kişisel seçim firma varsayılanını ezer mi, pano
+  firmaya açık olmak zorunda mı, hedef kullanıcı raporları göremiyorsa ne gösterilir. Kodlanmadı; pilot geri bildirimiyle karar verilecek.
+- Panoyu paylaşırken "bağlı raporları da paylaş" kolaylığı sunulsun mu (bölüm 6'da bilerek yapılmadı)?

@@ -14,8 +14,9 @@ public enum DashboardWidgetKind
 
 /// <summary>
 /// Kullanıcının kurduğu pano (CRM epik E2, dilim 1): kayıtlı raporlara bağlı bileşenlerin sıralı listesi. Pano <b>veri erişimi vermez</b>:
-/// her bileşen, bakan kişinin yetkisiyle (kayıt izni, kapsam, hassas alan) çalışır. Bu dilimde pano yalnızca sahibine görünür; paylaşım
-/// sonraki dilimdedir. Tenant verisidir; Row-Level Security ile korunur.
+/// her bileşen, bakan kişinin yetkisiyle (kayıt izni, kapsam, hassas alan) çalışır. Sahibi panoyu seçtiği kullanıcılarla ya da firmayla
+/// paylaşabilir (dilim 2, <see cref="ReportVisibility"/>); paylaşılan kişi panoyu görür, yalnızca sahibi değiştirir. Tenant verisidir;
+/// Row-Level Security ile korunur.
 /// </summary>
 public sealed class Dashboard : ITenantEntity, ICompanyShared
 {
@@ -40,6 +41,9 @@ public sealed class Dashboard : ITenantEntity, ICompanyShared
 
     public string Name { get; private set; } = string.Empty;
 
+    /// <summary>Paylaşım ayarı; kayıtlı raporlarla aynı üç düzey.</summary>
+    public ReportVisibility Visibility { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -53,6 +57,7 @@ public sealed class Dashboard : ITenantEntity, ICompanyShared
             Id = Guid.CreateVersion7(),
             OwnerUserId = ownerUserId,
             Name = NormalizeName(name),
+            Visibility = ReportVisibility.Private,
             CreatedAt = now,
             UpdatedAt = now,
             Version = 1,
@@ -61,6 +66,13 @@ public sealed class Dashboard : ITenantEntity, ICompanyShared
     public void Update(string name, DateTimeOffset now)
     {
         Name = NormalizeName(name);
+        UpdatedAt = now;
+        Version++;
+    }
+
+    public void SetVisibility(ReportVisibility visibility, DateTimeOffset now)
+    {
+        Visibility = visibility;
         UpdatedAt = now;
         Version++;
     }
@@ -124,6 +136,72 @@ public sealed class DashboardWidget : ITenantEntity, ICompanyShared
     }
 }
 
+/// <summary>
+/// Panonun belirli bir kullanıcıyla paylaşımı (<see cref="ReportVisibility.Users"/>). Paylaşım yalnızca panoyu görme hakkıdır; bileşenlerin
+/// bağlı olduğu raporları ve veriyi görme hakkı vermez.
+/// </summary>
+public sealed class DashboardShare : ITenantEntity, ICompanyShared
+{
+    private DashboardShare()
+    {
+        // EF Core için
+    }
+
+    public DashboardShare(Guid dashboardId, Guid userId, Guid createdBy, DateTimeOffset now)
+    {
+        Id = Guid.CreateVersion7();
+        DashboardId = dashboardId;
+        UserId = userId;
+        CreatedBy = createdBy;
+        CreatedAt = now;
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid TenantId { get; private set; }
+
+    public Guid DashboardId { get; private set; }
+
+    public Guid UserId { get; private set; }
+
+    public Guid CreatedBy { get; private set; }
+
+    public DateTimeOffset CreatedAt { get; private set; }
+}
+
+/// <summary>Kullanıcının varsayılan panosu (kişiye özel; kullanıcı başına en çok bir satır). Pano silinince satır da silinir.</summary>
+public sealed class DashboardDefault : ITenantEntity, ICompanyShared
+{
+    private DashboardDefault()
+    {
+        // EF Core için
+    }
+
+    public DashboardDefault(Guid userId, Guid dashboardId, DateTimeOffset now)
+    {
+        Id = Guid.CreateVersion7();
+        UserId = userId;
+        DashboardId = dashboardId;
+        CreatedAt = now;
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid TenantId { get; private set; }
+
+    public Guid UserId { get; private set; }
+
+    public Guid DashboardId { get; private set; }
+
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    public void MoveTo(Guid dashboardId, DateTimeOffset now)
+    {
+        DashboardId = dashboardId;
+        CreatedAt = now;
+    }
+}
+
 public sealed record DashboardWidgetInput(Guid ReportId, DashboardWidgetKind Kind, string? Title);
 
 public sealed record DashboardInput(string Name, IReadOnlyList<DashboardWidgetInput> Widgets);
@@ -131,9 +209,22 @@ public sealed record DashboardInput(string Name, IReadOnlyList<DashboardWidgetIn
 /// <summary><see cref="ReportName"/>: bakan kişi raporu artık göremiyorsa null (bileşen veri göstermez).</summary>
 public sealed record DashboardWidgetView(Guid Id, Guid ReportId, string? ReportName, DashboardWidgetKind Kind, string? Title, int Position);
 
-public sealed record DashboardSummary(Guid Id, string Name, int WidgetCount, DateTimeOffset UpdatedAt, long Version);
+/// <summary><see cref="IsDefault"/> bakan kişiye göredir; <see cref="SharedWithCount"/> yalnızca sahibine dolu gelir.</summary>
+public sealed record DashboardSummary(
+    Guid Id,
+    string Name,
+    int WidgetCount,
+    DateTimeOffset UpdatedAt,
+    long Version,
+    ReportVisibility Visibility,
+    Guid OwnerUserId,
+    string? OwnerName,
+    bool IsOwner,
+    bool IsDefault,
+    int SharedWithCount);
 
-public sealed record DashboardDetail(DashboardSummary Summary, IReadOnlyList<DashboardWidgetView> Widgets);
+/// <summary><see cref="SharedWith"/>: paylaşım listesini yalnızca sahibi görür; başkasına boş gelir.</summary>
+public sealed record DashboardDetail(DashboardSummary Summary, IReadOnlyList<DashboardWidgetView> Widgets, IReadOnlyList<Guid> SharedWith);
 
 /// <summary>Girdi geçersiz (ad, sınır, bileşen). <see cref="Field"/> alan hatası olarak döner.</summary>
 public sealed class DashboardException(string message, string field = "name") : Exception(message)
@@ -144,12 +235,17 @@ public sealed class DashboardException(string message, string field = "name") : 
 /// <summary>Pano başka bir sekmede değiştirildi (sürüm uyuşmuyor). API 409.</summary>
 public sealed class DashboardConflictException(string message) : Exception(message);
 
+/// <summary>Pano görünür ama değiştirme hakkı yok (sahibi değil). API 403.</summary>
+public sealed class DashboardForbiddenException(string message) : Exception(message);
+
 /// <summary>
-/// Aktif tenant'ta çağıranın panoları (CRM epik E2, dilim 1). Pano yalnızca sahibine görünür; başkasının ya da başka firmanın panosu
-/// "bulunamadı"dır. Yazma işlemleri <c>core.dashboard</c> kaydı olarak denetime yazılır. Yetki (<c>core.reports.*</c>) uç noktada denetlenir.
+/// Aktif tenant'ta çağıranın görebildiği panolar (CRM epik E2): kendisinin, firmaya açık olanlar ve kendisiyle paylaşılanlar. Görünürlük her
+/// okumada yeniden hesaplanır; paylaşım kaldırılınca erişim hemen biter. Görünmeyen ya da başka firmanın panosu "bulunamadı"dır. Yazma
+/// yalnızca sahibine açıktır ve <c>core.dashboard</c> kaydı olarak denetime yazılır. Yetki (<c>core.reports.*</c>) uç noktada denetlenir.
 /// </summary>
 public interface IDashboards
 {
+    /// <summary>Çağıranın varsayılan panosu başta, sonra ada göre.</summary>
     Task<IReadOnlyList<DashboardSummary>> ListAsync(CancellationToken cancellationToken);
 
     Task<DashboardDetail?> GetAsync(Guid id, CancellationToken cancellationToken);
@@ -157,9 +253,22 @@ public interface IDashboards
     Task<DashboardDetail> CreateAsync(DashboardInput input, CancellationToken cancellationToken);
 
     /// <summary>Adı ve bileşen listesini bütün olarak değiştirir (sıra listedeki sıradır).</summary>
+    /// <exception cref="DashboardForbiddenException">Çağıran panoyu görüyor ama sahibi değil.</exception>
     Task<DashboardDetail?> UpdateAsync(Guid id, DashboardInput input, long? expectedVersion, CancellationToken cancellationToken);
 
+    /// <exception cref="DashboardForbiddenException">Çağıran panoyu görüyor ama sahibi değil.</exception>
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Paylaşım ayarını değiştirir (yalnızca sahibi). Erişimi biten kullanıcının varsayılan işareti de kalkar.</summary>
+    /// <param name="users">Yalnızca <see cref="ReportVisibility.Users"/> için; tenant'ın etkin üyeleri olmalı.</param>
+    /// <exception cref="DashboardForbiddenException">Çağıran panoyu görüyor ama sahibi değil.</exception>
+    Task<DashboardDetail?> ShareAsync(
+        Guid id, ReportVisibility visibility, IReadOnlyList<Guid> users, long? expectedVersion, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Panoyu çağıranın varsayılanı yapar ya da işareti kaldırır (kişiye özel; önceki varsayılanın yerine geçer). Pano görünmüyorsa null.
+    /// </summary>
+    Task<bool?> SetDefaultAsync(Guid id, bool isDefault, CancellationToken cancellationToken);
 
     /// <summary>
     /// Bileşenin verisi: bağlı rapor çağıranın yetkisiyle çalıştırılır. Pano ya da bileşen yoksa, ya da çağıran raporu göremiyorsa null.
