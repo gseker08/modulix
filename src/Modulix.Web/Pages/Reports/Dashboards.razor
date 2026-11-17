@@ -6,8 +6,9 @@
 
 <PageTitle>@Texts.Get("reports.dashboards.title") · Modulix</PageTitle>
 
-@* Kullanıcının panoları (ADR-0054). Pano yalnızca sahibine görünür; liste kısa ve kişiseldir (en fazla 20), sayfalama ve görünüm yoktur.
-   Kurallar sunucudadır (/api/dashboards; okuma core.reports.read, yazma core.reports.manage). *@
+@* Kullanıcının görebildiği panolar (ADR-0054): kendisinin, kendisiyle paylaşılanlar ve firmaya açık olanlar; varsayılanı başta gelir.
+   Liste kısadır, sayfalama ve görünüm yoktur. Kurallar sunucudadır (/api/dashboards; okuma core.reports.read, yazma core.reports.manage,
+   paylaşım core.reports.share). *@
 <AuthGate Permission="@ReportAccess.Read">
     <a class="back-link" href="raporlar">← @Texts.Get("nav.app.reports")</a>
 
@@ -43,8 +44,14 @@
         <div class="tiles">
             @foreach (var dashboard in dashboards)
             {
+                @* Varsayılan pano listede ilk sıradadır (sunucu sıralar). Durum renkle değil metinle yazılır; karo içinde rozet sınıfı kullanılmaz
+                   (.tile span kuralı rozet rengini ezer). *@
                 <a class="tile" href="raporlar/panolar/@dashboard.Id">
                     <strong>@dashboard.Name</strong>
+                    @if (Marks(dashboard) is { Length: > 0 } marks)
+                    {
+                        <span>@marks</span>
+                    }
                     <span>@Texts.Get("reports.dashboards.widgetCount", dashboard.WidgetCount) · @Texts.Get("reports.dashboards.updated", CrmLabels.Time(dashboard.UpdatedAt))</span>
                 </a>
             }
@@ -70,6 +77,28 @@
         var result = await Api.GetAsync<List<DashboardSummaryDto>>("/api/dashboards");
         dashboards = result.Value;
         message = result.Error;
+    }
+
+    /// <summary>Karonun durum satırı: varsayılan, başkasının paylaştığı pano (sahibiyle) ya da kendi panosunun paylaşım düzeyi.</summary>
+    private static string Marks(DashboardSummaryDto dashboard)
+    {
+        var parts = new List<string>();
+        if (dashboard.IsDefault)
+        {
+            parts.Add("★ " + Texts.Get("reports.dashboards.defaultBadge"));
+        }
+
+        if (!dashboard.IsOwner)
+        {
+            parts.Add(Texts.Get("reports.dashboards.sharedBadge"));
+            parts.Add(Texts.Get("reports.ownerBadge", dashboard.OwnerName ?? "—"));
+        }
+        else if (dashboard.Visibility != "private")
+        {
+            parts.Add(Texts.Get("reports.sharingBadge", ReportCenterLabels.Visibility(dashboard.Visibility, dashboard.SharedWithCount)));
+        }
+
+        return string.Join(" · ", parts);
     }
 
     private async Task CreateAsync()

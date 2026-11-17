@@ -196,6 +196,8 @@ internal sealed class DashboardConfiguration : IEntityTypeConfiguration<Dashboar
         builder.Property(d => d.TenantId).IsRequired();
         builder.Property(d => d.OwnerUserId).IsRequired();
         builder.Property(d => d.Name).HasMaxLength(Dashboard.NameMaxLength).IsRequired();
+        // Sonradan eklenen sütun: var olan panolar özel kalır (geriye uyumlu migration).
+        builder.Property(d => d.Visibility).HasConversion<string>().HasMaxLength(20).HasDefaultValue(ReportVisibility.Private).IsRequired();
         builder.Property(d => d.CreatedAt).IsRequired();
         builder.Property(d => d.UpdatedAt).IsRequired();
         builder.Property(d => d.Version).IsConcurrencyToken();
@@ -204,6 +206,7 @@ internal sealed class DashboardConfiguration : IEntityTypeConfiguration<Dashboar
 
         // Ad kullanıcı içinde tekildir (benzersizlik tenant ile birlikte).
         builder.HasIndex(d => new { d.TenantId, d.OwnerUserId, d.Name }).IsUnique();
+        builder.HasIndex(d => new { d.TenantId, d.Visibility });
     }
 }
 
@@ -233,6 +236,53 @@ internal sealed class DashboardWidgetConfiguration : IEntityTypeConfiguration<Da
             .WithMany()
             .HasForeignKey(w => new { w.TenantId, w.ReportId })
             .HasPrincipalKey(r => new { r.TenantId, r.Id })
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class DashboardShareConfiguration : IEntityTypeConfiguration<DashboardShare>
+{
+    public void Configure(EntityTypeBuilder<DashboardShare> builder)
+    {
+        builder.ToTable("DashboardShares", DatabaseSchemas.Core);
+        builder.HasKey(s => s.Id);
+        builder.Property(s => s.Id).ValueGeneratedNever();
+        builder.Property(s => s.TenantId).IsRequired();
+        builder.Property(s => s.CreatedAt).IsRequired();
+
+        builder.HasAlternateKey(s => new { s.TenantId, s.Id });
+        builder.HasIndex(s => new { s.TenantId, s.DashboardId, s.UserId }).IsUnique();
+        builder.HasIndex(s => new { s.TenantId, s.UserId });
+
+        // Bileşik yabancı anahtar (ADR-0020): paylaşım ile pano aynı tenant'ta olmak zorundadır; pano silinince paylaşımlar da silinir.
+        builder.HasOne<Dashboard>()
+            .WithMany()
+            .HasForeignKey(s => new { s.TenantId, s.DashboardId })
+            .HasPrincipalKey(d => new { d.TenantId, d.Id })
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class DashboardDefaultConfiguration : IEntityTypeConfiguration<DashboardDefault>
+{
+    public void Configure(EntityTypeBuilder<DashboardDefault> builder)
+    {
+        builder.ToTable("DashboardDefaults", DatabaseSchemas.Core);
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).ValueGeneratedNever();
+        builder.Property(x => x.TenantId).IsRequired();
+        builder.Property(x => x.CreatedAt).IsRequired();
+
+        builder.HasAlternateKey(x => new { x.TenantId, x.Id });
+        // Kullanıcının firmada tek varsayılan panosu olur (benzersizlik tenant ile birlikte).
+        builder.HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
+        builder.HasIndex(x => new { x.TenantId, x.DashboardId });
+
+        // Pano silinince varsayılan işareti de silinir.
+        builder.HasOne<Dashboard>()
+            .WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.DashboardId })
+            .HasPrincipalKey(d => new { d.TenantId, d.Id })
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

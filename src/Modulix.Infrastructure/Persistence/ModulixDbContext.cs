@@ -156,6 +156,10 @@ public class ModulixDbContext(
 
     public DbSet<DashboardWidget> DashboardWidgets => Set<DashboardWidget>();
 
+    public DbSet<DashboardShare> DashboardShares => Set<DashboardShare>();
+
+    public DbSet<DashboardDefault> DashboardDefaults => Set<DashboardDefault>();
+
     public DbSet<ReportExport> ReportExports => Set<ReportExport>();
 
     public DbSet<ReportSchedule> ReportSchedules => Set<ReportSchedule>();

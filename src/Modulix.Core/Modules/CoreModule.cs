@@ -694,8 +694,15 @@ public sealed class CoreModule : IModule
         },
         new(AuditedEntityKeys.Dashboard, "Pano", null, new Dictionary<string, string>
         {
-            ["name"] = "Ad", ["widgets"] = "Bileşenler",
-        }, "name"),
+            ["name"] = "Ad", ["widgets"] = "Bileşenler", ["visibility"] = "Paylaşım", ["sharedWith"] = "Paylaşılan kullanıcılar",
+            ["isDefault"] = "Varsayılan pano",
+        }, "name")
+        {
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["visibility"] = new Dictionary<string, string> { ["Private"] = "Özel", ["Users"] = "Seçilen kullanıcılar", ["Tenant"] = "Firma" },
+            },
+        },
         new(AuditedEntityKeys.AuditArchive, "Denetim kaydı arşivi", null, new Dictionary<string, string>
         {
             ["period"] = "Dönem", ["rows"] = "Satır sayısı", ["bytes"] = "Boyut (bayt)", ["sha256"] = "SHA-256 özeti",

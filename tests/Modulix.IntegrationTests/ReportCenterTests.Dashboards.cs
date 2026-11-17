@@ -10,8 +10,9 @@ using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// CRM epik E2, dilim 1: kullanıcı panoları. Pano kayıtlı raporlara bağlı bileşenlerden oluşur, yalnızca sahibine görünür ve veri erişimi
-/// vermez: bileşen verisi bakan kişinin yetkisiyle gelir. Mutlu yol, hata/doğrulama, tenant izolasyonu ve yetki.
+/// CRM epik E2: kullanıcı panoları. Pano kayıtlı raporlara bağlı bileşenlerden oluşur ve veri erişimi vermez: bileşen verisi bakan kişinin
+/// yetkisiyle gelir. Dilim 2: sahibi panoyu seçtiği kullanıcılarla ya da firmayla paylaşır, kullanıcı görebildiği bir panoyu varsayılanı
+/// yapar. Mutlu yol, hata/doğrulama, tenant izolasyonu ve yetki.
 /// </summary>
 public partial class ReportCenterTests
 {
@@ -166,5 +167,196 @@ public partial class ReportCenterTests
             $"{Reports}/{shared.Summary.Id}/sharing", new ShareReportRequest("private", null)));
         Assert.Equal(HttpStatusCode.NotFound, (await WidgetDataAsync(own, dashboard, 0)).StatusCode);
         Assert.Null((await ReadAsync<DashboardDetailDto>(await own.GetAsync($"{Dashboards}/{dashboard.Summary.Id}"))).Widgets[0].ReportName);
+    }
+
+    // ---- Dilim 2: paylaşım ve varsayılan pano
+
+    private static readonly string[] DashboardOwner =
+        [.. DataRead, CoreModule.Permissions.ReadReports, CoreModule.Permissions.ManageReports, CoreModule.Permissions.ShareReports];
+
+    private static Task<HttpResponseMessage> ShareDashboardAsync(HttpClient client, Guid id, string visibility, IReadOnlyList<Guid>? users = null, long? version = null) =>
+        client.PutAsJsonAsync($"{Dashboards}/{id}/sharing", new ShareDashboardRequest(visibility, users, version));
+
+    private static Task<HttpResponseMessage> SetDefaultAsync(HttpClient client, Guid id, bool isDefault) =>
+        client.PutAsJsonAsync($"{Dashboards}/{id}/default", new DefaultDashboardRequest(isDefault));
+
+    private static async Task<List<DashboardSummaryDto>> DashboardsAsync(HttpClient client) =>
+        await ReadAsync<List<DashboardSummaryDto>>(await client.GetAsync(Dashboards));
+
+    [Fact]
+    public async Task A_shared_dashboard_is_visible_to_the_chosen_people_gives_no_data_access_and_revocation_is_immediate()
+    {
+        var s = await SetUpAsync();
+        await OpenAsync(s.Admin, s.CompanyId, "A", 100m);
+        var owner = await UserAsync(s, DashboardOwner, Scope.All);
+        var userTwo = await factory.CreateUserAsync(s.Tenant);
+        await factory.CreateRoleAsync(s.TenantId, [.. DataRead, .. CoreRead], Scope.All, userTwo);
+        var two = await LoginAsync(userTwo);
+        var three = await UserAsync(s, [.. DataRead, .. CoreRead], Scope.All);
+
+        var countOnly = new ReportSpecDto { Dataset = Opportunities, Groups = [new() { Field = "stage" }], Measures = [new() { Aggregation = "count" }] };
+        var open = await SaveAsync(owner, "Firmaya açık rapor", countOnly);
+        await ReadAsync<ReportDetailDto>(await owner.PutAsJsonAsync($"{Reports}/{open.Summary.Id}/sharing", new ShareReportRequest("tenant", null)));
+        var secret = await SaveAsync(owner, "Özel rapor", countOnly);
+        var dashboard = await CreateDashboardAsync(owner, "Ekip panosu", Number(open), Number(secret));
+        var id = dashboard.Summary.Id;
+        var url = $"{Dashboards}/{id}";
+        Assert.Equal(("private", true, 0), (dashboard.Summary.Visibility, dashboard.Summary.IsOwner, dashboard.Summary.SharedWithCount));
+
+        // Özel: başkası bulamaz.
+        Assert.Equal(HttpStatusCode.NotFound, (await two.GetAsync(url)).StatusCode);
+        Assert.Empty(await DashboardsAsync(two));
+
+        // Seçilen kullanıcıyla paylaş: yalnız o görür; paylaşım listesini yalnız sahibi görür.
+        var shared = await ReadAsync<DashboardDetailDto>(await ShareDashboardAsync(owner, id, "users", [userTwo.Id, userTwo.Id], dashboard.Summary.Version));
+        Assert.Equal(("users", 1, dashboard.Summary.Version + 1), (shared.Summary.Visibility, shared.Summary.SharedWithCount, shared.Summary.Version));
+        Assert.Equal([userTwo.Id], shared.SharedWith);
+        var seen = await ReadAsync<DashboardDetailDto>(await two.GetAsync(url));
+        Assert.False(seen.Summary.IsOwner);
+        Assert.NotNull(seen.Summary.OwnerName);
+        Assert.Equal(0, seen.Summary.SharedWithCount);
+        Assert.Empty(seen.SharedWith ?? []);
+        Assert.Equal(id, Assert.Single(await DashboardsAsync(two)).Id);
+        Assert.Equal(HttpStatusCode.NotFound, (await three.GetAsync(url)).StatusCode);
+
+        // Pano veri erişimi vermez: görebildiği raporun bileşeni kendi yetkisiyle çalışır, göremediği raporun bileşeni veri vermez.
+        Assert.Equal("ok", (await ReadAsync<ReportResultDto>(await WidgetDataAsync(two, seen, 0))).Status);
+        Assert.Null(seen.Widgets[1].ReportName);
+        Assert.Equal(HttpStatusCode.NotFound, (await WidgetDataAsync(two, seen, 1)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await two.GetAsync($"{Reports}/{secret.Summary.Id}")).StatusCode);
+
+        // Firmaya aç: üçüncü kişi de görür.
+        await ReadAsync<DashboardDetailDto>(await ShareDashboardAsync(owner, id, "tenant"));
+        Assert.Equal(HttpStatusCode.OK, (await three.GetAsync(url)).StatusCode);
+        Assert.Equal(id, Assert.Single(await DashboardsAsync(three)).Id);
+
+        // Paylaşımı geri al: erişim hemen biter (pano, liste, bileşen verisi).
+        var closed = await ReadAsync<DashboardDetailDto>(await ShareDashboardAsync(owner, id, "private"));
+        Assert.Equal(("private", 0), (closed.Summary.Visibility, closed.Summary.SharedWithCount));
+        foreach (var former in new[] { two, three })
+        {
+            Assert.Equal(HttpStatusCode.NotFound, (await former.GetAsync(url)).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await WidgetDataAsync(former, seen, 0)).StatusCode);
+            Assert.Empty(await DashboardsAsync(former));
+        }
+
+        // Paylaşım değişiklikleri denetim kaydında: oluşturma + üç paylaşım ayarı.
+        using var scope = factory.OpenScope(s.TenantId);
+        var entries = await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().AuditLog
+            .Where(a => a.EntityKey == CoreModule.AuditedEntityKeys.Dashboard && a.RecordId == id)
+            .CountAsync();
+        Assert.Equal(4, entries);
+    }
+
+    [Fact]
+    public async Task Dashboard_sharing_validates_the_visibility_the_selected_users_and_the_version()
+    {
+        var s = await SetUpAsync();
+        var dashboard = await CreateDashboardAsync(s.Admin, "Pano");
+        var id = dashboard.Summary.Id;
+        var member = await factory.CreateUserAsync(s.Tenant);
+        await factory.CreateRoleAsync(s.TenantId, [.. CoreRead], Scope.All, member);
+        var stranger = await factory.CreateUserAsync(await factory.CreateTenantAsync());
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await ShareDashboardAsync(s.Admin, id, "herkes")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await ShareDashboardAsync(s.Admin, id, "7")).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ShareDashboardAsync(s.Admin, id, "users", [])).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ShareDashboardAsync(s.Admin, id, "users", [s.AdminId])).StatusCode);   // yalnızca kendisi
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ShareDashboardAsync(s.Admin, id, "users", [stranger.Id])).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await ShareDashboardAsync(s.Admin, Guid.NewGuid(), "tenant")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await SetDefaultAsync(s.Admin, Guid.NewGuid(), true)).StatusCode);
+        Assert.Equal("private", (await ReadAsync<DashboardDetailDto>(await s.Admin.GetAsync($"{Dashboards}/{id}"))).Summary.Visibility);
+
+        Assert.Equal(HttpStatusCode.OK, (await ShareDashboardAsync(s.Admin, id, "users", [member.Id], dashboard.Summary.Version)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await ShareDashboardAsync(s.Admin, id, "tenant", null, dashboard.Summary.Version)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Another_tenant_never_sees_a_shared_dashboard_and_cannot_share_or_mark_it()
+    {
+        var a = await SetUpAsync();
+        var b = await SetUpAsync();
+        var dashboard = await CreateDashboardAsync(a.Admin, "A panosu");
+        var id = dashboard.Summary.Id;
+        await ReadAsync<DashboardDetailDto>(await ShareDashboardAsync(a.Admin, id, "tenant"));
+
+        // "Firma" paylaşımı yalnızca kendi firmasıdır.
+        Assert.Empty(await DashboardsAsync(b.Admin));
+        Assert.Equal(HttpStatusCode.NotFound, (await b.Admin.GetAsync($"{Dashboards}/{id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await ShareDashboardAsync(b.Admin, id, "private")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await SetDefaultAsync(b.Admin, id, true)).StatusCode);
+
+        // Öteki firmanın kullanıcısıyla paylaşılamaz.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ShareDashboardAsync(a.Admin, id, "users", [b.AdminId])).StatusCode);
+        Assert.Equal("tenant", (await ReadAsync<DashboardDetailDto>(await a.Admin.GetAsync($"{Dashboards}/{id}"))).Summary.Visibility);
+    }
+
+    [Fact]
+    public async Task Only_the_owner_with_the_share_permission_shares_and_a_viewer_cannot_change_the_dashboard()
+    {
+        var s = await SetUpAsync();
+        var owner = await UserAsync(s, DashboardOwner, Scope.All);
+        var dashboard = await CreateDashboardAsync(owner, "Paylaşılan pano");
+        var id = dashboard.Summary.Id;
+        var url = $"{Dashboards}/{id}";
+
+        // Paylaşım izni olmayan kendi panosunu da paylaşamaz.
+        var noShare = await UserAsync(s, [.. DataRead, CoreModule.Permissions.ReadReports, CoreModule.Permissions.ManageReports], Scope.All);
+        var mine = await CreateDashboardAsync(noShare, "Paylaşamam");
+        Assert.Equal(HttpStatusCode.Forbidden, (await ShareDashboardAsync(noShare, mine.Summary.Id, "tenant")).StatusCode);
+        Assert.Equal("private", (await ReadAsync<DashboardDetailDto>(await noShare.GetAsync($"{Dashboards}/{mine.Summary.Id}"))).Summary.Visibility);
+
+        // Rapor izni olmayan varsayılan da seçemez.
+        var noReports = await UserAsync(s, DataRead, Scope.All);
+        Assert.Equal(HttpStatusCode.Forbidden, (await SetDefaultAsync(noReports, id, true)).StatusCode);
+
+        // Paylaşılan kişi yönetme ve paylaşma iznine sahip olsa bile panoyu değiştiremez, silemez, paylaşımını ayarlayamaz.
+        await ReadAsync<DashboardDetailDto>(await ShareDashboardAsync(owner, id, "tenant"));
+        var editor = await UserAsync(s, DashboardOwner, Scope.All);
+        Assert.Equal(HttpStatusCode.OK, (await editor.GetAsync(url)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await editor.PutAsJsonAsync(url, new SaveDashboardRequest("Ele geçirildi"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await editor.DeleteAsync(url)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ShareDashboardAsync(editor, id, "private")).StatusCode);
+
+        var after = await ReadAsync<DashboardDetailDto>(await owner.GetAsync(url));
+        Assert.Equal(("Paylaşılan pano", "tenant"), (after.Summary.Name, after.Summary.Visibility));
+    }
+
+    [Fact]
+    public async Task The_default_dashboard_is_personal_listed_first_and_cleared_when_access_ends()
+    {
+        var s = await SetUpAsync();
+        var owner = await UserAsync(s, DashboardOwner, Scope.All);
+        var viewerUser = await factory.CreateUserAsync(s.Tenant);
+        await factory.CreateRoleAsync(s.TenantId, [.. DataRead, CoreModule.Permissions.ReadReports, CoreModule.Permissions.ManageReports], Scope.All, viewerUser);
+        var viewer = await LoginAsync(viewerUser);
+
+        var team = await CreateDashboardAsync(owner, "Z ekip panosu");
+        await ReadAsync<DashboardDetailDto>(await ShareDashboardAsync(owner, team.Summary.Id, "users", [viewerUser.Id]));
+        var own = await CreateDashboardAsync(viewer, "A kendi panom");
+
+        // Varsayılan yokken ada göre; paylaşılan pano varsayılan yapılınca başa geçer.
+        Assert.Equal([own.Summary.Id, team.Summary.Id], (await DashboardsAsync(viewer)).Select(d => d.Id));
+        Assert.Equal(HttpStatusCode.OK, (await SetDefaultAsync(viewer, team.Summary.Id, true)).StatusCode);
+        var listed = await DashboardsAsync(viewer);
+        Assert.Equal([(team.Summary.Id, true), (own.Summary.Id, false)], listed.Select(d => (d.Id, d.IsDefault)));
+
+        // Kişiye özeldir ve panoyu değiştirmez: sahibinin varsayılanı değildir, sürüm aynı kalır.
+        var ownersView = Assert.Single(await DashboardsAsync(owner));
+        Assert.False(ownersView.IsDefault);
+        Assert.Equal(listed[0].Version, ownersView.Version);
+
+        // Kullanıcı başına tek varsayılan: yenisi eskisinin yerine geçer; işaret kaldırılabilir.
+        Assert.Equal(HttpStatusCode.OK, (await SetDefaultAsync(viewer, own.Summary.Id, true)).StatusCode);
+        Assert.Equal([(own.Summary.Id, true), (team.Summary.Id, false)], (await DashboardsAsync(viewer)).Select(d => (d.Id, d.IsDefault)));
+        Assert.Equal(HttpStatusCode.OK, (await SetDefaultAsync(viewer, own.Summary.Id, false)).StatusCode);
+        Assert.DoesNotContain(await DashboardsAsync(viewer), d => d.IsDefault);
+
+        // Erişim bitince varsayılan işareti de kalkar; pano yeniden paylaşılınca kendiliğinden varsayılan olmaz.
+        Assert.Equal(HttpStatusCode.OK, (await SetDefaultAsync(viewer, team.Summary.Id, true)).StatusCode);
+        await ReadAsync<DashboardDetailDto>(await ShareDashboardAsync(owner, team.Summary.Id, "private"));
+        Assert.Equal(HttpStatusCode.NotFound, (await SetDefaultAsync(viewer, team.Summary.Id, true)).StatusCode);
+        await ReadAsync<DashboardDetailDto>(await ShareDashboardAsync(owner, team.Summary.Id, "tenant"));
+        Assert.Equal([(own.Summary.Id, false), (team.Summary.Id, false)], (await DashboardsAsync(viewer)).Select(d => (d.Id, d.IsDefault)));
     }
 }

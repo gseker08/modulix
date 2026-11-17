@@ -1,5 +1,6 @@
 @page "/raporlar/panolar/{Id:guid}"
 @using System.Net
+@using Modulix.Shared.Auth
 @inject ApiClient Api
 @inject SessionState Session
 @inject NavigationManager Navigation
@@ -30,13 +31,110 @@
     else
     {
         <PageHeader Title="@detail.Summary.Name" Icon="dashboard" Subtitle="@Texts.Get("reports.dashboards.updated", CrmLabels.Time(detail.Summary.UpdatedAt))">
-            @if (!editing && Session.Can(ReportAccess.Manage))
+            @if (!editing)
             {
-                <button type="button" class="btn btn-outline-secondary" @onclick="StartEditAsync">@Texts.Get("reports.dashboards.edit")</button>
+                <button type="button" class="btn btn-outline-secondary" aria-pressed="@(detail.Summary.IsDefault ? "true" : "false")" disabled="@busy" @onclick="ToggleDefaultAsync">
+                    @(detail.Summary.IsDefault ? Texts.Get("reports.dashboards.removeDefault") : Texts.Get("reports.dashboards.makeDefault"))
+                </button>
+                @if (detail.Summary.IsOwner && Session.Can(ReportAccess.Share))
+                {
+                    <button type="button" class="btn btn-outline-secondary" aria-expanded="@(sharing ? "true" : "false")" aria-controls="dash-share" @onclick="ToggleSharingAsync">@Texts.Get("reports.run.share")</button>
+                }
+                @if (detail.Summary.IsOwner && Session.Can(ReportAccess.Manage))
+                {
+                    <button type="button" class="btn btn-outline-secondary" @onclick="StartEditAsync">@Texts.Get("reports.dashboards.edit")</button>
+                }
             }
         </PageHeader>
 
+        <div class="header-meta">
+            @if (detail.Summary.IsDefault)
+            {
+                <span class="badge status-customer">@Texts.Get("reports.dashboards.defaultBadge")</span>
+            }
+            @if (!detail.Summary.IsOwner)
+            {
+                <span class="badge tag">@Texts.Get("reports.dashboards.sharedBadge")</span>
+            }
+            <span class="badge tag">@Texts.Get("reports.ownerBadge", detail.Summary.IsOwner ? Texts.Get("reports.ownerYou") : detail.Summary.OwnerName ?? "—")</span>
+            @if (detail.Summary.IsOwner)
+            {
+                <span class="badge tag">@Texts.Get("reports.sharingBadge", ReportCenterLabels.Visibility(detail.Summary.Visibility, detail.Summary.SharedWithCount))</span>
+            }
+        </div>
+        @if (!detail.Summary.IsOwner)
+        {
+            @* Paylaşılan pano salt görüntülenir: düzenleme, silme ve paylaşım yalnızca sahibindedir (sunucu da 403 döner). *@
+            <p class="text-muted" role="note">@Texts.Get("reports.dashboards.readOnly")</p>
+        }
+
         <Notice Text="@message" Failed="true" />
+
+        @if (sharing && !editing)
+        {
+            <section id="dash-share" class="report-builder-section" aria-labelledby="dash-share-title">
+                <h2 id="dash-share-title">@Texts.Get("reports.run.sharingTitle")</h2>
+                <p class="text-muted">@Texts.Get("reports.dashboards.sharingNote")</p>
+                <fieldset class="mb-3">
+                    <legend class="form-label">@Texts.Get("reports.run.whoCanSee")</legend>
+                    @foreach (var (key, label) in ReportCenterLabels.Visibilities)
+                    {
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="dash-visibility" id="dash-vis-@key" checked="@(shareVisibility == key)" @onchange="() => shareVisibility = key" />
+                            <label class="form-check-label" for="dash-vis-@key">@label</label>
+                        </div>
+                    }
+                </fieldset>
+
+                @if (shareVisibility == "users")
+                {
+                    <div class="mb-3">
+                        <label class="form-label" for="dash-member-filter">@Texts.Get("reports.searchUser")</label>
+                        <input id="dash-member-filter" class="form-control mb-2" type="search" placeholder="@Texts.Get("reports.run.typeName")" @bind="memberFilter" @bind:event="oninput" />
+                        @if (membersError is not null)
+                        {
+                            <div class="alert alert-danger" role="alert">
+                                @membersError
+                                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="LoadMembersAsync">@Texts.Get("crm.sales.retry")</button>
+                            </div>
+                        }
+                        else if (members is null)
+                        {
+                            <LoadingState Rows="3" />
+                        }
+                        else
+                        {
+                            <div class="report-member-list" role="group" aria-label="@Texts.Get("reports.run.shareUsers")">
+                                @foreach (var member in FilteredMembers())
+                                {
+                                    var memberId = member.UserId;
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="dash-mem-@memberId" checked="@shareUsers.Contains(memberId)" @onchange="e => ToggleMember(memberId, e.Value is true)" />
+                                        <label class="form-check-label" for="dash-mem-@memberId">@member.DisplayName</label>
+                                    </div>
+                                }
+                                @if (!FilteredMembers().Any())
+                                {
+                                    <EmptyState Compact="true" Title="@Texts.Get("reports.noUserFound")" />
+                                }
+                            </div>
+                            <p class="small text-muted mt-1" role="status">@Texts.Get("reports.run.usersSelected", shareUsers.Count)</p>
+                        }
+                        <FieldError Field="users" Errors="shareErrors" />
+                    </div>
+                }
+
+                @if (shareError is not null)
+                {
+                    <div class="alert alert-danger" role="alert">@shareError</div>
+                }
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => sharing = false">@Texts.Get("common.dismiss")</button>
+                    <button type="button" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")" @onclick="SaveSharingAsync">@Texts.Get("reports.run.saveSharing")</button>
+                </div>
+            </section>
+        }
 
         @if (editing)
         {
@@ -106,7 +204,7 @@
         }
         else if (detail.Widgets.Count == 0)
         {
-            <EmptyState Icon="dashboard" Title="@Texts.Get("reports.dashboards.noWidgets")" Text="@(Session.Can(ReportAccess.Manage) ? Texts.Get("reports.dashboards.noWidgetsHelp") : null)" />
+            <EmptyState Icon="dashboard" Title="@Texts.Get("reports.dashboards.noWidgets")" Text="@(CanEdit ? Texts.Get("reports.dashboards.noWidgetsHelp") : null)" />
         }
         else
         {
@@ -164,6 +262,19 @@
     private bool busy;
     private IReadOnlyDictionary<string, string[]>? errors;
 
+    // Paylaşım paneli (yalnızca sahibi ve core.reports.share).
+    private bool sharing;
+    private string shareVisibility = "private";
+    private readonly HashSet<Guid> shareUsers = [];
+    private List<TenantMemberResponse>? members;
+    private string? membersError;
+    private string memberFilter = string.Empty;
+    private string? shareError;
+    private IReadOnlyDictionary<string, string[]>? shareErrors;
+
+    /// <summary>Panoyu yalnızca sahibi değiştirir; paylaşılan kişi salt görüntüler.</summary>
+    private bool CanEdit => detail is { Summary.IsOwner: true } && Session.Can(ReportAccess.Manage);
+
     protected override async Task OnParametersSetAsync()
     {
         // Doğrudan açılışta oturum henüz yüklenmemiş olabilir; istek ondan önce giderse yanıt boş döner ve parametre değişmediği için yeniden denenmez.
@@ -178,16 +289,116 @@
             return;
         }
 
-        (detail, editing, message, notFound) = (null, false, null, false);
+        (detail, editing, sharing, message, notFound) = (null, false, false, null, false);
         var result = await Api.GetAsync<DashboardDetailDto>($"/api/dashboards/{Id}");
         detail = result.Value;
         notFound = result.Status == HttpStatusCode.NotFound;
         message = notFound ? null : result.Error;
-        if (detail is not null && EditQuery == "1" && Session.Can(ReportAccess.Manage))
+        if (EditQuery == "1" && CanEdit)
         {
             await StartEditAsync();
         }
     }
+
+    // ---- Varsayılan pano (kişiye özel) ve paylaşım
+
+    private async Task ToggleDefaultAsync()
+    {
+        if (detail is null)
+        {
+            return;
+        }
+
+        busy = true;
+        var wanted = !detail.Summary.IsDefault;
+        var result = await Api.PutAsync<DefaultDashboardResponse>($"/api/dashboards/{detail.Summary.Id}/default", new DefaultDashboardRequest(wanted));
+        busy = false;
+        if (result.Value is { } saved)
+        {
+            detail = detail with { Summary = detail.Summary with { IsDefault = saved.IsDefault } };
+            message = null;
+            Toasts.Success(Texts.Get(saved.IsDefault ? "reports.dashboards.defaultSet" : "reports.dashboards.defaultRemoved"));
+        }
+        else
+        {
+            message = result.Error;
+        }
+    }
+
+    private async Task ToggleSharingAsync()
+    {
+        sharing = !sharing;
+        if (!sharing || detail is null)
+        {
+            return;
+        }
+
+        (shareError, shareErrors) = (null, null);
+        shareVisibility = detail.Summary.Visibility;
+        shareUsers.Clear();
+        foreach (var user in detail.SharedWith ?? [])
+        {
+            shareUsers.Add(user);
+        }
+
+        if (members is null)
+        {
+            await LoadMembersAsync();
+        }
+    }
+
+    private async Task LoadMembersAsync()
+    {
+        membersError = null;
+        var response = await Api.GetAsync<List<TenantMemberResponse>>("/api/tenant/members");
+        members = response.IsSuccess ? response.Value ?? [] : null;
+        membersError = response.Error;
+    }
+
+    private IEnumerable<TenantMemberResponse> FilteredMembers() =>
+        (members ?? []).Where(m => m.UserId != Session.User?.UserId
+            && (memberFilter.Length == 0 || m.DisplayName.Contains(memberFilter, StringComparison.CurrentCultureIgnoreCase)));
+
+    private void ToggleMember(Guid id, bool selected)
+    {
+        if (selected)
+        {
+            shareUsers.Add(id);
+        }
+        else
+        {
+            shareUsers.Remove(id);
+        }
+    }
+
+    private async Task SaveSharingAsync()
+    {
+        if (detail is null)
+        {
+            return;
+        }
+
+        busy = true;
+        (shareError, shareErrors) = (null, null);
+        var users = shareVisibility == "users" ? shareUsers.ToList() : [];
+        var result = await Api.PutAsync<DashboardDetailDto>(
+            $"/api/dashboards/{detail.Summary.Id}/sharing", new ShareDashboardRequest(shareVisibility, users, detail.Summary.Version));
+        busy = false;
+        if (result.Value is { } saved)
+        {
+            detail = saved;
+            sharing = false;
+            Toasts.Success(Texts.Get("reports.run.sharingSaved"));
+            return;
+        }
+
+        shareErrors = result.FieldErrors;
+        shareError = result.Status == HttpStatusCode.Conflict
+            ? Texts.Get("reports.dashboards.shareConflict")
+            : result.FieldErrors.ContainsKey("users") ? null : result.Error;
+    }
+
+    // ---- Düzenleme (yalnızca sahibi)
 
     private async Task StartEditAsync()
     {
@@ -195,6 +406,8 @@
         {
             return;
         }
+
+        sharing = false;
 
         if (reports is null)
         {
