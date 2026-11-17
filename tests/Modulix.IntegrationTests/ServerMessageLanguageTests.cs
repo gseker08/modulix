@@ -96,6 +96,62 @@ public class ServerMessageLanguageTests(ModulixApiFactory factory) : IClassFixtu
         Assert.Equal(("ValidationFailed", "Doğrulama hatası.", "Bilinmeyen alan."), Summary(await InvalidCompanyAsync(client)));
     }
 
+    /// <summary>Dilim 18d-1: CRM'in kendi alan iletisi (vergi numarası uzunluğu) okurun dilinde; kod ve alan adı aynı.</summary>
+    [Fact]
+    public async Task Crm_field_error_comes_in_the_users_language()
+    {
+        var tenant = await CrmTenantAsync();
+        var english = await factory.CreateUserAsync(tenant);
+        var turkish = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, SalesAccess, english, turkish);
+        using var englishClient = await LoginAsync(english, "en");
+        using var turkishClient = await LoginAsync(turkish);
+
+        var inEnglish = await ShortTaxNumberAsync(englishClient);
+        var inTurkish = await ShortTaxNumberAsync(turkishClient);
+
+        Assert.Equal("ValidationFailed", inEnglish["code"]!.GetValue<string>());
+        Assert.Equal("ValidationFailed", inTurkish["code"]!.GetValue<string>());
+        Assert.Equal("The tax number must be 10 digits.", inEnglish["errors"]!["taxNumber"]![0]!.GetValue<string>());
+        Assert.Equal("Vergi numarası 10 haneli olmalıdır.", inTurkish["errors"]!["taxNumber"]![0]!.GetValue<string>());
+    }
+
+    /// <summary>Dilim 18d-1: müşteri adayı iş akışının iletisi hem başlıkta hem alan hatasında okurun dilinde.</summary>
+    [Fact]
+    public async Task Crm_lead_workflow_error_comes_in_the_users_language()
+    {
+        var tenant = await CrmTenantAsync();
+        var english = await factory.CreateUserAsync(tenant);
+        var turkish = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [LeadsRead, LeadsDisqualify], english, turkish);
+        using var englishClient = await LoginAsync(english, "en");
+        using var turkishClient = await LoginAsync(turkish);
+
+        var inEnglish = await DisqualifyWithoutReasonAsync(englishClient);
+        var inTurkish = await DisqualifyWithoutReasonAsync(turkishClient);
+
+        Assert.Equal(("ValidationFailed", "A disqualification reason is required."),
+            (inEnglish["code"]!.GetValue<string>(), inEnglish["errors"]!["disqualificationReason"]![0]!.GetValue<string>()));
+        Assert.Equal("A disqualification reason is required.", inEnglish["title"]!.GetValue<string>());
+        Assert.Equal(("ValidationFailed", "Eleme nedeni zorunludur."),
+            (inTurkish["code"]!.GetValue<string>(), inTurkish["errors"]!["disqualificationReason"]![0]!.GetValue<string>()));
+        Assert.Equal("Eleme nedeni zorunludur.", inTurkish["title"]!.GetValue<string>());
+    }
+
+    private static async Task<JsonObject> ShortTaxNumberAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Dil Vergi A.Ş.", TaxNumber: "123"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        return await ProblemAsync(response);
+    }
+
+    private static async Task<JsonObject> DisqualifyWithoutReasonAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync($"/api/crm/leads/{Guid.NewGuid()}/disqualify", new DisqualifyLeadRequest(1, " "));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        return await ProblemAsync(response);
+    }
+
     private async Task<Tenant> CrmTenantAsync()
     {
         var tenant = await factory.CreateTenantAsync();

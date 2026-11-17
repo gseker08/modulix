@@ -17,7 +17,7 @@ internal static class LookupGuard
     {
         if (value is { } id && id != stored && !await CompanyLinks.CanSeeCompanyAsync(context, id, cancellationToken))
         {
-            errors.Add(new RecordFieldError(field, "Firma bulunamadı."));
+            errors.Add(new RecordFieldError(field, CrmMessages.Lookup.CompanyNotFound));
         }
     }
 
@@ -26,7 +26,7 @@ internal static class LookupGuard
     {
         if (value is { } id && id != stored && !await CompanyLinks.CanSeeContactAsync(context, id, cancellationToken))
         {
-            errors.Add(new RecordFieldError(field, "Kişi bulunamadı."));
+            errors.Add(new RecordFieldError(field, CrmMessages.Lookup.ContactNotFound));
         }
     }
 
@@ -39,7 +39,7 @@ internal static class LookupGuard
     {
         if (value is { } id && id != stored && !await context.CanSeeCampaignAsync(id, cancellationToken))
         {
-            errors.Add(new RecordFieldError(field, "Kampanya bulunamadı."));
+            errors.Add(new RecordFieldError(field, CrmMessages.Lookup.CampaignNotFound));
         }
     }
 
@@ -60,7 +60,7 @@ internal static class LookupGuard
 
         if (!await ContactBelongsToCompanyAsync(context, contact, company, cancellationToken))
         {
-            errors.Add(new RecordFieldError(contactField, "Kişi seçilen firmayla ilişkili değil."));
+            errors.Add(new RecordFieldError(contactField, CrmMessages.Lookup.ContactNotOfCompany));
         }
     }
 
@@ -78,7 +78,7 @@ internal static class LookupGuard
 
         if (!await context.Data.Set<Opportunity>().AsNoTracking().AnyAsync(o => o.Id == opportunity && o.CompanyId == company, cancellationToken))
         {
-            errors.Add(new RecordFieldError("opportunityId", "Fırsat seçilen firmaya ait değil."));
+            errors.Add(new RecordFieldError("opportunityId", CrmMessages.Lookup.OpportunityNotOfCompany));
         }
     }
 

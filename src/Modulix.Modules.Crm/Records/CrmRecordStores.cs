@@ -141,7 +141,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         var parties = Context.Data.Set<Party>();
         var (field, party) = FieldNamed("partyId").Parse(values["partyId"]).Value is Guid partyId
             ? ("partyId", await parties.SingleOrDefaultAsync(p => p.Id == partyId, cancellationToken)
-                ?? throw new RecordValidationException([new RecordFieldError("partyId", "Firma bulunamadı.")]))
+                ?? throw new RecordValidationException([new RecordFieldError("partyId", CrmMessages.Lookup.CompanyNotFound)]))
             : FieldNamed("taxNumber").Parse(values["taxNumber"]).Value is string taxNumber
                 ? ("taxNumber", await parties.SingleOrDefaultAsync(p => p.TaxNumber == taxNumber, cancellationToken))
                 : ("taxNumber", null);
@@ -155,8 +155,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         if (await Context.Data.Set<Company>().AnyAsync(c => c.PartyId == party.Id, cancellationToken))
         {
             // Mevcut firma kapsam dışında olabilir (ADR-0026 K9): ileti kaydın adını, sahibini ya da kimliğini içermez.
-            throw new RecordValidationException([new RecordFieldError(field, await WithReferralHintAsync(
-                field == "partyId" ? "Bu firma CRM'de zaten kayıtlı." : "Bu vergi numarasıyla kayıtlı bir firma var.", cancellationToken))
+            throw new RecordValidationException([new RecordFieldError(field, await WithReferralHintAsync(field == "partyId", cancellationToken))
             {
                 Code = RecordFieldErrorCodes.Duplicate,
             }]);
@@ -177,11 +176,11 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
     /// eklenir (ADR-0026 K9). Kaydın görünür olup olmadığına bakılmaz: ileti ikisinde de aynıdır, böylece kapsam dışı kayıt
     /// ile kapsam içi kayıt ayırt edilemez.
     /// </summary>
-    private async Task<string> WithReferralHintAsync(string message, CancellationToken cancellationToken) =>
+    private async Task<ServerMessage> WithReferralHintAsync(bool sameParty, CancellationToken cancellationToken) =>
         await Context.Access.GetOwnersAsync(EntityKey, cancellationToken) is not null
         && await Context.Access.HidesOutOfScopeSharedRecordsAsync(cancellationToken)
-            ? message + " Kaydı göremiyorsanız yetkili (merkez) kullanıcıya başvurun."
-            : message;
+            ? sameParty ? CrmMessages.Company.AlreadyInCrmReferral : CrmMessages.Company.TaxNumberTakenReferral
+            : sameParty ? CrmMessages.Company.AlreadyInCrm : CrmMessages.Company.TaxNumberTaken;
 
     /// <summary>Vergi numarası taraflar arasında tekildir; başka bir tarafın numarası verilirse alan hatası (409 değil).</summary>
     protected override async Task AppliedAsync(Company entity, JsonObject values, CancellationToken cancellationToken)
@@ -192,7 +191,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
             && await Context.Data.Set<Party>().AnyAsync(p => p.TaxNumber == number && p.Id != entity.PartyId, cancellationToken))
         {
             throw new RecordValidationException([new RecordFieldError(
-                "taxNumber", await WithReferralHintAsync("Bu vergi numarasıyla kayıtlı bir firma var.", cancellationToken))]);
+                "taxNumber", await WithReferralHintAsync(sameParty: false, cancellationToken))]);
         }
 
         // Eski telefon/e-posta/şehir/adres alanları yapılandırılmış ana kayıtlara yansır (ADR-0012).
@@ -251,7 +250,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         if (number.Length != length || !number.All(char.IsAsciiDigit))
         {
             throw new RecordValidationException([new RecordFieldError("taxNumber",
-                entity.Party.Kind == PartyKind.Individual ? "T.C. kimlik numarası 11 haneli olmalıdır." : "Vergi numarası 10 haneli olmalıdır.")]);
+                entity.Party.Kind == PartyKind.Individual ? CrmMessages.Company.NationalIdLength : CrmMessages.Company.TaxNumberLength)]);
         }
     }
 
@@ -265,7 +264,7 @@ internal sealed partial class CompanyRecordStore(CrmStoreContext context) : CrmR
         if (await data.Set<Location>().AnyAsync(l => l.CompanyId == entity.Id, cancellationToken)
             || await data.Set<CompanyRelation>().AnyAsync(r => r.ParentCompanyId == entity.Id || r.ChildCompanyId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Firmanın lokasyonları veya firma ilişkileri var; önce onları kaldırın.");
+            throw new RecordConflictException(CrmMessages.Company.HasDirectory);
         }
 
         data.Set<Address>().RemoveRange(await data.Set<Address>().Where(a => a.CompanyId == entity.Id).ToListAsync(cancellationToken));
@@ -296,7 +295,7 @@ internal sealed partial class ContactRecordStore(CrmStoreContext context) : CrmR
         Field.SharedId<Contact>("personId", c => c.PersonId),
         Field.Text<Contact>("firstName", Person.NameMaxLength, c => c.Person.FirstName, (c, v) => c.Person.FirstName = v!, required: true),
         Field.Text<Contact>("lastName", Person.NameMaxLength, c => c.Person.LastName, (c, v) => c.Person.LastName = v!, required: true),
-        Field.Reference<Contact, Company>("companyId", "Firma bulunamadı.", c => c.CompanyId, (c, v) => c.CompanyId = v),
+        Field.Reference<Contact, Company>("companyId", CrmMessages.Lookup.CompanyNotFound, c => c.CompanyId, (c, v) => c.CompanyId = v),
         Field.Text<Contact>("title", Person.TitleMaxLength, c => c.Person.Title, (c, v) => c.Person.Title = v),
         Field.Email<Contact>("email", Person.EmailMaxLength, c => c.Person.Email, (c, v) => c.Person.Email = v),
         Field.Text<Contact>("phone", Person.PhoneMaxLength, c => c.Person.Phone, (c, v) => c.Person.Phone = v),
@@ -412,10 +411,10 @@ internal sealed partial class ContactRecordStore(CrmStoreContext context) : CrmR
         }
 
         var person = await Context.Data.Set<Person>().SingleOrDefaultAsync(p => p.Id == personId, cancellationToken)
-            ?? throw new RecordValidationException([new RecordFieldError("personId", "Kişi bulunamadı.")]);
+            ?? throw new RecordValidationException([new RecordFieldError("personId", CrmMessages.Lookup.ContactNotFound)]);
         if (await Context.Data.Set<Contact>().AnyAsync(c => c.PersonId == person.Id, cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError("personId", "Bu kişi CRM'de zaten kayıtlı.")]);
+            throw new RecordValidationException([new RecordFieldError("personId", CrmMessages.Contact.AlreadyInCrm)]);
         }
 
         entity.AttachPerson(person);
@@ -532,7 +531,7 @@ internal sealed partial class ContactRecordStore(CrmStoreContext context) : CrmR
             && (scope is null || (owner is { } ownerId && scope.Contains(ownerId)));
         if (!visible)
         {
-            throw new RecordValidationException([new RecordFieldError("companyId", "Firma bulunamadı.")]);
+            throw new RecordValidationException([new RecordFieldError("companyId", CrmMessages.Lookup.CompanyNotFound)]);
         }
     }
 

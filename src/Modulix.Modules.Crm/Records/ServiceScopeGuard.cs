@@ -23,19 +23,19 @@ internal static class ServiceScopeGuard
         var unknown = added.Where(c => !known.ContainsKey(c)).ToList();
         if (unknown.Count > 0)
         {
-            errors.Add(new RecordFieldError(field, $"Katalogda olmayan faaliyet: {string.Join(", ", unknown)}."));
+            errors.Add(new RecordFieldError(field, CrmMessages.Company.UnknownServiceActivities(string.Join(", ", unknown))));
         }
 
         var notActivities = added.Where(c => known.TryGetValue(c, out var info) && info.Kind != ActivityCodeKinds.Activity).ToList();
         if (notActivities.Count > 0)
         {
-            errors.Add(new RecordFieldError(field, $"Hizmet kapsamı için sektör veya grup değil, faaliyet seçilmeli: {string.Join(", ", notActivities)}."));
+            errors.Add(new RecordFieldError(field, CrmMessages.Company.ServiceNotActivity(string.Join(", ", notActivities))));
         }
 
         var inactive = added.Where(c => known.TryGetValue(c, out var info) && info.Kind == ActivityCodeKinds.Activity && !info.IsActive).ToList();
         if (inactive.Count > 0)
         {
-            errors.Add(new RecordFieldError(field, $"Pasif faaliyet eklenemez: {string.Join(", ", inactive)}."));
+            errors.Add(new RecordFieldError(field, CrmMessages.Company.InactiveServiceActivities(string.Join(", ", inactive))));
         }
     }
 }

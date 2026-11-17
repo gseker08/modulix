@@ -18,9 +18,9 @@ internal static class IndustryResolution
         }
 
         var industry = await catalog.ResolveAsync(written, cancellationToken)
-            ?? throw new RecordValidationException([new RecordFieldError("industry", "Katalogda olmayan sektör.")]);
+            ?? throw new RecordValidationException([new RecordFieldError("industry", CrmMessages.Company.IndustryNotInCatalog)]);
         return !industry.IsActive && stored != industry.Code
-            ? throw new RecordValidationException([new RecordFieldError("industry", "Bu sektör artık kullanılmıyor.")])
+            ? throw new RecordValidationException([new RecordFieldError("industry", CrmMessages.Company.IndustryRetired)])
             : industry;
     }
 }

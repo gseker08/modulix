@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Sectors;
 using Modulix.Core.Contracts.Tenancy;
@@ -91,14 +92,14 @@ internal sealed class LeadConversion(
         var read = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Lead, leadId), cancellationToken);
         if (!read.IsSuccess)
         {
-            return RecordResult<LeadConversionPreview>.Fail(read.Error!.Code, read.Error.Message, read.Error.FieldErrors);
+            return RecordResult<LeadConversionPreview>.Fail(read.Error!);
         }
 
         var lead = read.Value!;
         var blockers = new List<string>();
         if (LeadRules.CanConvert(Text(lead, "status") ?? LeadStatus.New) is { } blocked)
         {
-            blockers.Add(blocked);
+            blockers.Add(blocked.Text);
         }
 
         var companyName = Text(lead, "companyName");
@@ -127,17 +128,17 @@ internal sealed class LeadConversion(
         // Dönüşüm izni olmadan hiçbir kayıt açılmaz (aynı denetim son güncellemede boru hattında da yapılır).
         if (!await access.HasPermissionAsync(CrmModule.Permissions.LeadsConvert, cancellationToken))
         {
-            return RecordResult<LeadConversionResult>.Fail(RecordErrorCode.PermissionDenied, "Müşteri adayı dönüştürme izniniz yok.");
+            return RecordResult<LeadConversionResult>.Fail(RecordErrorCode.PermissionDenied, CrmMessages.Lead.ConvertPermissionDenied);
         }
 
         if ((request.CompanyId is not null) == request.CreateCompany)
         {
-            return Invalid<LeadConversionResult>("companyId", "Mevcut bir firma seçin ya da yeni firma oluşturmayı seçin (ikisinden tam biri).");
+            return Invalid<LeadConversionResult>("companyId", CrmMessages.Lead.ConvertCompanyChoice);
         }
 
         if (request.ContactId is not null && request.CreateContact)
         {
-            return Invalid<LeadConversionResult>("contactId", "Mevcut kişi ile yeni kişi oluşturma birlikte seçilemez.");
+            return Invalid<LeadConversionResult>("contactId", CrmMessages.Lead.ConvertContactChoice);
         }
 
         return await pipeline.RunAtomicAsync(ct => ConvertCoreAsync(request, ct), cancellationToken);
@@ -148,7 +149,7 @@ internal sealed class LeadConversion(
         var read = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Lead, request.LeadId), cancellationToken);
         if (!read.IsSuccess)
         {
-            return RecordResult<LeadConversionResult>.Fail(read.Error!.Code, read.Error.Message, read.Error.FieldErrors);
+            return RecordResult<LeadConversionResult>.Fail(read.Error!);
         }
 
         var lead = read.Value!;
@@ -158,21 +159,21 @@ internal sealed class LeadConversion(
             var already = Text(lead, "status") == LeadStatus.Converted;
             return RecordResult<LeadConversionResult>.Fail(
                 already ? RecordErrorCode.Conflict : RecordErrorCode.ValidationFailed,
-                already ? $"{blocked} Fırsat: {Text(lead, "convertedOpportunityId")}" : blocked,
+                already ? CrmMessages.Lead.AlreadyConvertedTo(Text(lead, "convertedOpportunityId") ?? string.Empty) : blocked,
                 [new RecordFieldError("status", blocked)]);
         }
 
         if (lead.Version != request.Version)
         {
             return RecordResult<LeadConversionResult>.Fail(RecordErrorCode.Conflict,
-                $"Müşteri adayı siz düzenlerken değişti (beklenen sürüm {request.Version}, güncel sürüm {lead.Version}). Güncel halini alıp tekrar deneyin.");
+                CrmMessages.Lead.ConvertConcurrency(request.Version, lead.Version));
         }
 
         // Dönüşüm sırasında da nitelendirme koşulları sağlanıyor olmalı (nitelendirmeden sonra veri silinmiş olabilir).
-        var missing = rules.SelectMany(r => r.Check(LeadWorkflow.Snapshot(lead))).Distinct().ToList();
+        var missing = rules.SelectMany(r => r.Check(LeadWorkflow.Snapshot(lead))).DistinctBy(m => m.Text).ToList();
         if (missing.Count > 0)
         {
-            return RecordResult<LeadConversionResult>.Fail(RecordErrorCode.ValidationFailed, "Müşteri adayı dönüştürülemedi: eksik bilgiler var.",
+            return RecordResult<LeadConversionResult>.Fail(RecordErrorCode.ValidationFailed, CrmMessages.Lead.ConvertIncomplete,
                 [.. missing.Select(m => new RecordFieldError("qualification", m))]);
         }
 
@@ -254,7 +255,7 @@ internal sealed class LeadConversion(
             var values = ContactValues(lead, request, companyId);
             if (values is null)
             {
-                return Invalid<LeadConversionResult>("contactFirstName", "Yeni kişi için ad ve soyad gerekir.");
+                return Invalid<LeadConversionResult>("contactFirstName", CrmMessages.Lead.NewContactName);
             }
 
             var created = await pipeline.CreateAsync(new RecordCommand(CrmModule.Entities.Contact, null, values), cancellationToken);
@@ -431,11 +432,13 @@ internal sealed class LeadConversion(
 
     private static Guid? Id(RecordData record, string name) => Guid.TryParse(Text(record, name), out var id) ? id : null;
 
-    private static RecordResult<T> Invalid<T>(string field, string message) =>
+    private static RecordResult<T> Invalid<T>(string field, ServerMessage message) =>
         RecordResult<T>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 
     // Alt işlemin hatası, hangi adımda olduğu belli olacak biçimde taşınır (alan hataları ön ekle).
     private static RecordResult<T> Fail<T>(RecordError error, string step) =>
-        RecordResult<T>.Fail(error.Code, error.Message,
-            error.FieldErrors?.Select(f => new RecordFieldError($"{step}.{f.Field}", f.Message)).ToList());
+        RecordResult<T>.Fail(error with
+        {
+            FieldErrors = error.FieldErrors?.Select(f => f with { Field = $"{step}.{f.Field}" }).ToList(),
+        });
 }

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Records;
@@ -117,10 +118,10 @@ internal sealed class LeadWorkflow(
             return Invalid(blocked, "status");
         }
 
-        var missing = rules.SelectMany(r => r.Check(Snapshot(lead))).Distinct().ToList();
+        var missing = rules.SelectMany(r => r.Check(Snapshot(lead))).DistinctBy(m => m.Text).ToList();
         if (missing.Count > 0)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Müşteri adayı nitelendirilemedi: eksik bilgiler var.",
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, CrmMessages.Lead.QualifyIncomplete,
                 [.. missing.Select(m => new RecordFieldError("qualification", m))]);
         }
 
@@ -138,7 +139,7 @@ internal sealed class LeadWorkflow(
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return Invalid("Eleme nedeni zorunludur.", "disqualificationReason");
+            return Invalid(CrmMessages.Lead.DisqualificationReasonRequired, "disqualificationReason");
         }
 
         if (await LoadAsync(leadId, cancellationToken) is not { Lead: { } lead, Error: null })
@@ -175,12 +176,12 @@ internal sealed class LeadWorkflow(
         var follow = followUpAt ?? await EarliestOpenActivityDueAsync(leadId, cancellationToken);
         if (follow is null)
         {
-            return Invalid("Takip tarihi girin ya da müşteri adayına vadeli bir takip aktivitesi ekleyin.", "followUpAt");
+            return Invalid(CrmMessages.Lead.FollowUpRequired, "followUpAt");
         }
 
         if (followUpAt is not null && followUpAt <= time.GetUtcNow())
         {
-            return Invalid("Takip tarihi gelecekte olmalıdır.", "followUpAt");
+            return Invalid(CrmMessages.Lead.FollowUpInFuture, "followUpAt");
         }
 
         return await UpdateAsync(lead, version, CrmModule.Permissions.LeadsQualify, LeadEventReasons.Nurturing, new JsonObject
@@ -195,7 +196,7 @@ internal sealed class LeadWorkflow(
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return Invalid("Yeniden açma gerekçesi zorunludur.", "statusReason");
+            return Invalid(CrmMessages.Lead.ReopenReasonRequired, "statusReason");
         }
 
         if (await LoadAsync(leadId, cancellationToken) is not { Lead: { } lead, Error: null })
@@ -259,7 +260,7 @@ internal sealed class LeadWorkflow(
         var result = await pipeline.GetAsync(new RecordRef(Key, leadId), cancellationToken);
         return result.IsSuccess
             ? RecordResult<RecordData>.Ok(result.Value!)
-            : RecordResult<RecordData>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
+            : RecordResult<RecordData>.Fail(result.Error!);
     }
 
     private async Task<RecordResult<RecordData>> UpdateAsync(
@@ -291,7 +292,7 @@ internal sealed class LeadWorkflow(
 
     private static string? Trim(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
-    private static RecordResult<RecordData> Invalid(string message, string field) =>
+    private static RecordResult<RecordData> Invalid(ServerMessage message, string field) =>
         RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 
     internal static LeadSnapshot Snapshot(RecordData lead)

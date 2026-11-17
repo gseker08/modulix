@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Crm.Domain;
@@ -36,7 +37,7 @@ internal static class CompanyScope
         return owner is { } ownerId && owners.Contains(ownerId);
     }
 
-    public static RecordValidationException Invalid(string field, string message) => new([new RecordFieldError(field, message)]);
+    public static RecordValidationException Invalid(string field, ServerMessage message) => new([new RecordFieldError(field, message)]);
 
     public static Guid? IdOf(JsonNode? node) =>
         node is JsonValue value && value.TryGetValue<string>(out var text) && Guid.TryParse(text, out var id) ? id : null;
@@ -44,10 +45,10 @@ internal static class CompanyScope
     /// <summary>Firmayı görüp görmediği denetlenir ve ortak kaydıyla yüklenir; erişilemeyen firma "bulunamadı" sayılır.</summary>
     public static async Task<Company> RequireCompanyAsync(CrmStoreContext context, string field, JsonObject values, CancellationToken cancellationToken)
     {
-        var companyId = IdOf(values[field]) ?? throw Invalid(field, "Bu alan zorunludur.");
+        var companyId = IdOf(values[field]) ?? throw Invalid(field, ServerMessages.Validation.Required);
         if (!await CompanyLinks.CanSeeCompanyAsync(context, companyId, cancellationToken))
         {
-            throw Invalid(field, "Firma bulunamadı.");
+            throw Invalid(field, CrmMessages.Lookup.CompanyNotFound);
         }
 
         return await context.Data.Set<Company>().Include(c => c.Party).SingleAsync(c => c.Id == companyId, cancellationToken);
@@ -77,7 +78,7 @@ internal sealed class LocationRecordStore(CrmStoreContext context) : CrmRecordSt
         Field.Text<Location>("code", Location.CodeMaxLength, l => l.Code, (l, v) => l.Code = v),
         Field.Choice<Location>("type", CrmModule.LocationTypes, l => l.Type, (l, v) => l.Type = v),
         Field.Flag<Location>("isActive", l => l.IsActive, (l, v) => l.IsActive = v),
-        Field.Reference<Location, Contact>("contactId", "Kişi bulunamadı.", l => l.ContactId, (l, v) => l.ContactId = v),
+        Field.Reference<Location, Contact>("contactId", CrmMessages.Lookup.ContactNotFound, l => l.ContactId, (l, v) => l.ContactId = v),
         Field.Text<Location>("notes", Company.NotesMaxLength, l => l.Notes, (l, v) => l.Notes = v),
     ];
 
@@ -117,7 +118,7 @@ internal sealed class LocationRecordStore(CrmStoreContext context) : CrmRecordSt
         if (entity.Code is { } code
             && await locations.AnyAsync(l => l.CompanyId == entity.CompanyId && l.Code == code && l.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("code", "Bu kod firmanın başka bir lokasyonunda kullanılıyor."));
+            errors.Add(new RecordFieldError("code", CrmMessages.Company.LocationCodeTaken));
         }
 
         if (entity.ContactId is { } contactId)
@@ -125,11 +126,11 @@ internal sealed class LocationRecordStore(CrmStoreContext context) : CrmRecordSt
             var stored = await locations.AsNoTracking().Where(l => l.Id == entity.Id).Select(l => l.ContactId).SingleOrDefaultAsync(cancellationToken);
             if (stored != contactId && !await CompanyLinks.CanSeeContactAsync(Context, contactId, cancellationToken))
             {
-                errors.Add(new RecordFieldError("contactId", "Kişi bulunamadı."));
+                errors.Add(new RecordFieldError("contactId", CrmMessages.Lookup.ContactNotFound));
             }
             else if (stored != contactId && !await LookupGuard.ContactBelongsToCompanyAsync(Context, contactId, entity.CompanyId, cancellationToken))
             {
-                errors.Add(new RecordFieldError("contactId", "Kişi bu firmayla ilişkili değil."));
+                errors.Add(new RecordFieldError("contactId", CrmMessages.Lookup.ContactNotRelated));
             }
         }
 
@@ -210,7 +211,7 @@ internal sealed class AddressRecordStore(CrmStoreContext context) : CrmRecordSto
         if (entity.LocationId is { } locationId
             && !await Context.Data.Set<Location>().AnyAsync(l => l.Id == locationId && l.CompanyId == entity.CompanyId, cancellationToken))
         {
-            throw CompanyScope.Invalid("locationId", "Lokasyon bu firmaya ait değil.");
+            throw CompanyScope.Invalid("locationId", CrmMessages.Lookup.LocationNotOfCompany);
         }
 
         return (values, false);
@@ -221,7 +222,7 @@ internal sealed class AddressRecordStore(CrmStoreContext context) : CrmRecordSto
         var errors = new List<RecordFieldError>();
         if (entity.Country.Length != Address.CountryLength || !entity.Country.All(char.IsAsciiLetter))
         {
-            errors.Add(new RecordFieldError("country", "İki harfli ülke kodu girin (ör. TR)."));
+            errors.Add(new RecordFieldError("country", CrmMessages.Field.Country));
         }
 
         if (!entity.IsActive)
@@ -233,7 +234,7 @@ internal sealed class AddressRecordStore(CrmStoreContext context) : CrmRecordSto
         if (entity.IsPrimary && await addresses.AnyAsync(
                 a => a.CompanyId == entity.CompanyId && a.LocationId == entity.LocationId && a.IsPrimary && a.IsActive && a.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("isPrimary", "Bu sahipte zaten bir ana adres var; önce onun ana adres işaretini kaldırın."));
+            errors.Add(new RecordFieldError("isPrimary", CrmMessages.Company.PrimaryAddressExists));
         }
 
         if (errors.Count > 0)

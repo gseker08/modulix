@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Crm.Domain;
 
 namespace Modulix.Modules.Crm.Leads;
@@ -16,35 +17,35 @@ namespace Modulix.Modules.Crm.Leads;
 public static class LeadRules
 {
     /// <summary>Atama yalnızca açık Lead'lerde yapılır; elenmiş Lead önce yeniden açılır, dönüşmüş Lead değişmez.</summary>
-    public static string? CanAssign(string status) =>
-        LeadStatus.IsOpen(status) ? null : "Yalnızca açık müşteri adayları atanabilir.";
+    public static ServerMessage? CanAssign(string status) =>
+        LeadStatus.IsOpen(status) ? null : CrmMessages.Lead.AssignOpenOnly;
 
-    public static string? CanStartContacting(string status) =>
-        status is LeadStatus.New or LeadStatus.Nurturing ? null : "İletişime geçilebilmesi için müşteri adayı yeni ya da daha sonra takipte olmalıdır.";
+    public static ServerMessage? CanStartContacting(string status) =>
+        status is LeadStatus.New or LeadStatus.Nurturing ? null : CrmMessages.Lead.ContactingNotAllowed;
 
-    public static string? CanQualify(string status) =>
+    public static ServerMessage? CanQualify(string status) =>
         status is LeadStatus.New or LeadStatus.Contacting or LeadStatus.Nurturing
             ? null
-            : status == LeadStatus.Qualified ? "Müşteri adayı zaten nitelikli." : "Bu durumdaki müşteri adayı nitelendirilemez.";
+            : status == LeadStatus.Qualified ? CrmMessages.Lead.AlreadyQualified : CrmMessages.Lead.QualifyNotAllowed;
 
-    public static string? CanNurture(string status) =>
+    public static ServerMessage? CanNurture(string status) =>
         status is LeadStatus.New or LeadStatus.Contacting or LeadStatus.Qualified
             ? null
-            : status == LeadStatus.Nurturing ? "Müşteri adayı zaten daha sonra takipte (tarihi değiştirmek için yeniden takibe alın)." : "Bu durumdaki müşteri adayı takibe alınamaz.";
+            : status == LeadStatus.Nurturing ? CrmMessages.Lead.AlreadyNurturing : CrmMessages.Lead.NurtureNotAllowed;
 
-    public static string? CanDisqualify(string status) =>
-        LeadStatus.IsOpen(status) ? null : "Yalnızca açık müşteri adayları elenebilir.";
+    public static ServerMessage? CanDisqualify(string status) =>
+        LeadStatus.IsOpen(status) ? null : CrmMessages.Lead.DisqualifyOpenOnly;
 
-    public static string? CanReopen(string status) =>
+    public static ServerMessage? CanReopen(string status) =>
         status == LeadStatus.Disqualified ? null
-        : status == LeadStatus.Converted ? "Dönüştürülmüş müşteri adayı yeniden açılamaz."
-        : "Yalnızca elenmiş müşteri adayı yeniden açılabilir.";
+        : status == LeadStatus.Converted ? CrmMessages.Lead.ConvertedCannotReopen
+        : CrmMessages.Lead.ReopenDisqualifiedOnly;
 
     /// <summary>Dönüşüm yalnızca nitelikli Lead'lerde ve yalnızca bir kez yapılır.</summary>
-    public static string? CanConvert(string status) =>
+    public static ServerMessage? CanConvert(string status) =>
         status == LeadStatus.Qualified ? null
-        : status == LeadStatus.Converted ? "Müşteri adayı zaten dönüştürülmüş."
-        : "Yalnızca nitelikli müşteri adayı dönüştürülebilir.";
+        : status == LeadStatus.Converted ? CrmMessages.Lead.AlreadyConverted
+        : CrmMessages.Lead.ConvertQualifiedOnly;
 
     /// <summary>Yeniden açılan Lead, ilk teması gerçekleşmişse İletişimde, değilse Yeni durumuna döner.</summary>
     public static string ReopenedStatus(DateTimeOffset? firstContactAt) =>
@@ -96,28 +97,28 @@ public sealed record LeadSnapshot(
 public interface ILeadQualificationRule
 {
     /// <summary>Eksikler (kullanıcıya gösterilecek); boş liste koşulun sağlandığını gösterir.</summary>
-    IReadOnlyList<string> Check(LeadSnapshot lead);
+    IReadOnlyList<ServerMessage> Check(LeadSnapshot lead);
 }
 
 /// <summary>Asgari koşul: bir ihtiyaç ifadesi ve ulaşılabilir bir iletişim bilgisi (e-posta, telefon ya da mevcut kişi).</summary>
 public sealed class MinimumQualificationRule : ILeadQualificationRule
 {
-    public IReadOnlyList<string> Check(LeadSnapshot lead)
+    public IReadOnlyList<ServerMessage> Check(LeadSnapshot lead)
     {
-        var missing = new List<string>();
+        var missing = new List<ServerMessage>();
         if (IsBlank(lead.NeedDescription) && IsBlank(lead.Description) && IsBlank(lead.ProductInterest))
         {
-            missing.Add("İhtiyaç: açıklama, ihtiyaç ya da ilgilenilen ürün/hizmet girilmeli.");
+            missing.Add(CrmMessages.Lead.MissingNeed);
         }
 
         if (IsBlank(lead.Email) && IsBlank(lead.Phone) && lead.ContactId is null)
         {
-            missing.Add("İletişim: e-posta, telefon ya da mevcut kişi girilmeli.");
+            missing.Add(CrmMessages.Lead.MissingContact);
         }
 
         if (IsBlank(lead.FirstName) && IsBlank(lead.LastName) && IsBlank(lead.CompanyName) && lead.CompanyId is null && lead.ContactId is null)
         {
-            missing.Add("Talep sahibi: ad, firma adı ya da mevcut firma/kişi girilmeli.");
+            missing.Add(CrmMessages.Lead.MissingRequester);
         }
 
         return missing;

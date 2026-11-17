@@ -211,7 +211,7 @@ internal static class LeadEndpoints
         var start = from ?? end.AddDays(-30);
         if (start >= end)
         {
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Geçersiz tarih aralığı.", detail: "Başlangıç, bitişten önce olmalıdır.");
+            return LocalizedProblems.Problem(StatusCodes.Status400BadRequest, CrmMessages.Lead.ReportRangeTitle, CrmMessages.Lead.ReportRangeDetail);
         }
 
         var cohort = await ReadAllAsync(pipeline, new Dictionary<string, string>

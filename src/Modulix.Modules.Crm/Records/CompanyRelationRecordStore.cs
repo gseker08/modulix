@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
 
@@ -76,17 +77,17 @@ internal sealed class CompanyRelationRecordStore(CrmStoreContext context) : CrmR
         {
             if (id is null)
             {
-                errors.Add(new RecordFieldError(name, "Bu alan zorunludur."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.Required));
             }
             else if (!await CompanyLinks.CanSeeCompanyAsync(Context, id.Value, cancellationToken))
             {
-                errors.Add(new RecordFieldError(name, "Firma bulunamadı."));
+                errors.Add(new RecordFieldError(name, CrmMessages.Lookup.CompanyNotFound));
             }
         }
 
         if (errors.Count == 0 && parentId == childId)
         {
-            errors.Add(new RecordFieldError("childCompanyId", "Bir firma kendisine bağlanamaz."));
+            errors.Add(new RecordFieldError("childCompanyId", CrmMessages.Company.SelfRelation));
         }
 
         if (errors.Count > 0)
@@ -107,7 +108,7 @@ internal sealed class CompanyRelationRecordStore(CrmStoreContext context) : CrmR
         entity.IsActive = entity.EndDate is null;
         if (!entity.IsActive && entity.EndDate < entity.StartDate)
         {
-            errors.Add(new RecordFieldError("endDate", "Bitiş tarihi başlangıçtan önce olamaz."));
+            errors.Add(new RecordFieldError("endDate", CrmMessages.Field.EndBeforeStart));
         }
 
         HashSet<Guid>? group = null;
@@ -116,7 +117,7 @@ internal sealed class CompanyRelationRecordStore(CrmStoreContext context) : CrmR
             if (await Context.Data.Set<CompanyRelation>().AnyAsync(r => r.IsActive && r.Id != entity.Id
                     && r.ParentCompanyId == entity.ParentCompanyId && r.ChildCompanyId == entity.ChildCompanyId, cancellationToken))
             {
-                errors.Add(new RecordFieldError("childCompanyId", "Bu iki firma arasında zaten aktif bir ilişki var."));
+                errors.Add(new RecordFieldError("childCompanyId", CrmMessages.Company.RelationExists));
             }
             else
             {
@@ -124,7 +125,7 @@ internal sealed class CompanyRelationRecordStore(CrmStoreContext context) : CrmR
                 var descendants = await ReachAsync(entity.ChildCompanyId, entity.Id, down: true, cancellationToken);
                 if (descendants.Contains(entity.ParentCompanyId))
                 {
-                    errors.Add(new RecordFieldError("childCompanyId", "Bu bağ firma hiyerarşisinde döngü oluşturur."));
+                    errors.Add(new RecordFieldError("childCompanyId", CrmMessages.Company.RelationCycle));
                 }
                 else
                 {
