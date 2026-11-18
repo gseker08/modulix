@@ -116,6 +116,11 @@ public sealed class DatasetCatalogTests
         Assert.Throws<InvalidOperationException>(() => Catalog(With(Dataset with { Columns = [.. Dataset.Columns, unit with { DerivedFrom = "stage" }] })));
         Assert.Throws<InvalidOperationException>(() => Catalog(With(Dataset with { Columns = [.. Dataset.Columns, unit with { Use = ColumnUse.Measure | ColumnUse.Show }] })));
 
+        // Üst departmana toplama yalnızca departman sütununda ve negatif olmayan derinlikle geçerlidir.
+        Assert.Single(Catalog(With(Dataset with { Columns = [.. Dataset.Columns, unit with { RollUpToDepth = 1 }] })).FindDataset("sales.deals")!.Value.Dataset.Columns, c => c.RollUpToDepth == 1);
+        Assert.Throws<InvalidOperationException>(() => Catalog(With(Dataset with { Columns = [.. Dataset.Columns, unit with { RollUpToDepth = -1 }] })));
+        Assert.Throws<InvalidOperationException>(() => Catalog(With(Dataset with { Columns = [.. Dataset.Columns, team with { RollUpToDepth = 1 }] })));
+
         // Türetme yalnızca departman ve ekip sütunlarına özgüdür.
         Assert.Throws<InvalidOperationException>(() => Catalog(With(Dataset with
         {

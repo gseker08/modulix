@@ -128,6 +128,44 @@ public partial class ReportCenterTests
     }
 
     [Fact]
+    public async Task The_top_unit_column_rolls_sub_units_into_their_main_department_without_double_counting()
+    {
+        var s = await SetUpAsync();
+        var org = await SeedOrgAsync(s);
+
+        // İkinci sorumlu "Satış"ın alt birimine taşınır: kendi departmanı alt birimdir, ana departmanı yine "Satış"tır.
+        Guid field;
+        using (var scope = factory.OpenScope(s.TenantId))
+        {
+            var units = scope.ServiceProvider.GetRequiredService<IBusinessUnitService>();
+            field = (await units.CreateAsync(org.SalesUnit, "Saha", null, BusinessUnitKinds.Other, CancellationToken.None))!.Unit.Id;
+            Assert.True(await units.SetMembershipBusinessUnitAsync(await factory.GetMembershipIdAsync(org.Owners[1], s.TenantId), field, CancellationToken.None));
+        }
+
+        var own = await RunAsync(s.Admin, CountBy("ownerUnit", org.Owners));
+        Assert.Equal(3, own.Rows.Count);
+        Assert.Equal(1m, Cell(own.Rows.Single(r => Label(r)!.EndsWith("Saha", StringComparison.Ordinal)), 1));
+
+        var top = await RunAsync(s.Admin, CountBy("ownerTopUnit", org.Owners));
+        Assert.Equal("ok", top.Status);
+        Assert.Equal(2, top.Rows.Count);
+        var sales = top.Rows.Single(r => Label(r)!.EndsWith("Satış", StringComparison.Ordinal));
+        Assert.Equal(3m, Cell(sales, 1));
+        Assert.Equal(org.SalesUnit.ToString(), sales.Keys[0]);
+        Assert.Equal(1m, Cell(top.Rows.Single(r => Label(r)!.EndsWith("Destek", StringComparison.Ordinal)), 1));
+        Assert.Equal(4m, top.Rows.Sum(r => Cell(r, 1)));
+
+        // Süzgeç ana departman kimliğiyle alt birimdeki kayıtları da getirir.
+        var inSales = await RunAsync(s.Admin, new ReportSpecDto
+        {
+            Dataset = Opportunities,
+            Columns = ["title"],
+            Filters = [OwnedBy(org.Owners), new() { Field = "ownerTopUnit", Operator = "equals", Value = org.SalesUnit.ToString() }],
+        });
+        Assert.Equal(["A1", "A2", "B1"], inSales.Rows.Select(r => r.Cells[0].GetString()!).Order().ToArray());
+    }
+
+    [Fact]
     public async Task Org_breakdown_validates_filter_values_and_ready_reports_run()
     {
         var s = await SetUpAsync();
