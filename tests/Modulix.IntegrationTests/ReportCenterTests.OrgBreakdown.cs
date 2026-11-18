@@ -5,6 +5,7 @@ using Modulix.Core.Teams;
 using Modulix.Shared.Crm;
 using Modulix.Shared.Reporting;
 using Scope = Modulix.Core.Contracts.Authorization.RecordScope;
+using static Modulix.Modules.Crm.CrmModule.Permissions;
 
 namespace Modulix.IntegrationTests;
 
