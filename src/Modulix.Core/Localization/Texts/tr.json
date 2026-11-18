@@ -5064,6 +5064,8 @@
   "reports.kind.choice": "Seçim",
   "reports.kind.lookup": "Kayıt",
   "reports.kind.user": "Kullanıcı",
+  "reports.kind.businessUnit": "Departman",
+  "reports.kind.team": "Ekip",
   "reports.frequency.daily": "Her gün",
   "reports.frequency.weekly": "Her hafta",
   "reports.frequency.monthly": "Her ay",
