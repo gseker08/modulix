@@ -19,6 +19,15 @@ public enum DatasetColumnKind
 
     /// <summary>Kullanıcı (kimlik); etiket firmanın etkin üyesinin adıdır. Katalog seçenek olarak etkin üyeleri verir.</summary>
     User = 9,
+
+    /// <summary>
+    /// Kullanıcı sütunundan türetilen departman (ADR-0054 dilim 4b): <see cref="DatasetColumn.DerivedFrom"/> kullanıcı sütununun bugünkü departmanı.
+    /// Kayıtta saklanmaz; rapor çalışırken <see cref="Tenancy.IBusinessUnitDirectory"/> ile çözülür. Etiket departman yoludur.
+    /// </summary>
+    BusinessUnit = 10,
+
+    /// <summary>Kullanıcı sütunundan türetilen birincil ekip (<see cref="Tenancy.ITeamDirectory"/>; kullanıcının en önce katıldığı ekip).</summary>
+    Team = 11,
 }
 
 [Flags]
@@ -49,6 +58,12 @@ public sealed record DatasetOption(string Key, string Label);
 /// </summary>
 public sealed record DatasetColumn(string Field, string Label, DatasetColumnKind Kind, ColumnUse Use)
 {
+    /// <summary>
+    /// <see cref="DatasetColumnKind.BusinessUnit"/> ve <see cref="DatasetColumnKind.Team"/> sütunlarının kaynağı: aynı veri kümesindeki
+    /// <see cref="DatasetColumnKind.User"/> sütununun alanı. Kaynak sütun çağıranın izni olmadığı için görünmüyorsa türetilen de görünmez.
+    /// </summary>
+    public string? DerivedFrom { get; init; }
+
     /// <summary>Tutar sütununun para birimi alanı (aynı kayıtta); tutar toplamları para birimine göre ayrılır.</summary>
     public string? CurrencyField { get; init; }
 

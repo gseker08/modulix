@@ -113,7 +113,7 @@ Doğrulama hatası 422 ve alan hatasıyla döner (`name`, `widgets`, `users`). P
 | 2 | Paylaşım (özel, seçilen kullanıcılar, firma) ve kişiye özel varsayılan pano (teslim edildi) |
 | 3 | Canlı yenileme: aralıkla (teslim edildi, 17.11.2026); iş olayıyla yenileme (sunucudan itme) ayrı karar ister, kodlanmadı |
 | 4a | Rol, ekip ve iş birimi hedefli paylaşım (rapor ve pano birlikte, bölüm 6); kodlandı (17 Kasım 2026; aşağıda "Dilim 4a") |
-| 4b | Ekip/departman kırılımı (ADR-0035 A-11 ile); çift sayım kararı bekliyor |
+| 4b | Ekip/departman kırılımı (ADR-0035 A-11 ile): yapıldı (18 Kasım 2026; aşağıda "Dilim 4b") |
 
 ## Dilim 4a: rol, ekip ve iş birimi hedefli paylaşım (tasarım ve uygulama, 17 Kasım 2026)
 
@@ -187,3 +187,24 @@ bekler. İş birimi hedefinde **alt birimler dahildir**.
   varsayılan pano belirlemesi istenirse kararlar gerekir: kim belirler (hangi izin), kişisel seçim firma varsayılanını ezer mi, pano
   firmaya açık olmak zorunda mı, hedef kullanıcı raporları göremiyorsa ne gösterilir. Kodlanmadı; pilot geri bildirimiyle karar verilecek.
 - Panoyu paylaşırken "bağlı raporları da paylaş" kolaylığı sunulsun mu (bölüm 6'da bilerek yapılmadı)?
+
+## Dilim 4b: departman ve ekip kırılımı (18 Kasım 2026)
+
+Kararlar (kullanıcı, 18 Kasım): **çift sayım yok, tek birincil üyelik**; boyutlar **iş birimi (departman) + ekip**.
+
+- **Türetilmiş sütun.** Veri kümesi `DatasetColumnKind.BusinessUnit` / `Team` sütunu bildirir ve `DerivedFrom` ile aynı kümedeki kullanıcı (ya da kullanıcı
+  tutan lookup) sütununa bağlar. Değer kayıtta saklanmaz: `ReportRunner` kaydı okuduktan sonra, hesaptan önce, yalnızca raporun kullandığı türetilmiş sütun için
+  `IBusinessUnitDirectory.UnitsOfUsersAsync` ve yeni `ITeamDirectory.PrimaryTeamsOfUsersAsync` ile bellekte doldurur. Gruplama, süzgeç, tablo sütunu, ayrıntı
+  (drill), pano bileşeni ve dışa aktarma aynı yoldan çalışır; ayrı pano koduna gerek yoktur.
+- **Çift sayım kuralı.** Her kayıt tek kovaya girer: sorumlunun tek departmanı ve **birincil ekibi = en önce katıldığı ekip** (üyelik kimliği Guid v7, zaman sıralı).
+  Ekibi/departmanı olmayan sorumlunun kaydı boş kovadadır. Böylece kovaların toplamı kayıt sayısına eşittir. Bugünkü sorumluya göre hesaplanır (tarihsel sahiplik
+  yoktur, ADR-0035 ile aynı sınır).
+- **Alt birimler.** Kova tam departmandır (etiket "Merkez › Satış" yoludur); "alt birimler dahil" toplamı yapılmadı: üst birim satırı yalnız kendi doğrudan üyelerini sayar.
+  Süzgeçte birden çok birim `In` ile seçilir. Birim ağacı toplamı ayrı bir iş olarak kaldı.
+- **Yetki.** Kayıtlar yine kayıt boru hattından (izin, kapsam, hassas alan) geçer; kaynak sütun hassas alan nedeniyle görünmüyorsa türetilen de görünmez. Departman ve ekip
+  adları erişim yetkisi sayılmaz (`IBusinessUnitDirectory` ile aynı).
+- **Sözleşme.** `Core.Contracts/Tenancy/ITeamDirectory` (ekip listesi ve birincil ekip), `TeamDirectory` Infrastructure'da. Şema değişikliği ve migration yoktur.
+- **CRM.** Fırsat, müşteri adayı, teklif ve firma veri kümelerine "Sorumlunun departmanı" (`ownerUnit`) ve "Sorumlunun ekibi" (`ownerTeam`); hazır raporlar
+  "Departmana göre kazanılan fırsatlar" ve "Ekibe göre kazanılan fırsatlar".
+- **Testler.** `DatasetCatalogTests` (türetme doğrulaması), `ReportCenterTests.OrgBreakdown.cs` (kırılım ve çift sayım, doğrulama, tenant izolasyonu, kayıt kapsamı ve izin).
+- **Yapılmadı.** Ekip kırılımı için kullanıcının birincil ekibini seçme (şimdilik ilk katıldığı ekip); alt birimler dahil toplam; diğer modüllerin veri kümeleri.

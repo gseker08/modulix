@@ -90,7 +90,7 @@ public static class ReportCenterLabels
     internal static readonly (string Key, string Label)[] KindSource =
     [
         ("text", "Metin"), ("number", "Sayı"), ("money", "Tutar"), ("date", "Tarih"), ("dateTime", "Tarih ve saat"), ("flag", "Evet/Hayır"),
-        ("choice", "Seçim"), ("lookup", "Kayıt"), ("user", "Kullanıcı"),
+        ("choice", "Seçim"), ("lookup", "Kayıt"), ("user", "Kullanıcı"), ("businessUnit", "Departman"), ("team", "Ekip"),
     ];
 
     internal static readonly (string Key, string Label)[] FrequencySource = [("daily", "Her gün"), ("weekly", "Her hafta"), ("monthly", "Her ay")];

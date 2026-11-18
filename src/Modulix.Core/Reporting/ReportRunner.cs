@@ -28,6 +28,8 @@ public sealed class ReportRunner(
     IChoiceLists choiceLists,
     ILookupSearch lookups,
     ITenantMembers members,
+    IBusinessUnitDirectory units,
+    ITeamDirectory teams,
     ITenantClock clock) : IReportRunner
 {
     public async Task<ReportResult> RunAsync(ReportRunRequest request, CancellationToken cancellationToken)
@@ -69,9 +71,44 @@ public sealed class ReportRunner(
             return ReportResult.Failed(status, [new ReportIssue(ReportIssueCode.NoAccess, null, error.Message)], now, dataset.DisplayName, dataset.Version);
         }
 
+        await DeriveAsync(spec, columns, read.Rows, cancellationToken);
         var computation = ReportAggregator.Compute(spec, columns, read.Rows, request.Drill, day.Zone);
         var result = await BuildAsync(request, spec, columns, dataset, computation, read, day, cancellationToken);
         return result with { Issues = [.. result.Issues, .. DriftIssues(request, dataset)] };
+    }
+
+    /// <summary>
+    /// Türetilmiş sütunlar (departman, ekip; ADR-0054 dilim 4b): kaynak kullanıcı sütunundan, kayıt okunduktan sonra ve hesaptan önce bellekte doldurulur.
+    /// Her kayıt tek kovaya girer (kullanıcının tek departmanı, birincil ekibi), bu yüzden toplamlar kırılımlarda iki kez sayılmaz; departman ya da
+    /// ekibi olmayan kullanıcının kaydı boş kovadadır. Yalnızca raporun kullandığı türetilmiş sütun için sorgu yapılır.
+    /// </summary>
+    private async Task DeriveAsync(ReportSpec spec, ReportColumnSet columns, List<RecordData> rows, CancellationToken cancellationToken)
+    {
+        var used = spec.Columns.Concat(spec.Filters.Select(f => f.Field)).Concat(spec.Groups.Select(g => g.Field))
+            .Concat(spec.Sort is { } sort ? [sort.Field] : [])
+            .Distinct(StringComparer.Ordinal)
+            .Select(columns.Find)
+            .Where(c => c is { Kind: DatasetColumnKind.BusinessUnit or DatasetColumnKind.Team, DerivedFrom: not null })
+            .Select(c => c!)
+            .ToList();
+        foreach (var column in used)
+        {
+            var userIds = rows
+                .Select(r => Guid.TryParse(ReportAggregator.Text(ReportAggregator.Raw(r.Values, column.DerivedFrom!)), out var id) ? id : Guid.Empty)
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
+            var map = column.Kind == DatasetColumnKind.BusinessUnit
+                ? await units.UnitsOfUsersAsync(userIds, cancellationToken)
+                : await teams.PrimaryTeamsOfUsersAsync(userIds, cancellationToken);
+            foreach (var row in rows)
+            {
+                if (Guid.TryParse(ReportAggregator.Text(ReportAggregator.Raw(row.Values, column.DerivedFrom!)), out var userId) && map.TryGetValue(userId, out var target))
+                {
+                    row.Values[column.Field] = target.ToString();
+                }
+            }
+        }
     }
 
     private static IEnumerable<ReportIssue> DriftIssues(ReportRunRequest request, DatasetDefinition dataset)
@@ -174,7 +211,7 @@ public sealed class ReportRunner(
             }
         }
 
-        var labeler = new Labeler(choiceLists, lookups, members);
+        var labeler = new Labeler(choiceLists, lookups, members, units, teams);
         if (spec.IsSummary && request.Drill is null)
         {
             return await SummaryAsync(spec, columns, dataset, computation, read, day, issues, labeler, cancellationToken);
@@ -266,7 +303,7 @@ public sealed class ReportRunner(
         var slice = computation.Matched.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
         var labelMap = new Dictionary<string, IReadOnlyDictionary<string, string>>();
-        foreach (var column in shown.Where(c => c.Kind is DatasetColumnKind.Choice or DatasetColumnKind.Lookup or DatasetColumnKind.User))
+        foreach (var column in shown.Where(c => c.Kind is DatasetColumnKind.Choice or DatasetColumnKind.Lookup or DatasetColumnKind.User or DatasetColumnKind.BusinessUnit or DatasetColumnKind.Team))
         {
             var keys = slice.Select(r => ReportAggregator.Text(ReportAggregator.Raw(r.Values, column.Field))).Where(k => k is not null).Select(k => k!).Distinct();
             labelMap[column.Field] = await labeler.ResolveAsync(column, keys, cancellationToken);
@@ -309,7 +346,7 @@ public sealed class ReportRunner(
                 return DateTimeOffset.TryParse(ReportAggregator.Text(node), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var time)
                     ? TimeZoneInfo.ConvertTime(time, zone).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
                     : null;
-            case DatasetColumnKind.Choice or DatasetColumnKind.Lookup or DatasetColumnKind.User:
+            case DatasetColumnKind.Choice or DatasetColumnKind.Lookup or DatasetColumnKind.User or DatasetColumnKind.BusinessUnit or DatasetColumnKind.Team:
             {
                 var key = ReportAggregator.Text(node);
                 return key is null ? null : labels?.GetValueOrDefault(key, key) ?? key;
@@ -337,7 +374,8 @@ public sealed class ReportRunner(
         measure.Aggregation == Aggregation.Count || measure.Field is null ? DatasetColumnKind.Number : columns.Find(measure.Field)?.Kind ?? DatasetColumnKind.Number;
 
     /// <summary>Seçim ve lookup değerlerinin görünen etiketleri (çağıranın görebildiği ölçüde; erişilemeyen kayıt kimliğiyle kalır).</summary>
-    private sealed class Labeler(IChoiceLists choiceLists, ILookupSearch lookups, ITenantMembers members)
+    private sealed class Labeler(
+        IChoiceLists choiceLists, ILookupSearch lookups, ITenantMembers members, IBusinessUnitDirectory units, ITeamDirectory teams)
     {
         public async Task<IReadOnlyDictionary<string, string>> ResolveAsync(DatasetColumn column, IEnumerable<string> keys, CancellationToken cancellationToken)
         {
@@ -367,6 +405,20 @@ public sealed class ReportRunner(
                     foreach (var member in await members.ListActiveAsync(cancellationToken))
                     {
                         labels[member.UserId.ToString()] = member.DisplayName;
+                    }
+
+                    break;
+                case DatasetColumnKind.BusinessUnit:
+                    foreach (var unit in await units.ListAsync(cancellationToken))
+                    {
+                        labels[unit.Id.ToString()] = unit.PathNames;
+                    }
+
+                    break;
+                case DatasetColumnKind.Team:
+                    foreach (var team in await teams.ListAsync(cancellationToken))
+                    {
+                        labels[team.Id.ToString()] = team.Name;
                     }
 
                     break;

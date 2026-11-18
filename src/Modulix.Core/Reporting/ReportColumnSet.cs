@@ -45,7 +45,8 @@ public sealed class ReportColumnSet
 
         foreach (var column in dataset.Columns)
         {
-            if (hiddenFields.Contains(column.Field) || (column.CurrencyField is { } currency && hiddenFields.Contains(currency)))
+            if (hiddenFields.Contains(column.Field) || (column.CurrencyField is { } currency && hiddenFields.Contains(currency))
+                || (column.DerivedFrom is { } source && hiddenFields.Contains(source)))
             {
                 hidden.Add(column.Field);
                 continue;
