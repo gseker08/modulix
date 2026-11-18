@@ -991,7 +991,7 @@
         @if (column is null || !ReportCenterLabels.NeedsValue(row.Operator))
         {
         }
-        else if (row.Operator == "in" && kind is "choice" or "user" && options is not null)
+        else if (row.Operator == "in" && kind is "choice" or "user" or "businessUnit" or "team" && options is not null)
         {
             <span class="report-choice-list" role="group" aria-label="@Texts.Get("reports.builder.filterValues", index + 1)">
                 @foreach (var option in options)
@@ -1009,7 +1009,7 @@
             <textarea id="@inputId" class="form-control form-control-sm" rows="3" aria-label="@Texts.Get("reports.builder.filterValuesLines", index + 1)" placeholder="@Texts.Get("reports.builder.valuesPlaceholder")"
                       @onchange="e => SetInText(row, e.Value?.ToString())">@row.InText</textarea>
         }
-        else if (kind is "choice" or "user" && options is not null)
+        else if (kind is "choice" or "user" or "businessUnit" or "team" && options is not null)
         {
             <select id="@inputId" class="form-select form-select-sm" aria-label="@Texts.Get("reports.builder.filterValue", index + 1)" value="@row.Value" @onchange="e => row.Value = e.Value?.ToString() ?? string.Empty">
                 <option value="">@Texts.Get("support.choose")</option>

@@ -62,6 +62,19 @@ public sealed partial class ModuleCatalog
         }
     }
 
+    /// <summary>Türetilmiş sütun (departman/ekip) aynı veri kümesindeki bir kullanıcı sütununa bağlı olmalı; kaynak kullanıcı kimliği tutan kullanıcı ya da lookup sütunudur.</summary>
+    private static bool IsBadDerived(DatasetDefinition dataset, DatasetColumn column)
+    {
+        var derivedKind = column.Kind is DatasetColumnKind.BusinessUnit or DatasetColumnKind.Team;
+        if (!derivedKind)
+        {
+            return column.DerivedFrom is not null;
+        }
+
+        return column.DerivedFrom is not { } source || !dataset.Columns.Any(c => c.Field == source && c.Kind is DatasetColumnKind.User or DatasetColumnKind.Lookup)
+            || column.Use.HasFlag(ColumnUse.Measure);
+    }
+
     private void ValidateDataset(string moduleKey, DatasetDefinition dataset)
     {
         var prefix = moduleKey + ".";
@@ -86,7 +99,8 @@ public sealed partial class ModuleCatalog
                 || (column.Use.HasFlag(ColumnUse.Group) && column.Kind is DatasetColumnKind.Number or DatasetColumnKind.Money)
                 || (column.Kind == DatasetColumnKind.Choice && column.ChoiceList is null && (column.Options is not { Count: > 0 }))
                 || (column.ChoiceList is { } list && !choiceLists.ContainsKey(list))
-                || (column.Kind == DatasetColumnKind.Lookup && (column.LookupKey is null || !lookups.ContainsKey(column.LookupKey)));
+                || (column.Kind == DatasetColumnKind.Lookup && (column.LookupKey is null || !lookups.ContainsKey(column.LookupKey)))
+                || IsBadDerived(dataset, column);
             if (bad)
             {
                 throw new InvalidOperationException($"Geçersiz veri kümesi sütunu: '{column.Field}' ({dataset.Key}).");

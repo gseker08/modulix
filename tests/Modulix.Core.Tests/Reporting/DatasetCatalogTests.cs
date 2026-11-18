@@ -105,6 +105,25 @@ public sealed class DatasetCatalogTests
     }
 
     [Fact]
+    public void A_derived_unit_or_team_column_needs_a_user_or_lookup_source_in_the_same_dataset()
+    {
+        DatasetColumn unit = new("ownerUnit", "Sorumlunun departmanı", DatasetColumnKind.BusinessUnit, All) { DerivedFrom = "ownerId" };
+        DatasetColumn team = new("ownerTeam", "Sorumlunun ekibi", DatasetColumnKind.Team, All) { DerivedFrom = "ownerId" };
+        Assert.Equal(2, Catalog(With(Dataset with { Columns = [.. Dataset.Columns, unit, team] })).FindDataset("sales.deals")!.Value.Dataset.Columns.Count(c => c.DerivedFrom is not null));
+
+        Assert.Throws<InvalidOperationException>(() => Catalog(With(Dataset with { Columns = [.. Dataset.Columns, unit with { DerivedFrom = null }] })));
+        Assert.Throws<InvalidOperationException>(() => Catalog(With(Dataset with { Columns = [.. Dataset.Columns, unit with { DerivedFrom = "missing" }] })));
+        Assert.Throws<InvalidOperationException>(() => Catalog(With(Dataset with { Columns = [.. Dataset.Columns, unit with { DerivedFrom = "stage" }] })));
+        Assert.Throws<InvalidOperationException>(() => Catalog(With(Dataset with { Columns = [.. Dataset.Columns, unit with { Use = ColumnUse.Measure | ColumnUse.Show }] })));
+
+        // Türetme yalnızca departman ve ekip sütunlarına özgüdür.
+        Assert.Throws<InvalidOperationException>(() => Catalog(With(Dataset with
+        {
+            Columns = [.. Dataset.Columns, new DatasetColumn("note", "Not", DatasetColumnKind.Text, All) { DerivedFrom = "ownerId" }],
+        })));
+    }
+
+    [Fact]
     public void Duplicate_empty_or_unused_columns_are_rejected()
     {
         var title = new DatasetColumn("title", "Başlık", DatasetColumnKind.Text, ColumnUse.Show);

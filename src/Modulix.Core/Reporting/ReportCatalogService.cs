@@ -12,7 +12,8 @@ namespace Modulix.Core.Reporting;
 /// ama kullanılamaz (kullanıcı neden göremediğini bilsin).
 /// </summary>
 public sealed class ReportCatalogService(
-    ModuleCatalog catalog, ReportColumnResolver resolver, ICurrentAccess access, IChoiceLists choiceLists, ITenantMembers members) : IReportCatalog
+    ModuleCatalog catalog, ReportColumnResolver resolver, ICurrentAccess access, IChoiceLists choiceLists, ITenantMembers members,
+    IBusinessUnitDirectory units, ITeamDirectory teams) : IReportCatalog
 {
     public async Task<ReportCatalogView> GetAsync(CancellationToken cancellationToken)
     {
@@ -74,6 +75,17 @@ public sealed class ReportCatalogService(
         {
             // Kullanıcı sütunu: seçenekler firmanın etkin üyeleridir (süzgeç değeri kullanıcı kimliğidir).
             return [.. (await members.ListActiveAsync(cancellationToken)).OrderBy(m => m.DisplayName, StringComparer.CurrentCultureIgnoreCase).Select(m => new DatasetOption(m.UserId.ToString(), m.DisplayName))];
+        }
+
+        if (column.Kind == DatasetColumnKind.BusinessUnit)
+        {
+            // Departman sütunu: süzgeç değeri departman kimliğidir; etiket departman yoludur, kapalı departman belirtilir.
+            return [.. (await units.ListAsync(cancellationToken)).Select(u => new DatasetOption(u.Id.ToString(), u.IsActive ? u.PathNames : $"{u.PathNames} (kapalı)"))];
+        }
+
+        if (column.Kind == DatasetColumnKind.Team)
+        {
+            return [.. (await teams.ListAsync(cancellationToken)).Select(t => new DatasetOption(t.Id.ToString(), t.Name))];
         }
 
         if (column.Kind != DatasetColumnKind.Choice)
