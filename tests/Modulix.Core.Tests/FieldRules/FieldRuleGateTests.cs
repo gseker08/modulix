@@ -98,11 +98,11 @@ public class FieldRuleGateTests
     }
 
     [Fact]
-    public void Entities_without_rule_fields_never_reach_the_rule_service()
+    public async Task Entities_without_rule_fields_never_reach_the_rule_service()
     {
         var (gate, rules) = Create(Rule("title-required", Title, FieldRuleEffect.Required, Won));
 
-        var errors = gate.CheckAsync("test.note", null, null, new JsonObject(), CancellationToken.None).GetAwaiter().GetResult();
+        var errors = await gate.CheckAsync("test.note", null, null, new JsonObject(), CancellationToken.None);
 
         Assert.Empty(errors);
         Assert.Equal(0, rules.Reads);

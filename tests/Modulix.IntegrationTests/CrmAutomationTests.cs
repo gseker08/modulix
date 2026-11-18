@@ -158,7 +158,7 @@ public class CrmAutomationTests(CrmAutomationFixture fixture) : IClassFixture<Cr
         Assert.Equal(3, round.Scanned);
         Assert.Equal(1, round.StepsRun);
         Assert.Equal(2, round.NotMatched);
-        var succeeded = Assert.Single((await RunsAsync(setup.Tenant.Id)).Where(r => r.Status == AutomationRunStatus.Succeeded));
+        var succeeded = Assert.Single(await RunsAsync(setup.Tenant.Id), r => r.Status == AutomationRunStatus.Succeeded);
         Assert.Equal(none, succeeded.RecordId);
     }
 

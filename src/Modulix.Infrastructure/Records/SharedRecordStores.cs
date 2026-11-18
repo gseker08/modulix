@@ -25,6 +25,9 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
 {
     private Dictionary<string, SharedField<TEntity>>? fieldsByName;
 
+    /// <summary>Türeyen depoların isteğe bağlı servisleri çözdüğü sağlayıcı.</summary>
+    protected IServiceProvider Services => services;
+
     public abstract string EntityKey { get; }
 
     /// <summary>Çekirdeğin kayıt türü: her tenant için açıktır, erişimi izinler belirler.</summary>
@@ -822,7 +825,7 @@ internal sealed class PlaceRecordStore(ModulixDbContext db, ModuleCatalog catalo
             place.KindKey = Place.DefaultKind;
         }
 
-        var choice = (await services.GetRequiredService<IChoiceLists>().GetAsync(Place.KindList, cancellationToken)).Find(place.KindKey);
+        var choice = (await Services.GetRequiredService<IChoiceLists>().GetAsync(Place.KindList, cancellationToken)).Find(place.KindKey);
         // Mevcut kayıtta pasife alınmış türün korunmasına izin verilir; yeni kayıtta (henüz izlenmiyor) izin yoktur.
         var entry = Db.Entry(place);
         var unchanged = entry.State is EntityState.Unchanged or EntityState.Modified && choice is not null

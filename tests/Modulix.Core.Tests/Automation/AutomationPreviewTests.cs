@@ -107,25 +107,25 @@ public class AutomationPreviewTests
     }
 
     [Fact]
-    public void Missing_or_forbidden_sample_record_is_reported_as_the_pipeline_says()
+    public async Task Missing_or_forbidden_sample_record_is_reported_as_the_pipeline_says()
     {
         var (service, pipeline) = Create();
         pipeline.Failure = new RecordError(RecordErrorCode.NotFound, "Kayıt bulunamadı.");
 
-        var result = service.PreviewAsync(
-            new AutomationPreviewRequest("sales", Entity, Definition(null), Guid.NewGuid(), null), CancellationToken.None).GetAwaiter().GetResult();
+        var result = await service.PreviewAsync(
+            new AutomationPreviewRequest("sales", Entity, Definition(null), Guid.NewGuid(), null), CancellationToken.None);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(RecordErrorCode.NotFound, result.Error!.Code);
     }
 
     [Fact]
-    public void Unknown_entity_or_missing_read_permission_is_refused()
+    public async Task Unknown_entity_or_missing_read_permission_is_refused()
     {
         var (service, _) = Create(permissions: [WritePermission]);
 
-        var result = service.PreviewAsync(
-            new AutomationPreviewRequest("sales", Entity, Definition(null), RecordId, null), CancellationToken.None).GetAwaiter().GetResult();
+        var result = await service.PreviewAsync(
+            new AutomationPreviewRequest("sales", Entity, Definition(null), RecordId, null), CancellationToken.None);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(RecordErrorCode.UnknownEntity, result.Error!.Code);

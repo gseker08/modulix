@@ -268,7 +268,7 @@ public class BusinessUnitRoleTests(ModulixApiFactory factory) : IClassFixture<Mo
         Assert.Equal(HttpStatusCode.NotFound, (await PutRoles(otherClient, t.UnitA.Id, (theirs.Id, false))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await PutRoles(otherClient, theirRoot.Id, (mine.Id, false))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await PutRoles(admin, t.UnitB.Id, (theirs.Id, false))).StatusCode);
-        Assert.Empty((await otherClient.GetFromJsonAsync<List<RoleDto>>("/api/roles"))!.Where(r => r.Id == mine.Id));
+        Assert.DoesNotContain((await otherClient.GetFromJsonAsync<List<RoleDto>>("/api/roles"))!, r => r.Id == mine.Id);
 
         // Veritabanı: başka tenant'ın rolü departmana bağlanamaz (bileşik yabancı anahtar); oturumsuz bağlantı satır görmez.
         using (var scope = factory.OpenScope(t.Tenant.Id))

@@ -38,7 +38,7 @@ public class AccessCacheBulkWriteRulesTests
         var sets = DbSetsByType();
 
         Assert.True(types.Count >= 10, $"WatchedTypes ayrıştırılamadı ({types.Count} tür).");
-        Assert.Empty(types.Where(t => !sets.ContainsKey(t)));
+        Assert.DoesNotContain(types, t => !sets.ContainsKey(t));
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public class AccessCacheBulkWriteRulesTests
         var watched = WatchedTypes().Select(t => sets[t]).ToHashSet(StringComparer.Ordinal);
         var found = BulkWrites(watched).Select(write => write.File + "|" + write.Set).ToHashSet(StringComparer.Ordinal);
 
-        Assert.Empty(Allowed.Keys.Where(key => !found.Contains(key)));
+        Assert.DoesNotContain(Allowed.Keys, key => !found.Contains(key));
     }
 
     private static IReadOnlyList<string> WatchedTypes()

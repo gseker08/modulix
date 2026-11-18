@@ -18,7 +18,7 @@ public sealed class GridViewState(string screenKey, string defaultSort)
 
     public string ScreenKey => screenKey;
 
-    public string DefaultSort => defaultSort;
+    public string DefaultSort { get; } = defaultSort;
 
     /// <summary>Bütün sütunların sırası (görünenler ve gizliler).</summary>
     public List<string> Order { get; } = [];
@@ -56,7 +56,7 @@ public sealed class GridViewState(string screenKey, string defaultSort)
             Visible.Add(column.Key);
         }
 
-        Sort = defaultSort;
+        Sort = DefaultSort;
     }
 
     /// <summary>Kayıtlı görünümü uygular: kayıtlı sütunlar sırayla görünür, tanımdaki diğerleri gizli kalır, sabit sütun hep görünür.</summary>
@@ -72,7 +72,7 @@ public sealed class GridViewState(string screenKey, string defaultSort)
             Visible.Add(key);
         }
 
-        Sort = string.IsNullOrEmpty(view.Sort) ? defaultSort : view.Sort;
+        Sort = string.IsNullOrEmpty(view.Sort) ? DefaultSort : view.Sort;
     }
 
     /// <summary>Durum, karşılaştırılan görünümden (null = varsayılan) farklı mı? Yalnızca görünen sütunların sırası ve sıralama sayılır.</summary>
@@ -81,16 +81,16 @@ public sealed class GridViewState(string screenKey, string defaultSort)
         if (baseline is null)
         {
             var defaults = definitions.Where(d => d.DefaultVisible || d.Locked).Select(d => d.Key);
-            return !defaults.SequenceEqual(VisibleKeys) || Sort != defaultSort;
+            return !defaults.SequenceEqual(VisibleKeys) || Sort != DefaultSort;
         }
 
-        var expectedSort = string.IsNullOrEmpty(baseline.Sort) ? defaultSort : baseline.Sort;
+        var expectedSort = string.IsNullOrEmpty(baseline.Sort) ? DefaultSort : baseline.Sort;
         return !KnownColumns(baseline).SequenceEqual(VisibleKeys) || Sort != expectedSort;
     }
 
     /// <summary>Durumu kişisel görünüm isteğine çevirir (sıralama varsayılansa kaydedilmez).</summary>
     public SaveGridViewRequest ToRequest(string name, string? filters) =>
-        new(screenKey, name, VisibleKeys, Sort == defaultSort ? null : Sort, filters);
+        new(screenKey, name, VisibleKeys, Sort == DefaultSort ? null : Sort, filters);
 
     public void Toggle(string key)
     {

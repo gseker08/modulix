@@ -93,7 +93,7 @@ public class ApprovalEscalationTests(ModulixApiFactory factory) : IClassFixture<
         Assert.Equal(1, await RunAsync(team));
 
         Assert.Contains((await GetAsync<NotificationPageDto>(first, "/api/notifications")).Items, n => n.Kind == "approval.overdue");
-        Assert.Empty((await GetAsync<NotificationPageDto>(requester, "/api/notifications")).Items.Where(n => n.Kind == "approval.overdue"));
+        Assert.DoesNotContain((await GetAsync<NotificationPageDto>(requester, "/api/notifications")).Items, n => n.Kind == "approval.overdue");
     }
 
     [Fact]

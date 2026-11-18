@@ -307,7 +307,7 @@ public class ContractSignatureFlowTests(ModulixApiFactory factory) : IClassFixtu
         var forged = $"{b.Tenant.Id:N}.{request.ProviderReference![33..]}";
         Assert.Equal(HttpStatusCode.NotFound, (await WebhookAsync(anonymous, new { eventId = "f1", sequence = 1, type = "Signed", reference = forged, signatoryPosition = 1 })).StatusCode);
         Assert.Equal("Applied", await OutcomeAsync(await WebhookAsync(anonymous, new { eventId = "f2", sequence = 1, type = "Viewed", reference = request.ProviderReference, signatoryPosition = 1 })));
-        Assert.Empty((await adminB.GetFromJsonAsync<PagedResult<ContractDto>>(Contracts))!.Items.Where(c => c.Id == contract.Id));
+        Assert.DoesNotContain((await adminB.GetFromJsonAsync<PagedResult<ContractDto>>(Contracts))!.Items, c => c.Id == contract.Id);
     }
 
     [Fact]

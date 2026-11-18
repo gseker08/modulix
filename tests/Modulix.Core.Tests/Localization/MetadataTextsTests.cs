@@ -65,7 +65,7 @@ public class MetadataTextsTests
         var names = new[] { (MetadataTexts.ModuleKey(core.Key), core.DisplayName) }
             .Concat(core.Permissions.Select(p => (MetadataTexts.PermissionKey(p.Key), p.DisplayName)));
 
-        Assert.Empty(names.Where(n => !tr.TryGetValue(n.Item1, out var text) || text != n.Item2 || !en.ContainsKey(n.Item1) || !az.ContainsKey(n.Item1)));
+        Assert.DoesNotContain(names, n => !tr.TryGetValue(n.Item1, out var text) || text != n.Item2 || !en.ContainsKey(n.Item1) || !az.ContainsKey(n.Item1));
     }
 
     [Fact]

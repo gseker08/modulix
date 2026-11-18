@@ -403,6 +403,6 @@ public class AutomationSubscriptionCatalogTests
 
         // Core'un tek kural türü süreli belgedir (ADR-0038 dilim 2b); modül türü yoksa başka kayıt olayı abonelik yüküne girmez.
         Assert.Equal(["core.credential"], catalog.FindSubscription(CoreModule.Subscriptions.Automation)!.Value.Subscription.EntityKeys);
-        Assert.Empty(catalog.SubscriptionsFor(DomainEventTypes.RecordUpdated, Entity).Where(s => s.Subscription.Key == CoreModule.Subscriptions.Automation));
+        Assert.DoesNotContain(catalog.SubscriptionsFor(DomainEventTypes.RecordUpdated, Entity), s => s.Subscription.Key == CoreModule.Subscriptions.Automation);
     }
 }

@@ -30,7 +30,6 @@ using Modulix.Core.Settings;
 using Modulix.Core.Teams;
 using Modulix.Infrastructure.Audit;
 using Modulix.Core.Approvals;
-using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Notifications;
 using Modulix.Infrastructure.Approvals;
 using Modulix.Infrastructure.Notifications;
