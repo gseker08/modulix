@@ -72,6 +72,9 @@ services:
       ASPNETCORE_HTTP_PORTS: "8080"
       ConnectionStrings__Modulix: "Server=sqlserver,1433;Database=Modulix;User Id=modulix_app;Password=${MODULIX_APP_PASSWORD:?MODULIX_APP_PASSWORD eksik};TrustServerCertificate=True"
       ConnectionStrings__ModulixMigrations: "Server=sqlserver,1433;Database=Modulix;User Id=modulix_migrator;Password=${MODULIX_MIGRATOR_PASSWORD:?MODULIX_MIGRATOR_PASSWORD eksik};TrustServerCertificate=True"
+    volumes:
+      # Yerel dosya deposu: yuklenen dosyalar konteyner yenilense de kalir (imajdaki App_Data APP_UID'e aittir).
+      - api-data:/app/App_Data
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -79,3 +82,4 @@ services:
 volumes:
   sqlserver-data:
   s3-data:
+  api-data:

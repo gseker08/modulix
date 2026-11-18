@@ -29,6 +29,10 @@ EXPOSE 8080
 
 COPY --from=build /app/publish .
 
+# Yerel dosya deposu (LocalBlobStorage) ve işlerin yazdığı App_Data klasörü; root olmayan kullanıcı yazabilsin.
+# compose'da bu yola adlandırılmış volume bağlanır, böylece konteyner yenilense de dosyalar kalır.
+RUN mkdir -p /app/App_Data && chown -R $APP_UID:$APP_UID /app/App_Data
+
 USER $APP_UID
 
 ENTRYPOINT ["dotnet", "Modulix.Api.dll"]
