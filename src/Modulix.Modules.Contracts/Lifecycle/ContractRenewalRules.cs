@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Localization;
+
 namespace Modulix.Modules.Contracts.Lifecycle;
 
 public static class RenewalOutcome
@@ -116,12 +118,12 @@ public static class ContractRenewalRules
     /// Fesih: yürürlükteki sözleşme feshedilir (<paramref name="effectiveDate"/> bugün ya da geçmişse hemen, gelecekse planlanır). Bildirim süresinden kısa sürede fesih için
     /// onay gerekir. Sonuç: izin verildi mi, hemen mi, bildirim süresi kısa mı.
     /// </summary>
-    public static (bool Allowed, string? Reason, bool Immediate, bool ShortNotice) Terminate(
+    public static (bool Allowed, ServerMessage? Reason, bool Immediate, bool ShortNotice) Terminate(
         string effectiveStatus, string signatureStatus, DateOnly effectiveDate, DateOnly today, int? noticePeriodDays)
     {
         if (!EffectiveStatus.IsBinding(effectiveStatus) || signatureStatus != SignatureStatus.Completed)
         {
-            return (false, "Yalnızca imzalı ve yürürlükteki sözleşme feshedilir (taslak ya da imzasız sözleşme iptal edilir).", false, false);
+            return (false, ContractsMessages.Renewal.TerminateSignedOnly, false, false);
         }
 
         var shortNotice = noticePeriodDays is > 0 && effectiveDate < today.AddDays(noticePeriodDays.Value);

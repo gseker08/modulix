@@ -107,7 +107,7 @@ internal sealed class ContractCommitments(
         var (ids, error) = await VisibleCommitmentIdsAsync(filters, cancellationToken);
         if (error is not null)
         {
-            return RecordResult<IReadOnlyList<OccurrenceView>>.Fail(error.Code, error.Message, error.FieldErrors);
+            return RecordResult<IReadOnlyList<OccurrenceView>>.Fail(error);
         }
 
         var today = await TodayAsync(cancellationToken);
@@ -292,7 +292,7 @@ internal sealed class ContractCommitments(
         var (ids, error) = await VisibleCommitmentIdsAsync(filters, cancellationToken);
         if (error is not null)
         {
-            return RecordResult<CommitmentEvaluation>.Fail(error.Code, error.Message, error.FieldErrors);
+            return RecordResult<CommitmentEvaluation>.Fail(error);
         }
 
         var today = await TodayAsync(cancellationToken);

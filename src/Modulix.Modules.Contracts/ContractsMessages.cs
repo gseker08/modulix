@@ -218,4 +218,291 @@ internal static class ContractsMessages
         public static ServerMessage TemplateVersionNotFound =>
             ServerMessage.Of("contracts.server.document.template-version-not-found", "Şablon sürümü bulunamadı.");
     }
+
+    /// <summary>Durum geçişi kuralları (<c>ContractRuleResult</c>) ve iş akışı.</summary>
+    public static class Transition
+    {
+        public static ServerMessage NotDraftContent =>
+            ServerMessage.Of("contracts.server.lifecycle.not-draft-content", "Sözleşme taslak durumunda değil; içerik değiştirilemez.");
+
+        public static ServerMessage ApprovalPendingContent =>
+            ServerMessage.Of("contracts.server.lifecycle.approval-pending-content", "Onay bekleyen içerik değiştirilemez; önce onayı geri çekin.");
+
+        public static ServerMessage SignatureContent =>
+            ServerMessage.Of("contracts.server.lifecycle.signature-content",
+                "İmzaya gönderilmiş ya da imzalanmış içerik değiştirilemez; yeni revizyon açın.");
+
+        public static ServerMessage InForceContent =>
+            ServerMessage.Of("contracts.server.lifecycle.in-force-content",
+                "Yürürlüğe girmiş sözleşme yerinde değiştirilemez; ek protokol ya da yeni revizyon açın.");
+
+        public static ServerMessage SignedDelete =>
+            ServerMessage.Of("contracts.server.lifecycle.signed-delete", "İmzalı sözleşme silinemez; iptal ya da fesih sürecini kullanın.");
+
+        public static ServerMessage InForceDelete => ServerMessage.Of("contracts.server.lifecycle.in-force-delete", "Yürürlük kaydı olan sözleşme silinemez.");
+
+        public static ServerMessage ReviewDraftOnly => ServerMessage.Of("contracts.server.lifecycle.review-draft-only", "Yalnızca taslak incelemeye gönderilir.");
+
+        public static ServerMessage ReadyInReviewOnly =>
+            ServerMessage.Of("contracts.server.lifecycle.ready-in-review-only", "Yalnızca incelemedeki sözleşme yayıma hazır işaretlenir.");
+
+        public static ServerMessage AlreadyDraft => ServerMessage.Of("contracts.server.lifecycle.already-draft", "Sözleşme zaten taslak.");
+
+        public static ServerMessage DraftApprovalPending =>
+            ServerMessage.Of("contracts.server.lifecycle.draft-approval-pending", "Onay beklerken taslağa dönülemez; önce onayı geri çekin.");
+
+        public static ServerMessage DraftSignature =>
+            ServerMessage.Of("contracts.server.lifecycle.draft-signature",
+                "İmzaya gönderilmiş ya da imzalanmış sürüm taslağa dönemez; yeni revizyon açın.");
+
+        public static ServerMessage SubmitNotReady =>
+            ServerMessage.Of("contracts.server.lifecycle.submit-not-ready", "Onaya göndermek için sözleşme yayıma hazır olmalıdır.");
+
+        public static ServerMessage AlreadyPending => ServerMessage.Of("contracts.server.lifecycle.already-pending", "Onay zaten bekliyor.");
+
+        public static ServerMessage AlreadyApproved => ServerMessage.Of("contracts.server.lifecycle.already-approved", "Bu sürüm zaten onaylı.");
+
+        public static ServerMessage SubmitSignature =>
+            ServerMessage.Of("contracts.server.lifecycle.submit-signature", "İmza sürecindeki sürüm yeniden onaya gönderilemez.");
+
+        public static ServerMessage NoPendingApproval => ServerMessage.Of("contracts.server.lifecycle.no-pending-approval", "Bekleyen onay yok.");
+
+        public static ServerMessage NoPendingVersion => ServerMessage.Of("contracts.server.lifecycle.no-pending-version", "Onay bekleyen sürüm yok.");
+
+        public static ServerMessage CancelInForce =>
+            ServerMessage.Of("contracts.server.lifecycle.cancel-in-force", "Yürürlük kaydı olan sözleşme iptal edilmez; fesih sürecini kullanın.");
+
+        public static ServerMessage CancelSigned =>
+            ServerMessage.Of("contracts.server.lifecycle.cancel-signed", "İmzalı sürüm iptal edilmez; imza iptali ve fesih ayrı süreçlerdir.");
+
+        public static ServerMessage ReviseInProgress =>
+            ServerMessage.Of("contracts.server.lifecycle.revise-in-progress",
+                "Onay ya da imza beklerken revizyon açılmaz; önce süreci sonuçlandırın.");
+
+        public static ServerMessage ReviseNotSigned =>
+            ServerMessage.Of("contracts.server.lifecycle.revise-not-signed",
+                "Revizyon imzalı ya da yürürlükteki sözleşme içindir; imzalanmamış sürüm taslağa döndürülerek düzenlenir.");
+
+        public static ServerMessage DraftRevisionOpen => ServerMessage.Of("contracts.server.lifecycle.draft-revision-open", "Açık bir taslak revizyon zaten var.");
+
+        public static ServerMessage UnknownAction => ServerMessage.Of("contracts.server.lifecycle.unknown-action", "Bilinmeyen eylem.");
+
+        public static ServerMessage MissingParty => ServerMessage.Of("contracts.server.lifecycle.missing-party", "Müşteri seçilmeden ilerlenemez.");
+
+        public static ServerMessage MissingStart => ServerMessage.Of("contracts.server.lifecycle.missing-start", "Başlangıç tarihi girilmeden ilerlenemez.");
+
+        public static ServerMessage MissingEnd =>
+            ServerMessage.Of("contracts.server.lifecycle.missing-end", "Bitiş tarihi girilmeli ya da sözleşme belirsiz süreli işaretlenmelidir.");
+
+        public static ServerMessage Closed =>
+            ServerMessage.Of("contracts.server.lifecycle.closed", "Süresi dolmuş, feshedilmiş ya da iptal edilmiş sözleşmede bu işlem yapılamaz.");
+
+        public static ServerMessage SelfApproval =>
+            ServerMessage.Of("contracts.server.lifecycle.self-approval", "Kendi onaya gönderdiğiniz sözleşmeyi onaylayamazsınız.");
+
+        public static ServerMessage NotYourStep => ServerMessage.Of("contracts.server.lifecycle.not-your-step", "Bu adımda karar veremezsiniz.");
+
+        public static ServerMessage ActionNotAllowed => ServerMessage.Of("contracts.server.lifecycle.action-not-allowed", "Bu işlem şu an yapılamaz.");
+
+        public static ServerMessage VersionNotFound => ServerMessage.Of("contracts.server.lifecycle.version-not-found", "Sürüm bulunamadı.");
+
+        public static ServerMessage CompareVersionNotFound =>
+            ServerMessage.Of("contracts.server.lifecycle.compare-version-not-found", "Karşılaştırılacak sürüm bulunamadı.");
+    }
+
+    /// <summary>İmza süreci, imzacılar ve imzalı belge dosyası.</summary>
+    public static class Signature
+    {
+        public static ServerMessage ApprovedReadyOnly =>
+            ServerMessage.Of("contracts.server.signature.approved-ready-only", "Yalnızca onaylanmış ve yayıma hazır sözleşme imzaya gönderilir.");
+
+        public static ServerMessage AlreadySigned =>
+            ServerMessage.Of("contracts.server.signature.already-signed", "Bu sürüm zaten imzalandı; değişiklik için yeni revizyon açın.");
+
+        public static ServerMessage RequestOpen => ServerMessage.Of("contracts.server.signature.request-open", "Açık bir imza isteği var; önce onu sonlandırın.");
+
+        public static ServerMessage ContractClosed =>
+            ServerMessage.Of("contracts.server.signature.contract-closed", "Süresi dolmuş, feshedilmiş ya da iptal edilmiş sözleşme imzaya gönderilemez.");
+
+        public static ServerMessage MethodOneOf => ServerMessage.Of("contracts.server.signature.method-one-of", "Yöntem Manual ya da Provider olmalıdır.");
+
+        public static ServerMessage ProviderDisabled =>
+            ServerMessage.Of("contracts.server.signature.provider-disabled",
+                "Bu firmada imza sağlayıcısı etkin değil (Sözleşme ayarları → İmza sağlayıcısı).");
+
+        public static ServerMessage ModeOneOf => ServerMessage.Of("contracts.server.signature.mode-one-of", "Kip Sequential ya da Parallel olmalıdır.");
+
+        public static ServerMessage ValidityDays => ServerMessage.Of("contracts.server.signature.validity-days", "Geçerlilik 1 ile 90 gün arasında olmalıdır.");
+
+        public static ServerMessage DocumentNotFinal =>
+            ServerMessage.Of("contracts.server.signature.document-not-final",
+                "İmzaya yalnızca güncel sürümün kesin (dondurulmuş sürümden üretilmiş) belgesi gönderilir.");
+
+        public static ServerMessage SampleDocument =>
+            ServerMessage.Of("contracts.server.signature.sample-document",
+                "Örnek metinden üretilen belge imzaya gönderilemez; kurumunuzun onaylı şablonunu kullanın.");
+
+        public static ServerMessage RequestInvalid => ServerMessage.Of("contracts.server.signature.request-invalid", "İmza isteği doğrulanamadı.");
+
+        public static ServerMessage ProviderManaged =>
+            ServerMessage.Of("contracts.server.signature.provider-managed",
+                "Bu istek sağlayıcı yöntemiyle yürüyor; imza sağlayıcıdan gelir. Manuel kayıt yalnızca manuel isteklerde yapılır.");
+
+        public static ServerMessage SignatoryNotFound => ServerMessage.Of("contracts.server.signature.signatory-not-found", "İmzacı bulunamadı.");
+
+        public static ServerMessage CannotSignNow => ServerMessage.Of("contracts.server.signature.cannot-sign-now", "Bu imzacı şimdi imzalayamaz.");
+
+        public static ServerMessage SelfVerify =>
+            ServerMessage.Of("contracts.server.signature.self-verify", "Kendi imzanızı doğrulayamazsınız; başka bir yetkili doğrulamalıdır.");
+
+        public static ServerMessage SignedInFuture => ServerMessage.Of("contracts.server.signature.signed-in-future", "İmza tarihi gelecekte olamaz.");
+
+        public static ServerMessage SignedBeforeRequest =>
+            ServerMessage.Of("contracts.server.signature.signed-before-request", "İmza tarihi isteğin açıldığı tarihten önce olamaz.");
+
+        public static ServerMessage RecordInvalid => ServerMessage.Of("contracts.server.signature.record-invalid", "İmza kaydı doğrulanamadı.");
+
+        public static ServerMessage ProviderDecline =>
+            ServerMessage.Of("contracts.server.signature.provider-decline", "Sağlayıcı yöntemli istekte ret sağlayıcıdan gelir.");
+
+        public static ServerMessage DeclineNotAllowed => ServerMessage.Of("contracts.server.signature.decline-not-allowed", "Bu imzacı için ret kaydedilemez.");
+
+        public static ServerMessage ReminderNotDue =>
+            ServerMessage.Of("contracts.server.signature.reminder-not-due",
+                "Hatırlatma yalnızca sırası gelmiş, henüz imzalamamış imzacı için kaydedilir.");
+
+        public static ServerMessage ReminderHourly =>
+            ServerMessage.Of("contracts.server.signature.reminder-hourly", "Aynı imzacıya en fazla saatte bir hatırlatma kaydedilir.");
+
+        public static ServerMessage NotExpiredYet => ServerMessage.Of("contracts.server.signature.not-expired-yet", "İmza isteğinin süresi henüz dolmadı.");
+
+        public static ServerMessage SimulationOnly =>
+            ServerMessage.Of("contracts.server.signature.simulation-only", "Simülasyon yalnızca simülasyon sağlayıcısıyla açılmış istekte kullanılabilir.");
+
+        public static ServerMessage EventNotApplied => ServerMessage.Of("contracts.server.signature.event-not-applied", "Olay uygulanamadı.");
+
+        public static ServerMessage ProviderNotFound => ServerMessage.Of("contracts.server.signature.provider-not-found", "Sağlayıcı bulunamadı.");
+
+        public static ServerMessage EventIdRequired =>
+            ServerMessage.Of("contracts.server.signature.event-id-required", "Olay kimliği zorunludur (en fazla 100 karakter).");
+
+        public static ServerMessage UnknownEventType => ServerMessage.Of("contracts.server.signature.unknown-event-type", "Bilinmeyen olay türü.");
+
+        public static ServerMessage EventSequence => ServerMessage.Of("contracts.server.signature.event-sequence", "Olay numarası 1 ya da büyük olmalıdır.");
+
+        public static ServerMessage EventInvalid => ServerMessage.Of("contracts.server.signature.event-invalid", "Olay doğrulanamadı.");
+
+        public static ServerMessage RequestNotFound => ServerMessage.Of("contracts.server.signature.request-not-found", "İstek bulunamadı.");
+
+        public static ServerMessage NoOpenRequest => ServerMessage.Of("contracts.server.signature.no-open-request", "Açık bir imza isteği yok.");
+
+        public static ServerMessage RequestExpired =>
+            ServerMessage.Of("contracts.server.signature.request-expired",
+                "İmza isteğinin süresi doldu; önce isteği sonlandırın (süre dolumu) ve gerekirse yeniden başlatın.");
+
+        public static ServerMessage SignatoryCount => ServerMessage.Of("contracts.server.signature.signatory-count", "En az bir, en fazla yirmi imzacı girin.");
+
+        public static ServerMessage SignatoryKind =>
+            ServerMessage.Of("contracts.server.signature.signatory-kind", "İmzacı türü Internal ya da External olmalıdır.");
+
+        public static ServerMessage CapacityTooLong => ServerMessage.Of("contracts.server.signature.capacity-too-long", "İmza sıfatı çok uzun.");
+
+        public static ServerMessage InternalMember =>
+            ServerMessage.Of("contracts.server.signature.internal-member", "İç imzacı bu firmanın etkin üyesi olmalıdır.");
+
+        public static ServerMessage DuplicateSignatory => ServerMessage.Of("contracts.server.signature.duplicate-signatory", "Aynı kişi iki kez imzacı olamaz.");
+
+        public static ServerMessage ExternalName =>
+            ServerMessage.Of("contracts.server.signature.external-name", "Dış imzacının adı zorunludur (2-150 karakter).");
+
+        public static ServerMessage ExternalEmailRequired =>
+            ServerMessage.Of("contracts.server.signature.external-email-required", "Sağlayıcı yönteminde dış imzacının e-postası zorunludur.");
+
+        public static ServerMessage RequiredSignatory =>
+            ServerMessage.Of("contracts.server.signature.required-signatory", "En az bir zorunlu imzacı olmalıdır.");
+
+        public static ServerMessage AlreadySignedBySignatory =>
+            ServerMessage.Of("contracts.server.signature.already-signed-by-signatory", "Bu imzacı zaten imzaladı.");
+
+        public static ServerMessage SignatoryClosed =>
+            ServerMessage.Of("contracts.server.signature.signatory-closed", "Bu imzacı için imza artık alınamaz.");
+
+        public static ServerMessage SequentialOrder =>
+            ServerMessage.Of("contracts.server.signature.sequential-order", "Sıralı imzada önce önceki zorunlu imzacılar imzalamalıdır.");
+
+        public static ServerMessage FileNameRequired => ServerMessage.Of("contracts.server.signature.file-name-required", "Dosya adı zorunludur.");
+
+        public static ServerMessage FileEmpty => ServerMessage.Of("contracts.server.signature.file-empty", "Dosya boş.");
+
+        public static ServerMessage FileTooLarge => ServerMessage.Of("contracts.server.signature.file-too-large", "Dosya en fazla 10 MB olabilir.");
+
+        public static ServerMessage FileType =>
+            ServerMessage.Of("contracts.server.signature.file-type", "Yalnızca PDF, PNG ya da JPEG dosyası yüklenebilir.");
+    }
+
+    /// <summary>Yenileme ve fesih.</summary>
+    public static class Renewal
+    {
+        public static ServerMessage ReasonFromList =>
+            ServerMessage.Of("contracts.server.renewal.reason-from-list", "Yenilememe nedeni listeden seçilmelidir.");
+
+        public static ServerMessage AlreadyDecided(string outcome) =>
+            ServerMessage.Of("contracts.server.renewal.already-decided", "Bu dönem için karar zaten verilmiş ({0}).", outcome);
+
+        public static ServerMessage DraftSignedOnly =>
+            ServerMessage.Of("contracts.server.renewal.draft-signed-only",
+                "Yenileme taslağı yalnızca imzalı ve yürürlükteki (ya da yeni süresi dolmuş) sözleşme için açılır.");
+
+        public static ServerMessage Indefinite =>
+            ServerMessage.Of("contracts.server.renewal.indefinite", "Belirsiz süreli sözleşmenin yenilenecek bir dönemi yoktur.");
+
+        public static ServerMessage TermMonths => ServerMessage.Of("contracts.server.renewal.term-months", "Süre 1 ile 120 ay arasında olmalıdır.");
+
+        public static ServerMessage StartAfterEnd =>
+            ServerMessage.Of("contracts.server.renewal.start-after-end", "Yeni dönem, mevcut dönemin bitişinden sonra başlamalıdır.");
+
+        public static ServerMessage TerminationReasonRequired =>
+            ServerMessage.Of("contracts.server.renewal.termination-reason-required", "Fesih gerekçesi zorunludur.");
+
+        public static ServerMessage TerminationBeforeStart =>
+            ServerMessage.Of("contracts.server.renewal.termination-before-start", "Fesih tarihi sözleşme başlangıcından önce olamaz.");
+
+        public static ServerMessage TerminationAfterEnd =>
+            ServerMessage.Of("contracts.server.renewal.termination-after-end", "Fesih tarihi sözleşme bitişinden sonra olamaz.");
+
+        public static ServerMessage ShortNotice(int days) =>
+            ServerMessage.Of("contracts.server.renewal.short-notice",
+                "Fesih tarihi bildirim süresinin ({0} gün) altında; yine de feshetmek için kısa bildirimi onaylayın.", days);
+
+        public static ServerMessage TerminateSignedOnly =>
+            ServerMessage.Of("contracts.server.renewal.terminate-signed-only",
+                "Yalnızca imzalı ve yürürlükteki sözleşme feshedilir (taslak ya da imzasız sözleşme iptal edilir).");
+    }
+
+    /// <summary>Kabul edilmiş tekliften sözleşme.</summary>
+    public static class FromQuote
+    {
+        public static ServerMessage PartyNotMatched =>
+            ServerMessage.Of("contracts.server.from-quote.party-not-matched",
+                "Teklifin müşterisi ortak kayıtla eşleşmedi; sözleşme boş taslaktan açılmalıdır.");
+
+        public static ServerMessage LinesRequired =>
+            ServerMessage.Of("contracts.server.from-quote.lines-required", "Sözleşmeye alınacak en az bir teklif kalemi seçin.");
+
+        public static ServerMessage LineNotInQuote => ServerMessage.Of("contracts.server.from-quote.line-not-in-quote", "Seçilen kalemlerden biri bu teklifte yok.");
+
+        public static ServerMessage StartRequired =>
+            ServerMessage.Of("contracts.server.from-quote.start-required", "Süre (ay) verildiğinde başlangıç tarihi de girilmelidir.");
+
+        public static ServerMessage LinesTaken(string lines) =>
+            ServerMessage.Of("contracts.server.from-quote.lines-taken", "Seçilen teklif kalemleri zaten bir sözleşmede: {0}.", lines);
+
+        public static ServerMessage LineTaken => ServerMessage.Of("contracts.server.from-quote.line-taken", "Kalem başka bir sözleşmede kullanılıyor.");
+
+        public static ServerMessage SourceUnavailable =>
+            ServerMessage.Of("contracts.server.from-quote.source-unavailable", "Teklif kaynağı kullanılamıyor; kabul edilmiş teklif bulunamadı.");
+
+        public static ServerMessage AcceptedNotFound =>
+            ServerMessage.Of("contracts.server.from-quote.accepted-not-found", "Kabul edilmiş teklif bulunamadı.");
+    }
 }

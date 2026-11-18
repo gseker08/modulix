@@ -45,7 +45,7 @@ public static class ContractTransitions
             case ContractAction.SendToReview:
                 if (s.Preparation != PreparationStatus.Draft)
                 {
-                    return ContractRuleResult.Deny("not-draft", "Yalnızca taslak incelemeye gönderilir.");
+                    return ContractRuleResult.Deny("not-draft", ContractsMessages.Transition.ReviewDraftOnly);
                 }
 
                 return closed ? Deny("closed") : ContractRuleResult.Ok;
@@ -53,7 +53,7 @@ public static class ContractTransitions
             case ContractAction.MarkReady:
                 if (s.Preparation != PreparationStatus.InReview)
                 {
-                    return ContractRuleResult.Deny("not-in-review", "Yalnızca incelemedeki sözleşme yayıma hazır işaretlenir.");
+                    return ContractRuleResult.Deny("not-in-review", ContractsMessages.Transition.ReadyInReviewOnly);
                 }
 
                 return MissingBasics(s) ?? ContractRuleResult.Ok;
@@ -61,17 +61,17 @@ public static class ContractTransitions
             case ContractAction.ReopenDraft:
                 if (s.Preparation == PreparationStatus.Draft)
                 {
-                    return ContractRuleResult.Deny("already-draft", "Sözleşme zaten taslak.");
+                    return ContractRuleResult.Deny("already-draft", ContractsMessages.Transition.AlreadyDraft);
                 }
 
                 if (s.Approval == ApprovalStatus.Pending)
                 {
-                    return ContractRuleResult.Deny("approval-pending", "Onay beklerken taslağa dönülemez; önce onayı geri çekin.");
+                    return ContractRuleResult.Deny("approval-pending", ContractsMessages.Transition.DraftApprovalPending);
                 }
 
                 if (signing || signed)
                 {
-                    return ContractRuleResult.Deny("signature-in-progress", "İmzaya gönderilmiş ya da imzalanmış sürüm taslağa dönemez; yeni revizyon açın.");
+                    return ContractRuleResult.Deny("signature-in-progress", ContractsMessages.Transition.DraftSignature);
                 }
 
                 return closed ? Deny("closed") : ContractRuleResult.Ok;
@@ -79,43 +79,43 @@ public static class ContractTransitions
             case ContractAction.SubmitForApproval:
                 if (s.Preparation != PreparationStatus.ReadyToPublish)
                 {
-                    return ContractRuleResult.Deny("not-ready", "Onaya göndermek için sözleşme yayıma hazır olmalıdır.");
+                    return ContractRuleResult.Deny("not-ready", ContractsMessages.Transition.SubmitNotReady);
                 }
 
                 if (s.Approval == ApprovalStatus.Pending)
                 {
-                    return ContractRuleResult.Deny("approval-pending", "Onay zaten bekliyor.");
+                    return ContractRuleResult.Deny("approval-pending", ContractsMessages.Transition.AlreadyPending);
                 }
 
                 if (s.Approval == ApprovalStatus.Approved)
                 {
-                    return ContractRuleResult.Deny("already-approved", "Bu sürüm zaten onaylı.");
+                    return ContractRuleResult.Deny("already-approved", ContractsMessages.Transition.AlreadyApproved);
                 }
 
                 if (signing || signed)
                 {
-                    return ContractRuleResult.Deny("signature-in-progress", "İmza sürecindeki sürüm yeniden onaya gönderilemez.");
+                    return ContractRuleResult.Deny("signature-in-progress", ContractsMessages.Transition.SubmitSignature);
                 }
 
                 return MissingBasics(s) ?? (closed ? Deny("closed") : ContractRuleResult.Ok);
 
             case ContractAction.WithdrawApproval:
-                return s.Approval == ApprovalStatus.Pending ? ContractRuleResult.Ok : ContractRuleResult.Deny("not-pending", "Bekleyen onay yok.");
+                return s.Approval == ApprovalStatus.Pending ? ContractRuleResult.Ok : ContractRuleResult.Deny("not-pending", ContractsMessages.Transition.NoPendingApproval);
 
             case ContractAction.Approve:
             case ContractAction.RejectApproval:
             case ContractAction.ReturnForChanges:
-                return s.Approval == ApprovalStatus.Pending ? ContractRuleResult.Ok : ContractRuleResult.Deny("not-pending", "Onay bekleyen sürüm yok.");
+                return s.Approval == ApprovalStatus.Pending ? ContractRuleResult.Ok : ContractRuleResult.Deny("not-pending", ContractsMessages.Transition.NoPendingVersion);
 
             case ContractAction.Cancel:
                 if (s.Effective != EffectiveStatus.NotInForce)
                 {
-                    return ContractRuleResult.Deny("in-force", "Yürürlük kaydı olan sözleşme iptal edilmez; fesih sürecini kullanın.");
+                    return ContractRuleResult.Deny("in-force", ContractsMessages.Transition.CancelInForce);
                 }
 
                 if (signed || s.Signature == SignatureStatus.PartiallySigned)
                 {
-                    return ContractRuleResult.Deny("signed", "İmzalı sürüm iptal edilmez; imza iptali ve fesih ayrı süreçlerdir.");
+                    return ContractRuleResult.Deny("signed", ContractsMessages.Transition.CancelSigned);
                 }
 
                 return ContractRuleResult.Ok;
@@ -123,20 +123,20 @@ public static class ContractTransitions
             case ContractAction.Revise:
                 if (s.Approval == ApprovalStatus.Pending || signing)
                 {
-                    return ContractRuleResult.Deny("in-progress", "Onay ya da imza beklerken revizyon açılmaz; önce süreci sonuçlandırın.");
+                    return ContractRuleResult.Deny("in-progress", ContractsMessages.Transition.ReviseInProgress);
                 }
 
                 if (!(signed || EffectiveStatus.IsBinding(s.Effective) || s.Effective == EffectiveStatus.Expired))
                 {
-                    return ContractRuleResult.Deny("not-signed", "Revizyon imzalı ya da yürürlükteki sözleşme içindir; imzalanmamış sürüm taslağa döndürülerek düzenlenir.");
+                    return ContractRuleResult.Deny("not-signed", ContractsMessages.Transition.ReviseNotSigned);
                 }
 
                 return s.Preparation == PreparationStatus.Draft && !signed
-                    ? ContractRuleResult.Deny("draft-open", "Açık bir taslak revizyon zaten var.")
+                    ? ContractRuleResult.Deny("draft-open", ContractsMessages.Transition.DraftRevisionOpen)
                     : ContractRuleResult.Ok;
 
             default:
-                return ContractRuleResult.Deny("unknown-action", "Bilinmeyen eylem.");
+                return ContractRuleResult.Deny("unknown-action", ContractsMessages.Transition.UnknownAction);
         }
     }
 
@@ -147,16 +147,16 @@ public static class ContractTransitions
     {
         if (!s.HasParty)
         {
-            return ContractRuleResult.Deny("missing-party", "Müşteri seçilmeden ilerlenemez.");
+            return ContractRuleResult.Deny("missing-party", ContractsMessages.Transition.MissingParty);
         }
 
         if (!s.HasStartDate)
         {
-            return ContractRuleResult.Deny("missing-start", "Başlangıç tarihi girilmeden ilerlenemez.");
+            return ContractRuleResult.Deny("missing-start", ContractsMessages.Transition.MissingStart);
         }
 
-        return s.HasEndOrIndefinite ? null : ContractRuleResult.Deny("missing-end", "Bitiş tarihi girilmeli ya da sözleşme belirsiz süreli işaretlenmelidir.");
+        return s.HasEndOrIndefinite ? null : ContractRuleResult.Deny("missing-end", ContractsMessages.Transition.MissingEnd);
     }
 
-    private static ContractRuleResult Deny(string code) => ContractRuleResult.Deny(code, "Süresi dolmuş, feshedilmiş ya da iptal edilmiş sözleşmede bu işlem yapılamaz.");
+    private static ContractRuleResult Deny(string code) => ContractRuleResult.Deny(code, ContractsMessages.Transition.Closed);
 }

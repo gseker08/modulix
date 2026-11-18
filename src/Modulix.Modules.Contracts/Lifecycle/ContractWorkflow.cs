@@ -117,7 +117,7 @@ internal sealed class ContractWorkflow(
             var rule = ContractTransitions.Can(action, state);
             if (rule.Allowed && IsDecision(action) && await SelfApprovalBlockedAsync(id, cancellationToken))
             {
-                rule = ContractRuleResult.Deny("self-approval", "Kendi onaya gönderdiğiniz sözleşmeyi onaylayamazsınız.");
+                rule = ContractRuleResult.Deny("self-approval", ContractsMessages.Transition.SelfApproval);
             }
 
             if (rule.Allowed && IsDecision(action) && await reader.ContractAsync(id, cancellationToken) is { } stepContract)
@@ -125,11 +125,11 @@ internal sealed class ContractWorkflow(
                 var (allowed, why) = ContractApprovalEngine.CanDecide(await approvals.StateAsync(stepContract, cancellationToken));
                 if (!allowed)
                 {
-                    rule = ContractRuleResult.Deny("not-your-step", why ?? "Bu adımda karar veremezsiniz.");
+                    rule = ContractRuleResult.Deny("not-your-step", why ?? ContractsMessages.Transition.NotYourStep);
                 }
             }
 
-            list.Add(new ContractActionState(action, rule.Allowed, rule.Code, rule.Message, ContractTransitions.RequiresReason(action)));
+            list.Add(new ContractActionState(action, rule.Allowed, rule.Code, rule.Message?.Text, ContractTransitions.RequiresReason(action)));
         }
 
         return RecordResult<IReadOnlyList<ContractActionState>>.Ok(list);
@@ -139,7 +139,7 @@ internal sealed class ContractWorkflow(
     {
         if (!PermissionOf.TryGetValue(action, out var permission))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.", [new RecordFieldError("action", "Bilinmeyen eylem.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Transition.UnknownAction, [new RecordFieldError("action", ContractsMessages.Transition.UnknownAction)]);
         }
 
         var loaded = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
@@ -163,13 +163,13 @@ internal sealed class ContractWorkflow(
         var rule = ContractTransitions.Can(action, StateOf(contract));
         if (!rule.Allowed)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, rule.Message ?? "Bu işlem şu an yapılamaz.", [new RecordFieldError(rule.Code ?? "status", rule.Message ?? string.Empty)]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, rule.Message ?? ContractsMessages.Transition.ActionNotAllowed, [new RecordFieldError(rule.Code ?? "status", rule.Message ?? string.Empty)]);
         }
 
         if (IsDecision(action) && await SelfApprovalBlockedAsync(id, cancellationToken))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Kendi onaya gönderdiğiniz sözleşmeyi onaylayamazsınız.",
-                [new RecordFieldError("approvalStatus", "Kendi onaya gönderdiğiniz sözleşmeyi onaylayamazsınız.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Transition.SelfApproval,
+                [new RecordFieldError("approvalStatus", ContractsMessages.Transition.SelfApproval)]);
         }
 
         // Onay planı (gönderimde kurulur) ve karar yetkisi (adım, vekâlet, dört göz) sunucuda denetlenir; arayüz yalnızca aynı sonucu gösterir.
@@ -189,7 +189,7 @@ internal sealed class ContractWorkflow(
                 var (allowed, why) = ContractApprovalEngine.CanDecide(decision);
                 if (!allowed)
                 {
-                    return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, why ?? "Bu adımda karar veremezsiniz.");
+                    return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, why ?? ContractsMessages.Transition.NotYourStep);
                 }
             }
             else
@@ -308,7 +308,7 @@ internal sealed class ContractWorkflow(
         var version = await reader.VersionAsync(id, versionNo, cancellationToken);
         if (version is null)
         {
-            return RecordResult<ContractVersionView>.Fail(RecordErrorCode.NotFound, "Sürüm bulunamadı.");
+            return RecordResult<ContractVersionView>.Fail(RecordErrorCode.NotFound, ContractsMessages.Transition.VersionNotFound);
         }
 
         var snapshot = ContractSnapshots.Deserialize(version.Snapshot);
@@ -327,7 +327,7 @@ internal sealed class ContractWorkflow(
         var after = await SnapshotAsync(id, withVersionNo, cancellationToken);
         if (before is null || after is null)
         {
-            return RecordResult<SnapshotDiff>.Fail(RecordErrorCode.NotFound, "Karşılaştırılacak sürüm bulunamadı.");
+            return RecordResult<SnapshotDiff>.Fail(RecordErrorCode.NotFound, ContractsMessages.Transition.CompareVersionNotFound);
         }
 
         return RecordResult<SnapshotDiff>.Ok(SnapshotComparer.Compare(before, after, await CanSeeFinancialsAsync(cancellationToken)));
@@ -387,5 +387,5 @@ internal sealed class ContractWorkflow(
 
     private static Func<ContractsStoreContext, Contract, CancellationToken, Task>? Effect(Func<ContractsStoreContext, Contract, CancellationToken, Task> effect) => effect;
 
-    private static RecordResult<T> Fail<T>(RecordError error) => RecordResult<T>.Fail(error.Code, error.Message, error.FieldErrors);
+    private static RecordResult<T> Fail<T>(RecordError error) => RecordResult<T>.Fail(error);
 }

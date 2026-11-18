@@ -209,7 +209,7 @@ internal sealed class ContractRenewals(
         var c = loaded.Contract;
         if (!NonRenewalReason.All.Contains(reason))
         {
-            return Invalid<RenewalOverview>("reason", "Yenilememe nedeni listeden seçilmelidir.");
+            return Invalid<RenewalOverview>("reason", ContractsMessages.Renewal.ReasonFromList);
         }
 
         if (Eligibility(c) is { } blocked)
@@ -220,7 +220,7 @@ internal sealed class ContractRenewals(
         var period = c.EndDate!.Value;
         if ((await reader.RenewalsAsync(contractId, cancellationToken)).FirstOrDefault(r => r.PeriodEnd == period) is { } existing)
         {
-            return Conflict<RenewalOverview>($"Bu dönem için karar zaten verilmiş ({existing.Outcome}).");
+            return Conflict<RenewalOverview>(ContractsMessages.Renewal.AlreadyDecided(existing.Outcome));
         }
 
         var cleanNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
@@ -253,12 +253,12 @@ internal sealed class ContractRenewals(
         var c = loaded.Contract;
         if (c.SignatureStatus != SignatureStatus.Completed || c.EffectiveStatus is not (EffectiveStatus.Active or EffectiveStatus.Suspended or EffectiveStatus.Expired))
         {
-            return Conflict<RenewalDraftResult>("Yenileme taslağı yalnızca imzalı ve yürürlükteki (ya da yeni süresi dolmuş) sözleşme için açılır.");
+            return Conflict<RenewalDraftResult>(ContractsMessages.Renewal.DraftSignedOnly);
         }
 
         if (c.IsIndefinite || c.EndDate is not { } period)
         {
-            return Conflict<RenewalDraftResult>("Belirsiz süreli sözleşmenin yenilenecek bir dönemi yoktur.");
+            return Conflict<RenewalDraftResult>(ContractsMessages.Renewal.Indefinite);
         }
 
         var existing = (await reader.RenewalsAsync(contractId, cancellationToken)).FirstOrDefault(r => r.PeriodEnd == period);
@@ -271,19 +271,19 @@ internal sealed class ContractRenewals(
 
         if (existing is not null)
         {
-            return Conflict<RenewalDraftResult>($"Bu dönem için karar zaten verilmiş ({existing.Outcome}).");
+            return Conflict<RenewalDraftResult>(ContractsMessages.Renewal.AlreadyDecided(existing.Outcome));
         }
 
         var months = input.TermMonths ?? ContractRenewalRules.SuggestedMonths(c.RenewalPeriodMonths, c.StartDate, c.EndDate);
         var start = input.StartDate ?? ContractPeriod.NextTermStart(period);
         if (months is < 1 or > 120)
         {
-            return Invalid<RenewalDraftResult>("termMonths", "Süre 1 ile 120 ay arasında olmalıdır.");
+            return Invalid<RenewalDraftResult>("termMonths", ContractsMessages.Renewal.TermMonths);
         }
 
         if (start <= period)
         {
-            return Invalid<RenewalDraftResult>("startDate", "Yeni dönem, mevcut dönemin bitişinden sonra başlamalıdır.");
+            return Invalid<RenewalDraftResult>("startDate", ContractsMessages.Renewal.StartAfterEnd);
         }
 
         var end = ContractPeriod.TermEnd(start, months);
@@ -408,7 +408,7 @@ internal sealed class ContractRenewals(
         var c = loaded.Contract;
         if (string.IsNullOrWhiteSpace(input.Reason))
         {
-            return Invalid<RenewalOverview>("reason", "Fesih gerekçesi zorunludur.");
+            return Invalid<RenewalOverview>("reason", ContractsMessages.Renewal.TerminationReasonRequired);
         }
 
         var rule = ContractRenewalRules.Terminate(c.EffectiveStatus, c.SignatureStatus, input.EffectiveDate, loaded.Today, c.NoticePeriodDays);
@@ -419,17 +419,17 @@ internal sealed class ContractRenewals(
 
         if (c.StartDate is { } start && input.EffectiveDate < start)
         {
-            return Invalid<RenewalOverview>("effectiveDate", "Fesih tarihi sözleşme başlangıcından önce olamaz.");
+            return Invalid<RenewalOverview>("effectiveDate", ContractsMessages.Renewal.TerminationBeforeStart);
         }
 
         if (!c.IsIndefinite && c.EndDate is { } end && input.EffectiveDate > end)
         {
-            return Invalid<RenewalOverview>("effectiveDate", "Fesih tarihi sözleşme bitişinden sonra olamaz.");
+            return Invalid<RenewalOverview>("effectiveDate", ContractsMessages.Renewal.TerminationAfterEnd);
         }
 
         if (rule.ShortNotice && !input.ConfirmShortNotice)
         {
-            return Conflict<RenewalOverview>($"Fesih tarihi bildirim süresinin ({c.NoticePeriodDays} gün) altında; yine de feshetmek için kısa bildirimi onaylayın.");
+            return Conflict<RenewalOverview>(ContractsMessages.Renewal.ShortNotice(c.NoticePeriodDays.GetValueOrDefault()));
         }
 
         var reason = input.Reason.Trim();
@@ -456,7 +456,7 @@ internal sealed class ContractRenewals(
     private static string? Eligibility(Contract c) =>
         c.SignatureStatus != SignatureStatus.Completed || !EffectiveStatus.IsBinding(c.EffectiveStatus)
             ? "Yenileme kararı yalnızca imzalı ve yürürlükteki sözleşme için verilir."
-            : c.IsIndefinite || c.EndDate is null ? "Belirsiz süreli sözleşmenin yenilenecek bir dönemi yoktur." : null;
+            : c.IsIndefinite || c.EndDate is null ? ContractsMessages.Renewal.Indefinite.Text : null;
 
     private async Task<RenewalOverview> OverviewAsync(Loaded loaded, CancellationToken cancellationToken)
     {
@@ -520,9 +520,9 @@ internal sealed class ContractRenewals(
 
     private static TimeZoneInfo Zone(ContractPolicySettings settings) => TimeZoneInfo.TryFindSystemTimeZoneById(settings.TimeZoneId, out var zone) ? zone : TimeZoneInfo.Utc;
 
-    private static RecordResult<T> Conflict<T>(string message) => RecordResult<T>.Fail(RecordErrorCode.Conflict, message, [new RecordFieldError("status", message)]);
+    private static RecordResult<T> Conflict<T>(ServerMessage message) => RecordResult<T>.Fail(RecordErrorCode.Conflict, message, [new RecordFieldError("status", message)]);
 
-    private static RecordResult<T> Invalid<T>(string field, string message) => RecordResult<T>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
+    private static RecordResult<T> Invalid<T>(string field, ServerMessage message) => RecordResult<T>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 
     private static RecordResult<T> As<T>(RecordResult<RecordData> result) => RecordResult<T>.Fail(result.Error!);
 }

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Contracts.Lifecycle;
 
@@ -131,22 +132,22 @@ public static class SignatureFlow
     }
 
     /// <summary>İmzacı şimdi imzalayabilir mi? Açık değilse nedeni; sıralı kipte önceki zorunlu imzacılar tamamlanmış olmalıdır.</summary>
-    public static (bool Allowed, string? Reason) CanSign(string mode, IReadOnlyList<SignatoryInfo> signatories, Guid signatoryId)
+    public static (bool Allowed, ServerMessage? Reason) CanSign(string mode, IReadOnlyList<SignatoryInfo> signatories, Guid signatoryId)
     {
         var current = signatories.FirstOrDefault(s => s.Id == signatoryId);
         if (current is null)
         {
-            return (false, "İmzacı bulunamadı.");
+            return (false, ContractsMessages.Signature.SignatoryNotFound);
         }
 
         if (!SignatoryStatus.IsOpen(current.Status))
         {
-            return (false, current.Status == SignatoryStatus.Signed ? "Bu imzacı zaten imzaladı." : "Bu imzacı için imza artık alınamaz.");
+            return (false, current.Status == SignatoryStatus.Signed ? ContractsMessages.Signature.AlreadySignedBySignatory : ContractsMessages.Signature.SignatoryClosed);
         }
 
         if (mode == SignatureMode.Sequential && signatories.Any(s => s.Position < current.Position && s.IsRequired && s.Status != SignatoryStatus.Signed))
         {
-            return (false, "Sıralı imzada önce önceki zorunlu imzacılar imzalamalıdır.");
+            return (false, ContractsMessages.Signature.SequentialOrder);
         }
 
         return (true, null);
@@ -173,22 +174,22 @@ public static class SignatureFileRules
 {
     public const int MaxBytes = 10 * 1024 * 1024;
 
-    public static string? Validate(string? fileName, byte[] content, out string contentType)
+    public static ServerMessage? Validate(string? fileName, byte[] content, out string contentType)
     {
         contentType = string.Empty;
         if (string.IsNullOrWhiteSpace(fileName))
         {
-            return "Dosya adı zorunludur.";
+            return ContractsMessages.Signature.FileNameRequired;
         }
 
         if (content.Length == 0)
         {
-            return "Dosya boş.";
+            return ContractsMessages.Signature.FileEmpty;
         }
 
         if (content.Length > MaxBytes)
         {
-            return "Dosya en fazla 10 MB olabilir.";
+            return ContractsMessages.Signature.FileTooLarge;
         }
 
         if (content.AsSpan().StartsWith("%PDF-"u8))
@@ -205,7 +206,7 @@ public static class SignatureFileRules
         }
         else
         {
-            return "Yalnızca PDF, PNG ya da JPEG dosyası yüklenebilir.";
+            return ContractsMessages.Signature.FileType;
         }
 
         return null;

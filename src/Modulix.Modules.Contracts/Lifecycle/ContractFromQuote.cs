@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Contracts.Sales;
 using Modulix.Modules.Contracts.Records;
@@ -87,31 +88,31 @@ internal sealed class ContractFromQuote(
 
         if (quote.PartyId is not { } partyId)
         {
-            return Invalid("partyId", "Teklifin müşterisi ortak kayıtla eşleşmedi; sözleşme boş taslaktan açılmalıdır.");
+            return Invalid("partyId", ContractsMessages.FromQuote.PartyNotMatched);
         }
 
         var keys = options.LineKeys is { Count: > 0 } requested ? requested.Distinct().ToList() : [.. quote.Lines.Select(l => l.StableKey)];
         var selected = quote.Lines.Where(l => keys.Contains(l.StableKey)).OrderBy(l => l.Position).ToList();
         if (selected.Count == 0 || selected.Count != keys.Count)
         {
-            return Invalid("lineKeys", selected.Count == 0 ? "Sözleşmeye alınacak en az bir teklif kalemi seçin." : "Seçilen kalemlerden biri bu teklifte yok.");
+            return Invalid("lineKeys", selected.Count == 0 ? ContractsMessages.FromQuote.LinesRequired : ContractsMessages.FromQuote.LineNotInQuote);
         }
 
         if (options.TermMonths is { } months && options.StartDate is null)
         {
-            return Invalid("startDate", "Süre (ay) verildiğinde başlangıç tarihi de girilmelidir.");
+            return Invalid("startDate", ContractsMessages.FromQuote.StartRequired);
         }
 
         if (options.TermMonths is < 1 or > 120)
         {
-            return Invalid("termMonths", "Süre 1 ile 120 ay arasında olmalıdır.");
+            return Invalid("termMonths", ContractsMessages.Renewal.TermMonths);
         }
 
         var used = await reader.UsedQuoteLinesAsync(quoteId, cancellationToken);
         if (selected.Where(l => used.ContainsKey(l.StableKey)).Select(l => l.Name).ToList() is { Count: > 0 } taken)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Seçilen teklif kalemleri zaten bir sözleşmede: " + string.Join(", ", taken) + ".",
-                [new RecordFieldError("lineKeys", "Kalem başka bir sözleşmede kullanılıyor.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, ContractsMessages.FromQuote.LinesTaken(string.Join(", ", taken)),
+                [new RecordFieldError("lineKeys", ContractsMessages.FromQuote.LineTaken)]);
         }
 
         var endDate = options.TermMonths is { } term && options.StartDate is { } start ? ContractPeriod.TermEnd(start, term) : (DateOnly?)null;
@@ -198,12 +199,12 @@ internal sealed class ContractFromQuote(
 
         if (quotes is null)
         {
-            return (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, "Teklif kaynağı kullanılamıyor; kabul edilmiş teklif bulunamadı."));
+            return (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, ContractsMessages.FromQuote.SourceUnavailable));
         }
 
         var quote = await quotes.GetAsync(quoteId, cancellationToken);
         return quote is null
-            ? (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, "Kabul edilmiş teklif bulunamadı."))
+            ? (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, ContractsMessages.FromQuote.AcceptedNotFound))
             : (quote, null);
     }
 
@@ -234,6 +235,6 @@ internal sealed class ContractFromQuote(
 
     private static string? Trim(string? text, int max) => text is { Length: > 0 } && text.Length > max ? text[..max] : text;
 
-    private static RecordResult<RecordData> Invalid(string field, string message) =>
+    private static RecordResult<RecordData> Invalid(string field, ServerMessage message) =>
         RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

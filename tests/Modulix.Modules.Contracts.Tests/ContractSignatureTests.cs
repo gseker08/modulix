@@ -56,7 +56,7 @@ public class ContractSignatureTests
     {
         var done = new[] { S(1, status: SignatoryStatus.Signed), S(2, status: SignatoryStatus.Declined) };
 
-        Assert.Contains("zaten imzaladı", SignatureFlow.CanSign(SignatureMode.Parallel, done, Id(1)).Reason);
+        Assert.Contains("zaten imzaladı", SignatureFlow.CanSign(SignatureMode.Parallel, done, Id(1)).Reason!.Text);
         Assert.False(SignatureFlow.CanSign(SignatureMode.Parallel, done, Id(2)).Allowed);
         Assert.False(SignatureFlow.CanSign(SignatureMode.Parallel, done, Guid.NewGuid()).Allowed);
     }
@@ -91,7 +91,7 @@ public class ContractSignatureTests
         Assert.NotNull(SignatureFileRules.Validate("html.pdf", Encoding.ASCII.GetBytes("<script>alert(1)</script>"), out _));
         Assert.NotNull(SignatureFileRules.Validate("bos.pdf", [], out _));
         Assert.NotNull(SignatureFileRules.Validate("", pdf, out _));
-        Assert.Contains("10 MB", SignatureFileRules.Validate("buyuk.pdf", new byte[SignatureFileRules.MaxBytes + 1], out _));
+        Assert.Contains("10 MB", SignatureFileRules.Validate("buyuk.pdf", new byte[SignatureFileRules.MaxBytes + 1], out _)!.Text);
     }
 
     [Theory]
