@@ -108,7 +108,7 @@ internal sealed class CompanyRelationRecordStore(CrmStoreContext context) : CrmR
         entity.IsActive = entity.EndDate is null;
         if (!entity.IsActive && entity.EndDate < entity.StartDate)
         {
-            errors.Add(new RecordFieldError("endDate", CrmMessages.Field.EndBeforeStart));
+            errors.Add(new RecordFieldError("endDate", ServerMessages.Validation.EndBeforeStart));
         }
 
         HashSet<Guid>? group = null;

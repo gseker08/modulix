@@ -155,7 +155,7 @@ internal sealed class ForecastWorkflow(
         var scopeType = request.ScopeType ?? TargetScope.Tenant;
         if (!TargetScope.All.Contains(scopeType))
         {
-            return Invalid("scopeType", CrmMessages.Field.OneOf(string.Join(", ", TargetScope.All)));
+            return Invalid("scopeType", ServerMessages.Validation.OneOf(string.Join(", ", TargetScope.All)));
         }
 
         if (scopeType == TargetScope.User && (request.ScopeUserId is not { } user || !await members.IsActiveMemberAsync(user, cancellationToken)))
@@ -171,7 +171,7 @@ internal sealed class ForecastWorkflow(
         var currency = (request.Currency ?? policy.DefaultCurrency).Trim().ToUpperInvariant();
         if (currency.Length != 3 || !currency.All(char.IsAsciiLetter))
         {
-            return Invalid("currency", CrmMessages.Field.Currency);
+            return Invalid("currency", ServerMessages.Validation.Currency);
         }
 
         var today = ReportPeriods.Today(time.GetUtcNow(), policy.TimeZone);
@@ -304,7 +304,7 @@ internal sealed class ForecastWorkflow(
     {
         if (kind is null || !ForecastAdjustmentKind.All.Contains(kind))
         {
-            return Invalid("kind", CrmMessages.Field.OneOf(string.Join(", ", ForecastAdjustmentKind.All)));
+            return Invalid("kind", ServerMessages.Validation.OneOf(string.Join(", ", ForecastAdjustmentKind.All)));
         }
 
         if (ForecastRules.ValidateReason(reason) is { } reasonError)

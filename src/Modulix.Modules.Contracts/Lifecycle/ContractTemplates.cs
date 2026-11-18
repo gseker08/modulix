@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Contracts.Domain;
 using Modulix.Modules.Contracts.Records;
@@ -46,20 +47,20 @@ internal sealed class ContractTemplates(
 
         if (Text(template, "status") == TemplateStatus.Archived)
         {
-            return Conflict("Arşivlenmiş şablon yayımlanamaz; önce geri alın.");
+            return Conflict(ContractsMessages.Document.TemplateArchivedPublish);
         }
 
         var body = Text(template, "body") ?? string.Empty;
         if (ContractTemplateEngine.Validate(body) is { Count: > 0 } issues)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Şablon yayımlanamaz: metin geçersiz.",
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Document.TemplatePublishInvalid,
                 [.. issues.Select(i => new RecordFieldError("body", i.Line > 0 ? $"Satır {i.Line}: {i.Message}" : i.Message))]);
         }
 
         var publishedNo = template.Values["publishedVersionNo"]?.GetValue<int>();
         if (publishedNo is { } current && await reader.TemplateVersionAsync(id, current, cancellationToken) is { } latest && latest.Sha256 == Text(template, "bodySha256"))
         {
-            return Conflict("Yayımlanmamış değişiklik yok; son yayımlanan sürümle aynı.");
+            return Conflict(ContractsMessages.Document.TemplateUnchanged);
         }
 
         var next = (publishedNo ?? 0) + 1;
@@ -85,12 +86,12 @@ internal sealed class ContractTemplates(
 
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", [new RecordFieldError("reason", "Gerekçe zorunludur.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Contract.ReasonRequired, [new RecordFieldError("reason", ContractsMessages.Contract.ReasonRequired)]);
         }
 
         if (Text(template, "status") == TemplateStatus.Archived)
         {
-            return Conflict("Şablon zaten arşivlenmiş.");
+            return Conflict(ContractsMessages.Document.TemplateAlreadyArchived);
         }
 
         using (gate.Open([ContractsModule.Permissions.TemplatesPublish], "Archived", reason.Trim()))
@@ -109,7 +110,7 @@ internal sealed class ContractTemplates(
 
         if (Text(template, "status") != TemplateStatus.Archived)
         {
-            return Conflict("Yalnızca arşivlenmiş şablon geri alınır.");
+            return Conflict(ContractsMessages.Document.TemplateRestoreArchivedOnly);
         }
 
         // Yayımlanmış sürümü olan şablon yayımlanmış, olmayan taslak olarak döner.
@@ -125,7 +126,7 @@ internal sealed class ContractTemplates(
         var template = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
         if (!template.IsSuccess)
         {
-            return RecordResult<IReadOnlyList<ContractTemplateVersionView>>.Fail(template.Error!.Code, template.Error.Message, template.Error.FieldErrors);
+            return RecordResult<IReadOnlyList<ContractTemplateVersionView>>.Fail(template.Error!);
         }
 
         var versions = await reader.TemplateVersionsAsync(id, cancellationToken);
@@ -138,12 +139,12 @@ internal sealed class ContractTemplates(
         var template = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);
         if (!template.IsSuccess)
         {
-            return RecordResult<ContractTemplateVersionView>.Fail(template.Error!.Code, template.Error.Message, template.Error.FieldErrors);
+            return RecordResult<ContractTemplateVersionView>.Fail(template.Error!);
         }
 
         return await reader.TemplateVersionAsync(id, versionNo, cancellationToken) is { } v
             ? RecordResult<ContractTemplateVersionView>.Ok(new ContractTemplateVersionView(v.Id, v.VersionNo, v.Name, v.Sha256, v.IsExample, v.Notes, v.PublishedBy, v.CreatedAt, v.Body))
-            : RecordResult<ContractTemplateVersionView>.Fail(RecordErrorCode.NotFound, "Şablon sürümü bulunamadı.");
+            : RecordResult<ContractTemplateVersionView>.Fail(RecordErrorCode.NotFound, ContractsMessages.Document.TemplateVersionNotFound);
     }
 
     /// <summary>Şablonu okur (görünürlük boru hattında) ve yayımlama iznini denetler; sorun varsa hazır hata döner.</summary>
@@ -157,12 +158,12 @@ internal sealed class ContractTemplates(
 
         return (await access.GetPermissionsAsync(cancellationToken)).Contains(ContractsModule.Permissions.TemplatesPublish)
             ? (loaded.Value, null)
-            : (null, RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{ContractsModule.Permissions.TemplatesPublish}' izni gerekir."));
+            : (null, RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(ContractsModule.Permissions.TemplatesPublish)));
     }
 
     private static string? Text(RecordData record, string field) =>
         record.Values.TryGetPropertyValue(field, out var node) && node is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
 
-    private static RecordResult<RecordData> Conflict(string message) =>
+    private static RecordResult<RecordData> Conflict(ServerMessage message) =>
         RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, message, [new RecordFieldError("status", message)]);
 }

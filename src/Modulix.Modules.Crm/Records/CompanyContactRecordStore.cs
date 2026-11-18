@@ -183,7 +183,7 @@ internal sealed class CompanyContactRecordStore(CrmStoreContext context) : CrmRe
             entity.IsPrimary = false;
             if (entity.EndDate < entity.StartDate)
             {
-                errors.Add(new RecordFieldError("endDate", CrmMessages.Field.EndBeforeStart));
+                errors.Add(new RecordFieldError("endDate", ServerMessages.Validation.EndBeforeStart));
             }
         }
 

@@ -44,7 +44,7 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
 
     protected override IReadOnlyList<RecordField<ContractCommitment>> Fields { get; } =
     [
-        Field.Reference<ContractCommitment, Contract>("contractId", "Sözleşme bulunamadı.", c => c.ContractId, (c, v) => c.ContractId = v!.Value, required: true, createOnly: true),
+        Field.Reference<ContractCommitment, Contract>("contractId", ContractsMessages.Contract.NotFound, c => c.ContractId, (c, v) => c.ContractId = v!.Value, required: true, createOnly: true),
         Field.Text<ContractCommitment>("title", ContractCommitment.TitleMaxLength, c => c.Title, (c, v) => c.Title = v!, required: true),
         Field.Text<ContractCommitment>("description", ContractCommitment.TextMaxLength, c => c.Description, (c, v) => c.Description = v),
         Field.ListChoice<ContractCommitment>("category", ContractsModule.Lists.CommitmentCategory, c => c.Category, (c, v) => c.Category = v ?? string.Empty),
@@ -63,7 +63,7 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
         Field.OptionalChoice<ContractCommitment>("direction", CommitmentDirection.All, c => c.Direction, (c, v) => c.Direction = v),
         Field.Quantity<ContractCommitment>("targetValue", c => c.TargetValue, (c, v) => c.TargetValue = v),
         Field.Quantity<ContractCommitment>("tolerance", c => c.Tolerance, (c, v) => c.Tolerance = v),
-        Field.Reference<ContractCommitment, ContractCommitment>("dependsOnCommitmentId", "Bağımlı olunan taahhüt bulunamadı.", c => c.DependsOnCommitmentId, (c, v) => c.DependsOnCommitmentId = v),
+        Field.Reference<ContractCommitment, ContractCommitment>("dependsOnCommitmentId", ContractsMessages.Commitment.DependencyNotFound, c => c.DependsOnCommitmentId, (c, v) => c.DependsOnCommitmentId = v),
         Field.Text<ContractCommitment>("consequenceNote", ContractCommitment.TextMaxLength, c => c.ConsequenceNote, (c, v) => c.ConsequenceNote = v),
         Field.Text<ContractCommitment>("status", Contract.StatusMaxLength, c => c.Status, (c, v) => c.Status = v!).AsSystem(),
         Field.Id<ContractCommitment>("createdBy", c => c.CreatedBy, (c, v) => c.CreatedBy = v).AsSystem(),
@@ -117,18 +117,18 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
         var contract = await data.Set<Contract>().AsNoTracking().SingleOrDefaultAsync(c => c.Id == entity.ContractId, cancellationToken);
         if (contract is null || (await Context.Access.GetOwnersAsync(ContractsModule.Entities.Contract, cancellationToken) is { } owners && !owners.Contains(contract.OwnerId ?? Guid.Empty)))
         {
-            throw new RecordValidationException([new RecordFieldError("contractId", "Sözleşme bulunamadı.")]);
+            throw new RecordValidationException([new RecordFieldError("contractId", ContractsMessages.Contract.NotFound)]);
         }
 
         var errors = new List<RecordFieldError>();
         if (contract.EffectiveStatus is EffectiveStatus.Terminated or EffectiveStatus.Cancelled or EffectiveStatus.Expired)
         {
-            errors.Add(new RecordFieldError("contractId", "Süresi dolmuş, feshedilmiş ya da iptal edilmiş sözleşmeye taahhüt eklenemez ya da değiştirilemez."));
+            errors.Add(new RecordFieldError("contractId", ContractsMessages.Commitment.ContractClosed));
         }
 
         if (!isNew && entity.Status != CommitmentStatus.Active)
         {
-            errors.Add(new RecordFieldError("status", "Tamamlanmış ya da iptal edilmiş taahhüt düzenlenemez."));
+            errors.Add(new RecordFieldError("status", ContractsMessages.Commitment.Closed));
         }
 
         var occurrences = isNew ? [] : await data.Set<ContractCommitmentOccurrence>().Where(o => o.CommitmentId == entity.Id).ToListAsync(cancellationToken);
@@ -140,7 +140,7 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
         {
             foreach (var name in changedKeys)
             {
-                errors.Add(new RecordFieldError(name, "Gerçekleşmesi kaydedilmiş taahhütte takvim ve ölçüm değiştirilemez; önceki kayıtlar yeniden yazılmaz. Yeni bir taahhüt açın."));
+                errors.Add(new RecordFieldError(name, ContractsMessages.Commitment.ScheduleLocked));
             }
         }
 
@@ -184,12 +184,12 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
         var occurrences = await data.Set<ContractCommitmentOccurrence>().Where(o => o.CommitmentId == entity.Id).ToListAsync(cancellationToken);
         if (occurrences.Any(o => o.Status != OccurrenceStatus.Open))
         {
-            throw new RecordConflictException("Gerçekleşmesi kaydedilmiş taahhüt silinemez (kayıtlar korunur); iptal edin.");
+            throw new RecordConflictException(ContractsMessages.Commitment.RecordedDelete);
         }
 
         if (await data.Set<ContractCommitment>().AnyAsync(c => c.DependsOnCommitmentId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Başka bir taahhüt bu taahhüde bağlı; önce bağı kaldırın.");
+            throw new RecordConflictException(ContractsMessages.Commitment.HasDependents);
         }
 
         data.Set<ContractCommitmentOccurrence>().RemoveRange(occurrences);
@@ -201,7 +201,7 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
     {
         if (c.StartDate == default)
         {
-            errors.Add(new RecordFieldError("startDate", "Başlangıç tarihi zorunludur."));
+            errors.Add(new RecordFieldError("startDate", ContractsMessages.Commitment.StartRequired));
         }
 
         if (c.DueDate == default)
@@ -210,41 +210,41 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
         }
         else if (c.StartDate != default && c.DueDate < c.StartDate)
         {
-            errors.Add(new RecordFieldError("dueDate", "Son tarih başlangıçtan önce olamaz."));
+            errors.Add(new RecordFieldError("dueDate", ContractsMessages.Commitment.DueBeforeStart));
         }
 
         if (c.Kind == CommitmentKind.Periodic)
         {
             if (c.Recurrence is null)
             {
-                errors.Add(new RecordFieldError("recurrence", "Dönemsel taahhüt için tekrar kuralı seçin."));
+                errors.Add(new RecordFieldError("recurrence", ContractsMessages.Commitment.RecurrenceRequired));
             }
 
             if (c.RecurrenceEndDate is { } end && c.DueDate != default && end < c.DueDate)
             {
-                errors.Add(new RecordFieldError("recurrenceEndDate", "Tekrar bitişi ilk son tarihten önce olamaz."));
+                errors.Add(new RecordFieldError("recurrenceEndDate", ContractsMessages.Commitment.RecurrenceEndOrder));
             }
         }
         else if (c.Recurrence is not null || c.RecurrenceEndDate is not null)
         {
-            errors.Add(new RecordFieldError("recurrence", "Tek seferlik taahhütte tekrar kuralı olmaz."));
+            errors.Add(new RecordFieldError("recurrence", ContractsMessages.Commitment.OneOffNoRecurrence));
         }
 
         if (!string.IsNullOrWhiteSpace(c.MetricName))
         {
             if (c.Direction is null)
             {
-                errors.Add(new RecordFieldError("direction", "Ölçüm için yön (en az / en çok / tam) seçin."));
+                errors.Add(new RecordFieldError("direction", ContractsMessages.Commitment.DirectionRequired));
             }
 
             if (c.TargetValue is null)
             {
-                errors.Add(new RecordFieldError("targetValue", "Ölçüm için hedef değer girin."));
+                errors.Add(new RecordFieldError("targetValue", ContractsMessages.Commitment.TargetRequired));
             }
         }
         else if (c.Direction is not null || c.TargetValue is not null || c.Tolerance is not null || !string.IsNullOrWhiteSpace(c.Unit))
         {
-            errors.Add(new RecordFieldError("metricName", "Hedef, tolerans, birim ya da yön girildiyse ölçüt adı da girilmelidir."));
+            errors.Add(new RecordFieldError("metricName", ContractsMessages.Commitment.MetricNameRequired));
         }
     }
 
@@ -258,7 +258,7 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
 
         if (dependsOn == c.Id)
         {
-            errors.Add(new RecordFieldError("dependsOnCommitmentId", "Taahhüt kendine bağlı olamaz."));
+            errors.Add(new RecordFieldError("dependsOnCommitmentId", ContractsMessages.Commitment.SelfDependency));
             return;
         }
 
@@ -269,7 +269,7 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
         {
             if (id == c.Id)
             {
-                errors.Add(new RecordFieldError("dependsOnCommitmentId", "Bağımlılık döngü oluşturuyor."));
+                errors.Add(new RecordFieldError("dependsOnCommitmentId", ContractsMessages.Commitment.DependencyCycle));
                 return;
             }
 
@@ -286,7 +286,7 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
 
             if (first && parent.ContractId != c.ContractId)
             {
-                errors.Add(new RecordFieldError("dependsOnCommitmentId", "Bağımlı olunan taahhüt aynı sözleşmeden olmalıdır."));
+                errors.Add(new RecordFieldError("dependsOnCommitmentId", ContractsMessages.Commitment.DependencySameContract));
                 return;
             }
 

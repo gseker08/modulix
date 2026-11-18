@@ -368,7 +368,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
 
         if (!keys.Contains(sort, StringComparer.Ordinal))
         {
-            throw new RecordValidationException([new RecordFieldError("sort", CrmMessages.Field.InvalidSort)]);
+            throw new RecordValidationException([new RecordFieldError("sort", ServerMessages.Validation.InvalidSort)]);
         }
 
         return (filters.Where(f => f.Key != "sort").ToDictionary(f => f.Key, f => f.Value), sort);
@@ -458,7 +458,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
                 // Oluştururken PrepareNewAsync kullanır; sonra değiştirilemez (boş değer verilmemiş sayılır).
                 if (!isNew && value is not null && !JsonNode.DeepEquals(field.Read(entity), JsonValue.Create(value.ToString())))
                 {
-                    errors.Add(new RecordFieldError(name, CrmMessages.Field.CreateOnly));
+                    errors.Add(new RecordFieldError(name, ServerMessages.Validation.CreateOnly));
                 }
 
                 continue;
@@ -477,7 +477,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
                 var unchanged = !isNew && choice is not null && field.Read(entity)?.GetValue<string>() == choice.Key;
                 if (choice is null || (!choice.Active && !unchanged))
                 {
-                    errors.Add(new RecordFieldError(name, choice is null ? CrmMessages.Field.NotInList : CrmMessages.Field.Retired));
+                    errors.Add(new RecordFieldError(name, choice is null ? ServerMessages.Validation.NotInList : ServerMessages.Validation.Retired));
                     continue;
                 }
 
@@ -499,7 +499,7 @@ internal abstract class CrmRecordStore<TEntity>(CrmStoreContext context) : IReco
     {
         if (expectedVersion is { } expected && expected != RecordVersion(entity))
         {
-            throw new RecordConflictException(CrmMessages.Field.Concurrency(expected, RecordVersion(entity)));
+            throw new RecordConflictException(ServerMessages.Record.ConcurrencyVersion(expected, RecordVersion(entity)));
         }
     }
 }

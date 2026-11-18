@@ -61,6 +61,11 @@ public static class ServerMessages
         public static ServerMessage Concurrency =>
             ServerMessage.Of("server.record.concurrency", "Kayıt siz düzenlerken değişti. Güncel halini alıp tekrar deneyin.");
 
+        /// <summary>Eşzamanlılık: okunan sürüm güncel değil (sürümler iletide; modüllerin kayıt depoları).</summary>
+        public static ServerMessage ConcurrencyVersion(long expected, long current) =>
+            ServerMessage.Of("server.record.concurrency-version",
+                "Kayıt siz düzenlerken değişti (beklenen sürüm {0}, güncel sürüm {1}). Güncel halini alıp tekrar deneyin.", expected, current);
+
         public static ServerMessage DuplicateKey => ServerMessage.Of("server.record.duplicate-key", "Aynı anahtarla bir kayıt zaten var.");
 
         public static ServerMessage HasDependents =>
@@ -116,6 +121,70 @@ public static class ServerMessages
         public static ServerMessage CustomObject => ServerMessage.Of("server.validation.custom-object", "Özel alanlar nesne olmalıdır.");
 
         public static ServerMessage UnknownFieldType => ServerMessage.Of("server.validation.unknown-field-type", "Bilinmeyen alan tipi.");
+
+        // Modüllerin kayıt alanı biçim iletileri (her modülün RecordField'ı; dilim 18d). Modüller birbirine başvuramadığı için ortak
+        // biçim iletileri burada tek kopyadır.
+
+        public static ServerMessage NotEmpty => ServerMessage.Of("server.validation.not-empty", "Bu alan boş bırakılamaz.");
+
+        public static ServerMessage CodeNameList =>
+            ServerMessage.Of("server.validation.code-name-list", "Kod ve ad çiftlerinden oluşan liste bekleniyor.");
+
+        public static ServerMessage Money =>
+            ServerMessage.Of("server.validation.money", "0 veya daha büyük, en fazla iki ondalıklı bir tutar girin.");
+
+        public static ServerMessage PositiveDecimal =>
+            ServerMessage.Of("server.validation.positive-decimal", "Sıfırdan büyük, en fazla on ondalıklı bir sayı girin.");
+
+        public static ServerMessage Rate =>
+            ServerMessage.Of("server.validation.rate", "0 ile 100 arasında, en fazla dört ondalıklı bir oran girin.");
+
+        public static ServerMessage Quantity =>
+            ServerMessage.Of("server.validation.quantity", "0 veya daha büyük, en fazla altı ondalıklı bir sayı girin.");
+
+        public static ServerMessage Currency => ServerMessage.Of("server.validation.currency", "Üç harfli para birimi kodu girin (ör. TRY).");
+
+        public static ServerMessage Time => ServerMessage.Of("server.validation.time", "Zaman ISO 8601 biçiminde olmalıdır.");
+
+        public static ServerMessage NotInList => ServerMessage.Of("server.validation.not-in-list", "Listede olmayan değer.");
+
+        public static ServerMessage Retired => ServerMessage.Of("server.validation.retired", "Bu değer artık kullanılmıyor.");
+
+        public static ServerMessage Percent => ServerMessage.Of("server.validation.percent", "0 ile 100 arasında bir tam sayı girin.");
+
+        public static ServerMessage Minutes(int max) => ServerMessage.Of("server.validation.minutes", "1 ile {0} arasında dakika girin.", max);
+
+        public static ServerMessage IntegerRange(int min, int max) =>
+            ServerMessage.Of("server.validation.integer-range", "{0} ile {1} arasında bir tam sayı girin.", min, max);
+
+        public static ServerMessage NonNegativeInteger =>
+            ServerMessage.Of("server.validation.non-negative-integer", "0 veya daha büyük bir tam sayı girin.");
+
+        public static ServerMessage PartyKind => ServerMessage.Of("server.validation.party-kind", "Organization veya Individual olmalıdır.");
+
+        public static ServerMessage Flag => ServerMessage.Of("server.validation.flag", "true veya false olmalıdır.");
+
+        public static ServerMessage KeyList => ServerMessage.Of("server.validation.key-list", "Metin listesi olmalıdır.");
+
+        public static ServerMessage InvalidValue(string value) => ServerMessage.Of("server.validation.invalid-value", "Geçersiz değer: {0}.", value);
+
+        public static ServerMessage TooManyValues => ServerMessage.Of("server.validation.too-many-values", "Çok fazla değer seçildi.");
+
+        public static ServerMessage OneOf(string allowed) => ServerMessage.Of("server.validation.one-of", "Şunlardan biri olmalıdır: {0}.", allowed);
+
+        public static ServerMessage Phone => ServerMessage.Of("server.validation.phone", "Geçerli bir telefon numarası girin.");
+
+        public static ServerMessage Country => ServerMessage.Of("server.validation.country", "İki harfli ülke kodu girin (ör. TR).");
+
+        public static ServerMessage Url => ServerMessage.Of("server.validation.url", "Geçerli bir web adresi girin.");
+
+        public static ServerMessage CreateOnly => ServerMessage.Of("server.validation.create-only", "Oluşturulduktan sonra değiştirilemez.");
+
+        public static ServerMessage InvalidSort => ServerMessage.Of("server.validation.invalid-sort", "Geçersiz sıralama.");
+
+        public static ServerMessage NotMember => ServerMessage.Of("server.validation.not-member", "Kullanıcı bu kuruluşun üyesi değil.");
+
+        public static ServerMessage EndBeforeStart => ServerMessage.Of("server.validation.end-before-start", "Bitiş tarihi başlangıçtan önce olamaz.");
     }
 
     /// <summary>Uç nokta erişim denetiminin (izin, modül, lisans, tenant) iletileri.</summary>

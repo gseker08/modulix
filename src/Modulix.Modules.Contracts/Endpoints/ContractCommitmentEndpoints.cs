@@ -45,7 +45,7 @@ internal static class ContractCommitmentEndpoints
                 }
                 catch (FormatException)
                 {
-                    return RecordProblems.ToProblem(new RecordError(RecordErrorCode.ValidationFailed, "Dosya içeriği geçersiz.", [new RecordFieldError("file", "Dosya içeriği geçersiz (base64).")]));
+                    return RecordProblems.ToProblem(new RecordError(RecordErrorCode.ValidationFailed, ContractsMessages.Contract.InvalidFile, [new RecordFieldError("file", ContractsMessages.Contract.InvalidFileBase64)]));
                 }
             }
 

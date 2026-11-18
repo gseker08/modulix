@@ -2,6 +2,7 @@ using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Modules.Contracts.Domain;
@@ -110,7 +111,7 @@ internal sealed class ContractSignatures(
 
         return await reader.SignatureFileAsync(contractId, fileId, cancellationToken) is { } file
             ? RecordResult<SignatureFileContent>.Ok(new SignatureFileContent(file.Id, file.FileName, file.ContentType, file.Content, file.Sha256))
-            : RecordResult<SignatureFileContent>.Fail(RecordErrorCode.NotFound, "Dosya bulunamadı.");
+            : RecordResult<SignatureFileContent>.Fail(RecordErrorCode.NotFound, ContractsMessages.Contract.FileNotFound);
     }
 
     // ---- başlatma
@@ -167,7 +168,7 @@ internal sealed class ContractSignatures(
         var document = (await documents.ListAsync(contractId, cancellationToken)) is { IsSuccess: true } list ? list.Value!.FirstOrDefault(d => d.Id == input.DocumentId) : null;
         if (document is null)
         {
-            errors.Add(new RecordFieldError("documentId", "Belge bulunamadı."));
+            errors.Add(new RecordFieldError("documentId", ContractsMessages.Document.NotFound));
         }
         else if (!document.IsFinal || document.ContractVersionNo != c.CurrentVersionNo)
         {
@@ -315,7 +316,7 @@ internal sealed class ContractSignatures(
 
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", [new RecordFieldError("reason", "Gerekçe zorunludur.")]);
+            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Contract.ReasonRequired, [new RecordFieldError("reason", ContractsMessages.Contract.ReasonRequired)]);
         }
 
         if (state.Request.Method != SignatureMethod.Manual)
@@ -379,7 +380,7 @@ internal sealed class ContractSignatures(
 
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", [new RecordFieldError("reason", "Gerekçe zorunludur.")]);
+            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Contract.ReasonRequired, [new RecordFieldError("reason", ContractsMessages.Contract.ReasonRequired)]);
         }
 
         var text = reason.Trim();
@@ -435,7 +436,7 @@ internal sealed class ContractSignatures(
         var result = await ApplyEventAsync(input, [ContractsModule.Permissions.SignaturesManage], cancellationToken);
         if (!result.IsSuccess)
         {
-            return RecordResult<ContractSignatureOverview>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
+            return RecordResult<ContractSignatureOverview>.Fail(result.Error!);
         }
 
         return result.Value!.Outcome == SignatureEventOutcome.Applied
@@ -526,7 +527,7 @@ internal sealed class ContractSignatures(
             var skipped = await ApplyAsync(state, Infos(signatories), [], [logged], null, null, null, permissions, cancellationToken);
             return skipped.IsSuccess
                 ? RecordResult<ProviderEventResult>.Ok(new ProviderEventResult(outcome, note))
-                : RecordResult<ProviderEventResult>.Fail(skipped.Error!.Code, skipped.Error.Message, skipped.Error.FieldErrors);
+                : RecordResult<ProviderEventResult>.Fail(skipped.Error!);
         }
 
         RecordResult<RecordData> applied;
@@ -563,7 +564,7 @@ internal sealed class ContractSignatures(
 
         return applied.IsSuccess
             ? RecordResult<ProviderEventResult>.Ok(new ProviderEventResult(SignatureEventOutcome.Applied))
-            : RecordResult<ProviderEventResult>.Fail(applied.Error!.Code, applied.Error.Message, applied.Error.FieldErrors);
+            : RecordResult<ProviderEventResult>.Fail(applied.Error!);
     }
 
     // ---- ortak çekirdek
@@ -709,18 +710,18 @@ internal sealed class ContractSignatures(
         var record = await pipeline.GetAsync(new RecordRef(Key, contractId), cancellationToken);
         if (!record.IsSuccess)
         {
-            return (null, RecordResult<T>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors));
+            return (null, RecordResult<T>.Fail(record.Error!));
         }
 
         if (permission is not null && !(await access.GetPermissionsAsync(cancellationToken)).Contains(permission))
         {
-            return (null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir."));
+            return (null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission)));
         }
 
         var contract = await reader.ContractAsync(contractId, cancellationToken);
         if (contract is null)
         {
-            return (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, "Sözleşme bulunamadı."));
+            return (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, ContractsMessages.Contract.NotFound));
         }
 
         return (new Loaded(record.Value!, contract, policy is null ? ContractPolicySettings.Default : await policy.GetAsync(cancellationToken)), null);
@@ -852,7 +853,7 @@ internal sealed class ContractSignatures(
         RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.Conflict, message, [new RecordFieldError("signatureStatus", message)]);
 
     private static RecordResult<ContractSignatureOverview> AsOverview(RecordResult<RecordData> result) =>
-        result.IsSuccess ? RecordResult<ContractSignatureOverview>.Ok(null!) : RecordResult<ContractSignatureOverview>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
+        result.IsSuccess ? RecordResult<ContractSignatureOverview>.Ok(null!) : RecordResult<ContractSignatureOverview>.Fail(result.Error!);
 }
 
 /// <summary>Sözleşme sistem kimliklerinin izin çapası (oturumsuz çağıran sistem adına çalışır); olay işlemez.</summary>

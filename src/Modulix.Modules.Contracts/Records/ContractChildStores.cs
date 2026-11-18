@@ -25,10 +25,10 @@ internal sealed class ContractPartyRecordStore(ContractsStoreContext context) : 
 
     protected override IReadOnlyList<RecordField<ContractParty>> Fields { get; } =
     [
-        Field.Reference<ContractParty, Contract>("contractId", "Sözleşme bulunamadı.", p => p.ContractId, (p, v) => p.ContractId = v!.Value, required: true, createOnly: true),
+        Field.Reference<ContractParty, Contract>("contractId", ContractsMessages.Contract.NotFound, p => p.ContractId, (p, v) => p.ContractId = v!.Value, required: true, createOnly: true),
         Field.Choice<ContractParty>("role", PartyRoles.All, p => p.Role, (p, v) => p.Role = v),
-        Field.Shared<ContractParty, Party>("partyId", "Taraf bulunamadı.", p => p.PartyId, (p, v) => p.PartyId = v),
-        Field.Shared<ContractParty, Person>("personId", "Kişi bulunamadı.", p => p.PersonId, (p, v) => p.PersonId = v),
+        Field.Shared<ContractParty, Party>("partyId", ContractsMessages.Contract.PartyNotFound, p => p.PartyId, (p, v) => p.PartyId = v),
+        Field.Shared<ContractParty, Person>("personId", ContractsMessages.Contract.PersonNotFound, p => p.PersonId, (p, v) => p.PersonId = v),
         Field.Integer<ContractParty>("position", p => p.Position, (p, v) => { if (v is { } n) { p.Position = n; } }, max: 9999),
         Field.Text<ContractParty>("notes", ContractParty.NotesMaxLength, p => p.Notes, (p, v) => p.Notes = v),
     ];
@@ -64,13 +64,13 @@ internal sealed class ContractPartyRecordStore(ContractsStoreContext context) : 
         var errors = new List<RecordFieldError>();
         if (entity.PartyId is null && entity.PersonId is null)
         {
-            errors.Add(new RecordFieldError("partyId", "Taraf ya da kişi seçin."));
+            errors.Add(new RecordFieldError("partyId", ContractsMessages.Contract.PartyOrPersonRequired));
         }
 
         if (entity.PartyId is { } partyId && entity.PersonId is { } personId
             && !await Context.Data.Set<Person>().AsNoTracking().AnyAsync(p => p.Id == personId && p.PartyId == partyId, cancellationToken))
         {
-            errors.Add(new RecordFieldError("personId", "Kişi seçilen tarafla ilişkili değil."));
+            errors.Add(new RecordFieldError("personId", ContractsMessages.Contract.PersonNotOfParty));
         }
 
         if (errors.Count > 0)
@@ -111,7 +111,7 @@ internal sealed class ContractLineRecordStore(ContractsStoreContext context) : C
 
     protected override IReadOnlyList<RecordField<ContractLine>> Fields { get; } =
     [
-        Field.Reference<ContractLine, Contract>("contractId", "Sözleşme bulunamadı.", l => l.ContractId, (l, v) => l.ContractId = v!.Value, required: true, createOnly: true),
+        Field.Reference<ContractLine, Contract>("contractId", ContractsMessages.Contract.NotFound, l => l.ContractId, (l, v) => l.ContractId = v!.Value, required: true, createOnly: true),
         Field.Id<ContractLine>("stableKey", l => l.StableKey == Guid.Empty ? null : l.StableKey, (_, _) => { }).AsSystem(),
         Field.Integer<ContractLine>("position", l => l.Position, (l, v) => { if (v is { } n) { l.Position = n; } }, max: 9999),
         Field.Choice<ContractLine>("kind", LineKinds.All, l => l.Kind, (l, v) => l.Kind = v),

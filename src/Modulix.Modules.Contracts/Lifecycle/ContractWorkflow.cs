@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Modules.Contracts.Domain;
@@ -149,13 +150,13 @@ internal sealed class ContractWorkflow(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(permission))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission));
         }
 
         var text = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         if (ContractTransitions.RequiresReason(action) && text is null)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", [new RecordFieldError("reason", "Gerekçe zorunludur.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Contract.ReasonRequired, [new RecordFieldError("reason", ContractsMessages.Contract.ReasonRequired)]);
         }
 
         var contract = loaded.Value!;
@@ -179,7 +180,7 @@ internal sealed class ContractWorkflow(
             var entity = await reader.ContractAsync(id, cancellationToken);
             if (entity is null)
             {
-                return RecordResult<RecordData>.Fail(RecordErrorCode.NotFound, "Sözleşme bulunamadı.");
+                return RecordResult<RecordData>.Fail(RecordErrorCode.NotFound, ContractsMessages.Contract.NotFound);
             }
 
             if (IsDecision(action))
