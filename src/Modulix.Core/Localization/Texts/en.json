@@ -5064,7 +5064,7 @@
   "reports.kind.choice": "Choice",
   "reports.kind.lookup": "Record",
   "reports.kind.user": "User",
-  "reports.kind.businessUnit": "Business unit",
+  "reports.kind.businessunit": "Business unit",
   "reports.kind.team": "Team",
   "reports.frequency.daily": "Every day",
   "reports.frequency.weekly": "Every week",
