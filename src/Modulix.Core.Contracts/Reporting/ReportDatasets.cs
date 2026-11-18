@@ -64,6 +64,13 @@ public sealed record DatasetColumn(string Field, string Label, DatasetColumnKind
     /// </summary>
     public string? DerivedFrom { get; init; }
 
+    /// <summary>
+    /// Yalnızca <see cref="DatasetColumnKind.BusinessUnit"/>: kayıt, kullanıcının departmanı yerine ağaçta bu derinlikteki üst departmanına yazılır
+    /// ("alt birimler dahil" toplam; kök birim 0, kökün altındaki ana departmanlar 1). Kullanıcının birimi bu derinlikten yukarıdaysa kendi birimi kalır.
+    /// Her kayıt yine tek kovaya girer, toplamlar çift sayılmaz.
+    /// </summary>
+    public int? RollUpToDepth { get; init; }
+
     /// <summary>Tutar sütununun para birimi alanı (aynı kayıtta); tutar toplamları para birimine göre ayrılır.</summary>
     public string? CurrencyField { get; init; }
 

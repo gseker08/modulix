@@ -68,7 +68,12 @@ public sealed partial class ModuleCatalog
         var derivedKind = column.Kind is DatasetColumnKind.BusinessUnit or DatasetColumnKind.Team;
         if (!derivedKind)
         {
-            return column.DerivedFrom is not null;
+            return column.DerivedFrom is not null || column.RollUpToDepth is not null;
+        }
+
+        if (column.RollUpToDepth is < 0 || (column.RollUpToDepth is not null && column.Kind != DatasetColumnKind.BusinessUnit))
+        {
+            return true;
         }
 
         return column.DerivedFrom is not { } source || !dataset.Columns.Any(c => c.Field == source && c.Kind is DatasetColumnKind.User or DatasetColumnKind.Lookup)

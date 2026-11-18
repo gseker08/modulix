@@ -205,6 +205,7 @@ Kararlar (kullanıcı, 18 Kasım): **çift sayım yok, tek birincil üyelik**; b
   adları erişim yetkisi sayılmaz (`IBusinessUnitDirectory` ile aynı).
 - **Sözleşme.** `Core.Contracts/Tenancy/ITeamDirectory` (ekip listesi ve birincil ekip), `TeamDirectory` Infrastructure'da. Şema değişikliği ve migration yoktur.
 - **CRM.** Fırsat, müşteri adayı, teklif ve firma veri kümelerine "Sorumlunun departmanı" (`ownerUnit`) ve "Sorumlunun ekibi" (`ownerTeam`); hazır raporlar
+- **Alt birimler dahil toplam.** `DatasetColumn.RollUpToDepth` (yalnız `BusinessUnit` türünde) kaydı sorumlunun biriminin ağaçtaki o derinlikteki üst departmanına yazar; CRM'de `ownerTopUnit` (derinlik 1) ve "Ana departmana göre kazanılan fırsatlar". Her kayıt yine tek kovadadır; şema değişikliği yok.
   "Departmana göre kazanılan fırsatlar" ve "Ekibe göre kazanılan fırsatlar".
 - **Testler.** `DatasetCatalogTests` (türetme doğrulaması), `ReportCenterTests.OrgBreakdown.cs` (kırılım ve çift sayım, doğrulama, tenant izolasyonu, kayıt kapsamı ve izin).
 - **Yapılmadı.** Ekip kırılımı için kullanıcının birincil ekibini seçme (şimdilik ilk katıldığı ekip); alt birimler dahil toplam; diğer modüllerin veri kümeleri.

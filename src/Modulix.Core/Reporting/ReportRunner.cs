@@ -101,6 +101,12 @@ public sealed class ReportRunner(
             var map = column.Kind == DatasetColumnKind.BusinessUnit
                 ? await units.UnitsOfUsersAsync(userIds, cancellationToken)
                 : await teams.PrimaryTeamsOfUsersAsync(userIds, cancellationToken);
+            if (column is { Kind: DatasetColumnKind.BusinessUnit, RollUpToDepth: { } depth })
+            {
+                var tree = (await units.ListAsync(cancellationToken)).ToDictionary(u => u.Id);
+                map = map.ToDictionary(p => p.Key, p => tree.TryGetValue(p.Value, out var unit) && unit.PathIds.Count > depth ? unit.PathIds[depth] : p.Value);
+            }
+
             foreach (var row in rows)
             {
                 if (Guid.TryParse(ReportAggregator.Text(ReportAggregator.Raw(row.Values, column.DerivedFrom!)), out var userId) && map.TryGetValue(userId, out var target))
