@@ -145,7 +145,7 @@ public class ServerMessageTests
 
             foreach (var method in group.GetMethods(BindingFlags.Public | BindingFlags.Static).Where(m => m.ReturnType == typeof(ServerMessage) && !m.IsSpecialName))
             {
-                var args = method.GetParameters().Select(p => p.ParameterType == typeof(int) ? (object)7 : "x" + p.Position).ToArray();
+                var args = method.GetParameters().Select(p => p.ParameterType == typeof(string) ? "x" + p.Position : Convert.ChangeType(7, p.ParameterType, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
                 yield return ($"{group.Name}.{method.Name}", (ServerMessage)method.Invoke(null, args)!);
             }
         }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Modules.Contracts.Domain;
@@ -153,7 +154,7 @@ internal sealed class ContractRenewals(
                 cancellationToken);
             if (!result.IsSuccess)
             {
-                return RecordResult<IReadOnlyList<RenewalCalendarItem>>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
+                return RecordResult<IReadOnlyList<RenewalCalendarItem>>.Fail(result.Error!);
             }
 
             rows.AddRange(result.Value!.Items);
@@ -324,7 +325,7 @@ internal sealed class ContractRenewals(
 
             if (!draft.IsSuccess)
             {
-                return RecordResult<Guid>.Fail(draft.Error!.Code, draft.Error.Message, draft.Error.FieldErrors);
+                return RecordResult<Guid>.Fail(draft.Error!);
             }
 
             foreach (var p in parties)
@@ -340,7 +341,7 @@ internal sealed class ContractRenewals(
                 }), ct);
                 if (!added.IsSuccess)
                 {
-                    return RecordResult<Guid>.Fail(added.Error!.Code, added.Error.Message, added.Error.FieldErrors);
+                    return RecordResult<Guid>.Fail(added.Error!);
                 }
             }
 
@@ -363,7 +364,7 @@ internal sealed class ContractRenewals(
                 }), ct);
                 if (!added.IsSuccess)
                 {
-                    return RecordResult<Guid>.Fail(added.Error!.Code, added.Error.Message, added.Error.FieldErrors);
+                    return RecordResult<Guid>.Fail(added.Error!);
                 }
             }
 
@@ -371,7 +372,7 @@ internal sealed class ContractRenewals(
             var source = await pipeline.GetAsync(new RecordRef(Key, contractId), ct);
             if (!source.IsSuccess)
             {
-                return RecordResult<Guid>.Fail(source.Error!.Code, source.Error.Message, source.Error.FieldErrors);
+                return RecordResult<Guid>.Fail(source.Error!);
             }
 
             var draftId = draft.Value!.Id;
@@ -383,12 +384,12 @@ internal sealed class ContractRenewals(
                     return Task.CompletedTask;
                 },
                 ct);
-            return marked.IsSuccess ? RecordResult<Guid>.Ok(draftId) : RecordResult<Guid>.Fail(marked.Error!.Code, marked.Error.Message, marked.Error.FieldErrors);
+            return marked.IsSuccess ? RecordResult<Guid>.Ok(draftId) : RecordResult<Guid>.Fail(marked.Error!);
         }, cancellationToken);
 
         if (!created.IsSuccess)
         {
-            return RecordResult<RenewalDraftResult>.Fail(created.Error!.Code, created.Error.Message, created.Error.FieldErrors);
+            return RecordResult<RenewalDraftResult>.Fail(created.Error!);
         }
 
         return RecordResult<RenewalDraftResult>.Ok(new RenewalDraftResult(created.Value, (await reader.ContractAsync(created.Value, cancellationToken))?.Number ?? string.Empty, false));
@@ -487,18 +488,18 @@ internal sealed class ContractRenewals(
         var record = await pipeline.GetAsync(new RecordRef(Key, contractId), cancellationToken);
         if (!record.IsSuccess)
         {
-            return (null, RecordResult<T>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors));
+            return (null, RecordResult<T>.Fail(record.Error!));
         }
 
         if (permission is not null && !(await access.GetPermissionsAsync(cancellationToken)).Contains(permission))
         {
-            return (null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir."));
+            return (null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission)));
         }
 
         var contract = await reader.ContractAsync(contractId, cancellationToken);
         if (contract is null)
         {
-            return (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, "Sözleşme bulunamadı."));
+            return (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, ContractsMessages.Contract.NotFound));
         }
 
         var settings = policy is null ? ContractPolicySettings.Default : await policy.GetAsync(cancellationToken);
@@ -523,5 +524,5 @@ internal sealed class ContractRenewals(
 
     private static RecordResult<T> Invalid<T>(string field, string message) => RecordResult<T>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 
-    private static RecordResult<T> As<T>(RecordResult<RecordData> result) => RecordResult<T>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
+    private static RecordResult<T> As<T>(RecordResult<RecordData> result) => RecordResult<T>.Fail(result.Error!);
 }

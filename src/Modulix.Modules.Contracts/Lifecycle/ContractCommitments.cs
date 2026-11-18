@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Crm.Contracts.Activities;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
@@ -125,18 +126,18 @@ internal sealed class ContractCommitments(
         var record = await pipeline.GetAsync(new RecordRef(Key, commitmentId), cancellationToken);
         if (!record.IsSuccess)
         {
-            return RecordResult<CommitmentFileContent>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors);
+            return RecordResult<CommitmentFileContent>.Fail(record.Error!);
         }
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(ContractsModule.Permissions.DocumentsDownload))
         {
-            return RecordResult<CommitmentFileContent>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{ContractsModule.Permissions.DocumentsDownload}' izni gerekir.");
+            return RecordResult<CommitmentFileContent>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(ContractsModule.Permissions.DocumentsDownload));
         }
 
         var occurrence = (await reader.OccurrencesOfAsync([commitmentId], cancellationToken)).FirstOrDefault(o => o.Id == occurrenceId);
         return occurrence is not null && await reader.CommitmentFileAsync(occurrenceId, fileId, cancellationToken) is { } file
             ? RecordResult<CommitmentFileContent>.Ok(new CommitmentFileContent(file.Id, file.FileName, file.ContentType, file.Content, file.Sha256))
-            : RecordResult<CommitmentFileContent>.Fail(RecordErrorCode.NotFound, "Dosya bulunamadı.");
+            : RecordResult<CommitmentFileContent>.Fail(RecordErrorCode.NotFound, ContractsMessages.Contract.FileNotFound);
     }
 
     // ---- tamamlama
@@ -154,16 +155,16 @@ internal sealed class ContractCommitments(
         var today = await TodayAsync(cancellationToken);
         if (!CommitmentTracker.IsCompletable(o.Status, o.CompletedOn))
         {
-            return Conflict<OccurrenceView>("Tamamlanmış, muaf tutulmuş ya da iptal edilmiş gerçekleşme değiştirilemez; kayıtlar yeniden yazılmaz.");
+            return Conflict<OccurrenceView>(ContractsMessages.Commitment.OccurrenceClosed);
         }
 
-        if (input.CompletedOn > today) { errors.Add(new RecordFieldError("completedOn", "Tamamlanma tarihi gelecekte olamaz.")); }
-        else if (input.CompletedOn < c.StartDate) { errors.Add(new RecordFieldError("completedOn", "Tamamlanma tarihi taahhüdün başlangıcından önce olamaz.")); }
+        if (input.CompletedOn > today) { errors.Add(new RecordFieldError("completedOn", ContractsMessages.Commitment.CompletedInFuture)); }
+        else if (input.CompletedOn < c.StartDate) { errors.Add(new RecordFieldError("completedOn", ContractsMessages.Commitment.CompletedBeforeStart)); }
 
         var measured = !string.IsNullOrWhiteSpace(c.MetricName);
-        if (measured && input.ActualValue is null) { errors.Add(new RecordFieldError("actualValue", $"'{c.MetricName}' için gerçekleşen değeri girin.")); }
-        if (input.ActualValue is < 0) { errors.Add(new RecordFieldError("actualValue", "Gerçekleşen değer negatif olamaz.")); }
-        if (input.Note is { Length: > ContractCommitmentOccurrence.NoteMaxLength }) { errors.Add(new RecordFieldError("note", "Not en fazla 1000 karakter olabilir.")); }
+        if (measured && input.ActualValue is null) { errors.Add(new RecordFieldError("actualValue", ContractsMessages.Commitment.ActualRequired(c.MetricName!))); }
+        if (input.ActualValue is < 0) { errors.Add(new RecordFieldError("actualValue", ContractsMessages.Commitment.ActualNegative)); }
+        if (input.Note is { Length: > ContractCommitmentOccurrence.NoteMaxLength }) { errors.Add(new RecordFieldError("note", ContractsMessages.Commitment.NoteMaxLength(ContractCommitmentOccurrence.NoteMaxLength))); }
 
         NewCommitmentFile? file = null;
         if (input.Content is { Length: > 0 } content)
@@ -174,13 +175,13 @@ internal sealed class ContractCommitments(
 
         if (errors.Count > 0)
         {
-            return RecordResult<OccurrenceView>.Fail(RecordErrorCode.ValidationFailed, "Gerçekleşme doğrulanamadı.", errors);
+            return RecordResult<OccurrenceView>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Commitment.OccurrenceInvalid, errors);
         }
 
         var blocked = await DependencyBlockAsync(c, o, cancellationToken);
         if (blocked is { } blockedDue)
         {
-            return Conflict<OccurrenceView>($"Bu taahhüt, bağlı olduğu taahhüdün {blockedDue:dd.MM.yyyy} tarihli gerçekleşmesi tamamlanmadan kaydedilemez.");
+            return Conflict<OccurrenceView>(ContractsMessages.Commitment.BlockedByDependency(blockedDue.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture)));
         }
 
         var met = measured && input.ActualValue is { } actual ? CommitmentMeasure.Meets(c.Direction, c.TargetValue, c.Tolerance, actual) : null;
@@ -202,7 +203,7 @@ internal sealed class ContractCommitments(
             cancellationToken);
         if (!commit.IsSuccess)
         {
-            return RecordResult<OccurrenceView>.Fail(commit.Error!.Code, commit.Error.Message, commit.Error.FieldErrors);
+            return RecordResult<OccurrenceView>.Fail(commit.Error!);
         }
 
         if (breached)
@@ -224,12 +225,12 @@ internal sealed class ContractCommitments(
         var (record, c, o, _) = state;
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return RecordResult<OccurrenceView>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", [new RecordFieldError("reason", "Gerekçe zorunludur.")]);
+            return RecordResult<OccurrenceView>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Contract.ReasonRequired, [new RecordFieldError("reason", ContractsMessages.Contract.ReasonRequired)]);
         }
 
         if (!CommitmentTracker.IsCompletable(o.Status, o.CompletedOn))
         {
-            return Conflict<OccurrenceView>("Tamamlanmış, muaf tutulmuş ya da iptal edilmiş gerçekleşme için muafiyet verilemez.");
+            return Conflict<OccurrenceView>(ContractsMessages.Commitment.WaiveClosed);
         }
 
         var title = $"{c.Title}: dönem {o.Sequence} ({o.DueDate:dd.MM.yyyy}) — {reason.Trim()}";
@@ -241,7 +242,7 @@ internal sealed class ContractCommitments(
             cancellationToken);
         return commit.IsSuccess
             ? await ViewOfAsync(commitmentId, occurrenceId, await TodayAsync(cancellationToken), cancellationToken)
-            : RecordResult<OccurrenceView>.Fail(commit.Error!.Code, commit.Error.Message, commit.Error.FieldErrors);
+            : RecordResult<OccurrenceView>.Fail(commit.Error!);
     }
 
     public async Task<RecordResult<RecordData>> CancelAsync(Guid commitmentId, string reason, CancellationToken cancellationToken)
@@ -254,18 +255,18 @@ internal sealed class ContractCommitments(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(ContractsModule.Permissions.CommitmentsWrite))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{ContractsModule.Permissions.CommitmentsWrite}' izni gerekir.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(ContractsModule.Permissions.CommitmentsWrite));
         }
 
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", [new RecordFieldError("reason", "Gerekçe zorunludur.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Contract.ReasonRequired, [new RecordFieldError("reason", ContractsMessages.Contract.ReasonRequired)]);
         }
 
         var c = await reader.CommitmentAsync(commitmentId, cancellationToken);
         if (c is null || c.Status != CommitmentStatus.Active)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Yalnızca etkin taahhüt iptal edilir.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, ContractsMessages.Commitment.CancelActiveOnly);
         }
 
         var open = (await reader.OccurrencesOfAsync([commitmentId], cancellationToken)).Where(o => CommitmentTracker.IsCompletable(o.Status, o.CompletedOn)).ToList();
@@ -283,7 +284,7 @@ internal sealed class ContractCommitments(
     {
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(ContractsModule.Permissions.CommitmentsWrite))
         {
-            return RecordResult<CommitmentEvaluation>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{ContractsModule.Permissions.CommitmentsWrite}' izni gerekir.");
+            return RecordResult<CommitmentEvaluation>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(ContractsModule.Permissions.CommitmentsWrite));
         }
 
         var filters = new Dictionary<string, string> { ["status"] = CommitmentStatus.Active };
@@ -455,29 +456,29 @@ internal sealed class ContractCommitments(
         var record = await pipeline.GetAsync(new RecordRef(Key, commitmentId), cancellationToken);
         if (!record.IsSuccess)
         {
-            return (null, RecordResult<T>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors));
+            return (null, RecordResult<T>.Fail(record.Error!));
         }
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(permission))
         {
-            return (null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir."));
+            return (null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission)));
         }
 
         var commitment = await reader.CommitmentAsync(commitmentId, cancellationToken);
         if (commitment is null)
         {
-            return (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, "Taahhüt bulunamadı."));
+            return (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, ContractsMessages.Commitment.NotFound));
         }
 
         if (commitment.Status != CommitmentStatus.Active)
         {
-            return (null, Conflict<T>("Tamamlanmış ya da iptal edilmiş taahhüdün gerçekleşmesi değiştirilemez."));
+            return (null, Conflict<T>(ContractsMessages.Commitment.ClosedOccurrences));
         }
 
         var occurrences = await reader.OccurrencesOfAsync([commitmentId], cancellationToken);
         var occurrence = occurrences.FirstOrDefault(o => o.Id == occurrenceId);
         return occurrence is null
-            ? (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, "Gerçekleşme bulunamadı."))
+            ? (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, ContractsMessages.Commitment.OccurrenceNotFound))
             : (new Loaded(record.Value!, commitment, occurrence, occurrences), null);
     }
 
@@ -548,7 +549,7 @@ internal sealed class ContractCommitments(
     private async Task<RecordResult<OccurrenceView>> ViewOfAsync(Guid commitmentId, Guid occurrenceId, DateOnly today, CancellationToken cancellationToken)
     {
         var view = (await ViewsAsync([commitmentId], today, cancellationToken)).FirstOrDefault(v => v.Id == occurrenceId);
-        return view is null ? RecordResult<OccurrenceView>.Fail(RecordErrorCode.NotFound, "Gerçekleşme bulunamadı.") : RecordResult<OccurrenceView>.Ok(view);
+        return view is null ? RecordResult<OccurrenceView>.Fail(RecordErrorCode.NotFound, ContractsMessages.Commitment.OccurrenceNotFound) : RecordResult<OccurrenceView>.Ok(view);
     }
 
     private static OccurrenceView ToView(ContractCommitmentOccurrence o, ContractCommitment c, (string Number, string Title) contract, string? fileName, DateOnly? blocked, DateOnly today)
@@ -577,6 +578,6 @@ internal sealed class ContractCommitments(
 
     private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
-    private static RecordResult<T> Conflict<T>(string message) =>
+    private static RecordResult<T> Conflict<T>(ServerMessage message) =>
         RecordResult<T>.Fail(RecordErrorCode.Conflict, message, [new RecordFieldError("status", message)]);
 }

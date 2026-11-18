@@ -215,7 +215,7 @@ internal sealed class OpportunityCompetitorRecordStore(CrmStoreContext context) 
     {
         if (entity.AlternativeCurrency is { } code && (code.Length != Opportunity.CurrencyLength || !code.All(char.IsAsciiLetter)))
         {
-            throw new RecordValidationException([new RecordFieldError("alternativeCurrency", CrmMessages.Field.Currency)]);
+            throw new RecordValidationException([new RecordFieldError("alternativeCurrency", ServerMessages.Validation.Currency)]);
         }
 
         if (entity.AlternativeAmount is not null && entity.AlternativeCurrency is null)

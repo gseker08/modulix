@@ -177,7 +177,7 @@ internal sealed class ContractFromQuote(
                 var added = await pipeline.CreateAsync(new RecordCommand(ContractsModule.Entities.ContractLine, null, lineValues), ct);
                 if (!added.IsSuccess)
                 {
-                    return RecordResult<RecordData>.Fail(added.Error!.Code, added.Error.Message, added.Error.FieldErrors);
+                    return RecordResult<RecordData>.Fail(added.Error!);
                 }
             }
 

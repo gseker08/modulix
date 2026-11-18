@@ -63,7 +63,7 @@ internal sealed class ContractTemplateRecordStore(ContractsStoreContext context)
 
         if (!isNew && !workflow && entity.Status == TemplateStatus.Archived)
         {
-            errors.Add(new RecordFieldError("name", "Arşivlenmiş şablon düzenlenemez; önce geri alın."));
+            errors.Add(new RecordFieldError("name", ContractsMessages.Document.TemplateArchivedEdit));
         }
 
         if (values.ContainsKey("body") || isNew)
@@ -77,7 +77,7 @@ internal sealed class ContractTemplateRecordStore(ContractsStoreContext context)
         if ((values.ContainsKey("name") || values.ContainsKey("language") || isNew)
             && await Context.Data.Set<ContractTemplate>().AsNoTracking().AnyAsync(t => t.Id != entity.Id && t.Name == entity.Name && t.Language == entity.Language, cancellationToken))
         {
-            errors.Add(new RecordFieldError("name", "Bu adla ve dilde bir şablon zaten var."));
+            errors.Add(new RecordFieldError("name", ContractsMessages.Document.TemplateNameTaken));
         }
 
         if (errors.Count > 0)
@@ -100,7 +100,7 @@ internal sealed class ContractTemplateRecordStore(ContractsStoreContext context)
             || await data.Set<ContractTemplateVersion>().AnyAsync(v => v.TemplateId == entity.Id, cancellationToken)
             || await data.Set<ContractDocument>().AnyAsync(d => d.TemplateId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Yayımlanmış ya da belgesi olan şablon silinemez; arşivleyin.");
+            throw new RecordConflictException(ContractsMessages.Document.TemplateInUse);
         }
     }
 }

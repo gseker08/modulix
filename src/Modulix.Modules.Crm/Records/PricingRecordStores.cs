@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Pricing;
 using Modulix.Modules.Crm.Domain;
@@ -561,7 +562,7 @@ internal sealed class DiscountPolicyRecordStore(CrmStoreContext context) : CrmRe
 
         if (entity.ValidFrom is { } from && entity.ValidTo is { } to && from > to)
         {
-            errors.Add(new RecordFieldError("validTo", CrmMessages.Field.EndBeforeStart));
+            errors.Add(new RecordFieldError("validTo", ServerMessages.Validation.EndBeforeStart));
         }
 
         return errors.Count > 0 ? Task.FromException(new RecordValidationException(errors)) : Task.CompletedTask;

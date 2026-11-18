@@ -78,7 +78,7 @@ internal sealed class ContractDashboard(IRecordPipeline pipeline, ICurrentAccess
             var result = await pipeline.QueryAsync(new RecordQuery(Key, 1, 1, null, filters), cancellationToken);
             if (!result.IsSuccess)
             {
-                return RecordResult<ContractDashboardView>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
+                return RecordResult<ContractDashboardView>.Fail(result.Error!);
             }
 
             counts[key] = counts.GetValueOrDefault(key) + result.Value!.TotalCount;
@@ -93,7 +93,7 @@ internal sealed class ContractDashboard(IRecordPipeline pipeline, ICurrentAccess
                 new RecordQuery(Key, page, RecordQuery.MaxPageSize, null, new Dictionary<string, string> { ["effectiveStatus"] = EffectiveStatus.Active }), cancellationToken);
             if (!result.IsSuccess)
             {
-                return RecordResult<ContractDashboardView>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
+                return RecordResult<ContractDashboardView>.Fail(result.Error!);
             }
 
             rows.AddRange(result.Value!.Items);

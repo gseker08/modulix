@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Records;
@@ -94,8 +95,8 @@ internal sealed class QuoteReport(IRecordPipeline pipeline, TimeProvider time, Q
     {
         if (query.To < query.From)
         {
-            return RecordResult<QuoteReportResult>.Fail(RecordErrorCode.ValidationFailed, CrmMessages.Field.EndBeforeStart,
-                [new RecordFieldError("to", CrmMessages.Field.EndBeforeStart)]);
+            return RecordResult<QuoteReportResult>.Fail(RecordErrorCode.ValidationFailed, ServerMessages.Validation.EndBeforeStart,
+                [new RecordFieldError("to", ServerMessages.Validation.EndBeforeStart)]);
         }
 
         var owner = query.OwnerId is { } id ? new Dictionary<string, string> { ["ownerId"] = id.ToString() } : [];
@@ -168,8 +169,8 @@ internal sealed class QuoteReport(IRecordPipeline pipeline, TimeProvider time, Q
 
         if (query.To < query.From)
         {
-            return RecordResult<QuoteMarginReportResult>.Fail(RecordErrorCode.ValidationFailed, CrmMessages.Field.EndBeforeStart,
-                [new RecordFieldError("to", CrmMessages.Field.EndBeforeStart)]);
+            return RecordResult<QuoteMarginReportResult>.Fail(RecordErrorCode.ValidationFailed, ServerMessages.Validation.EndBeforeStart,
+                [new RecordFieldError("to", ServerMessages.Validation.EndBeforeStart)]);
         }
 
         var owner = query.OwnerId is { } id ? new Dictionary<string, string> { ["ownerId"] = id.ToString() } : [];

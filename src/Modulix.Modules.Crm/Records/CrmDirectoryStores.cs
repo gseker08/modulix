@@ -222,7 +222,7 @@ internal sealed class AddressRecordStore(CrmStoreContext context) : CrmRecordSto
         var errors = new List<RecordFieldError>();
         if (entity.Country.Length != Address.CountryLength || !entity.Country.All(char.IsAsciiLetter))
         {
-            errors.Add(new RecordFieldError("country", CrmMessages.Field.Country));
+            errors.Add(new RecordFieldError("country", ServerMessages.Validation.Country));
         }
 
         if (!entity.IsActive)

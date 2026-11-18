@@ -54,27 +54,27 @@ internal sealed partial class ContractApprovalRuleRecordStore(ContractsStoreCont
 
         if (!ContractApprovalEvaluator.HasCriterion(entity.MinGrossTotal, entity.MinDiscountPercent, entity.MinTermMonths, entity.RequiresNonStandardTerms, entity.MinRiskLevel))
         {
-            errors.Add(new RecordFieldError("minGrossTotal", "En az bir koşul girin: tutar, indirim, süre, standart dışı madde ya da risk düzeyi."));
+            errors.Add(new RecordFieldError("minGrossTotal", ContractsMessages.Approval.RuleConditionRequired));
         }
 
         if (entity.MinDiscountPercent is { } percent && (percent < 0 || percent >= 100))
         {
-            errors.Add(new RecordFieldError("minDiscountPercent", "İndirim eşiği 0 ile 100 arasında (100 hariç) olmalıdır."));
+            errors.Add(new RecordFieldError("minDiscountPercent", ContractsMessages.Approval.RuleDiscountRange));
         }
 
         if (entity.MinGrossTotal is < 0)
         {
-            errors.Add(new RecordFieldError("minGrossTotal", "Tutar eşiği negatif olamaz."));
+            errors.Add(new RecordFieldError("minGrossTotal", ContractsMessages.Approval.RuleAmountNegative));
         }
 
         if (entity.MinTermMonths is < 0)
         {
-            errors.Add(new RecordFieldError("minTermMonths", "Süre eşiği negatif olamaz."));
+            errors.Add(new RecordFieldError("minTermMonths", ContractsMessages.Approval.RuleTermNegative));
         }
 
         if (entity.Step is < 1 or > 9)
         {
-            errors.Add(new RecordFieldError("step", "Onay adımı 1 ile 9 arasında olmalıdır."));
+            errors.Add(new RecordFieldError("step", ContractsMessages.Approval.RuleStepRange));
         }
 
         if (entity.Currency is { Length: > 0 } currency)
@@ -85,7 +85,7 @@ internal sealed partial class ContractApprovalRuleRecordStore(ContractsStoreCont
             }
             else
             {
-                errors.Add(new RecordFieldError("currency", "Para birimi üç harfli kod olmalıdır (ör. TRY)."));
+                errors.Add(new RecordFieldError("currency", ContractsMessages.Approval.RuleCurrency));
             }
         }
 
@@ -145,7 +145,7 @@ internal sealed class ContractApprovalDelegationRecordStore(ContractsStoreContex
         var errors = new List<RecordFieldError>();
         if (entity.FromUserId == Guid.Empty)
         {
-            errors.Add(new RecordFieldError("fromUserId", "Vekâlet veren zorunludur."));
+            errors.Add(new RecordFieldError("fromUserId", ContractsMessages.Approval.DelegatorRequired));
         }
 
         if (entity.ToUserId == Guid.Empty)
@@ -155,7 +155,7 @@ internal sealed class ContractApprovalDelegationRecordStore(ContractsStoreContex
 
         if (entity.FromUserId != Guid.Empty && entity.FromUserId == entity.ToUserId)
         {
-            errors.Add(new RecordFieldError("toUserId", "Kişi kendine vekâlet veremez."));
+            errors.Add(new RecordFieldError("toUserId", ContractsMessages.Approval.SelfDelegation));
         }
 
         if (entity.StartsAt == default)
@@ -165,7 +165,7 @@ internal sealed class ContractApprovalDelegationRecordStore(ContractsStoreContex
 
         if (entity.EndsAt is { } end && end <= entity.StartsAt)
         {
-            errors.Add(new RecordFieldError("endsAt", "Bitiş, başlangıçtan sonra olmalıdır."));
+            errors.Add(new RecordFieldError("endsAt", ContractsMessages.Approval.EndAfterStart));
         }
 
         return errors.Count > 0 ? Task.FromException(new RecordValidationException(errors)) : Task.CompletedTask;

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Contracts.Domain;
 using Modulix.Modules.Contracts.Records;
@@ -90,17 +91,17 @@ internal sealed class ContractDocuments(
         var visible = (await pipeline.GetAsync(new RecordRef(ContractsModule.Entities.Contract, contractId), cancellationToken)).IsSuccess;
         if (!visible)
         {
-            return RecordResult<ContractDocumentInfo>.Fail(RecordErrorCode.NotFound, "Sözleşme bulunamadı.");
+            return RecordResult<ContractDocumentInfo>.Fail(RecordErrorCode.NotFound, ContractsMessages.Contract.NotFound);
         }
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(ContractsModule.Permissions.DocumentsGenerate))
         {
-            return RecordResult<ContractDocumentInfo>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{ContractsModule.Permissions.DocumentsGenerate}' izni gerekir.");
+            return RecordResult<ContractDocumentInfo>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(ContractsModule.Permissions.DocumentsGenerate));
         }
 
         if (renderer is null)
         {
-            return RecordResult<ContractDocumentInfo>.Fail(RecordErrorCode.Conflict, "PDF üretici yapılandırılmamış; belge üretilemez.");
+            return RecordResult<ContractDocumentInfo>.Fail(RecordErrorCode.Conflict, ContractsMessages.Document.PdfNotConfigured);
         }
 
         var (prepared, error) = await PrepareAsync<ContractDocumentInfo>(contractId, templateId, useDraft: false, cancellationToken);
@@ -154,7 +155,7 @@ internal sealed class ContractDocuments(
 
         return result.IsSuccess
             ? RecordResult<ContractDocumentInfo>.Ok(Info(document))
-            : RecordResult<ContractDocumentInfo>.Fail(result.Error!.Code, result.Error.Message, result.Error.FieldErrors);
+            : RecordResult<ContractDocumentInfo>.Fail(result.Error!);
     }
 
     public async Task<RecordResult<IReadOnlyList<ContractDocumentInfo>>> ListAsync(Guid contractId, CancellationToken cancellationToken)
@@ -162,7 +163,7 @@ internal sealed class ContractDocuments(
         var contract = await pipeline.GetAsync(new RecordRef(ContractsModule.Entities.Contract, contractId), cancellationToken);
         if (!contract.IsSuccess)
         {
-            return RecordResult<IReadOnlyList<ContractDocumentInfo>>.Fail(contract.Error!.Code, contract.Error.Message, contract.Error.FieldErrors);
+            return RecordResult<IReadOnlyList<ContractDocumentInfo>>.Fail(contract.Error!);
         }
 
         return RecordResult<IReadOnlyList<ContractDocumentInfo>>.Ok([.. (await reader.DocumentsAsync(contractId, cancellationToken)).Select(Info)]);
@@ -173,18 +174,18 @@ internal sealed class ContractDocuments(
         var contract = await pipeline.GetAsync(new RecordRef(ContractsModule.Entities.Contract, contractId), cancellationToken);
         if (!contract.IsSuccess)
         {
-            return RecordResult<ContractDocumentFile>.Fail(contract.Error!.Code, contract.Error.Message, contract.Error.FieldErrors);
+            return RecordResult<ContractDocumentFile>.Fail(contract.Error!);
         }
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(ContractsModule.Permissions.DocumentsDownload))
         {
-            return RecordResult<ContractDocumentFile>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{ContractsModule.Permissions.DocumentsDownload}' izni gerekir.");
+            return RecordResult<ContractDocumentFile>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(ContractsModule.Permissions.DocumentsDownload));
         }
 
         if (await reader.DocumentMetaAsync(contractId, documentId, cancellationToken) is not { } meta
             || await reader.DocumentContentAsync(contractId, documentId, cancellationToken) is not { } content)
         {
-            return RecordResult<ContractDocumentFile>.Fail(RecordErrorCode.NotFound, "Belge bulunamadı.");
+            return RecordResult<ContractDocumentFile>.Fail(RecordErrorCode.NotFound, ContractsMessages.Document.NotFound);
         }
 
         return RecordResult<ContractDocumentFile>.Ok(new ContractDocumentFile(Info(meta), content));
@@ -193,19 +194,19 @@ internal sealed class ContractDocuments(
     /// <summary>Önizleme ve üretimin ortak hazırlığı: erişim, şablon kaynağı, uyum, izin, veri ve render.</summary>
     private async Task<(Prepared? Prepared, RecordResult<T>? Error)> PrepareAsync<T>(Guid contractId, Guid templateId, bool useDraft, CancellationToken cancellationToken)
     {
-        RecordResult<T> Fail(RecordErrorCode code, string message, string field = "templateId") =>
+        RecordResult<T> Fail(RecordErrorCode code, ServerMessage message, string field = "templateId") =>
             RecordResult<T>.Fail(code, message, code == RecordErrorCode.ValidationFailed ? [new RecordFieldError(field, message)] : null);
 
         var contractRecord = await pipeline.GetAsync(new RecordRef(ContractsModule.Entities.Contract, contractId), cancellationToken);
         if (!contractRecord.IsSuccess)
         {
-            return (null, RecordResult<T>.Fail(contractRecord.Error!.Code, contractRecord.Error.Message, contractRecord.Error.FieldErrors));
+            return (null, RecordResult<T>.Fail(contractRecord.Error!));
         }
 
         var templateRecord = await pipeline.GetAsync(new RecordRef(ContractsModule.Entities.ContractTemplate, templateId), cancellationToken);
         if (!templateRecord.IsSuccess || await reader.TemplateAsync(templateId, cancellationToken) is not { } template)
         {
-            return (null, Fail(RecordErrorCode.NotFound, "Şablon bulunamadı."));
+            return (null, Fail(RecordErrorCode.NotFound, ContractsMessages.Document.TemplateNotFound));
         }
 
         var granted = await access.GetPermissionsAsync(cancellationToken);
@@ -214,7 +215,7 @@ internal sealed class ContractDocuments(
         {
             if (!granted.Contains(ContractsModule.Permissions.TemplatesEdit))
             {
-                return (null, Fail(RecordErrorCode.PermissionDenied, $"Çalışma kopyasını önizlemek için '{ContractsModule.Permissions.TemplatesEdit}' izni gerekir."));
+                return (null, Fail(RecordErrorCode.PermissionDenied, ContractsMessages.Document.DraftPreviewPermission(ContractsModule.Permissions.TemplatesEdit)));
             }
 
             source = new TemplateSource(template.Id, template.Name, template.PublishedVersionNo ?? 0, template.Body, template.IsExample, IsDraft: true);
@@ -235,22 +236,22 @@ internal sealed class ContractDocuments(
         var contract = await reader.ContractAsync(contractId, cancellationToken);
         if (contract is null)
         {
-            return (null, Fail(RecordErrorCode.NotFound, "Sözleşme bulunamadı."));
+            return (null, Fail(RecordErrorCode.NotFound, ContractsMessages.Contract.NotFound));
         }
 
         if (template.ContractType is { } type && type != contract.Type)
         {
-            return (null, Fail(RecordErrorCode.ValidationFailed, "Bu şablon seçilen sözleşme türü için tanımlı değil."));
+            return (null, Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Document.TemplateTypeMismatch));
         }
 
         if (ContractTemplateEngine.Validate(source.Body) is { Count: > 0 } issues)
         {
-            return (null, Fail(RecordErrorCode.ValidationFailed, "Şablon metni geçersiz: " + issues[0].Message));
+            return (null, Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Document.TemplateInvalid(issues[0].Message)));
         }
 
         if (ContractTemplateEngine.UsesFinancials(source.Body) && !granted.Contains(ContractsModule.Permissions.FinancialsRead))
         {
-            return (null, Fail(RecordErrorCode.PermissionDenied, $"Bu şablon tutar değişkenleri içeriyor; '{ContractsModule.Permissions.FinancialsRead}' izni gerekir."));
+            return (null, Fail(RecordErrorCode.PermissionDenied, ContractsMessages.Document.FinancialsPermission(ContractsModule.Permissions.FinancialsRead)));
         }
 
         // Dondurulmuş (onaya/imzaya gitmiş) sürüm varsa belge onun içeriğinden üretilir ve kesindir; yoksa güncel taslak kopyadır.

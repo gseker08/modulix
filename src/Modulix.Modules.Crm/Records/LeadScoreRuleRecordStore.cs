@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Leads;
@@ -82,7 +83,7 @@ internal sealed class LeadScoreRuleRecordStore(CrmStoreContext context) : CrmRec
             }
             else
             {
-                errors.Add(new RecordFieldError("value", CrmMessages.Field.IntegerRange(1, LeadScoreOperator.MaxCount)));
+                errors.Add(new RecordFieldError("value", ServerMessages.Validation.IntegerRange(1, LeadScoreOperator.MaxCount)));
             }
         }
         else

@@ -161,7 +161,7 @@ internal sealed class OpportunityWorkflow(
 
         if (request.WonCurrency is { } code && (code.Trim().Length != Opportunity.CurrencyLength || !code.Trim().All(char.IsAsciiLetter)))
         {
-            return Invalid(CrmMessages.Field.Currency, "wonCurrency");
+            return Invalid(ServerMessages.Validation.Currency, "wonCurrency");
         }
 
         if (request.WonAmount is < 0)

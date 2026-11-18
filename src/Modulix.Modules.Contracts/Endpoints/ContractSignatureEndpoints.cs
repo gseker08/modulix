@@ -74,7 +74,7 @@ internal static class ContractSignatureEndpoints
             }
             catch (FormatException)
             {
-                return RecordProblems.ToProblem(new RecordError(RecordErrorCode.ValidationFailed, "Dosya içeriği geçersiz.", [new RecordFieldError("file", "Dosya içeriği geçersiz (base64).")]));
+                return RecordProblems.ToProblem(new RecordError(RecordErrorCode.ValidationFailed, ContractsMessages.Contract.InvalidFile, [new RecordFieldError("file", ContractsMessages.Contract.InvalidFileBase64)]));
             }
 
             return Overview(await signatures.RecordManualAsync(id, signatoryId, new ManualSignatureInput(r.SignedOn, r.Note, r.FileName ?? string.Empty, content), ct));

@@ -33,10 +33,10 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         Field.Text<Contract>("title", Contract.TitleMaxLength, c => c.Title, (c, v) => c.Title = v!, required: true),
         Field.ListChoice<Contract>("type", ContractsModule.Lists.ContractType, c => c.Type, (c, v) => c.Type = v ?? string.Empty),
         Field.Text<Contract>("description", Contract.TextMaxLength, c => c.Description, (c, v) => c.Description = v),
-        Field.Shared<Contract, Party>("partyId", "Müşteri bulunamadı.", c => c.PartyId, (c, v) => c.PartyId = v!.Value, required: true),
-        Field.Shared<Contract, Person>("personId", "Kişi bulunamadı.", c => c.PersonId, (c, v) => c.PersonId = v),
+        Field.Shared<Contract, Party>("partyId", ContractsMessages.Contract.CustomerNotFound, c => c.PartyId, (c, v) => c.PartyId = v!.Value, required: true),
+        Field.Shared<Contract, Person>("personId", ContractsMessages.Contract.PersonNotFound, c => c.PersonId, (c, v) => c.PersonId = v),
         Field.Owner<Contract>(OwnerField, c => c.OwnerId, (c, v) => c.OwnerId = v),
-        Field.Reference<Contract, Contract>("previousContractId", "Önceki sözleşme bulunamadı.", c => c.PreviousContractId, (c, v) => c.PreviousContractId = v),
+        Field.Reference<Contract, Contract>("previousContractId", ContractsMessages.Contract.PreviousNotFound, c => c.PreviousContractId, (c, v) => c.PreviousContractId = v),
         Field.Id<Contract>("sourceQuoteId", c => c.SourceQuoteId, (c, v) => c.SourceQuoteId = v).AsSystem(),
         Field.Text<Contract>("sourceQuoteNumber", Contract.NumberMaxLength, c => c.SourceQuoteNumber, (c, v) => c.SourceQuoteNumber = v).AsSystem(),
         Field.Integer<Contract>("sourceQuoteRevisionNo", c => c.SourceQuoteRevisionNo, (c, v) => c.SourceQuoteRevisionNo = v).AsSystem(),
@@ -195,14 +195,14 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
 
         if (entity.PreviousContractId == entity.Id)
         {
-            errors.Add(new RecordFieldError("previousContractId", "Sözleşme kendisinin öncülü olamaz."));
+            errors.Add(new RecordFieldError("previousContractId", ContractsMessages.Contract.SelfPrevious));
         }
 
         // Bağımlı lookup: kişi, müşteri tarafına bağlı olmalıdır (ADR-0016). Kişi ya da müşteri değiştiyse denetlenir.
         if (entity.PersonId is { } personId && (values.ContainsKey("personId") || values.ContainsKey("partyId"))
             && !await Context.Data.Set<Person>().AsNoTracking().AnyAsync(p => p.Id == personId && p.PartyId == entity.PartyId, cancellationToken))
         {
-            errors.Add(new RecordFieldError("personId", "Kişi seçilen müşteriyle ilişkili değil."));
+            errors.Add(new RecordFieldError("personId", ContractsMessages.Contract.PersonNotOfCustomer));
         }
 
         if (errors.Count > 0)
@@ -248,7 +248,7 @@ internal sealed class ContractRecordStore(ContractsStoreContext context) : Contr
         var data = Context.Data;
         if (await data.Set<ContractCommitmentOccurrence>().AnyAsync(o => o.ContractId == entity.Id && o.Status != OccurrenceStatus.Open, cancellationToken))
         {
-            throw new RecordConflictException("Gerçekleşmesi kaydedilmiş taahhüdü olan sözleşme silinemez.");
+            throw new RecordConflictException(ContractsMessages.Contract.HasRecordedCommitments);
         }
 
         data.Set<ContractCommitmentOccurrence>().RemoveRange(await data.Set<ContractCommitmentOccurrence>().Where(o => o.ContractId == entity.Id).ToListAsync(cancellationToken));
@@ -352,7 +352,7 @@ internal static class ContractChildren
 
         if (contract is null)
         {
-            throw new RecordValidationException([new RecordFieldError(field, "Sözleşme bulunamadı.")]);
+            throw new RecordValidationException([new RecordFieldError(field, ContractsMessages.Contract.NotFound)]);
         }
 
         if (!context.Gate.IsOpen)

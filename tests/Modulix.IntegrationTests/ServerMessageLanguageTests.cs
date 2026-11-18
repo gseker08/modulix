@@ -186,6 +186,35 @@ public class ServerMessageLanguageTests(ModulixApiFactory factory) : IClassFixtu
             (inTurkish["code"]!.GetValue<string>(), inTurkish["errors"]!["toCurrency"]![0]!.GetValue<string>()));
     }
 
+    /// <summary>Dilim 18d-2: Sözleşmeler modülünün alan hatası (koşulsuz onay kuralı) okurun dilinde; kod ve alan adı aynı.</summary>
+    [Fact]
+    public async Task Contracts_field_error_comes_in_the_users_language()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        await factory.SetModuleAsync(tenant.Id, "contracts", enabled: true);
+        var english = await factory.CreateUserAsync(tenant);
+        var turkish = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [Modulix.Modules.Contracts.ContractsModule.Permissions.ApprovalsManage], english, turkish);
+        using var englishClient = await LoginAsync(english, "en");
+        using var turkishClient = await LoginAsync(turkish);
+
+        var inEnglish = await UnconditionalRuleAsync(englishClient);
+        var inTurkish = await UnconditionalRuleAsync(turkishClient);
+
+        Assert.Equal(("ValidationFailed", "Enter at least one condition: amount, discount, term, non-standard clause, or risk level."),
+            (inEnglish["code"]!.GetValue<string>(), inEnglish["errors"]!["minGrossTotal"]![0]!.GetValue<string>()));
+        Assert.Equal(("ValidationFailed", "En az bir koşul girin: tutar, indirim, süre, standart dışı madde ya da risk düzeyi."),
+            (inTurkish["code"]!.GetValue<string>(), inTurkish["errors"]!["minGrossTotal"]![0]!.GetValue<string>()));
+    }
+
+    private static async Task<JsonObject> UnconditionalRuleAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync("/api/contracts/approval-rules",
+            new Modulix.Shared.Contracts.SaveContractApprovalRuleRequest("Dil kuralı"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        return await ProblemAsync(response);
+    }
+
     private static async Task<JsonObject> SameCurrencyRateAsync(HttpClient client)
     {
         var response = await client.PostAsJsonAsync("/api/crm/exchange-rates", new SaveExchangeRateRequest("TRY", "TRY", 1m, new DateOnly(2026, 5, 30)));

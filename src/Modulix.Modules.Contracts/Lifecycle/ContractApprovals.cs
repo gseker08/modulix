@@ -197,13 +197,13 @@ internal sealed class ContractApprovals(
         var record = await pipeline.GetAsync(new RecordRef(Key, contractId), cancellationToken);
         if (!record.IsSuccess)
         {
-            return RecordResult<ContractApprovalView>.Fail(record.Error!.Code, record.Error.Message, record.Error.FieldErrors);
+            return RecordResult<ContractApprovalView>.Fail(record.Error!);
         }
 
         var contract = await reader.ContractAsync(contractId, cancellationToken);
         if (contract is null)
         {
-            return RecordResult<ContractApprovalView>.Fail(RecordErrorCode.NotFound, "Sözleşme bulunamadı.");
+            return RecordResult<ContractApprovalView>.Fail(RecordErrorCode.NotFound, ContractsMessages.Contract.NotFound);
         }
 
         var state = await engine.StateAsync(contract, cancellationToken);
@@ -246,7 +246,7 @@ internal sealed class ContractApprovals(
             new RecordQuery(Key, 1, RecordQuery.MaxPageSize, null, new Dictionary<string, string> { ["approvalStatus"] = ApprovalStatus.Pending }), cancellationToken);
         if (!page.IsSuccess)
         {
-            return RecordResult<IReadOnlyList<ContractApprovalInboxItem>>.Fail(page.Error!.Code, page.Error.Message, page.Error.FieldErrors);
+            return RecordResult<IReadOnlyList<ContractApprovalInboxItem>>.Fail(page.Error!);
         }
 
         var items = new List<ContractApprovalInboxItem>();

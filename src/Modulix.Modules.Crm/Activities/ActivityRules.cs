@@ -202,7 +202,7 @@ public static class ActivityRules
                 return CrmMessages.Activity.AllDayNoTime;
             }
 
-            return endDate is { } end && end < startDate ? CrmMessages.Field.EndBeforeStart : null;
+            return endDate is { } end && end < startDate ? ServerMessages.Validation.EndBeforeStart : null;
         }
 
         if (startDate is not null || endDate is not null)

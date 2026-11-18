@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Domain;
 using Modulix.Modules.Crm.Records;
@@ -92,8 +93,8 @@ internal sealed class OpportunityReport(
     {
         if (query.To < query.From)
         {
-            return RecordResult<OpportunityReportResult>.Fail(RecordErrorCode.ValidationFailed, CrmMessages.Field.EndBeforeStart,
-                [new RecordFieldError("to", CrmMessages.Field.EndBeforeStart)]);
+            return RecordResult<OpportunityReportResult>.Fail(RecordErrorCode.ValidationFailed, ServerMessages.Validation.EndBeforeStart,
+                [new RecordFieldError("to", ServerMessages.Validation.EndBeforeStart)]);
         }
 
         var staleDays = (policyProvider is null ? OpportunityPolicy.Default : await policyProvider.GetAsync(cancellationToken)).StaleDays;
