@@ -127,39 +127,39 @@ internal sealed class ContractSignatures(
         var c = loaded.Contract;
         if (c.ApprovalStatus != ApprovalStatus.Approved || c.PreparationStatus != PreparationStatus.ReadyToPublish)
         {
-            return Conflict("Yalnızca onaylanmış ve yayıma hazır sözleşme imzaya gönderilir.");
+            return Conflict(ContractsMessages.Signature.ApprovedReadyOnly);
         }
 
         if (c.SignatureStatus is SignatureStatus.Pending or SignatureStatus.PartiallySigned or SignatureStatus.Completed)
         {
-            return Conflict(c.SignatureStatus == SignatureStatus.Completed ? "Bu sürüm zaten imzalandı; değişiklik için yeni revizyon açın." : "Açık bir imza isteği var; önce onu sonlandırın.");
+            return Conflict(c.SignatureStatus == SignatureStatus.Completed ? ContractsMessages.Signature.AlreadySigned : ContractsMessages.Signature.RequestOpen);
         }
 
         if (c.EffectiveStatus is EffectiveStatus.Expired or EffectiveStatus.Terminated or EffectiveStatus.Cancelled)
         {
-            return Conflict("Süresi dolmuş, feshedilmiş ya da iptal edilmiş sözleşme imzaya gönderilemez.");
+            return Conflict(ContractsMessages.Signature.ContractClosed);
         }
 
         var errors = new List<RecordFieldError>();
         var provider = providers.Find(loaded.Policy.SignatureProvider);
         if (!SignatureMethod.All.Contains(input.Method))
         {
-            errors.Add(new RecordFieldError("method", "Yöntem Manual ya da Provider olmalıdır."));
+            errors.Add(new RecordFieldError("method", ContractsMessages.Signature.MethodOneOf));
         }
         else if (input.Method == SignatureMethod.Provider && provider is null)
         {
-            errors.Add(new RecordFieldError("method", "Bu firmada imza sağlayıcısı etkin değil (Sözleşme ayarları → İmza sağlayıcısı)."));
+            errors.Add(new RecordFieldError("method", ContractsMessages.Signature.ProviderDisabled));
         }
 
         if (!SignatureMode.All.Contains(input.Mode))
         {
-            errors.Add(new RecordFieldError("mode", "Kip Sequential ya da Parallel olmalıdır."));
+            errors.Add(new RecordFieldError("mode", ContractsMessages.Signature.ModeOneOf));
         }
 
         var validity = input.ValidityDays ?? loaded.Policy.SignatureValidityDays;
         if (validity is < 1 or > 90)
         {
-            errors.Add(new RecordFieldError("validityDays", "Geçerlilik 1 ile 90 gün arasında olmalıdır."));
+            errors.Add(new RecordFieldError("validityDays", ContractsMessages.Signature.ValidityDays));
         }
 
         var members = await storeContext.Members.ListActiveAsync(cancellationToken);
@@ -172,16 +172,16 @@ internal sealed class ContractSignatures(
         }
         else if (!document.IsFinal || document.ContractVersionNo != c.CurrentVersionNo)
         {
-            errors.Add(new RecordFieldError("documentId", "İmzaya yalnızca güncel sürümün kesin (dondurulmuş sürümden üretilmiş) belgesi gönderilir."));
+            errors.Add(new RecordFieldError("documentId", ContractsMessages.Signature.DocumentNotFinal));
         }
         else if (document.IsExample)
         {
-            errors.Add(new RecordFieldError("documentId", "Örnek metinden üretilen belge imzaya gönderilemez; kurumunuzun onaylı şablonunu kullanın."));
+            errors.Add(new RecordFieldError("documentId", ContractsMessages.Signature.SampleDocument));
         }
 
         if (errors.Count > 0 || document is null)
         {
-            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.ValidationFailed, "İmza isteği doğrulanamadı.", errors);
+            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Signature.RequestInvalid, errors);
         }
 
         var now = time.GetUtcNow();
@@ -245,26 +245,26 @@ internal sealed class ContractSignatures(
         var (loaded, request, signatories) = (state.Loaded, state.Request, state.Signatories);
         if (request.Method != SignatureMethod.Manual)
         {
-            return Conflict("Bu istek sağlayıcı yöntemiyle yürüyor; imza sağlayıcıdan gelir. Manuel kayıt yalnızca manuel isteklerde yapılır.");
+            return Conflict(ContractsMessages.Signature.ProviderManaged);
         }
 
         var target = signatories.FirstOrDefault(s => s.Id == signatoryId);
         if (target is null)
         {
-            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.NotFound, "İmzacı bulunamadı.");
+            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.NotFound, ContractsMessages.Signature.SignatoryNotFound);
         }
 
         var infos = Infos(signatories);
         var (allowed, why) = SignatureFlow.CanSign(request.Mode, infos, signatoryId);
         if (!allowed)
         {
-            return Conflict(why ?? "Bu imzacı şimdi imzalayamaz.");
+            return Conflict(why ?? ContractsMessages.Signature.CannotSignNow);
         }
 
         // Doğrulayan, imzacının kendisi olamaz: iç imzacının imzasını başka bir yetkili doğrular.
         if (target.UserId is { } signerUser && signerUser == tenant.Current?.UserId)
         {
-            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.PermissionDenied, "Kendi imzanızı doğrulayamazsınız; başka bir yetkili doğrulamalıdır.");
+            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.PermissionDenied, ContractsMessages.Signature.SelfVerify);
         }
 
         var errors = new List<RecordFieldError>();
@@ -277,16 +277,16 @@ internal sealed class ContractSignatures(
         var today = ContractPeriod.Today(now, Zone(loaded.Policy));
         if (input.SignedOn > today)
         {
-            errors.Add(new RecordFieldError("signedOn", "İmza tarihi gelecekte olamaz."));
+            errors.Add(new RecordFieldError("signedOn", ContractsMessages.Signature.SignedInFuture));
         }
         else if (input.SignedOn < ContractPeriod.Today(request.CreatedAt, Zone(loaded.Policy)))
         {
-            errors.Add(new RecordFieldError("signedOn", "İmza tarihi isteğin açıldığı tarihten önce olamaz."));
+            errors.Add(new RecordFieldError("signedOn", ContractsMessages.Signature.SignedBeforeRequest));
         }
 
         if (errors.Count > 0)
         {
-            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.ValidationFailed, "İmza kaydı doğrulanamadı.", errors);
+            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Signature.RecordInvalid, errors);
         }
 
         var signedAt = new DateTimeOffset(input.SignedOn.ToDateTime(new TimeOnly(12, 0)), TimeSpan.Zero);
@@ -321,18 +321,18 @@ internal sealed class ContractSignatures(
 
         if (state.Request.Method != SignatureMethod.Manual)
         {
-            return Conflict("Sağlayıcı yöntemli istekte ret sağlayıcıdan gelir.");
+            return Conflict(ContractsMessages.Signature.ProviderDecline);
         }
 
         var target = state.Signatories.FirstOrDefault(s => s.Id == signatoryId);
         if (target is null)
         {
-            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.NotFound, "İmzacı bulunamadı.");
+            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.NotFound, ContractsMessages.Signature.SignatoryNotFound);
         }
 
         if (!SignatoryStatus.IsOpen(target.Status))
         {
-            return Conflict("Bu imzacı için ret kaydedilemez.");
+            return Conflict(ContractsMessages.Signature.DeclineNotAllowed);
         }
 
         var declined = await DeclineCoreAsync(state, target, reason.Trim(), "User", null, null, [ContractsModule.Permissions.SignaturesManage], cancellationToken);
@@ -350,18 +350,18 @@ internal sealed class ContractSignatures(
         var target = state.Signatories.FirstOrDefault(s => s.Id == signatoryId);
         if (target is null)
         {
-            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.NotFound, "İmzacı bulunamadı.");
+            return RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.NotFound, ContractsMessages.Signature.SignatoryNotFound);
         }
 
         if (!SignatureFlow.Active(state.Request.Mode, Infos(state.Signatories)).Contains(signatoryId) || target.Status == SignatoryStatus.Waiting)
         {
-            return Conflict("Hatırlatma yalnızca sırası gelmiş, henüz imzalamamış imzacı için kaydedilir.");
+            return Conflict(ContractsMessages.Signature.ReminderNotDue);
         }
 
         var now = time.GetUtcNow();
         if (target.LastReminderAt is { } last && now - last < ReminderInterval)
         {
-            return Conflict("Aynı imzacıya en fazla saatte bir hatırlatma kaydedilir.");
+            return Conflict(ContractsMessages.Signature.ReminderHourly);
         }
 
         // Hatırlatma yalnızca kaydedilir; Modulix müşteriye e-posta ya da bildirim göndermez (gerçek gönderim sağlayıcıya ya da kullanıcıya aittir).
@@ -410,7 +410,7 @@ internal sealed class ContractSignatures(
 
         if (state.Request.ExpiresAt > time.GetUtcNow())
         {
-            return Conflict("İmza isteğinin süresi henüz dolmadı.");
+            return Conflict(ContractsMessages.Signature.NotExpiredYet);
         }
 
         var expired = await ExpireCoreAsync(state, "User", null, null, [ContractsModule.Permissions.SignaturesManage], cancellationToken);
@@ -429,7 +429,7 @@ internal sealed class ContractSignatures(
 
         if (providers.Find(state.Request.Provider) is not { IsSimulation: true } provider || state.Request.ProviderReference is not { } reference)
         {
-            return Conflict("Simülasyon yalnızca simülasyon sağlayıcısıyla açılmış istekte kullanılabilir.");
+            return Conflict(ContractsMessages.Signature.SimulationOnly);
         }
 
         var input = new ProviderEventInput(provider.Name, $"sim-{Guid.NewGuid():N}", state.Request.LastEventSequence + 1, type, reference, signatoryPosition, time.GetUtcNow(), null, note);
@@ -441,7 +441,7 @@ internal sealed class ContractSignatures(
 
         return result.Value!.Outcome == SignatureEventOutcome.Applied
             ? await GetAsync(contractId, cancellationToken)
-            : Conflict(result.Value.Message ?? "Olay uygulanamadı.");
+            : Conflict(result.Value.Message ?? ContractsMessages.Signature.EventNotApplied);
     }
 
     public Task<RecordResult<ProviderEventResult>> ApplyProviderEventAsync(ProviderEventInput input, CancellationToken cancellationToken) =>
@@ -452,33 +452,33 @@ internal sealed class ContractSignatures(
         var errors = new List<RecordFieldError>();
         if (providers.Find(input.Provider) is not { } provider)
         {
-            return RecordResult<ProviderEventResult>.Fail(RecordErrorCode.NotFound, "Sağlayıcı bulunamadı.");
+            return RecordResult<ProviderEventResult>.Fail(RecordErrorCode.NotFound, ContractsMessages.Signature.ProviderNotFound);
         }
 
         if (string.IsNullOrWhiteSpace(input.EventId) || input.EventId.Length > ContractSignatureEvent.EventIdMaxLength)
         {
-            errors.Add(new RecordFieldError("eventId", "Olay kimliği zorunludur (en fazla 100 karakter)."));
+            errors.Add(new RecordFieldError("eventId", ContractsMessages.Signature.EventIdRequired));
         }
 
         if (!SignatureEventType.FromProvider.Contains(input.Type))
         {
-            errors.Add(new RecordFieldError("type", "Bilinmeyen olay türü."));
+            errors.Add(new RecordFieldError("type", ContractsMessages.Signature.UnknownEventType));
         }
 
         if (input.Sequence < 1)
         {
-            errors.Add(new RecordFieldError("sequence", "Olay numarası 1 ya da büyük olmalıdır."));
+            errors.Add(new RecordFieldError("sequence", ContractsMessages.Signature.EventSequence));
         }
 
         if (errors.Count > 0)
         {
-            return RecordResult<ProviderEventResult>.Fail(RecordErrorCode.ValidationFailed, "Olay doğrulanamadı.", errors);
+            return RecordResult<ProviderEventResult>.Fail(RecordErrorCode.ValidationFailed, ContractsMessages.Signature.EventInvalid, errors);
         }
 
         var request = await reader.SignatureRequestByReferenceAsync(input.Reference, cancellationToken);
         if (request is null || !string.Equals(request.Provider, provider.Name, StringComparison.Ordinal))
         {
-            return RecordResult<ProviderEventResult>.Fail(RecordErrorCode.NotFound, "İstek bulunamadı.");
+            return RecordResult<ProviderEventResult>.Fail(RecordErrorCode.NotFound, ContractsMessages.Signature.RequestNotFound);
         }
 
         var (loaded, error) = await LoadAsync<ProviderEventResult>(request.ContractId, null, cancellationToken);
@@ -509,7 +509,7 @@ internal sealed class ContractSignatures(
         }
         else if (input.Type != SignatureEventType.Expired && target is null)
         {
-            (outcome, note) = (SignatureEventOutcome.Rejected, "İmzacı bulunamadı.");
+            (outcome, note) = (SignatureEventOutcome.Rejected, ContractsMessages.Signature.SignatoryNotFound.Text);
         }
         else if (input.Type == SignatureEventType.Signed && request.ExpiresAt <= time.GetUtcNow())
         {
@@ -517,7 +517,7 @@ internal sealed class ContractSignatures(
         }
         else if (input.Type == SignatureEventType.Signed && !SignatureFlow.CanSign(request.Mode, Infos(signatories), target!.Id).Allowed)
         {
-            (outcome, note) = (SignatureEventOutcome.Rejected, SignatureFlow.CanSign(request.Mode, Infos(signatories), target!.Id).Reason);
+            (outcome, note) = (SignatureEventOutcome.Rejected, SignatureFlow.CanSign(request.Mode, Infos(signatories), target!.Id).Reason?.Text);
         }
 
         var logged = new NewSignatureEvent("Provider", input.Type, target?.Id, input.EventId, input.Sequence, outcome, note ?? input.Note, null);
@@ -583,12 +583,12 @@ internal sealed class ContractSignatures(
         var request = await reader.OpenSignatureRequestAsync(contractId, cancellationToken);
         if (request is null)
         {
-            return (null, Conflict("Açık bir imza isteği yok."));
+            return (null, Conflict(ContractsMessages.Signature.NoOpenRequest));
         }
 
         if (!allowExpired && request.ExpiresAt <= time.GetUtcNow())
         {
-            return (null, Conflict("İmza isteğinin süresi doldu; önce isteği sonlandırın (süre dolumu) ve gerekirse yeniden başlatın."));
+            return (null, Conflict(ContractsMessages.Signature.RequestExpired));
         }
 
         return (new OpenState(loaded, request, await reader.SignatoriesAsync([request.Id], cancellationToken)), null);
@@ -766,7 +766,7 @@ internal sealed class ContractSignatures(
         var result = new List<ResolvedSignatory>();
         if (input.Signatories.Count is < 1 or > 20)
         {
-            errors.Add(new RecordFieldError("signatories", "En az bir, en fazla yirmi imzacı girin."));
+            errors.Add(new RecordFieldError("signatories", ContractsMessages.Signature.SignatoryCount));
             return result;
         }
 
@@ -777,14 +777,14 @@ internal sealed class ContractSignatures(
             var field = $"signatories[{i}]";
             if (!SignatoryKind.All.Contains(s.Kind))
             {
-                errors.Add(new RecordFieldError(field, "İmzacı türü Internal ya da External olmalıdır."));
+                errors.Add(new RecordFieldError(field, ContractsMessages.Signature.SignatoryKind));
                 continue;
             }
 
             var capacity = string.IsNullOrWhiteSpace(s.Capacity) ? null : s.Capacity.Trim();
             if (capacity is { Length: > ContractSignatory.CapacityMaxLength })
             {
-                errors.Add(new RecordFieldError(field, "İmza sıfatı çok uzun."));
+                errors.Add(new RecordFieldError(field, ContractsMessages.Signature.CapacityTooLong));
                 continue;
             }
 
@@ -793,11 +793,11 @@ internal sealed class ContractSignatures(
                 var member = s.UserId is { } id ? members.FirstOrDefault(m => m.UserId == id) : null;
                 if (member is null)
                 {
-                    errors.Add(new RecordFieldError(field, "İç imzacı bu firmanın etkin üyesi olmalıdır."));
+                    errors.Add(new RecordFieldError(field, ContractsMessages.Signature.InternalMember));
                 }
                 else if (!usedUsers.Add(member.UserId))
                 {
-                    errors.Add(new RecordFieldError(field, "Aynı kişi iki kez imzacı olamaz."));
+                    errors.Add(new RecordFieldError(field, ContractsMessages.Signature.DuplicateSignatory));
                 }
                 else
                 {
@@ -811,7 +811,7 @@ internal sealed class ContractSignatures(
             var email = string.IsNullOrWhiteSpace(s.Email) ? null : s.Email.Trim();
             if (string.IsNullOrEmpty(name) || name.Length < 2 || name.Length > ContractSignatory.NameMaxLength)
             {
-                errors.Add(new RecordFieldError(field, "Dış imzacının adı zorunludur (2-150 karakter)."));
+                errors.Add(new RecordFieldError(field, ContractsMessages.Signature.ExternalName));
             }
             else if (email is not null && (email.Length > ContractSignatory.EmailMaxLength || !MailAddress.TryCreate(email, out var parsed) || parsed.Address != email || !email.Contains('.')))
             {
@@ -819,7 +819,7 @@ internal sealed class ContractSignatures(
             }
             else if (email is null && needEmail)
             {
-                errors.Add(new RecordFieldError(field, "Sağlayıcı yönteminde dış imzacının e-postası zorunludur."));
+                errors.Add(new RecordFieldError(field, ContractsMessages.Signature.ExternalEmailRequired));
             }
             else
             {
@@ -829,7 +829,7 @@ internal sealed class ContractSignatures(
 
         if (errors.Count == 0 && !result.Any(s => s.IsRequired))
         {
-            errors.Add(new RecordFieldError("signatories", "En az bir zorunlu imzacı olmalıdır."));
+            errors.Add(new RecordFieldError("signatories", ContractsMessages.Signature.RequiredSignatory));
         }
 
         return result;
@@ -849,7 +849,7 @@ internal sealed class ContractSignatures(
         return values;
     }
 
-    private static RecordResult<ContractSignatureOverview> Conflict(string message) =>
+    private static RecordResult<ContractSignatureOverview> Conflict(ServerMessage message) =>
         RecordResult<ContractSignatureOverview>.Fail(RecordErrorCode.Conflict, message, [new RecordFieldError("signatureStatus", message)]);
 
     private static RecordResult<ContractSignatureOverview> AsOverview(RecordResult<RecordData> result) =>

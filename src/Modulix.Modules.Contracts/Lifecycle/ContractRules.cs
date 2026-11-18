@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Localization;
+
 namespace Modulix.Modules.Contracts.Lifecycle;
 
 // Saf kurallar (ADR-0022): veritabanı ve HTTP bilmez; birim testleriyle doğrulanır. Durum anahtarları API'de ve arayüzde aynen kullanılır.
@@ -128,11 +130,11 @@ public static class BillingPeriods
     public static IReadOnlyList<string> All { get; } = [Monthly, Quarterly, Yearly];
 }
 
-public readonly record struct ContractRuleResult(bool Allowed, string? Code = null, string? Message = null)
+public readonly record struct ContractRuleResult(bool Allowed, string? Code = null, ServerMessage? Message = null)
 {
     public static ContractRuleResult Ok { get; } = new(true);
 
-    public static ContractRuleResult Deny(string code, string message) => new(false, code, message);
+    public static ContractRuleResult Deny(string code, ServerMessage message) => new(false, code, message);
 }
 
 /// <summary>Sözleşme iş kuralları. Kurallar API seviyesinde uygulanır; arayüz yalnızca aynı kuralları gösterir.</summary>
@@ -146,22 +148,22 @@ public static class ContractRules
     {
         if (preparation != PreparationStatus.Draft)
         {
-            return ContractRuleResult.Deny("not-draft", "Sözleşme taslak durumunda değil; içerik değiştirilemez.");
+            return ContractRuleResult.Deny("not-draft", ContractsMessages.Transition.NotDraftContent);
         }
 
         if (approval == ApprovalStatus.Pending)
         {
-            return ContractRuleResult.Deny("approval-pending", "Onay bekleyen içerik değiştirilemez; önce onayı geri çekin.");
+            return ContractRuleResult.Deny("approval-pending", ContractsMessages.Transition.ApprovalPendingContent);
         }
 
         if (signature is SignatureStatus.Pending or SignatureStatus.PartiallySigned or SignatureStatus.Completed)
         {
-            return ContractRuleResult.Deny("signature-in-progress", "İmzaya gönderilmiş ya da imzalanmış içerik değiştirilemez; yeni revizyon açın.");
+            return ContractRuleResult.Deny("signature-in-progress", ContractsMessages.Transition.SignatureContent);
         }
 
         if (EffectiveStatus.IsBinding(effective) || effective is EffectiveStatus.Expired or EffectiveStatus.Terminated)
         {
-            return ContractRuleResult.Deny("in-force", "Yürürlüğe girmiş sözleşme yerinde değiştirilemez; ek protokol ya da yeni revizyon açın.");
+            return ContractRuleResult.Deny("in-force", ContractsMessages.Transition.InForceContent);
         }
 
         return ContractRuleResult.Ok;
@@ -172,12 +174,12 @@ public static class ContractRules
     {
         if (signature is SignatureStatus.Completed or SignatureStatus.PartiallySigned)
         {
-            return ContractRuleResult.Deny("signed", "İmzalı sözleşme silinemez; iptal ya da fesih sürecini kullanın.");
+            return ContractRuleResult.Deny("signed", ContractsMessages.Transition.SignedDelete);
         }
 
         if (effective != EffectiveStatus.NotInForce)
         {
-            return ContractRuleResult.Deny("in-force", "Yürürlük kaydı olan sözleşme silinemez.");
+            return ContractRuleResult.Deny("in-force", ContractsMessages.Transition.InForceDelete);
         }
 
         return ContractRuleResult.Ok;
