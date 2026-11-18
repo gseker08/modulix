@@ -151,7 +151,7 @@ bekler. İş birimi hedefinde **alt birimler dahildir**.
 - Çubuk grafik en fazla 10 grubu çizer; birden çok para birimi varsa yalnızca ilki çizilir ve not düşülür (para birimleri toplanamaz).
 - Düzenleme tek formdur: ad, bileşen satırları (rapor, gösterim, başlık, yukarı/aşağı, kaldır). Kaydedilene kadar pano değişmez. Rapor
   seçicisi çağıranın görebildiği ilk 100 raporu listeler.
-- Bakan kişinin artık göremediği raporun bileşeni "Bu rapor artık size görünmüyor" yazar ve düzenlemeye alınmaz; kaydedince panodan düşer.
+- Bakan kişinin artık göremediği raporun bileşeni "Bu rapor size görünmüyor" yazar ve düzenlemeye alınmaz; kaydedince panodan düşer.
 
 ## Ekran (dilim 2)
 

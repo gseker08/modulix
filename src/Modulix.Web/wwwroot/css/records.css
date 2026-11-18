@@ -165,9 +165,10 @@
     text-align: right;
 }
 
-/* Uzun değerler (tutar) için geniş değer sütunu: çubuklar satırlar arasında hizalı kalır. */
+/* Uzun değerler (tutar) için geniş değer sütunu: çubuklar satırlar arasında hizalı kalır. Dar kartta çubuğa yer kalsın diye
+   etiket sütunu daralır ve çubuğun en küçük genişliği vardır. */
 .bar-chart-wide .bar-row {
-    grid-template-columns: 7rem 1fr 7.5rem;
+    grid-template-columns: 5rem minmax(4rem, 1fr) 6.5rem;
 }
 
 @media (min-width: 768px) {

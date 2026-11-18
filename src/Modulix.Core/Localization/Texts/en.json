@@ -7892,7 +7892,7 @@
   "reports.dashboards.delete": "Delete dashboard",
   "reports.dashboards.deleteQuestion": "Delete this dashboard? Reports are not deleted.",
   "reports.dashboards.notFound": "Dashboard not found.",
-  "reports.dashboards.widget.hidden": "This report is no longer visible to you.",
+  "reports.dashboards.widget.hidden": "This report is not visible to you.",
   "reports.dashboards.widget.records": "records",
   "reports.dashboards.widget.openReport": "Open report",
   "reports.dashboards.widget.noData": "No data.",

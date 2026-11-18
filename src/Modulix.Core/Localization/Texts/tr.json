@@ -7892,7 +7892,7 @@
   "reports.dashboards.delete": "Panoyu sil",
   "reports.dashboards.deleteQuestion": "Pano silinsin mi? Raporlar silinmez.",
   "reports.dashboards.notFound": "Pano bulunamadı.",
-  "reports.dashboards.widget.hidden": "Bu rapor artık size görünmüyor.",
+  "reports.dashboards.widget.hidden": "Bu rapor size görünmüyor.",
   "reports.dashboards.widget.records": "kayıt",
   "reports.dashboards.widget.openReport": "Raporu aç",
   "reports.dashboards.widget.noData": "Veri yok.",
