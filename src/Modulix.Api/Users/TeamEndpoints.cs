@@ -63,6 +63,11 @@ public static class TeamEndpoints
                 ? Results.NoContent()
                 : UserNotFound()));
 
+        membership.MapPut("/primary", (Guid membershipId, SetPrimaryTeamRequest request, ITeamService service, IMembershipScope scope, CancellationToken ct) => RunAsync(async () =>
+            await scope.CanManageAsync(membershipId, ct) && await service.SetPrimaryTeamAsync(membershipId, request.TeamId, ct)
+                ? Results.NoContent()
+                : UserNotFound()));
+
         return app;
     }
 
@@ -78,7 +83,7 @@ public static class TeamEndpoints
         }
     }
 
-    private static TeamDto ToDto(TeamSummary team) => new(team.Id, team.Name, team.Description, team.MemberCount);
+    private static TeamDto ToDto(TeamSummary team) => new(team.Id, team.Name, team.Description, team.MemberCount, team.IsPrimary);
 
     private static TeamDetailDto ToDto(TeamDetail team) => new(
         team.Id,

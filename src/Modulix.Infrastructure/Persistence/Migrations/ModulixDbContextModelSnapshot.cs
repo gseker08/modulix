@@ -3847,6 +3847,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("IsPrimary")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<Guid>("MembershipId")
                         .HasColumnType("uniqueidentifier");
 
@@ -3859,6 +3864,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "MembershipId");
+
+                    b.HasIndex("TenantId", "MembershipId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_TeamMembers_Primary")
+                        .HasFilter("[IsPrimary] = 1");
 
                     b.HasIndex("TenantId", "TeamId", "MembershipId")
                         .IsUnique();

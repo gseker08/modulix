@@ -6,7 +6,7 @@ namespace Modulix.Infrastructure.Teams;
 
 /// <summary>
 /// <see cref="ITeamDirectory"/> uygulaması: ekipleri ve kullanıcının birincil ekibini salt okunur verir. Sorgular tenant süzgeci ve Row-Level Security
-/// altındadır; aktif tenant yoksa sonuç boştur. Birincil ekip, kullanıcının en önce katıldığı ekiptir (üyelik kimliği zaman sıralıdır, Guid v7).
+/// altındadır; aktif tenant yoksa sonuç boştur. Birincil ekip, yönetimin işaretlediği ekiptir; işaret yoksa kullanıcının en önce katıldığı ekiptir (üyelik kimliği zaman sıralıdır, Guid v7).
 /// </summary>
 internal sealed class TeamDirectory(ModulixDbContext db, ITenantContextAccessor tenant) : ITeamDirectory
 {
@@ -33,8 +33,8 @@ internal sealed class TeamDirectory(ModulixDbContext db, ITenantContextAccessor 
                 from member in db.TeamMembers.AsNoTracking()
                 join membership in db.Memberships.AsNoTracking() on member.MembershipId equals membership.Id
                 where membership.TenantId == current.TenantId && wanted.Contains(membership.UserId)
-                select new { membership.UserId, member.TeamId, member.Id })
+                select new { membership.UserId, member.TeamId, member.Id, member.IsPrimary })
             .ToListAsync(cancellationToken);
-        return rows.GroupBy(r => r.UserId).ToDictionary(g => g.Key, g => g.OrderBy(r => r.Id).First().TeamId);
+        return rows.GroupBy(r => r.UserId).ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.IsPrimary).ThenBy(r => r.Id).First().TeamId);
     }
 }
