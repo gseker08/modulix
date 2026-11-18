@@ -7889,7 +7889,7 @@
   "reports.dashboards.delete": "Paneli sil",
   "reports.dashboards.deleteQuestion": "Panel silinsin? Hesabatlar silinmir.",
   "reports.dashboards.notFound": "Panel tapılmadı.",
-  "reports.dashboards.widget.hidden": "Bu hesabat artıq sizə görünmür.",
+  "reports.dashboards.widget.hidden": "Bu hesabat sizə görünmür.",
   "reports.dashboards.widget.records": "qeyd",
   "reports.dashboards.widget.openReport": "Hesabatı aç",
   "reports.dashboards.widget.noData": "Məlumat yoxdur.",
