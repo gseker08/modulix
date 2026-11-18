@@ -1,7 +1,7 @@
 namespace Modulix.Core.Teams;
 
 /// <summary>Ekip listesi satırı.</summary>
-public sealed record TeamSummary(Guid Id, string Name, string? Description, int MemberCount);
+public sealed record TeamSummary(Guid Id, string Name, string? Description, int MemberCount, bool IsPrimary = false);
 
 /// <summary>Ekibin bir üyesi (üyelik kimliğiyle).</summary>
 public sealed record TeamMemberSummary(Guid MembershipId, Guid UserId, string DisplayName, string Email);
@@ -37,4 +37,10 @@ public interface ITeamService
 
     /// <summary>Kişinin ekiplerini verilen listeyle değiştirir. Üyelik bu tenant'ta yoksa false.</summary>
     Task<bool> SetMembershipTeamsAsync(Guid membershipId, IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Kişinin birincil ekibini seçer (rapor kırılımında kayıt bu ekipte sayılır); <paramref name="teamId"/> null ise seçim kaldırılır ve en önce katıldığı
+    /// ekip birincil sayılır. Üyelik bu tenant'ta yoksa false; kişi o ekipte değilse <see cref="ArgumentException"/>.
+    /// </summary>
+    Task<bool> SetPrimaryTeamAsync(Guid membershipId, Guid? teamId, CancellationToken cancellationToken);
 }

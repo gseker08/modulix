@@ -119,6 +119,10 @@ internal sealed class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMem
         // Kapsam hesabı kişinin ekiplerinden başlar.
         builder.HasIndex(tm => new { tm.TenantId, tm.MembershipId });
 
+        // Birincil ekip: üyelik başına en fazla bir işaretli satır.
+        builder.Property(tm => tm.IsPrimary).IsRequired().HasDefaultValue(false);
+        builder.HasIndex(tm => new { tm.TenantId, tm.MembershipId }).IsUnique().HasFilter("[IsPrimary] = 1").HasDatabaseName("UX_TeamMembers_Primary");
+
         // Bileşik yabancı anahtar (ADR-0020 Dilim 2): ekip üyeliği ile üyelik aynı tenant'ta olmak zorundadır. Üyelik silinince
         // ekip üyeliği de silinir.
         builder.Property(tm => tm.MembershipId).IsRequired();

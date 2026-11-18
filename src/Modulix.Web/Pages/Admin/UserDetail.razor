@@ -171,6 +171,10 @@
             else
             {
                 <p class="text-muted small">@Texts.Get("admin.userDetail.teamsHelp")</p>
+                @if (savedTeams.Count > 1)
+                {
+                    <p class="text-muted small">@Texts.Get("admin.userDetail.primaryTeamHelp")</p>
+                }
                 <div class="role-picker">
                     @foreach (var team in teams)
                     {
@@ -179,6 +183,14 @@
                                    @onchange="e => ToggleTeam(team.Id, e.Value is true)" />
                             <span class="form-check-label">@team.Name <small class="text-muted">· @Texts.Get("admin.userDetail.memberCount", team.MemberCount)</small></span>
                         </label>
+                        @if (savedTeams.Count > 1 && savedTeams.Contains(team.Id))
+                        {
+                            <label class="form-check">
+                                <input class="form-check-input" type="radio" name="primaryTeam" checked="@(primaryTeam == team.Id)" disabled="@busy"
+                                       @onchange="() => SetPrimaryTeamAsync(team.Id)" />
+                                <span class="form-check-label">@Texts.Get("admin.userDetail.primaryTeam", team.Name)</span>
+                            </label>
+                        }
                     }
                 </div>
                 <div class="form-actions">
@@ -289,6 +301,8 @@
     private HashSet<Guid> selectedRoles = [];
     private IReadOnlyList<TeamDto> teams = [];
     private HashSet<Guid> selectedTeams = [];
+    private HashSet<Guid> savedTeams = [];
+    private Guid? primaryTeam;
     private IReadOnlyList<BusinessUnitDto> units = [];
     private MembershipBusinessUnitDto? currentUnit;
     private Guid selectedUnitId;
@@ -548,7 +562,26 @@
     private async Task LoadTeamsAsync()
     {
         teams = (await Api.GetAsync<List<TeamDto>>("/api/teams")).Value ?? [];
-        selectedTeams = ((await Api.GetAsync<List<TeamDto>>($"/api/users/{MembershipId}/teams")).Value ?? []).Select(t => t.Id).ToHashSet();
+        var mine = (await Api.GetAsync<List<TeamDto>>($"/api/users/{MembershipId}/teams")).Value ?? [];
+        selectedTeams = mine.Select(t => t.Id).ToHashSet();
+        savedTeams = [.. selectedTeams];
+        primaryTeam = mine.FirstOrDefault(t => t.IsPrimary)?.Id;
+    }
+
+    private async Task SetPrimaryTeamAsync(Guid teamId)
+    {
+        busy = true;
+        notice = null;
+        var result = await Api.PutAsync<bool>($"/api/users/{MembershipId}/teams/primary", new SetPrimaryTeamRequest(teamId));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        await LoadTeamsAsync();
+        notice = Texts.Get("admin.userDetail.primaryTeamSaved");
     }
 
     private void ToggleTeam(Guid teamId, bool on)

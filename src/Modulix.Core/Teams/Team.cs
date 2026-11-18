@@ -85,4 +85,12 @@ public sealed class TeamMember : ITenantEntity, ICompanyShared
     public Guid TeamId { get; private set; }
 
     public Guid MembershipId { get; private set; }
+
+    /// <summary>
+    /// Kişinin birincil ekibi (ADR-0054 dilim 4b): rapor kırılımında kayıt bu ekipte sayılır. Üyelik başına en fazla bir satır işaretlidir;
+    /// hiçbiri işaretli değilse en önce katıldığı ekip birincil sayılır.
+    /// </summary>
+    public bool IsPrimary { get; private set; }
+
+    public void SetPrimary(bool primary) => IsPrimary = primary;
 }

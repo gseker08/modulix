@@ -124,11 +124,14 @@ internal sealed class TeamService(
             return null;
         }
 
-        var teamIds = await db.TeamMembers.AsNoTracking()
+        var rows = await db.TeamMembers.AsNoTracking()
             .Where(tm => tm.MembershipId == membershipId)
-            .Select(tm => tm.TeamId)
+            .Select(tm => new { tm.Id, tm.TeamId, tm.IsPrimary })
             .ToListAsync(cancellationToken);
-        return (await ListAsync(cancellationToken)).Where(t => teamIds.Contains(t.Id)).ToList();
+
+        // Seçilmiş birincil ekip yoksa en önce katıldığı ekip birincildir (TeamDirectory ile aynı kural).
+        var primaryId = (rows.FirstOrDefault(r => r.IsPrimary) ?? rows.OrderBy(r => r.Id).FirstOrDefault())?.TeamId;
+        return (await ListAsync(cancellationToken)).Where(t => rows.Any(r => r.TeamId == t.Id)).Select(t => t with { IsPrimary = t.Id == primaryId }).ToList();
     }
 
     public async Task<bool> SetMembershipTeamsAsync(Guid membershipId, IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken)
@@ -184,6 +187,54 @@ internal sealed class TeamService(
             }
 
             Audit(tenant, team.Id, AuditAction.Updated, Snapshot(team, befores[team.Id]), Snapshot(team, await MembersOfAsync(ids, cancellationToken)));
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> SetPrimaryTeamAsync(Guid membershipId, Guid? teamId, CancellationToken cancellationToken)
+    {
+        var tenant = RequireTenant();
+        if (!await db.Memberships.AnyAsync(m => m.Id == membershipId && m.TenantId == tenant.TenantId, cancellationToken))
+        {
+            return false;
+        }
+
+        var rows = await db.TeamMembers.Where(tm => tm.MembershipId == membershipId).ToListAsync(cancellationToken);
+        if (teamId is { } wanted && rows.All(r => r.TeamId != wanted))
+        {
+            throw new ArgumentException("Birincil ekip, kişinin üyesi olduğu ekiplerden biri olmalı.", nameof(teamId));
+        }
+
+        var previous = rows.FirstOrDefault(r => r.IsPrimary)?.TeamId;
+        if (previous == teamId)
+        {
+            return true;
+        }
+
+        // Tekil dizin üyelik başına tek işaretli satıra izin verir: önce eski işaret kaldırılıp kaydedilir.
+        foreach (var row in rows.Where(r => r.IsPrimary))
+        {
+            row.SetPrimary(false);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        if (teamId is { } chosen)
+        {
+            rows.Single(r => r.TeamId == chosen).SetPrimary(true);
+        }
+
+        var name = await (from membership in db.Memberships.AsNoTracking()
+                          join user in db.Users.AsNoTracking() on membership.UserId equals user.Id
+                          where membership.Id == membershipId
+                          select user.DisplayName).SingleAsync(cancellationToken);
+        foreach (var (id, before, after) in new[] { (previous, name, (string?)null), (teamId, (string?)null, name) })
+        {
+            if (id is { } changedTeam)
+            {
+                Audit(tenant, changedTeam, AuditAction.Updated, new JsonObject { ["primaryFor"] = before }, new JsonObject { ["primaryFor"] = after });
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);

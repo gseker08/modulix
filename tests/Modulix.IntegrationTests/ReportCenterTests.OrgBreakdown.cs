@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Organization;
@@ -125,6 +126,70 @@ public partial class ReportCenterTests
         Assert.Contains(columns.Single(c => c.Field == "ownerTeam").Options!, o => o.Key == org.FirstTeam.ToString() && o.Label == "Alfa");
         Assert.Equal("businessUnit", columns.Single(c => c.Field == "ownerUnit").Kind);
         Assert.Equal("team", columns.Single(c => c.Field == "ownerTeam").Kind);
+    }
+
+    private static Task<HttpResponseMessage> SetPrimaryTeamAsync(HttpClient client, Guid membershipId, Guid? teamId) =>
+        client.PutAsJsonAsync($"/api/users/{membershipId}/teams/primary", new Modulix.Shared.Users.SetPrimaryTeamRequest(teamId));
+
+    [Fact]
+    public async Task A_chosen_primary_team_decides_the_team_bucket_and_clearing_it_returns_to_the_first_joined_team()
+    {
+        var s = await SetUpAsync();
+        var org = await SeedOrgAsync(s);
+        var membership = await factory.GetMembershipIdAsync(org.Owners[0], s.TenantId);
+
+        async Task<(decimal Alfa, decimal Beta)> BucketsAsync()
+        {
+            var byTeam = await RunAsync(s.Admin, CountBy("ownerTeam", org.Owners));
+            return (byTeam.Rows.Where(r => Label(r) == "Alfa").Sum(r => Cell(r, 1)), byTeam.Rows.Where(r => Label(r) == "Beta").Sum(r => Cell(r, 1)));
+        }
+
+        Assert.Equal((2m, 1m), await BucketsAsync());                 // varsayılan: ilk katıldığı ekip (Alfa)
+
+        Assert.Equal(HttpStatusCode.NoContent, (await SetPrimaryTeamAsync(s.Admin, membership, org.SecondTeam)).StatusCode);
+        Assert.Equal((0m, 3m), await BucketsAsync());                 // seçim Beta: ilk kullanıcının iki kaydı da Beta'da, toplam yine 4
+        var mine = await ReadAsync<List<Modulix.Shared.Users.TeamDto>>(await s.Admin.GetAsync($"/api/users/{membership}/teams"));
+        Assert.Equal(org.SecondTeam, mine.Single(t => t.IsPrimary).Id);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await SetPrimaryTeamAsync(s.Admin, membership, null)).StatusCode);
+        Assert.Equal((2m, 1m), await BucketsAsync());
+
+        // Birincil ekipten çıkarılan kişi yeniden varsayılana düşer.
+        Assert.Equal(HttpStatusCode.NoContent, (await SetPrimaryTeamAsync(s.Admin, membership, org.SecondTeam)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await s.Admin.PutAsJsonAsync($"/api/users/{membership}/teams", new Modulix.Shared.Users.SetMembershipTeamsRequest([org.FirstTeam]))).StatusCode);
+        Assert.Equal((2m, 1m), await BucketsAsync());
+    }
+
+    [Fact]
+    public async Task The_primary_team_must_be_one_of_the_persons_teams_and_the_person_must_exist()
+    {
+        var s = await SetUpAsync();
+        var org = await SeedOrgAsync(s);
+        var third = await factory.GetMembershipIdAsync(org.Owners[2], s.TenantId);                 // hiçbir ekipte değil
+        var first = await factory.GetMembershipIdAsync(org.Owners[0], s.TenantId);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await SetPrimaryTeamAsync(s.Admin, third, org.FirstTeam)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await SetPrimaryTeamAsync(s.Admin, first, Guid.NewGuid())).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await SetPrimaryTeamAsync(s.Admin, Guid.NewGuid(), org.FirstTeam)).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_primary_team_cannot_be_set_across_tenants_or_without_user_management_permission()
+    {
+        var s = await SetUpAsync();
+        var org = await SeedOrgAsync(s);
+        var other = await SetUpAsync();
+        var theirs = await SeedOrgAsync(other);
+        var membership = await factory.GetMembershipIdAsync(org.Owners[0], s.TenantId);
+        var theirMembership = await factory.GetMembershipIdAsync(theirs.Owners[0], other.TenantId);
+
+        // Başka firmanın yöneticisi bu üyeliği bulamaz; kendi üyeliğine bizim ekibimizi seçemez.
+        Assert.Equal(HttpStatusCode.NotFound, (await SetPrimaryTeamAsync(other.Admin, membership, org.SecondTeam)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await SetPrimaryTeamAsync(other.Admin, theirMembership, org.SecondTeam)).StatusCode);
+
+        // Kullanıcı yönetimi izni olmayan kullanıcı birincil ekibi değiştiremez.
+        var reader = await UserAsync(s, [.. DataRead, .. CoreRead], Scope.All);
+        Assert.Equal(HttpStatusCode.Forbidden, (await SetPrimaryTeamAsync(reader, membership, org.SecondTeam)).StatusCode);
     }
 
     [Fact]
