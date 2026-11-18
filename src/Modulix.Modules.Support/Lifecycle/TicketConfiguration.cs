@@ -95,7 +95,7 @@ public interface IPriorityMatrixService
     Task<RecordResult<IReadOnlyList<PriorityCell>>> SaveAsync(IReadOnlyList<PriorityCell> cells, CancellationToken cancellationToken);
 }
 
-internal sealed class PriorityMatrixService(IRecordPipeline pipeline, ICurrentAccess access, SupportStoreContext context) : IPriorityMatrixService
+internal sealed class PriorityMatrixService(IRecordPipeline pipeline, ICurrentAccess access) : IPriorityMatrixService
 {
     private const string Key = SupportModule.Entities.PriorityMatrix;
 

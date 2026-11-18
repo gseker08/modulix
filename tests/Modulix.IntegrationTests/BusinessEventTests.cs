@@ -129,7 +129,7 @@ public sealed class BusinessEventTests : IClassFixture<ModulixApiFactory>, IAsyn
 
         // Teslim: izinsiz test aboneliği olayı alır ama hassas tutarı görmez; otomasyon aboneliği bekleyen çalışma açar.
         await DrainAsync();
-        var received = Assert.Single(BusinessEventRecorder.Received.Where(e => e.RecordId == opp.Id));
+        var received = Assert.Single(BusinessEventRecorder.Received, e => e.RecordId == opp.Id);
         Assert.Equal(Won, received.EventType);
         Assert.Contains("wonAmount", received.HiddenFields);
         Assert.False(received.Payload.ContainsKey("wonAmount"));

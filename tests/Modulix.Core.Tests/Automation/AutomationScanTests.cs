@@ -140,13 +140,13 @@ public class AutomationRecordSourceDeclarationTests
     }
 
     [Fact]
-    public void Scan_trigger_is_rejected_for_an_entity_without_a_record_source()
+    public async Task Scan_trigger_is_rejected_for_an_entity_without_a_record_source()
     {
         var catalog = Catalog(With(null));
         var definition = ValidDefinition(trigger: new ScheduledTrigger("06:00"));
         var access = new FakeAccess(["sales.deals.read", WritePermission, SecretPermission], ["sales", "billing"]);
 
-        var issues = Validator(catalog, access).ValidateAsync("sales", Entity, definition, CancellationToken.None).GetAwaiter().GetResult();
+        var issues = await Validator(catalog, access).ValidateAsync("sales", Entity, definition, CancellationToken.None);
 
         Assert.Contains(issues, i => i.Path == "trigger" && i.Message.Contains("desteklemiyor"));
     }

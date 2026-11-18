@@ -127,13 +127,13 @@ public class ContractSignatureTests
     }
 
     [Fact]
-    public void Simulation_provider_never_talks_to_the_network_and_is_flagged_as_simulation()
+    public async Task Simulation_provider_never_talks_to_the_network_and_is_flagged_as_simulation()
     {
         var provider = new SimulationSignatureProvider();
         var request = new ProviderSignatureRequest("ref.1", "sozlesme.pdf", new string('a', 64), [new ProviderSignatory(1, "Ali", "ali@ornek.test", null, true)], DateTimeOffset.UtcNow.AddDays(1), true);
 
         Assert.True(provider.IsSimulation);
-        Assert.Equal("ref.1", provider.CreateRequestAsync(request, CancellationToken.None).Result.ProviderReference);
+        Assert.Equal("ref.1", (await provider.CreateRequestAsync(request, CancellationToken.None)).ProviderReference);
         Assert.True(provider.CancelRequestAsync("ref.1", CancellationToken.None).IsCompletedSuccessfully);
     }
 }

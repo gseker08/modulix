@@ -379,7 +379,7 @@ public class OpportunityTests(ModulixApiFactory factory) : IClassFixture<Modulix
         var again = (await WinAsync(client, reopened)).Opportunity;
         var report = await ReportAsync(client);
         Assert.Equal(1, report.WonCount);
-        Assert.Equal(again.ClosureCycle, 2);
+        Assert.Equal(2, again.ClosureCycle);
     }
 
     [Fact]

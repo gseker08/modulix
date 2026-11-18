@@ -44,7 +44,7 @@ public class AuditArchiveTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var period = Assert.Single(result.Periods, p => p.End == February.AddMonths(1));
         Assert.True(period.Cleared, period.Problem);
         Assert.True(period.Rows >= 3);
-        Assert.Empty(result.Periods.Where(p => !p.Cleared));
+        Assert.DoesNotContain(result.Periods, p => !p.Cleared);
 
         using (var scope = factory.OpenScope(a.Id))
         {

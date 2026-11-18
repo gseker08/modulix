@@ -201,7 +201,7 @@ public class HrAnnouncementTests(ModulixApiFactory factory) : IClassFixture<Modu
         // Okunmamış süzgeci: okur iki duyuru görür, birini okuyunca bir kalır; yöneticinin okuması okurunkini etkilemez.
         Assert.Equal(2, (await ListAsync(staff, Announcements, "active=true&unread=true")).Count);
         await MarkReadAsync(staff, mine.Id);
-        Assert.Equal(1, (await ListAsync(staff, Announcements, "active=true&unread=true")).Count);
+        Assert.Single(await ListAsync(staff, Announcements, "active=true&unread=true"));
         Assert.Equal(3, (await ListAsync(hr, Announcements, "active=true&unread=true")).Count);
         Assert.Empty(await ListAsync(hrB, Announcements, "unread=true"));
     }
