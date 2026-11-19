@@ -20,7 +20,7 @@
     }
     else
     {
-        @if (starters.Count > 0)
+        @if (ShowStarters && starters.Count > 0)
         {
             <h3>@Texts.Get("admin.subProfiles.starters")</h3>
             <p class="text-muted">
@@ -52,7 +52,7 @@
         }
 
         <div class="list-toolbar">
-            <button type="button" class="btn btn-primary" disabled="@busy" @onclick="NewProfile">@Texts.Get("admin.subProfiles.new")</button>
+            <button type="button" class="btn @(ShowStarters ? "btn-primary" : "btn-tonal")" disabled="@busy" @onclick="NewProfile">@Texts.Get("admin.subProfiles.new")</button>
         </div>
 
         @if (profileForm is not null)
@@ -557,6 +557,9 @@
 </section>
 
 @code {
+    /// <summary>Hazır alt profil kartları; Sektör profili sayfası bunları kendi "önerilen paketler" adımında gösterdiği için kapatır.</summary>
+    [Parameter] public bool ShowStarters { get; set; } = true;
+
     private List<SubProfileDto>? profiles;
     private List<SubProfileStarterDto> starters = [];
     private string featureFilter = string.Empty;

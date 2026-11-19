@@ -16,6 +16,18 @@ public class SubProfileStarterCatalogTests
         new(SubProfileOptionKind.Field, target, label, type, Choices: choices);
 
     [Fact]
+    public void Catalog_rejects_a_suggestion_rule_that_can_never_match_or_repeats_a_code()
+    {
+        SubProfileStarter With(string[] codes, int min) => new("a", "A", "", null, [Field("crm.deal", "Alan")], null, codes, min);
+
+        Assert.NotNull(new SubProfileStarterCatalog([With(["kara", "deniz"], 2)], Modules).Find("a"));
+        Assert.Throws<InvalidOperationException>(() => new SubProfileStarterCatalog([With(["kara", "deniz"], 3)], Modules));
+        Assert.Throws<InvalidOperationException>(() => new SubProfileStarterCatalog([With(["kara", "kara"], 1)], Modules));
+        Assert.Throws<InvalidOperationException>(() => new SubProfileStarterCatalog([With(["kara"], 0)], Modules));
+        Assert.Throws<InvalidOperationException>(() => new SubProfileStarterCatalog([With(["kara", " "], 1)], Modules));
+    }
+
+    [Fact]
     public void Valid_starters_are_found_by_key_and_their_modules_come_from_the_option_targets()
     {
         var starter = new SubProfileStarter(

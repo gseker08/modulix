@@ -509,3 +509,42 @@
     .profile-plan li {
         margin-bottom: 0.25rem;
     }
+
+/* Onay kutulu paket kartı (Sektör profili 3. adım, 19.11.2026): kutu solda, yanında ad (+ rozet) ve tek satır içerik. Birden fazla faaliyetin
+   birleşimiyle önerilen kart ("suggested") marka renginde kalın çerçevelidir. */
+.profile-cards:has(> .profile-card-check) {
+    grid-template-columns: repeat(auto-fit, minmax(16.25rem, 1fr));
+    gap: 0.5rem;
+}
+
+.profile-card.profile-card-check {
+    flex-direction: row;
+    gap: 0.625rem;
+    padding: 0.625rem 0.75rem;
+    box-shadow: none;
+    cursor: pointer;
+}
+
+    .profile-card.profile-card-check .form-check-input {
+        flex: none;
+        margin-top: 0.2rem;
+    }
+
+    .profile-card.profile-card-check p {
+        margin: 0;
+        font-size: 0.875rem;
+    }
+
+    .profile-card.profile-card-check strong {
+        font-weight: 600;
+    }
+
+    .profile-card.profile-card-check .badge {
+        margin-left: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .profile-card.profile-card-check.suggested {
+        border: 2px solid var(--mx-tone-brand-fg);
+    }

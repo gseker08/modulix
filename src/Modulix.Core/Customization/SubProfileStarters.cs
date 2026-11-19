@@ -6,6 +6,8 @@ namespace Modulix.Core.Customization;
 /// Hazır alt profil (ADR-0041 K9): firmanın tek tıkla kendi alt profili olarak ekleyebildiği öneri. Kodda tanımlıdır, firma verisi değildir;
 /// eklenince firmanın alt profili (taslak) olur ve firma istediği gibi değiştirir. İçerik ürün önerisidir, bir işletmeyle doğrulanmamıştır.
 /// <see cref="Key"/> eklenen alt profilin koduna dönüşür; <see cref="ActivityCode"/> katalogda yoksa ya da pasifse bağlanmadan eklenir.
+/// Firma <see cref="ActivityCode"/> faaliyetini seçtiyse ya da <see cref="SuggestedActivityCodes"/> içinden en az <see cref="SuggestedMinMatches"/>
+/// tanesini seçtiyse ekran bu alt profili önerir (ör. birden fazla taşıma modu seçen firmaya çok modlu taşıma).
 /// </summary>
 public sealed record SubProfileStarter(
     string Key,
@@ -13,7 +15,9 @@ public sealed record SubProfileStarter(
     string Description,
     string? ActivityCode,
     IReadOnlyList<SubProfileOptionInput> Options,
-    IReadOnlyList<SubProfileFeatureInput>? Features = null);
+    IReadOnlyList<SubProfileFeatureInput>? Features = null,
+    IReadOnlyList<string>? SuggestedActivityCodes = null,
+    int SuggestedMinMatches = 1);
 
 /// <summary>Hazır alt profiller; açılışta tanımlar modül kataloğuna göre doğrulanır (bilinmeyen kayıt türü, liste, kategori, tekrar eden seçenek).</summary>
 public sealed class SubProfileStarterCatalog
@@ -63,6 +67,13 @@ public sealed class SubProfileStarterCatalog
         if (starter.Options.Count == 0)
         {
             throw Fails("seçenek yok");
+        }
+
+        var suggested = starter.SuggestedActivityCodes ?? [];
+        if (suggested.Any(string.IsNullOrWhiteSpace) || suggested.Distinct(StringComparer.Ordinal).Count() != suggested.Count
+            || starter.SuggestedMinMatches < 1 || (suggested.Count > 0 && starter.SuggestedMinMatches > suggested.Count))
+        {
+            throw Fails("öneri kuralı");
         }
 
         var seenFeatures = new List<SubProfileFeature>();
@@ -128,4 +139,7 @@ public sealed record SubProfileStarterView(
     IReadOnlyList<string> OptionLabels,
     IReadOnlyList<string> FeatureLabels,
     IReadOnlyList<string> MissingModules,
-    bool Added);
+    bool Added,
+    string? ActivityCode,
+    IReadOnlyList<string> SuggestedActivityCodes,
+    int SuggestedMinMatches);

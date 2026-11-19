@@ -459,7 +459,10 @@ internal sealed class SubProfileService(
             [.. s.Options.Select(o => o.Label)],
             SubProfileRules.GroupLabels(s.Features ?? []),
             MissingModules(s, enabled),
-            codes.Contains(s.Key)))];
+            codes.Contains(s.Key),
+            s.ActivityCode,
+            s.SuggestedActivityCodes ?? [],
+            s.SuggestedMinMatches))];
     }
 
     public async Task<SubProfileView?> CreateFromStarterAsync(string key, CancellationToken cancellationToken)

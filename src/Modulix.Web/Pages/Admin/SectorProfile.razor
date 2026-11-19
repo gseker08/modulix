@@ -1,11 +1,13 @@
 @page "/yonetim/sektor-profili"
 @inject ApiClient Api
 @inject SessionState Session
+@inject ToastService Toasts
 
 <PageTitle>@Texts.Get("nav.app.admin.sector-profile") · Modulix</PageTitle>
 
-@* Sektör profili (Y9c): hazır alanlar ve liste değerleri. Bir kez uygulanır ve yalnızca ekler; önce önizleme gösterilir. Altında firmanın alt profilleri
-   ve faaliyet seçimi vardır (ADR-0041 K8). *@
+@* Sektör kurulumu, üç adım tek sayfada: sektör profili (Y9c), faaliyet seçimi (ADR-0029) ve faaliyetlere göre önerilen hazır alt profiller
+   (ADR-0041 K9). Seçenekler sektöre göre daralır: faaliyetler profilin katalogdaki sektör düğümünün altından, paketler görünen faaliyetlerden gelir.
+   Üç adımın değişiklikleri alttaki tek düğmeyle sırayla uygulanır; altında firmanın alt profillerinin ayrıntılı düzenlemesi vardır. *@
 <AuthGate Permission="@CoreAccess.ManageCustomization">
     <a class="back-link" href="yonetim">← @Texts.Get("nav.app.admin")</a>
 
@@ -13,73 +15,325 @@
         <h1>@Texts.Get("nav.app.admin.sector-profile")</h1>
     </div>
 
-    <p class="text-muted">
-        @Texts.Get("admin.sectorProfile.intro")
-    </p>
-
     @if (message is not null)
     {
-        <div class="alert alert-danger" role="alert">@message</div>
-    }
-
-    @if (profiles is not null)
-    {
-        <p>
-            @Texts.Get("admin.sectorProfile.current")
-            <strong>@(CurrentName ?? Texts.Get("admin.sectorProfile.notApplied"))</strong>
-            @if (profiles.AppliedAt is { } appliedAt)
+        <div class="alert alert-danger" role="alert">
+            @message
+            @if (errors.Count > 0)
             {
-                <span class="text-muted"> · @CrmLabels.Time(appliedAt)</span>
-            }
-        </p>
-
-        <div class="profile-cards">
-            @foreach (var profile in profiles.Profiles)
-            {
-                <button type="button" class="profile-card @(profile.Key == selected ? "active" : null)" aria-pressed="@((profile.Key == selected) ? "true" : "false")"
-                        @onclick="() => PreviewAsync(profile.Key)">
-                    <strong>@profile.Name</strong>
-                    <span>@profile.Description</span>
-                    @if (profile.Key == profiles.Current)
+                <ul class="mb-0">
+                    @foreach (var error in errors)
                     {
-                        <span class="badge category">@Texts.Get("admin.sectorProfile.applied")</span>
+                        <li>@error</li>
                     }
-                </button>
+                </ul>
             }
         </div>
+    }
 
-        @if (plan is not null)
+    @if (profiles is null || catalog is null)
+    {
+        @if (message is null)
         {
-            <section class="record-form settings-group" aria-live="polite">
-                <h2>@plan.ProfileName</h2>
-                <ProfilePreview Plan="plan" Applied="applied" />
-                @if (!applied)
+            <LoadingState />
+        }
+    }
+    else
+    {
+        <FormSection Title="@Texts.Get("admin.sectorSetup.step1.title")" Marker="1" Class="section-card-step" Description="@Texts.Get("admin.sectorSetup.step1.description")">
+            <div class="check-list">
+                @foreach (var profile in profiles.Profiles)
                 {
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-primary" disabled="@busy" @onclick="ApplyAsync">
-                            @(plan.IsEmpty ? Texts.Get("admin.sectorProfile.saveProfile") : Texts.Get("admin.sectorProfile.apply"))
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">@Texts.Get("common.dismiss")</button>
-                    </div>
+                    <button type="button" class="chip chip-soft @(profile.Key == selectedProfile ? "active" : null)" aria-pressed="@(profile.Key == selectedProfile ? "true" : "false")"
+                            disabled="@busy" @onclick="() => SelectProfileAsync(profile.Key)">
+                        @if (profile.Icon is { } profileIcon)
+                        {
+                            <AppIcon Name="@profileIcon" Size="16" />
+                        }
+                        @profile.Name
+                        @if (profile.Key == selectedProfile)
+                        {
+                            <AppIcon Name="check" Size="14" />
+                        }
+                    </button>
                 }
-            </section>
+            </div>
+
+            @* Seçim firmanın uygulanmış profilinden farklıysa hangisinin yürürlükte olduğu söylenir; aynıysa seçili çip yeterlidir. *@
+            @if (selectedProfile != profiles.Current)
+            {
+                <p class="form-text">
+                    @Texts.Get("admin.sectorProfile.current")
+                    <strong>@(CurrentName ?? Texts.Get("admin.sectorProfile.notApplied"))</strong>
+                    @if (profiles.AppliedAt is { } appliedAt)
+                    {
+                        <span> · @CrmLabels.Time(appliedAt)</span>
+                    }
+                </p>
+            }
+        </FormSection>
+
+        <div id="faaliyetler">
+            <FormSection Title="@Texts.Get("admin.sectorSetup.step2.title")" Marker="2" Class="section-card-step" Description="@Texts.Get("admin.sectorSetup.step2.description")">
+                @if (catalog.Nodes.Count == 0)
+                {
+                    <p class="text-muted">@Texts.Get("admin.activities.emptyCatalog")</p>
+                }
+                else
+                {
+                    @if (SectorRoot is null && !showAll)
+                    {
+                        <p class="text-muted">@Texts.Get(selectedProfile is null ? "admin.sectorSetup.chooseSector" : "admin.sectorSetup.noSectorCatalog")</p>
+                    }
+
+                    <fieldset disabled="@busy">
+                        <legend class="visually-hidden">@Texts.Get("admin.activities.legend")</legend>
+                        @foreach (var group in Groups())
+                        {
+                            <div class="mb-3">
+                                <h3 class="form-label">@group.Title</h3>
+                                <div class="check-list">
+                                    @foreach (var node in group.Items)
+                                    {
+                                        <button type="button" class="chip chip-soft @(selectedNodes.Contains(node.Id) ? "active" : null)" aria-pressed="@(selectedNodes.Contains(node.Id) ? "true" : "false")"
+                                                @onclick="() => ToggleActivityAsync(node.Id)">
+                                            @if (IconOf(node) is { } nodeIcon)
+                                            {
+                                                <AppIcon Name="@nodeIcon" Size="16" />
+                                            }
+                                            @(node.IsActive ? LabelOf(node) : $"{LabelOf(node)} ({Texts.Get("common.inactive")})")
+                                        </button>
+                                    }
+                                </div>
+                                @foreach (var item in group.Hints)
+                                {
+                                    <p class="form-text"><strong>@item.Label:</strong> @item.Hint</p>
+                                }
+                                @foreach (var hint in ComboHints().Where(h => group.Items.Any(n => h.Codes.Contains(n.Code))))
+                                {
+                                    <div class="alert alert-info alert-inline" role="status"><AppIcon Name="shuffle" Size="18" /><span>@hint.Text</span></div>
+                                }
+                            </div>
+                        }
+                    </fieldset>
+
+                    @if (preview is not null)
+                    {
+                        @if (preview.CatalogOnlyNodeIds.Count > 0)
+                        {
+                            <p class="form-text">@Texts.Get("admin.activities.catalogOnlyNote", string.Join(", ", preview.CatalogOnlyNodeIds.Select(NameOf)))</p>
+                        }
+                        @foreach (var gap in preview.Gaps)
+                        {
+                            <p class="form-text">@((MarkupString)Texts.Get("admin.activities.gap", $"<code>{System.Net.WebUtility.HtmlEncode(gap.Capability)}</code>", System.Net.WebUtility.HtmlEncode(string.Join(", ", gap.RequiredByNodes.Select(NameOf)))))</p>
+                        }
+                        @foreach (var error in preview.Errors)
+                        {
+                            <p class="text-danger">@error</p>
+                        }
+                    }
+
+                    @if (HasOtherSectors)
+                    {
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-ghost" disabled="@busy" @onclick="() => showAll = !showAll">
+                                @Texts.Get(showAll ? "admin.sectorSetup.showMine" : "admin.sectorSetup.showAll")
+                            </button>
+                        </div>
+                    }
+                }
+            </FormSection>
+        </div>
+
+        <FormSection Title="@Texts.Get("admin.sectorSetup.step3.title")" Marker="3" Class="section-card-step" Description="@Texts.Get("admin.sectorSetup.step3.description")">
+            @if (VisibleStarters.Count == 0)
+            {
+                <EmptyState Title="@Texts.Get("admin.sectorSetup.noStarters")" />
+            }
+            else
+            {
+                <div class="profile-cards">
+                    @foreach (var starter in VisibleStarters)
+                    {
+                        <label class="profile-card profile-card-check @(CanAdd(starter) && IsCombo(starter) ? "suggested" : null)" title="@starter.Description">
+                            <input class="form-check-input" type="checkbox" checked="@(starter.Added || chosenStarters.Contains(starter.Key))"
+                                   disabled="@(busy || !CanAdd(starter))" @onchange="() => ToggleStarter(starter.Key)" />
+                            <div>
+                                <p>
+                                    <strong>@starter.Name</strong>
+                                    @if (starter.Added)
+                                    {
+                                        <span class="badge category">@Texts.Get("admin.subProfiles.added")</span>
+                                    }
+                                    else if (starter.MissingModules.Count > 0)
+                                    {
+                                        <span class="badge">@Texts.Get("admin.subProfiles.moduleOff", string.Join(", ", starter.MissingModules))</span>
+                                    }
+                                    else if (IsCombo(starter))
+                                    {
+                                        <span class="badge user-active">@Texts.Get("admin.sectorSetup.suggested")</span>
+                                    }
+                                </p>
+                                <p class="text-muted">@string.Join(", ", starter.Options)</p>
+                            </div>
+                        </label>
+                    }
+                </div>
+            }
+            <p class="form-text"><a href="yonetim/sektor-profili#alt-profiller">@Texts.Get("admin.sectorSetup.createOwn")</a></p>
+        </FormSection>
+
+        @if (previewing && PendingParts.Count > 0)
+        {
+            <FormSection Title="@Texts.Get("admin.sectorSetup.preview.title")" Icon="eye" Description="@Texts.Get("admin.sectorSetup.preview.description")">
+                <div aria-live="polite">
+                    @if (plan is not null && ProfilePending)
+                    {
+                        <h3 class="form-label">@plan.ProfileName</h3>
+                        <ProfilePreview Plan="plan" Applied="false" />
+                    }
+
+                    @if (AddedActivityNames.Count > 0 || RemovedActivityNames.Count > 0 || chosenStarters.Count > 0)
+                    {
+                        <ul class="profile-plan">
+                            @if (AddedActivityNames.Count > 0)
+                            {
+                                <li>@Texts.Get("admin.sectorSetup.preview.added", string.Join(", ", AddedActivityNames))</li>
+                            }
+                            @if (RemovedActivityNames.Count > 0)
+                            {
+                                <li>@Texts.Get("admin.sectorSetup.preview.removed", string.Join(", ", RemovedActivityNames))</li>
+                            }
+                            @foreach (var starter in starters.Where(s => chosenStarters.Contains(s.Key)))
+                            {
+                                <li>@Texts.Get("admin.sectorSetup.preview.package", starter.Name, string.Join(", ", starter.Options))</li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </FormSection>
         }
 
-        <SubProfilesSection />
+        <div class="form-toolbar form-toolbar-summary">
+            <p aria-live="polite">
+                @if (PendingParts.Count == 0)
+                {
+                    @Texts.Get("admin.sectorSetup.pending.none")
+                }
+                else
+                {
+                    <strong>@Texts.Get("admin.sectorSetup.pending.label")</strong>
+                    @(" " + string.Join(" · ", PendingParts))
+                }
+            </p>
+            <div class="form-toolbar-actions">
+                @if (previewing && PendingParts.Count > 0)
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => previewing = false">@Texts.Get("common.dismiss")</button>
+                    <button type="button" class="btn btn-primary" aria-busy="@(busy ? "true" : "false")" disabled="@busy" @onclick="ApplyAllAsync">@Texts.Get("admin.sectorSetup.applyAll")</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@(busy || PendingParts.Count == 0)" @onclick="ResetAsync">@Texts.Get("common.dismiss")</button>
+                    <button type="button" class="btn btn-primary" disabled="@(busy || PendingParts.Count == 0)" @onclick="() => previewing = true">@Texts.Get("admin.sectorSetup.previewApply")</button>
+                }
+            </div>
+        </div>
 
-        <ActivitySelectionSection />
+        <div id="alt-profiller">
+            <SubProfilesSection @key="subProfilesVersion" ShowStarters="false" />
+        </div>
     }
 </AuthGate>
 
 @code {
+    private const string ActivityKind = "Activity";
+
     private SectorProfilesResponse? profiles;
+    private SectorCatalogResponse? catalog;
+    private List<SubProfileStarterDto> starters = [];
     private ProfilePlanDto? plan;
-    private string? selected;
-    private bool applied;
+    private SelectionPreviewDto? preview;
+    private string? selectedProfile;
+    private HashSet<Guid> selectedNodes = [];
+    private HashSet<Guid> originalNodes = [];
+    private readonly HashSet<string> chosenStarters = new(StringComparer.Ordinal);
+    private bool showAll;
+    private bool previewing;
     private bool busy;
     private string? message;
+    private List<string> errors = [];
+    private int subProfilesVersion;
+
+    private sealed record ActivityGroup(string Title, List<ActivityNodeDto> Items)
+    {
+        // Yalnızca profilin öne çıkardığı grupta doludur: çiplerin altındaki tek cümlelik açıklamalar.
+        public List<ActivityFocusItemDto> Hints { get; init; } = [];
+    }
 
     private string? CurrentName => profiles?.Profiles.FirstOrDefault(p => p.Key == profiles.Current)?.Name ?? profiles?.Current;
+
+    private SectorProfileDto? SelectedProfile => profiles?.Profiles.FirstOrDefault(p => p.Key == selectedProfile);
+
+    // Profilin katalogdaki sektör düğümü; profil bir sektöre bağlı değilse ya da düğüm katalogda yoksa null.
+    private ActivityNodeDto? SectorRoot =>
+        SelectedProfile?.ActivitySectorCode is { } code ? catalog?.Nodes.FirstOrDefault(n => n.Code == code && n.Kind != ActivityKind) : null;
+
+    private bool HasOtherSectors => catalog is not null && catalog.Nodes.Any(n => n.ParentId is null && n.Id != SectorRoot?.Id);
+
+    // Profil yeniyse ya da uygulanmış profilin eksiği varsa uygulanacak bir şey vardır.
+    private bool ProfilePending => selectedProfile is not null && (selectedProfile != profiles?.Current || plan is { IsEmpty: false });
+
+    private int ActivityChanges => selectedNodes.Except(originalNodes).Count() + originalNodes.Except(selectedNodes).Count();
+
+    private List<string> AddedActivityNames => [.. selectedNodes.Except(originalNodes).Select(NameOf).Order()];
+
+    private List<string> RemovedActivityNames => [.. originalNodes.Except(selectedNodes).Select(NameOf).Order()];
+
+    private HashSet<string> SelectedCodes => [.. catalog!.Nodes.Where(n => selectedNodes.Contains(n.Id)).Select(n => n.Code)];
+
+    private List<string> PendingParts
+    {
+        get
+        {
+            List<string> parts = [];
+            void Add(string key, int count)
+            {
+                if (count > 0)
+                {
+                    parts.Add(Texts.Get(key, count));
+                }
+            }
+
+            var profilePlan = ProfilePending ? plan : null;
+            Add("admin.sectorSetup.pending.modules", profilePlan?.ModulesToEnable.Count ?? 0);
+            Add("admin.sectorSetup.pending.activities", selectedNodes.Except(originalNodes).Count());
+            Add("admin.sectorSetup.pending.removed", originalNodes.Except(selectedNodes).Count());
+            Add("admin.sectorSetup.pending.packages", chosenStarters.Count);
+            Add("admin.sectorSetup.pending.fields", (profilePlan?.Fields.Count ?? 0) + starters.Where(s => chosenStarters.Contains(s.Key)).Sum(s => s.Options.Count));
+            Add("admin.sectorSetup.pending.listValues", profilePlan?.ListValues.Count ?? 0);
+
+            // Profil değişiyor ama eklenecek bir şey saymıyorsa (ör. hazır alanı olmayan profil) yine de bekleyen değişiklik vardır.
+            if (parts.Count == 0 && ProfilePending)
+            {
+                parts.Add(Texts.Get("admin.sectorSetup.pending.profile", SelectedProfile?.Name));
+            }
+
+            return parts;
+        }
+    }
+
+    // Sektöre uygun paketler: faaliyeti ekranda görünen (ya da faaliyete bağlı olmayan), önerilen ve zaten eklenmiş olanlar; önerilenler başta.
+    private List<SubProfileStarterDto> VisibleStarters
+    {
+        get
+        {
+            HashSet<string> visible = [.. Groups().SelectMany(g => g.Items).Select(n => n.Code)];
+            return [.. starters
+                .Where(s => s.Added || IsSuggested(s) || s.ActivityCode is null || visible.Contains(s.ActivityCode))
+                .OrderByDescending(IsSuggested)];
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -92,38 +346,256 @@
 
     private async Task LoadAsync()
     {
-        var result = await Api.GetAsync<SectorProfilesResponse>("/api/customization/profiles");
-        profiles = result.Value;
-        message = result.Error;
-    }
-
-    private async Task PreviewAsync(string key)
-    {
-        selected = key;
-        applied = false;
-        plan = null;
-        var result = await Api.GetAsync<ProfilePlanDto>($"/api/customization/profiles/{Uri.EscapeDataString(key)}/preview");
-        plan = result.Value;
-        message = result.Error;
-    }
-
-    private async Task ApplyAsync()
-    {
-        busy = true;
-        var result = await Api.PostAsync<ProfilePlanDto>($"/api/customization/profiles/{Uri.EscapeDataString(selected!)}/apply", new { });
-        busy = false;
-        message = result.Error;
-        if (result.Value is { } done)
+        var profileResult = await Api.GetAsync<SectorProfilesResponse>("/api/customization/profiles");
+        var catalogResult = await Api.GetAsync<SectorCatalogResponse>("/api/sectors/catalog");
+        var selectionResult = await Api.GetAsync<TenantActivitySelectionResponse>("/api/sectors/selection");
+        var starterResult = await Api.GetAsync<List<SubProfileStarterDto>>("/api/customization/sub-profiles/starters");
+        profiles = profileResult.Value;
+        catalog = catalogResult.Value;
+        starters = starterResult.Value ?? [];
+        Report(profileResult.Error ?? catalogResult.Error ?? selectionResult.Error ?? starterResult.Error, null);
+        if (selectionResult.Value is { } selection)
         {
-            plan = done;
-            applied = true;
-            await LoadAsync();
+            selectedNodes = [.. selection.SelectedNodeIds];
+            originalNodes = [.. selection.SelectedNodeIds];
+            preview = selection.Preview;
+        }
+
+        chosenStarters.Clear();
+        previewing = false;
+        selectedProfile = profiles?.Current;
+        plan = null;
+        if (selectedProfile is not null)
+        {
+            plan = (await Api.GetAsync<ProfilePlanDto>($"/api/customization/profiles/{Uri.EscapeDataString(selectedProfile)}/preview")).Value;
         }
     }
 
-    private void Cancel()
+    private async Task SelectProfileAsync(string key)
     {
-        selected = null;
+        selectedProfile = key;
+        previewing = false;
         plan = null;
+        var result = await Api.GetAsync<ProfilePlanDto>($"/api/customization/profiles/{Uri.EscapeDataString(key)}/preview");
+        plan = result.Value;
+        Report(result.Error, null);
+        SyncChosenStarters([]);
+    }
+
+    /// <summary>
+    /// Görünen faaliyetler, gruplarıyla: profilin sektör düğümünün altı (ya da "tümünü göster" ile bütün katalog). Sektörün dışında kalan seçili
+    /// düğümler gizlenmez, ayrı grupta gösterilir ki kaldırılabilsin.
+    /// </summary>
+    private List<ActivityGroup> Groups()
+    {
+        List<ActivityGroup> groups = [];
+        if (catalog is null)
+        {
+            return groups;
+        }
+
+        var byParent = catalog.Nodes.ToLookup(n => n.ParentId);
+        IEnumerable<ActivityNodeDto> Children(Guid? parentId) => byParent[parentId].OrderBy(n => n.SortOrder).ThenBy(n => n.Name);
+        IEnumerable<ActivityNodeDto> Activities(ActivityNodeDto node) =>
+            Children(node.Id).SelectMany(child => child.Kind == ActivityKind ? Activities(child).Prepend(child) : Activities(child));
+
+        List<ActivityNodeDto> roots = showAll ? [.. Children(null)] : SectorRoot is { } root ? [root] : [];
+        var prefixed = roots.Count > 1;
+        foreach (var sector in roots)
+        {
+            if (sector.Kind == ActivityKind)
+            {
+                groups.Add(new ActivityGroup(Texts.Get("admin.sectorSetup.generalGroup"), [sector, .. Activities(sector)]));
+                continue;
+            }
+
+            foreach (var child in Children(sector.Id).Where(c => c.Kind != ActivityKind))
+            {
+                groups.Add(new ActivityGroup(prefixed ? $"{sector.Name} · {child.Name}" : child.Name, [.. Activities(child)]));
+            }
+
+            List<ActivityNodeDto> direct = [.. Children(sector.Id).Where(c => c.Kind == ActivityKind).SelectMany(c => Activities(c).Prepend(c))];
+            groups.Add(new ActivityGroup(prefixed ? sector.Name : Texts.Get("admin.sectorSetup.generalGroup"), direct));
+        }
+
+        // Pasif faaliyet yeni seçilemez; yalnızca seçiliyse (kaldırılabilsin diye) gösterilir.
+        foreach (var group in groups)
+        {
+            group.Items.RemoveAll(n => !n.IsActive && !selectedNodes.Contains(n.Id));
+        }
+
+        // Profilin öne çıkardığı ayrım (ör. taşıyıcı / organizatör) kendi gruplarından alınır ve ilk grup olarak gösterilir.
+        if (!showAll && SelectedProfile?.ActivityFocus is { } focus)
+        {
+            List<ActivityFocusItemDto> present = [.. focus.Items.Where(i => groups.Any(g => g.Items.Any(n => n.Code == i.Code)))];
+            if (present.Count > 0)
+            {
+                List<ActivityNodeDto> featured = [.. present.Select(i => groups.SelectMany(g => g.Items).First(n => n.Code == i.Code))];
+                foreach (var group in groups)
+                {
+                    group.Items.RemoveAll(featured.Contains);
+                }
+
+                groups.Insert(0, new ActivityGroup(focus.Title, featured) { Hints = present });
+            }
+        }
+
+        groups.RemoveAll(g => g.Items.Count == 0);
+        HashSet<Guid> shown = [.. groups.SelectMany(g => g.Items).Select(n => n.Id)];
+        List<ActivityNodeDto> outside = [.. catalog.Nodes.Where(n => selectedNodes.Contains(n.Id) && !shown.Contains(n.Id)).OrderBy(n => n.Name)];
+        if (outside.Count > 0)
+        {
+            groups.Add(new ActivityGroup(Texts.Get("admin.sectorSetup.otherSelected"), outside));
+        }
+
+        return groups;
+    }
+
+    private string NameOf(Guid id) => catalog!.Nodes.FirstOrDefault(n => n.Id == id)?.Name ?? id.ToString();
+
+    private int MatchCount(SubProfileStarterDto starter, HashSet<string> codes) => (starter.SuggestedActivityCodes ?? []).Count(codes.Contains);
+
+    private bool IsSuggested(SubProfileStarterDto starter) => IsSuggested(starter, SelectedCodes);
+
+    private bool IsSuggested(SubProfileStarterDto starter, HashSet<string> codes) =>
+        (starter.ActivityCode is { } code && codes.Contains(code))
+        || (starter.SuggestedActivityCodes is { Count: > 0 } && MatchCount(starter, codes) >= starter.SuggestedMinMatches);
+
+    private bool CanAdd(SubProfileStarterDto starter) => !starter.Added && starter.MissingModules.Count == 0;
+
+    // Birden fazla faaliyetin birlikte seçilmesiyle önerilen paketler (ör. iki taşıma modu → çok modlu taşıma) için bilgi satırı.
+    private IEnumerable<(IReadOnlyList<string> Codes, string Text)> ComboHints()
+    {
+        var codes = SelectedCodes;
+        foreach (var starter in starters.Where(s => CanAdd(s) && IsCombo(s, codes)))
+        {
+            var names = catalog!.Nodes.Where(n => starter.SuggestedActivityCodes!.Contains(n.Code) && codes.Contains(n.Code)).Select(n => n.Name).ToList();
+            yield return (starter.SuggestedActivityCodes!, Texts.Get("admin.sectorSetup.comboHint", names.Count, string.Join(", ", names), starter.Name));
+        }
+    }
+
+    // Birden fazla faaliyetin birleşimiyle önerilen paket (ör. iki taşıma modu → çok modlu taşıma): kartı vurgulanır ve "Önerilen" rozeti alır.
+    private bool IsCombo(SubProfileStarterDto starter) => IsCombo(starter, SelectedCodes);
+
+    private bool IsCombo(SubProfileStarterDto starter, HashSet<string> codes) =>
+        starter.SuggestedMinMatches > 1 && MatchCount(starter, codes) >= starter.SuggestedMinMatches;
+
+    // Öne çıkarılan faaliyetin çipinde profilin verdiği kısa ad yazar; ön izleme ve özetlerde katalog adı kalır.
+    private string LabelOf(ActivityNodeDto node) =>
+        !showAll && SelectedProfile?.ActivityFocus?.Items.FirstOrDefault(i => i.Code == node.Code) is { } item ? item.Label : node.Name;
+
+    // Faaliyetin ikonu seçili profilin eşlemesinden gelir; eşlenmemiş faaliyet ikonsuz çizilir.
+    private string? IconOf(ActivityNodeDto node) => SelectedProfile?.ActivityIcons?.GetValueOrDefault(node.Code);
+
+    // Seçim değişince yeni önerilen paketler işaretlenir, artık önerilmeyenlerin işareti kalkar; kullanıcının elle işaretledikleri önerildikçe kalır.
+    private void SyncChosenStarters(HashSet<string> suggestedBefore)
+    {
+        var codes = SelectedCodes;
+        HashSet<string> visible = [.. VisibleStarters.Select(s => s.Key)];
+        foreach (var starter in starters)
+        {
+            var suggested = IsSuggested(starter, codes);
+            if (suggested && CanAdd(starter) && !suggestedBefore.Contains(starter.Key))
+            {
+                chosenStarters.Add(starter.Key);
+            }
+            else if ((!suggested && suggestedBefore.Contains(starter.Key)) || !visible.Contains(starter.Key))
+            {
+                chosenStarters.Remove(starter.Key);
+            }
+        }
+    }
+
+    private async Task ToggleActivityAsync(Guid id)
+    {
+        previewing = false;
+        var codes = SelectedCodes;
+        HashSet<string> suggestedBefore =[.. starters.Where(s => IsSuggested(s, codes)).Select(s => s.Key)];
+        if (!selectedNodes.Remove(id))
+        {
+            selectedNodes.Add(id);
+        }
+
+        SyncChosenStarters(suggestedBefore);
+        var result = await Api.PostAsync<SelectionPreviewDto>("/api/sectors/selection/preview", new ActivityIdsRequest([.. selectedNodes]));
+        Report(result.Error, result.FieldErrors);
+        preview = result.Value ?? preview;
+    }
+
+    private void ToggleStarter(string key)
+    {
+        previewing = false;
+        if (!chosenStarters.Remove(key))
+        {
+            chosenStarters.Add(key);
+        }
+    }
+
+    /// <summary>Üç adımı sırayla uygular: profil, faaliyet seçimi, işaretli paketler (eklenir ve etkinleştirilir). İlk hatada durur; yapılanlar kalır ve ekran yeniden yüklenir.</summary>
+    private async Task ApplyAllAsync()
+    {
+        busy = true;
+        string? failure = null;
+        IReadOnlyDictionary<string, string[]>? fieldErrors = null;
+
+        if (ProfilePending)
+        {
+            var result = await Api.PostAsync<ProfilePlanDto>($"/api/customization/profiles/{Uri.EscapeDataString(selectedProfile!)}/apply", new { });
+            failure = result.IsSuccess ? null : result.Error ?? Texts.Get("admin.sectorSetup.failed");
+        }
+
+        if (failure is null && ActivityChanges > 0)
+        {
+            var result = await Api.PutAsync<TenantActivitySelectionResponse>("/api/sectors/selection", new ActivityIdsRequest([.. selectedNodes]));
+            failure = result.IsSuccess ? null : result.Error ?? Texts.Get("admin.sectorSetup.failed");
+            fieldErrors = result.FieldErrors;
+        }
+
+        foreach (var starter in starters.Where(s => chosenStarters.Contains(s.Key)))
+        {
+            if (failure is not null)
+            {
+                break;
+            }
+
+            var created = await Api.PostAsync<SubProfileDto>($"/api/customization/sub-profiles/starters/{Uri.EscapeDataString(starter.Key)}", new { });
+            if (created.Value is not { } profile)
+            {
+                failure = created.Error ?? Texts.Get("admin.sectorSetup.failed");
+                break;
+            }
+
+            var activated = await Api.PostAsync<SubProfileDto>($"/api/customization/sub-profiles/{profile.Id}/status", new SetSubProfileStatusRequest(SubProfileStatuses.Active, profile.Revision));
+            if (!activated.IsSuccess)
+            {
+                failure = activated.Error ?? Texts.Get("admin.sectorSetup.failed");
+                fieldErrors = activated.FieldErrors;
+            }
+        }
+
+        await LoadAsync();
+        subProfilesVersion++;
+        busy = false;
+        if (failure is null)
+        {
+            Toasts.Success(Texts.Get("admin.sectorSetup.applied"));
+        }
+        else
+        {
+            Report(failure, fieldErrors);
+        }
+    }
+
+    private async Task ResetAsync()
+    {
+        busy = true;
+        await LoadAsync();
+        busy = false;
+    }
+
+    private void Report(string? error, IReadOnlyDictionary<string, string[]>? fieldErrors)
+    {
+        message = error;
+        errors = fieldErrors is null ? [] : [.. fieldErrors.Values.SelectMany(v => v)];
     }
 }

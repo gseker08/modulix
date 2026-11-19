@@ -865,3 +865,72 @@
         height: 2rem;
         font-size: 1rem;
     }
+
+/* ---- Kurulum adımı (Sektör profili, 19.11.2026): FormSection Marker + Class="section-card-step" ---- */
+/* Adım numarası yuvarlak işaretle çizilir; başlığın altında ayırıcı çizgi yoktur ve gövde başlık metniyle aynı hizada başlar. */
+.section-card-icon.section-card-marker {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    font-size: var(--mx-fs-helper);
+}
+
+    .section-card-icon.section-card-marker strong {
+        font-weight: 600;
+    }
+
+.section-card.section-card-step > .section-card-head {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.section-card.section-card-step > .section-card-body {
+    padding-top: var(--mx-space-3);
+}
+
+@media (min-width: 768px) {
+    .section-card.section-card-step > .section-card-body {
+        padding-left: calc(var(--mx-space-4) + 1.5rem + var(--mx-space-3));
+    }
+}
+
+/* Kurulum özet çubuğu: sayfanın sonunda durur (yapışmaz), nötr zeminlidir. Yalnızca burada Vazgeç çerçeveli ve saydam, birincil düğme düz
+   marka mavisidir (degrade ve ışıma yok); kullanıcının 19.11.2026 kararıyla düğme kuralının (6.11 ve 12.11) bilinçli istisnasıdır. */
+.form-toolbar.form-toolbar-summary {
+    position: static;
+    padding: var(--mx-space-3) var(--mx-space-4);
+    border: 0;
+    border-radius: 12px;
+    background: var(--mx-surface-control);
+    box-shadow: none;
+}
+
+    .form-toolbar.form-toolbar-summary p strong {
+        color: var(--mx-text-primary);
+        font-weight: 600;
+    }
+
+    .form-toolbar.form-toolbar-summary .btn-outline-secondary {
+        --bs-btn-bg: transparent;
+        --bs-btn-border-color: var(--mx-border-strong);
+        --bs-btn-hover-bg: var(--mx-surface);
+        --bs-btn-hover-border-color: var(--mx-border-strong);
+        --bs-btn-active-bg: var(--mx-surface);
+        --bs-btn-active-border-color: var(--mx-border-strong);
+        --bs-btn-disabled-bg: transparent;
+        --bs-btn-disabled-border-color: var(--mx-border);
+    }
+
+    .form-toolbar.form-toolbar-summary .btn-primary {
+        --bs-btn-bg: var(--mx-brand-primary);
+        --bs-btn-hover-bg: var(--mx-brand-primary-hover);
+        --bs-btn-active-bg: var(--mx-brand-primary-hover);
+        font-weight: 600;
+        background-image: none;
+        box-shadow: none;
+    }
+
+        .form-toolbar.form-toolbar-summary .btn-primary:hover:not(:disabled):not(.disabled) {
+            background-image: none;
+            box-shadow: none;
+        }

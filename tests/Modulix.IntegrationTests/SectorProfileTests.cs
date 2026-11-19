@@ -140,6 +140,13 @@ public class SectorProfileTests(ModulixApiFactory factory) : IClassFixture<Modul
         // Firmanın profili en son uygulanandır; yeniden uygulamada eklenecek bir şey kalmaz.
         var state = (await adminClient.GetFromJsonAsync<SectorProfilesResponse>("/api/customization/profiles"))!;
         Assert.Equal("logistics", state.Current);
+
+        // Profil faaliyet kataloğundaki sektör düğümüne bağlıdır; karşılığı olmayan profilde bağ boştur.
+        Assert.Equal("lojistik", state.Profiles.Single(p => p.Key == "logistics").ActivitySectorCode);
+        Assert.Equal("truck", state.Profiles.Single(p => p.Key == "logistics").Icon);
+        Assert.Equal("ship", state.Profiles.Single(p => p.Key == "logistics").ActivityIcons!["denizyolu-tasimaciligi"]);
+        Assert.Equal(["tasiyicilik", "tasima-organizasyonu"], state.Profiles.Single(p => p.Key == "logistics").ActivityFocus!.Items.Select(i => i.Code));
+        Assert.Null(state.Profiles.Single(p => p.Key == "general").ActivitySectorCode);
         Assert.True((await adminClient.GetFromJsonAsync<ProfilePlanDto>("/api/customization/profiles/clinic/preview"))!.IsEmpty);
         using (var scope = factory.OpenScope(tenant.Id))
         {

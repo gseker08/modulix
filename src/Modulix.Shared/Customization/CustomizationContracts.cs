@@ -92,7 +92,20 @@ public sealed record SaveChoiceValue(string? Key, string Label, string? Category
 public sealed record SaveChoiceListRequest(IReadOnlyList<SaveChoiceValue> Values);
 
 /// <summary>Sektör profili (Y9c); <see cref="Modules"/> profilin önerdiği modüllerin anahtarları.</summary>
-public sealed record SectorProfileDto(string Key, string Name, string Description, IReadOnlyList<string> Modules);
+public sealed record SectorProfileDto(
+    string Key,
+    string Name,
+    string Description,
+    IReadOnlyList<string> Modules,
+    string? ActivitySectorCode = null,
+    string? Icon = null,
+    IReadOnlyDictionary<string, string>? ActivityIcons = null,
+    ActivityFocusDto? ActivityFocus = null);
+
+/// <summary>Profilin faaliyet seçiminde öne çıkardığı ayrım (ör. taşıyıcı / organizatör); öğeler faaliyet kataloğu kodlarıdır.</summary>
+public sealed record ActivityFocusDto(string Title, IReadOnlyList<ActivityFocusItemDto> Items);
+
+public sealed record ActivityFocusItemDto(string Code, string Label, string Hint);
 
 /// <summary>Firmanın profili (yoksa null) ve seçilebilecek profiller.</summary>
 public sealed record SectorProfilesResponse(string? Current, DateTimeOffset? AppliedAt, IReadOnlyList<SectorProfileDto> Profiles);

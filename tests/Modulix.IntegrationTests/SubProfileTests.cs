@@ -215,7 +215,11 @@ public class SubProfileTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         using var client = await LoginAsync(admin);
 
         var starters = (await client.GetFromJsonAsync<List<SubProfileStarterDto>>($"{Url}/starters"))!;
-        Assert.Equal(["kara-tasimaciligi", "gumruklu-antrepo", "deniz-tasimaciligi"], starters.Select(s => s.Key));
+        Assert.Equal(["kara-tasimaciligi", "gumruklu-antrepo", "deniz-tasimaciligi", "hava-tasimaciligi", "demiryolu-tasimaciligi", "multimodal-tasima"], starters.Select(s => s.Key));
+
+        // Öneri kuralı: her hazır alt profil kendi faaliyetine bağlıdır; çok modlu taşıma iki taşıma modu seçilince de önerilir.
+        Assert.Equal("karayolu-tasimaciligi", starters[0].ActivityCode);
+        Assert.Equal(("tasima-organizasyonu", 2, 4), (starters[5].ActivityCode, starters[5].SuggestedMinMatches, starters[5].SuggestedActivityCodes!.Count));
         Assert.All(starters, s =>
         {
             Assert.False(s.Added);
@@ -235,7 +239,7 @@ public class SubProfileTests(ModulixApiFactory factory) : IClassFixture<ModulixA
         // Eklemek hiçbir şeyi uygulamaz; kart "Eklendi" olur, diğer hazır alt profiller etkilenmez.
         Assert.Empty((await client.GetFromJsonAsync<List<CustomFieldDto>>("/api/custom-fields"))!);
         var after = (await client.GetFromJsonAsync<List<SubProfileStarterDto>>($"{Url}/starters"))!;
-        Assert.Equal([true, false, false], after.Select(s => s.Added));
+        Assert.Equal([true, false, false, false, false, false], after.Select(s => s.Added));
 
         var active = await SetStatusAsync(client, created.Id, SubProfileStatuses.Active, created.Revision);
         Assert.All(active.Options, o => Assert.NotNull(o.AppliedAt));

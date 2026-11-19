@@ -18,6 +18,10 @@ public sealed record ProfileListValue(string ListKey, string Label, string? Cate
 /// <summary>
 /// Sektör profili (Y9c): bir sektör için hazır başlangıç paketi. Kodda tanımlıdır, firma verisi değildir. Firmaya bir kez
 /// uygulanır ve yalnızca ekler (<see cref="SectorProfileRules.Plan"/>); firmanın mevcut alanları ve değerleri değişmez.
+/// <see cref="ActivitySectorCode"/> profilin faaliyet kataloğundaki sektör düğümünün kodudur (ADR-0029): ekran faaliyetleri ve hazır alt profilleri
+/// bu düğümün altıyla sınırlar. Boşsa profilin katalogda karşılığı yoktur; düğüm katalogda bulunmazsa da ekran aynı biçimde davranır.
+/// <see cref="Icon"/> profilin, <see cref="ActivityIcons"/> faaliyet kodlarının ekrandaki ikon adlarıdır (arayüz ikon seti); yalnızca görseldir,
+/// eşlenmemiş faaliyet ikonsuz çizilir. <see cref="ActivityFocus"/> faaliyet seçiminde öne çıkarılan ayrımdır.
 /// </summary>
 public sealed record SectorProfile(
     string Key,
@@ -25,7 +29,20 @@ public sealed record SectorProfile(
     string Description,
     IReadOnlyList<string> Modules,
     IReadOnlyList<ProfileField> Fields,
-    IReadOnlyList<ProfileListValue> ListValues);
+    IReadOnlyList<ProfileListValue> ListValues,
+    string? ActivitySectorCode = null,
+    string? Icon = null,
+    IReadOnlyDictionary<string, string>? ActivityIcons = null,
+    ProfileActivityFocus? ActivityFocus = null);
+
+/// <summary>
+/// Profilin faaliyet seçiminde öne çıkardığı ayrım (ör. taşıyıcı / organizatör): ekranda ilk grup olarak, kendi başlığı ve açıklamalarıyla
+/// gösterilir. Öğeler faaliyet kataloğundaki kodlardır; katalogda bulunmayan öğe ekranda atlanır. Yalnızca sunumdur, seçim kuralı değildir.
+/// </summary>
+public sealed record ProfileActivityFocus(string Title, IReadOnlyList<ProfileFocusItem> Items);
+
+/// <summary>Öne çıkarılan faaliyet: <see cref="Label"/> çipte katalog adının yerine yazılır, <see cref="Hint"/> altında tek cümleyle açıklar.</summary>
+public sealed record ProfileFocusItem(string Code, string Label, string Hint);
 
 /// <summary>Profiller; açılışta tanımlar modül kataloğuna göre doğrulanır (bilinmeyen modül, kayıt türü, liste, kategori).</summary>
 public sealed class SectorProfileCatalog
@@ -80,6 +97,15 @@ public sealed class SectorProfileCatalog
             {
                 Fails($"alan '{field.Label}'");
             }
+        }
+
+        if (profile.ActivityFocus is { } focus
+            && (string.IsNullOrWhiteSpace(focus.Title)
+                || focus.Items.Count == 0
+                || focus.Items.Any(i => string.IsNullOrWhiteSpace(i.Code) || string.IsNullOrWhiteSpace(i.Label) || string.IsNullOrWhiteSpace(i.Hint))
+                || focus.Items.Select(i => i.Code).Distinct(StringComparer.Ordinal).Count() != focus.Items.Count))
+        {
+            Fails("öne çıkarılan faaliyetler");
         }
 
         foreach (var value in profile.ListValues)

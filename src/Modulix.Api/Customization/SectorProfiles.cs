@@ -31,7 +31,29 @@ internal static class SectorProfiles
             ],
             [
                 new(CrmModule.Lists.CompanySource, "Yük borsası"),
-            ]),
+            ],
+            ActivitySectorCode: "lojistik",
+            Icon: "truck",
+            ActivityIcons: new Dictionary<string, string>
+            {
+                ["karayolu-tasimaciligi"] = "truck",
+                ["denizyolu-tasimaciligi"] = "ship",
+                ["havayolu-tasimaciligi"] = "plane",
+                ["demiryolu-tasimaciligi"] = "train",
+                ["gumruklu-antrepo"] = "warehouse",
+                ["serbest-depolama"] = "box",
+                ["dagitim-son-kilometre"] = "package",
+                ["tasiyicilik"] = "truck",
+                ["tasima-organizasyonu"] = "route",
+                ["transit-aktarma"] = "arrow-left-right",
+            },
+            // Doğrulanmamış ürün önerisi: moddan önce "kendi aracıyla mı taşıyor, taşımayı mı organize ediyor" sorulur; ikisi birlikte seçilebilir.
+            ActivityFocus: new ProfileActivityFocus(
+                "Çalışma biçiminiz",
+                [
+                    new("tasiyicilik", "Taşıyıcı", "Taşımayı kendi araçlarınızla yaparsınız."),
+                    new("tasima-organizasyonu", "Organizatör", "Taşımayı başka taşıyıcıların araçlarıyla organize edersiniz (forwarder)."),
+                ])),
         new(
             "clinic",
             "Klinik",

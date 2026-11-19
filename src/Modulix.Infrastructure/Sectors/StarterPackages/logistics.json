@@ -25,6 +25,7 @@
     { "code": "serbest-depolama", "parentCode": "depolama", "kind": "Activity", "name": "Serbest depolama", "description": null, "sortOrder": 20, "capabilities": ["warehouse.stock"] },
 
     { "code": "dagitim-son-kilometre", "parentCode": "lojistik", "kind": "Activity", "name": "Dağıtım ve son kilometre", "description": null, "sortOrder": 30, "capabilities": ["logistics.last-mile"] },
+    { "code": "tasiyicilik", "parentCode": "lojistik", "kind": "Activity", "name": "Taşıyıcılık (kendi araçlarıyla)", "description": "Taşımayı kendi araçlarıyla yapan işletme; taşıma organizasyonundan ayrıdır.", "sortOrder": 35, "capabilities": ["logistics.shipments", "logistics.carriers"] },
     { "code": "tasima-organizasyonu", "parentCode": "lojistik", "kind": "Activity", "name": "Taşıma organizasyonu", "description": null, "sortOrder": 40, "capabilities": ["logistics.shipments", "logistics.carriers"] },
     { "code": "transit-aktarma", "parentCode": "lojistik", "kind": "Activity", "name": "Transit aktarma", "description": null, "sortOrder": 50, "capabilities": ["logistics.shipments"] },
     { "code": "diger-lojistik", "parentCode": "lojistik", "kind": "Activity", "name": "Diğer", "description": null, "sortOrder": 90, "capabilities": [] }
