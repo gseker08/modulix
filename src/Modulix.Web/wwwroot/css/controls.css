@@ -648,3 +648,18 @@ code {
     max-width: 26rem;
     margin: 2rem auto;
 }
+
+/* İkonlu bilgi satırı (alert-inline): ikon solda, metin yanında; kurulum ekranındaki öneri notu. */
+.alert.alert-inline {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-2);
+    margin: var(--mx-space-3) 0 0;
+    padding: var(--mx-space-2) var(--mx-space-3);
+    border: 0;
+    font-size: 0.875rem;
+}
+
+    .alert.alert-inline .app-icon {
+        flex: none;
+    }

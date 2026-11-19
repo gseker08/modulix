@@ -45,7 +45,8 @@ public static class SectorProfileEndpoints
     }
 
     internal static List<SectorProfileDto> ToDto(SectorProfileCatalog catalog) =>
-        [.. catalog.Profiles.Select(p => new SectorProfileDto(p.Key, p.Name, p.Description, p.Modules))];
+        [.. catalog.Profiles.Select(p => new SectorProfileDto(p.Key, p.Name, p.Description, p.Modules, p.ActivitySectorCode, p.Icon, p.ActivityIcons,
+            p.ActivityFocus is { } focus ? new ActivityFocusDto(focus.Title, [.. focus.Items.Select(i => new ActivityFocusItemDto(i.Code, i.Label, i.Hint))]) : null))];
 
     /// <summary>Plan önizlemesi; modül, kayıt türü ve liste adları <paramref name="bundle"/> dilinde (ADR-0034, dilim 18c-5). Profilin kendi adı ve eklediği alan ve değer adları profil verisidir, çevrilmez.</summary>
     internal static ProfilePlanDto ToDto(ProfilePlan plan, ModuleCatalog modules, IReadOnlyDictionary<string, string> bundle) => new(

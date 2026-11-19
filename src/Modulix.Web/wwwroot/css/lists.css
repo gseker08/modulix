@@ -590,6 +590,20 @@ tr.done td.primary {
         color: var(--mx-text-on-brand);
     }
 
+    /* Seçim çipi (kurulum ekranları, ör. Sektör profili): seçilince dolu degrade yerine açık marka zemini, marka renginde yazı ve çerçeve. */
+    .chip.chip-soft {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: 500;
+    }
+
+        .chip.chip-soft.active {
+            background: var(--mx-tone-brand-bg);
+            border-color: var(--mx-tone-brand-fg);
+            color: var(--mx-tone-brand-fg);
+        }
+
 /* ---- Liste araç çubuğu ve görünüm seçici (ViewSelector): solda "Görünüm: … ▾", sağda arama + eylemler ---- */
 .list-toolbar {
     display: flex;

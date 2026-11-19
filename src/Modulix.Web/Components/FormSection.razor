@@ -3,7 +3,11 @@
    "Temel Bilgiler", "Finans", "Genel İletişim Bilgileri" kartları bu bileşenle kurulur. *@
 <section class="section-card @Class" aria-labelledby="@headingId">
     <div class="section-card-head">
-        @if (Icon is not null)
+        @if (Marker is not null)
+        {
+            <span class="section-card-icon section-card-marker" aria-hidden="true"><strong>@Marker</strong></span>
+        }
+        else if (Icon is not null)
         {
             <span class="section-card-icon" aria-hidden="true"><AppIcon Name="@Icon" Size="18" /></span>
         }
@@ -33,6 +37,10 @@
     /// <summary>AppIcon adı; başlığın solundaki renkli kutuda görünür.</summary>
     [Parameter]
     public string? Icon { get; set; }
+
+    /// <summary>İkon yerine kutuda gösterilen kısa işaret (ör. adım numarası "1"); verilirse <see cref="Icon"/> çizilmez.</summary>
+    [Parameter]
+    public string? Marker { get; set; }
 
     [Parameter]
     public string? Description { get; set; }

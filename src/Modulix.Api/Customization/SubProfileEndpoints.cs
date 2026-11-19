@@ -31,7 +31,7 @@ public static class SubProfileEndpoints
         group.MapGet("/", async (ISubProfileService service, ModuleCatalog modules, CancellationToken ct) =>
             (await service.ListAsync(ct)).Select(p => ToDto(p, modules)).ToList());
         group.MapGet("/starters", async (ISubProfileService service, CancellationToken ct) =>
-            (await service.ListStartersAsync(ct)).Select(s => new SubProfileStarterDto(s.Key, s.Name, s.Description, s.ActivityName, s.OptionLabels, s.FeatureLabels, s.MissingModules, s.Added)).ToList());
+            (await service.ListStartersAsync(ct)).Select(s => new SubProfileStarterDto(s.Key, s.Name, s.Description, s.ActivityName, s.OptionLabels, s.FeatureLabels, s.MissingModules, s.Added, s.ActivityCode, s.SuggestedActivityCodes, s.SuggestedMinMatches)).ToList());
         group.MapPost("/starters/{key}", (string key, ISubProfileService service, ModuleCatalog modules, CancellationToken ct) => RunAsync(async () =>
         {
             if (await service.CreateFromStarterAsync(key, ct) is not { } created)

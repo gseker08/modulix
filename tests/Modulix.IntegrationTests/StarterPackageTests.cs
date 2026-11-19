@@ -47,7 +47,7 @@ public class StarterPackageTests(ModulixApiFactory factory) : IClassFixture<Modu
         var installed = package.NodeCount;
         Assert.Equal(installed, catalog.Nodes.Count(n => n.Code is "lojistik" or "tasimacilik" or "karayolu-tasimaciligi" or "denizyolu-tasimaciligi"
             or "havayolu-tasimaciligi" or "demiryolu-tasimaciligi" or "depolama" or "gumruklu-antrepo" or "serbest-depolama"
-            or "dagitim-son-kilometre" or "tasima-organizasyonu" or "transit-aktarma" or "diger-lojistik"));
+            or "dagitim-son-kilometre" or "tasiyicilik" or "tasima-organizasyonu" or "transit-aktarma" or "diger-lojistik"));
         Assert.All(catalog.Nodes.Where(n => n.Code is "lojistik" or "karayolu-tasimaciligi" or "gumruklu-antrepo"), n => Assert.Equal("CatalogOnly", n.Readiness));
         Assert.Equal(["warehouse.stock"], catalog.Capabilities.Single(c => c.Code == "warehouse.bonded").DependsOn);
 

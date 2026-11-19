@@ -84,7 +84,8 @@ public sealed record SubProfileDto(
 
 /// <summary>
 /// Hazır alt profil (öneri): tek tıkla firmanın taslak alt profili olarak eklenir. <see cref="MissingModules"/> kapalı olduğu için
-/// eklenemeyen modül adlarıdır; <see cref="Added"/> firmada bu hazır alt profil zaten varsa true.
+/// eklenemeyen modül adlarıdır; <see cref="Added"/> firmada bu hazır alt profil zaten varsa true. Firma <see cref="ActivityCode"/> faaliyetini ya da
+/// <see cref="SuggestedActivityCodes"/> içinden en az <see cref="SuggestedMinMatches"/> tanesini seçtiyse ekran bu alt profili önerir.
 /// </summary>
 public sealed record SubProfileStarterDto(
     string Key,
@@ -94,7 +95,10 @@ public sealed record SubProfileStarterDto(
     IReadOnlyList<string> Options,
     IReadOnlyList<string> Features,
     IReadOnlyList<string> MissingModules,
-    bool Added);
+    bool Added,
+    string? ActivityCode = null,
+    IReadOnlyList<string>? SuggestedActivityCodes = null,
+    int SuggestedMinMatches = 1);
 
 /// <summary>Ekleme ya da düzenleme; <see cref="Revision"/> yalnızca düzenlemede gönderilir (açık ekranın eski olup olmadığını denetler).</summary>
 public sealed record SaveSubProfileRequest(string Name, string? Description, string? ActivityCode, long Revision = 0);
