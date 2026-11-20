@@ -20,10 +20,6 @@
             <LoadingState />
         }
     }
-    else if (editing)
-    {
-        <ContactEditor Contact="contact" Lookups="Lookups" Saved="ContactSaved" Deleted="ContactDeleted" Cancelled="() => editing = false" />
-    }
     else
     {
         <div class="page-header">
@@ -50,10 +46,6 @@
                 @if (Session.Can(CrmAccess.ContactsMerge))
                 {
                     <a class="btn btn-outline-secondary" href="@($"crm/kisiler/{Id}/birlestir")">@Texts.Get("crm.contact.merge")</a>
-                }
-                @if (Session.Can(CrmAccess.ContactsWrite))
-                {
-                    <button type="button" class="btn btn-primary" @onclick="() => editing = true">@Texts.Get("common.edit")</button>
                 }
             </div>
         </div>
@@ -102,6 +94,13 @@
                 @if (tabs.Rendered(TabGeneral))
                 {
                     <div role="tabpanel" id="tabpanel-@TabGeneral" aria-labelledby="tab-@TabGeneral" class="record-tabpanel" hidden="@tabs.Hidden(TabGeneral)">
+                        @* Düzenleme izni olan kullanıcıya alanlar doğrudan açık gelir (ayrı "Düzenle" adımı yok); izin yoksa salt okunur. *@
+                        @if (Session.Can(CrmAccess.ContactsWrite))
+                        {
+                            <ContactEditor Embedded="true" Contact="contact" Lookups="Lookups" Saved="ContactSaved" Deleted="ContactDeleted" />
+                        }
+                        else
+                        {
                         <FormSection Title="@Texts.Get("crm.company.general")" Icon="info">
                         <dl class="detail-grid">
                             @if (contact.Notes is { } notes)
@@ -118,6 +117,7 @@
                             }
                         </dl>
                         </FormSection>
+                        }
 
                         <FormSection Title="@Texts.Get("crm.contact.contactInfo")" Icon="phone">
                             <ContactPointsSection ContactId="Id" Title="@Texts.Get("crm.contact.generalPhoneEmail")" CanWrite="Session.Can(CrmAccess.ContactsWrite)" Changed="ReloadContactAsync" />
@@ -276,7 +276,6 @@
     private IReadOnlyList<ActivityDto>? activities;
     private IReadOnlyList<OpportunityDto>? opportunities;
     private CompanyContactDto? editingLink;
-    private bool editing;
     private bool busy;
     private string? message;
     private int activityPage = 1, activityTotal, opportunityPage = 1, opportunityTotal;
@@ -389,7 +388,6 @@
     private async Task ContactSaved(ContactDto saved)
     {
         contact = saved;
-        editing = false;
         await LoadLinksAsync();
     }
 

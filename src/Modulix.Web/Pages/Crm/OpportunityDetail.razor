@@ -37,10 +37,6 @@
             <LoadingState />
         }
     }
-    else if (editing)
-    {
-        <OpportunityEditor Opportunity="opportunity" Lookups="Lookups" Saved="SavedAsync" Deleted="DeletedAsync" Cancelled="() => editing = false" />
-    }
     else
     {
         <div class="page-header">
@@ -80,10 +76,6 @@
                 </div>
             </div>
             <div class="header-actions">
-                @if (Session.Can(CrmAccess.OpportunitiesWrite))
-                {
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => editing = true">@Texts.Get("common.edit")</button>
-                }
                 @if (Session.Can(CrmAccess.QuotesWrite) && opportunity.Status == OpportunityStatus.Open)
                 {
                     <a class="btn btn-primary" href="crm/teklifler/yeni?opportunityId=@Id&companyId=@opportunity.CompanyId"><span aria-hidden="true">+</span> @Texts.Get("crm.opp.newQuote")</a>
@@ -138,27 +130,46 @@
             {
             <div role="tabpanel" id="tabpanel-@TabGeneral" aria-labelledby="tab-@TabGeneral" class="record-tabpanel" hidden="@tabs.Hidden(TabGeneral)">
 
+            @* Düzenleme izni olan kullanıcıya alanlar doğrudan açık gelir (ayrı "Düzenle" adımı yok); izin yoksa salt okunur.
+               Formda düzenlenen alanlar form açıkken aşağıdaki bölümde yinelenmez; orada yalnızca izleme bilgileri kalır. *@
+            @if (CanEdit)
+            {
+                <OpportunityEditor Embedded="true" Opportunity="opportunity" Lookups="Lookups" Saved="SavedAsync" Deleted="DeletedAsync" />
+            }
+
             <FormSection Title="@Texts.Get("crm.opp.section.basic")" Icon="target">
                 <dl class="detail-grid">
-                    <div><dt>@Texts.Get("crm.contacts.col.company")</dt><dd><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></dd></div>
-                    <div><dt>@Texts.Get("crm.opp.mainContact")</dt><dd>@(opportunity.ContactId is null ? "—" : Lookups.ContactName(opportunity.ContactId))</dd></div>
-                    <div><dt>@Texts.Get("common.field.owner")</dt><dd>@(opportunity.OwnerId is null ? "—" : Lookups.MemberName(opportunity.OwnerId))</dd></div>
-                    <div><dt>@Texts.Get("crm.company.editor.kind")</dt><dd>@(opportunity.Type is null ? "—" : Lookups.Label(CrmLists.OpportunityType, opportunity.Type))</dd></div>
-                    <div><dt>@Texts.Get("crm.opp.acquisition")</dt><dd>@(opportunity.Source is null ? "—" : Lookups.Label(CrmLeadLists.Source, opportunity.Source))</dd></div>
+                    @if (!CanEdit)
+                    {
+                        <div><dt>@Texts.Get("crm.contacts.col.company")</dt><dd><a href="crm/firmalar/@opportunity.CompanyId">@Lookups.CompanyName(opportunity.CompanyId)</a></dd></div>
+                        <div><dt>@Texts.Get("crm.opp.mainContact")</dt><dd>@(opportunity.ContactId is null ? "—" : Lookups.ContactName(opportunity.ContactId))</dd></div>
+                        <div><dt>@Texts.Get("common.field.owner")</dt><dd>@(opportunity.OwnerId is null ? "—" : Lookups.MemberName(opportunity.OwnerId))</dd></div>
+                        <div><dt>@Texts.Get("crm.company.editor.kind")</dt><dd>@(opportunity.Type is null ? "—" : Lookups.Label(CrmLists.OpportunityType, opportunity.Type))</dd></div>
+                        <div><dt>@Texts.Get("crm.opp.acquisition")</dt><dd>@(opportunity.Source is null ? "—" : Lookups.Label(CrmLeadLists.Source, opportunity.Source))</dd></div>
+                    }
                     @if (opportunity.SourceLeadId is { } leadId && Session.Can(CrmAccess.LeadsRead))
                     {
                         <div><dt>@Texts.Get("crm.opportunities.sourceLead")</dt><dd><a href="crm/leadler/@leadId">@Texts.Get("crm.opp.openLead")</a></dd></div>
                     }
                     @if (ShowAmounts)
                     {
-                        <div><dt>@Texts.Get("crm.opp.kpi.amount")</dt><dd>@(opportunity.Amount is { } amount ? CrmLabels.Amount(amount, opportunity.Currency) : Texts.Get("crm.lead.unknown"))</dd></div>
+                        @if (!CanEdit)
+                        {
+                            <div><dt>@Texts.Get("crm.opp.kpi.amount")</dt><dd>@(opportunity.Amount is { } amount ? CrmLabels.Amount(amount, opportunity.Currency) : Texts.Get("crm.lead.unknown"))</dd></div>
+                        }
                         <div><dt>@Texts.Get("crm.opportunities.col.probability")</dt><dd>@(opportunity.Probability is { } p ? $"%{p}" : Texts.Get("crm.lead.unknown"))@($" ({Texts.Get(opportunity.ProbabilityManual ? "crm.opp.probManual" : "crm.opp.probDefault")})")</dd></div>
                         <div><dt>@Texts.Get("crm.opp.weightedAmount")</dt><dd>@(Weighted is { } w ? CrmLabels.Amount(w, opportunity.Currency) : "—")</dd></div>
-                        <div><dt>@Texts.Get("crm.opp.customerBudget")</dt><dd>@(opportunity.CustomerBudget is { } budget ? CrmLabels.Amount(budget, opportunity.Currency) : Texts.Get("crm.lead.unknown")) · @CrmText.OpportunityBudgetStatusName(opportunity.BudgetStatus)</dd></div>
+                        @if (!CanEdit)
+                        {
+                            <div><dt>@Texts.Get("crm.opp.customerBudget")</dt><dd>@(opportunity.CustomerBudget is { } budget ? CrmLabels.Amount(budget, opportunity.Currency) : Texts.Get("crm.lead.unknown")) · @CrmText.OpportunityBudgetStatusName(opportunity.BudgetStatus)</dd></div>
+                        }
                     }
                     <div><dt>@Texts.Get("crm.opp.kpi.expectedClose")</dt><dd>@(opportunity.ExpectedCloseDate is { } close ? CrmLabels.Date(close) : "—")@(opportunity.CloseDateChangeCount > 0 ? $" · {Texts.Get("crm.opp.changedTimes", opportunity.CloseDateChangeCount)}" : null)</dd></div>
-                    <div><dt>@Texts.Get("crm.opp.targetDecision")</dt><dd>@(opportunity.TargetDecisionDate is { } decision ? CrmLabels.Date(decision) : "—")</dd></div>
-                    <div><dt>@Texts.Get("crm.opportunities.col.nextAction")</dt><dd>@(opportunity.NextAction ?? Texts.Get("crm.opp.undefined"))@(opportunity.NextActionDate is { } nad ? $" · {CrmLabels.Date(nad)}" : null)</dd></div>
+                    @if (!CanEdit)
+                    {
+                        <div><dt>@Texts.Get("crm.opp.targetDecision")</dt><dd>@(opportunity.TargetDecisionDate is { } decision ? CrmLabels.Date(decision) : "—")</dd></div>
+                        <div><dt>@Texts.Get("crm.opportunities.col.nextAction")</dt><dd>@(opportunity.NextAction ?? Texts.Get("crm.opp.undefined"))@(opportunity.NextActionDate is { } nad ? $" · {CrmLabels.Date(nad)}" : null)</dd></div>
+                    }
                     <div><dt>@Texts.Get("crm.opp.lastInteraction")</dt><dd>@(opportunity.LastInteractionAt is { } last ? CrmLabels.Time(last) : Texts.Get("crm.lead.notYet"))</dd></div>
                     <div><dt>@Texts.Get("crm.opp.stageEntered")</dt><dd>@(opportunity.StageEnteredAt is { } entered ? Texts.Get("crm.opp.stageEnteredValue", CrmLabels.Time(entered), (int)(DateTimeOffset.UtcNow - entered).TotalDays) : "—")</dd></div>
                     @if (opportunity.Status == OpportunityStatus.OnHold && opportunity.HoldReviewDate is { } holdReview)
@@ -197,21 +208,24 @@
                             <div><dt>@Texts.Get("crm.opp.lostToCompetitor")</dt><dd>@Texts.Get(Lookups.CategoryOf(CrmLists.OpportunityLossReason, opportunity.LossReason) == "competitor" ? "crm.opp.yesNoCompetitor" : "common.no")</dd></div>
                         }
                     }
-                    @foreach (var field in Lookups.FieldsOf(CrmEntityKeys.Opportunity))
+                    @if (!CanEdit)
                     {
-                        var text = CustomFieldText.Format(field, opportunity.Custom);
-                        @if (text.Length > 0)
+                        @foreach (var field in Lookups.FieldsOf(CrmEntityKeys.Opportunity))
                         {
-                            <div><dt>@field.Label</dt><dd>@text</dd></div>
+                            var text = CustomFieldText.Format(field, opportunity.Custom);
+                            @if (text.Length > 0)
+                            {
+                                <div><dt>@field.Label</dt><dd>@text</dd></div>
+                            }
                         }
-                    }
-                    @if (opportunity.Description is { } description)
-                    {
-                        <div class="span-all"><dt>@Texts.Get("crm.lead.description")</dt><dd class="notes">@description</dd></div>
-                    }
-                    @if (opportunity.Notes is { } notes)
-                    {
-                        <div class="span-all"><dt>@Texts.Get("common.field.notes")</dt><dd class="notes">@notes</dd></div>
+                        @if (opportunity.Description is { } description)
+                        {
+                            <div class="span-all"><dt>@Texts.Get("crm.lead.description")</dt><dd class="notes">@description</dd></div>
+                        }
+                        @if (opportunity.Notes is { } notes)
+                        {
+                            <div class="span-all"><dt>@Texts.Get("common.field.notes")</dt><dd class="notes">@notes</dd></div>
+                        }
                     }
                 </dl>
             </FormSection>
@@ -356,7 +370,7 @@
                 }
             </section>
 
-            @if (HasNeedAnalysis)
+            @if (HasNeedAnalysis && !CanEdit)
             {
                 <FormSection Title="@Texts.Get("crm.opp.details")" Icon="clipboard-list" Description="@Texts.Get("crm.opp.needAnalysis")">
                     <dl class="detail-grid">
@@ -797,7 +811,6 @@
     private int? reopenProbability;
     private string winnerId = string.Empty;
     private bool followUp;
-    private bool editing;
     private bool addingContact;
     private bool addingCompetitor;
     private bool addingActivity;
@@ -838,6 +851,8 @@
     private bool CanClose => Session.Can(CrmAccess.OpportunitiesClose) || Session.Can(CrmAccess.OpportunitiesWrite);
 
     private bool CanReopen => Session.Can(CrmAccess.OpportunitiesReopen);
+
+    private bool CanEdit => Session.Can(CrmAccess.OpportunitiesWrite);
 
     private bool AnyAction => opportunity is not null && (opportunity.Status switch
     {
@@ -1088,14 +1103,12 @@
 
     private async Task SavedAsync(OpportunityDto saved)
     {
-        editing = false;
         await LoadAsync();
     }
 
     private Task DeletedAsync()
     {
         opportunity = null;
-        editing = false;
         message = Texts.Get("crm.opp.deleted");
         return Task.CompletedTask;
     }
