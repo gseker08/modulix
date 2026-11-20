@@ -658,7 +658,8 @@
     display: none;
 }
 
-.record-form.sectioned:has(> .form-toolbar):not(.drawer *) .form-actions:not(:has(.btn-outline-danger)) {
+/* Sil onay satırına (ConfirmAction → confirm-inline) dönüşünce çubuk gizlenmez. */
+.record-form.sectioned:has(> .form-toolbar):not(.drawer *) .form-actions:not(:has(.btn-outline-danger, .confirm-inline)) {
     display: none;
 }
 

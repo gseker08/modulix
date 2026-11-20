@@ -221,7 +221,9 @@
                 }
                 @if (Company is not null)
                 {
-                    <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
+                    <span class="ms-auto">
+                        <ConfirmAction Class="btn btn-outline-danger" Disabled="@busy" OnConfirm="DeleteAsync">@Texts.Get("common.delete")</ConfirmAction>
+                    </span>
                 }
             </div>
         </div>
