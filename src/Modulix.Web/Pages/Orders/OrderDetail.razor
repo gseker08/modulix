@@ -129,7 +129,8 @@
 
         <section aria-labelledby="terms-title">
             <h2 id="terms-title">@Texts.Get("orders.detail.terms")</h2>
-            @if (!editing)
+            @* Taslak siparişte düzenleme izni olan kullanıcıya alanlar doğrudan açık gelir (ayrı "Düzenle" adımı yok); değilse salt okunur. *@
+            @if (!CanEdit)
             {
                 <dl class="detail-list">
                     <dt>@Texts.Get("orders.header-field.paymentterms")</dt><dd>@(order.PaymentTerms ?? "—")</dd>
@@ -138,18 +139,14 @@
                     <dt>@Texts.Get("orders.header-field.commitments")</dt><dd>@(order.Commitments ?? "—")</dd>
                     <dt>@Texts.Get("orders.header-field.operationsnotes")</dt><dd>@(order.OperationsNotes ?? "—")</dd>
                 </dl>
-                @if (CanEdit)
-                {
-                    <button type="button" class="btn btn-outline-primary" @onclick="StartEdit">@Texts.Get("orders.detail.edit")</button>
-                }
-                else if (Session.Can(OrdersAccess.OrdersWrite) && order.Status != "Draft")
+                @if (Session.Can(OrdersAccess.OrdersWrite) && order.Status != "Draft")
                 {
                     <p class="text-muted">@Texts.Get("orders.detail.edit-locked")</p>
                 }
             }
             else
             {
-                <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
                     <fieldset disabled="@busy">
                         <legend class="visually-hidden">@Texts.Get("orders.detail.edit-legend")</legend>
                         <FormTabs Title="@Texts.Get("orders.detail.terms-short")" Label="@Texts.Get("orders.detail.form-sections")">
@@ -206,8 +203,9 @@
                         </FormTabs>
                     </fieldset>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
-                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => editing = false">@Texts.Get("common.dismiss")</button>
+                        <UnsavedChanges IsDirty="() => dirty" />
+                        <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Revert">@Texts.Get("common.view.discard")</button>
+                        <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : null)" disabled="@busy">@Texts.Get("common.save")</button>
                     </div>
                 </form>
             }
@@ -315,7 +313,7 @@
     private bool noticeFailed;
     private bool notFound;
     private bool busy;
-    private bool editing;
+    private bool dirty;
     private EditForm form = new();
 
     private bool CanEdit => order is { Status: "Draft" } && Session.Can(OrdersAccess.OrdersWrite);
@@ -357,6 +355,12 @@
         }
 
         order = result.Value;
+        // Durum eylemleri siparişi yeniler: yazılmış ama kaydedilmemiş alanlar korunur.
+        if (!dirty)
+        {
+            FillForm();
+        }
+
         var lineResult = await Api.GetAsync<PagedResult<OrderLineDto>>($"/api/orders/order-lines?orderId={Id}&pageSize=200");
         lines = lineResult.Value?.Items.ToList() ?? [];
         var historyResult = await Api.GetAsync<List<OrderHistoryDto>>($"/api/orders/orders/{Id}/history");
@@ -372,11 +376,17 @@
     private async Task OnActionAsync(OrderDto updated)
     {
         order = updated;
-        editing = false;
         await LoadAsync();
     }
 
-    private void StartEdit()
+    /// <summary>Kaydedilmemiş değişiklikleri atar, formu siparişteki değerlere döndürür.</summary>
+    private void Revert()
+    {
+        dirty = false;
+        FillForm();
+    }
+
+    private void FillForm()
     {
         if (order is null) { return; }
         form = new EditForm
@@ -386,7 +396,6 @@
             CommercialTerms = order.CommercialTerms, Commitments = order.Commitments, OperationsNotes = order.OperationsNotes,
         };
         errors = null;
-        editing = true;
     }
 
     private async Task SaveAsync()
@@ -409,7 +418,7 @@
         }
 
         order = result.Value;
-        editing = false;
+        dirty = false;
         noticeFailed = false;
         notice = Texts.Get("orders.detail.saved");
         await LoadAsync();

@@ -96,15 +96,10 @@
                 @if (!string.IsNullOrEmpty(job.CancelReason)) { <dt>@Texts.Get("orders.fulfillment-page.cancel-reason")</dt><dd>@job.CancelReason</dd> }
                 <dt>@Texts.Get("orders.jobdetail.source")</dt><dd>@Texts.Get(job.Source == "Handover" ? "orders.job-history.generated" : "orders.job-history.createdmanually")</dd>
             </dl>
+            @* Düzenleme izni olan kullanıcıya alanlar doğrudan açık gelir (ayrı "Düzenle" adımı yok). *@
             @if (CanEdit)
             {
-                @if (!editing)
-                {
-                    <button type="button" class="btn btn-outline-primary" @onclick="StartEdit">@Texts.Get("orders.jobdetail.edit")</button>
-                }
-                else
-                {
-                    <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                    <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
                         <fieldset disabled="@busy">
                             <legend class="visually-hidden">@Texts.Get("orders.jobdetail.edit-legend")</legend>
                             <FormTabs Title="@Texts.Get("orders.jobdetail.edit-legend")" Label="@Texts.Get("orders.jobdetail.tabs-label")">
@@ -124,11 +119,11 @@
                             </FormTabs>
                         </fieldset>
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
-                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => editing = false">@Texts.Get("common.dismiss")</button>
+                            <UnsavedChanges IsDirty="() => dirty" />
+                            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Revert">@Texts.Get("common.view.discard")</button>
+                            <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : null)" disabled="@busy">@Texts.Get("common.save")</button>
                         </div>
                     </form>
-                }
             }
         </section>
 
@@ -228,7 +223,7 @@
     private bool failed;
     private bool notFound;
     private bool busy;
-    private bool editing;
+    private bool dirty;
     private string reason = string.Empty;
     private string? formError;
     private Guid? assignUser;
@@ -271,17 +266,29 @@
         }
 
         detail = result.Value;
+        // Eylemler ve görev değişiklikleri işi yeniler: yazılmış ama kaydedilmemiş alanlar korunur.
+        if (!dirty)
+        {
+            FillForm();
+        }
+
         var siblings = await Api.GetAsync<PagedResult<OperationJobDto>>($"/api/orders/operation-jobs?orderId={detail!.Job.OrderId}&pageSize=100");
         var linked = detail.DependsOn.Select(d => d.JobId).ToHashSet();
         candidates = [.. (siblings.Value?.Items ?? []).Where(j => j.Id != Id && !linked.Contains(j.Id))];
     }
 
-    private void StartEdit()
+    /// <summary>Kaydedilmemiş değişiklikleri atar, formu işteki değerlere döndürür.</summary>
+    private void Revert()
+    {
+        dirty = false;
+        FillForm();
+    }
+
+    private void FillForm()
     {
         var j = detail!.Job;
         form = new EditForm { Title = j.Title, Priority = j.Priority, PlannedStartDate = j.PlannedStartDate, PlannedEndDate = j.PlannedEndDate, Location = j.Location, Notes = j.Notes };
         errors = null;
-        editing = true;
     }
 
     private async Task SaveAsync()
@@ -294,7 +301,8 @@
         failed = !result.IsSuccess;
         errors = result.FieldErrors;
         notice = result.IsSuccess ? Texts.Get("orders.jobdetail.saved") : result.Error;
-        if (result.IsSuccess) { editing = false; }
+        // Hata hâlinde yazılanlar ve alan hataları formda kalır; iş yine de yeniden okunur (sürüm güncellenir).
+        dirty = !result.IsSuccess;
         await LoadAsync();
     }
 

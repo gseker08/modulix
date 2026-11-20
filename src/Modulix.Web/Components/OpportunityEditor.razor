@@ -9,16 +9,26 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@Texts.Get(Opportunity is null ? "crm.opportunities.new" : "crm.opportunities.editor.card")</h2>
-            @if (Opportunity is not null)
+            @if (!Embedded)
             {
-                <p>@Opportunity.Title</p>
+                <h2>@Texts.Get(Opportunity is null ? "crm.opportunities.new" : "crm.opportunities.editor.card")</h2>
+                @if (Opportunity is not null)
+                {
+                    <p>@Opportunity.Title</p>
+                }
             }
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+            @if (Embedded)
+            {
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Revert">@Texts.Get("common.view.discard")</button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+            }
+            <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : null)" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -219,8 +229,11 @@
     </LayoutForm>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+        @if (!Embedded)
+        {
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+        }
         @if (Opportunity is not null)
         {
             <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
@@ -273,6 +286,9 @@
 
     [Parameter] public EventCallback Cancelled { get; set; }
 
+    /// <summary>Gömülü kip: form fırsat detayının içinde doğrudan açık durur (başlık ve İptal yok, "Geri al" var).</summary>
+    [Parameter] public bool Embedded { get; set; }
+
     protected override void OnParametersSet()
     {
         if (initialized && ReferenceEquals(source, Opportunity))
@@ -280,6 +296,27 @@
             return;
         }
 
+        // Detaydaki eylemler (aşama, durum) kaydı yeniler ama formdaki alanlara dokunmaz: yazılanlar korunur, sürüm ve aşama güncellenir.
+        if (initialized && dirty && Opportunity is not null && source?.Id == Opportunity.Id)
+        {
+            source = Opportunity;
+            form.Version = Opportunity.Version;
+            form.Stage = Opportunity.Stage;
+            return;
+        }
+
+        Fill();
+    }
+
+    /// <summary>Kaydedilmemiş değişiklikleri atar, formu kayıttaki değerlere döndürür.</summary>
+    private void Revert()
+    {
+        dirty = false;
+        Fill();
+    }
+
+    private void Fill()
+    {
         initialized = true;
         source = Opportunity;
         form = Opportunity is { } o
@@ -358,7 +395,7 @@
 
         public Guid? Id { get; init; }
 
-        public long? Version { get; init; }
+        public long? Version { get; set; }
 
         public string Title { get; set; } = string.Empty;
 

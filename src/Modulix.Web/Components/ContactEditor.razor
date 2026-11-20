@@ -8,16 +8,26 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@Texts.Get(Contact is null ? "crm.contacts.new" : "crm.contact.editor.card")</h2>
-            @if (Contact is not null)
+            @if (!Embedded)
             {
-                <p>@Contact.FirstName @Contact.LastName</p>
+                <h2>@Texts.Get(Contact is null ? "crm.contacts.new" : "crm.contact.editor.card")</h2>
+                @if (Contact is not null)
+                {
+                    <p>@Contact.FirstName @Contact.LastName</p>
+                }
             }
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+            @if (Embedded)
+            {
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Revert">@Texts.Get("common.view.discard")</button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+            }
+            <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : null)" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -41,7 +51,9 @@
         <p class="shared-note text-muted">@Texts.Get("crm.contact.editor.sharedNote")</p>
     }
 
-    <div class="record-layout">
+    <div class="@(Embedded ? null : "record-layout")">
+        @if (!Embedded)
+        {
         <aside class="record-summary" aria-label="@Texts.Get("crm.contact.summary.aria")">
             <div class="summary-card">
                 <div class="summary-identity">
@@ -61,8 +73,9 @@
                 </dl>
             </div>
         </aside>
+        }
 
-        <div class="record-main">
+        <div class="@(Embedded ? null : "record-main")">
             <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("crm.contact.editor.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
@@ -136,8 +149,11 @@
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+                @if (!Embedded)
+                {
+                    <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+                }
                 @if (form.Id is not null)
                 {
                     <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
@@ -190,6 +206,17 @@
     [Parameter] public EventCallback Deleted { get; set; }
 
     [Parameter] public EventCallback Cancelled { get; set; }
+
+    /// <summary>Gömülü kip: form kişi detayının içinde doğrudan açık durur (başlık, özet kartı ve İptal yok, "Geri al" var).</summary>
+    [Parameter] public bool Embedded { get; set; }
+
+    /// <summary>Kaydedilmemiş değişiklikleri atar, formu kayıttaki değerlere döndürür.</summary>
+    private void Revert()
+    {
+        dirty = false;
+        initialized = false;
+        OnParametersSet();
+    }
 
     private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.Contact)];
 
