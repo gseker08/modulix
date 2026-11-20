@@ -1,6 +1,7 @@
 @* Lead ekleme/düzenleme formu. Durum, sorumlu ve dönüşüm alanları burada değişmez: ilgili eylemler Lead detayındadır.
    Yeni Lead kaydedilmeden önce olası eşleşmeler gösterilir; aynı e-posta tek başına engel değildir, kullanıcı yine de kaydedebilir.
-   Alanlar firmanın form düzenine (ADR-0021) göre bölüm kartlarına ve sekmelere yerleşir; her alanın girdisi burada tanımlıdır. *@
+   Alanlar firmanın form düzenine (ADR-0021) göre bölüm kartlarına ve sekmelere yerleşir; her alanın girdisi burada tanımlıdır.
+   Gömülü kipte (Embedded) form Lead detayının içinde doğrudan açık durur: başlık detay sayfasındadır, "İptal" yerine "Geri al" vardır. *@
 @inject ApiClient Api
 @inject SessionState Session
 @inject FormLayouts Layouts
@@ -9,16 +10,26 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@Texts.Get(Lead is null ? "crm.leads.new" : "crm.lead.editor.card")</h2>
-            @if (Lead is not null)
+            @if (!Embedded)
             {
-                <p>@Lead.LeadNumber · @Lead.Subject</p>
+                <h2>@Texts.Get(Lead is null ? "crm.leads.new" : "crm.lead.editor.card")</h2>
+                @if (Lead is not null)
+                {
+                    <p>@Lead.LeadNumber · @Lead.Subject</p>
+                }
             }
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+            @if (Embedded)
+            {
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Revert">@Texts.Get("common.view.discard")</button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+            }
+            <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : null)" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -220,14 +231,20 @@
         </div>
     }
 
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get(matches is { Count: > 0 } ? "crm.lead.editor.saveAnyway" : "common.save")</button>
-        <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
-        @if (Lead is not null && Session.Can(CrmAccess.LeadsDelete) && Lead.Status != LeadStatus.Converted)
-        {
-            <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
-        }
-    </div>
+    @if (!Embedded || CanDelete)
+    {
+        <div class="form-actions">
+            @if (!Embedded)
+            {
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get(matches is { Count: > 0 } ? "crm.lead.editor.saveAnyway" : "common.save")</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+            }
+            @if (CanDelete)
+            {
+                <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
+            }
+        </div>
+    }
 </form>
 
 @code {
@@ -276,6 +293,11 @@
 
     [Parameter] public EventCallback Cancelled { get; set; }
 
+    /// <summary>Gömülü kip: form Lead detayının içinde doğrudan açık durur (başlık ve İptal yok, "Geri al" var).</summary>
+    [Parameter] public bool Embedded { get; set; }
+
+    private bool CanDelete => Lead is not null && Session.Can(CrmAccess.LeadsDelete) && Lead.Status != LeadStatus.Converted;
+
     private IReadOnlyList<CustomFieldDto> CustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.Lead)];
 
     protected override void OnParametersSet()
@@ -285,6 +307,26 @@
             return;
         }
 
+        // Detaydaki eylemler (atama, durum) kaydı yeniler ama formdaki alanlara dokunmaz: yazılanlar korunur, yalnızca sürüm güncellenir.
+        if (initialized && dirty && Lead is not null && source?.Id == Lead.Id)
+        {
+            source = Lead;
+            form.Version = Lead.Version;
+            return;
+        }
+
+        Fill();
+    }
+
+    /// <summary>Kaydedilmemiş değişiklikleri atar, formu kayıttaki değerlere döndürür.</summary>
+    private void Revert()
+    {
+        dirty = false;
+        Fill();
+    }
+
+    private void Fill()
+    {
         initialized = true;
         source = Lead;
         form = Lead is { } l
@@ -381,7 +423,7 @@
     {
         public System.Text.Json.Nodes.JsonObject Custom { get; set; } = [];
 
-        public long? Version { get; init; }
+        public long? Version { get; set; }
 
         public string Subject { get; set; } = string.Empty;
 

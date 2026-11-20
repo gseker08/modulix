@@ -20,10 +20,6 @@
             <LoadingState />
         }
     }
-    else if (editingCompany)
-    {
-        <CompanyEditor Company="company" Lookups="Lookups" Saved="CompanySaved" Deleted="CompanyDeleted" Cancelled="() => editingCompany = false" />
-    }
     else
     {
         <div class="page-header">
@@ -48,10 +44,6 @@
                 @if (Session.Can(CrmAccess.CompaniesMerge))
                 {
                     <a class="btn btn-outline-secondary" href="@($"crm/firmalar/{Id}/birlestir")">@Texts.Get("crm.company.merge")</a>
-                }
-                @if (Session.Can(CrmAccess.CompaniesWrite))
-                {
-                    <button type="button" class="btn btn-primary" @onclick="() => editingCompany = true">@Texts.Get("common.edit")</button>
                 }
             </div>
         </div>
@@ -134,6 +126,13 @@
                 @if (tabs.Rendered(TabGeneral))
                 {
                     <div role="tabpanel" id="tabpanel-@TabGeneral" aria-labelledby="tab-@TabGeneral" class="record-tabpanel" hidden="@tabs.Hidden(TabGeneral)">
+                        @* Yazma izni olan kullanıcıya alanlar doğrudan açık gelir (ayrı "Düzenle" adımı yok); izin yoksa salt okunur özet. *@
+                        @if (Session.Can(CrmAccess.CompaniesWrite))
+                        {
+                            <CompanyEditor Embedded="true" Company="company" Lookups="Lookups" Saved="CompanySaved" Deleted="CompanyDeleted" />
+                        }
+                        else
+                        {
                         @* Boş alanlar gösterilmez; telefonda kart kısa kalır. Kimlik ve iletişim özet kartındadır. *@
                         <FormSection Title="@Texts.Get("crm.company.general")" Icon="info">
                         <dl class="detail-grid">
@@ -162,6 +161,7 @@
                             }
                         </dl>
                         </FormSection>
+                        }
 
                         @if (company.PartyId is { } partyId)
                         {
@@ -406,7 +406,6 @@
     private IReadOnlyList<ActivityDto>? activities;
     private ActivityDto? selectedActivity;
     private OpportunityDto? selectedOpportunity;
-    private bool editingCompany;
     private bool editingActivity;
     private bool editingOpportunity;
     private bool busy;
@@ -577,7 +576,6 @@
     private void CompanySaved(CompanyDto saved)
     {
         company = saved;
-        editingCompany = false;
     }
 
     private void CompanyDeleted() => Navigation.NavigateTo("crm/firmalar");
