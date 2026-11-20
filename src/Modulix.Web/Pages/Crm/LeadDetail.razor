@@ -33,10 +33,6 @@
             <LoadingState />
         }
     }
-    else if (editing)
-    {
-        <LeadEditor Lead="lead" Lookups="Lookups" Saved="LeadSaved" Deleted="LeadDeleted" Cancelled="() => editing = false" />
-    }
     else
     {
         <div class="page-header">
@@ -52,12 +48,6 @@
                     }
                 </div>
             </div>
-            <div class="header-actions">
-                @if (Session.Can(CrmAccess.LeadsUpdate) && lead.Status != LeadStatus.Converted)
-                {
-                    <button type="button" class="btn btn-outline-primary" @onclick="() => editing = true">@Texts.Get("common.edit")</button>
-                }
-            </div>
         </div>
 
         @if (lead.Status == LeadStatus.Converted)
@@ -71,6 +61,13 @@
             </div>
         }
 
+        @* Düzenleme izni olan kullanıcıya alanlar doğrudan açık gelir (ayrı "Düzenle" adımı yok); izin yoksa ya da Lead dönüştürülmüşse salt okunur. *@
+        @if (CanEdit)
+        {
+            <LeadEditor Embedded="true" Lead="lead" Lookups="Lookups" Saved="LeadSaved" Deleted="LeadDeleted" />
+        }
+        else
+        {
         <FormSection Title="@Texts.Get("crm.lead.section.request")" Icon="inbox">
             <dl class="detail-grid">
                 <div><dt>@Texts.Get("crm.leads.col.requester")</dt><dd>@(string.Join(' ', new[] { lead.FirstName, lead.LastName }.Where(n => !string.IsNullOrWhiteSpace(n))) is { Length: > 0 } name ? name : "—")</dd></div>
@@ -119,9 +116,15 @@
             </dl>
         </FormSection>
 
+        }
+
+        @* Formda düzenlenmeyen izleme bilgileri; kaynak ve özel alanlar form açıkken formdadır, burada yinelenmez. *@
         <FormSection Title="@Texts.Get("crm.lead.section.source")" Icon="user-check">
             <dl class="detail-grid">
-                <div><dt>@Texts.Get("crm.company.source")</dt><dd>@(lead.Source is null ? "—" : Lookups.Label(CrmLeadLists.Source, lead.Source))@(lead.SourceDetail is { } sd ? $" · {sd}" : null)</dd></div>
+                @if (!CanEdit)
+                {
+                    <div><dt>@Texts.Get("crm.company.source")</dt><dd>@(lead.Source is null ? "—" : Lookups.Label(CrmLeadLists.Source, lead.Source))@(lead.SourceDetail is { } sd ? $" · {sd}" : null)</dd></div>
+                }
                 <div><dt>@Texts.Get("crm.lead.firstReceived")</dt><dd>@CrmLabels.Time(lead.FirstReceivedAt)</dd></div>
                 @if (lead.ExternalSource is { } external)
                 {
@@ -149,12 +152,19 @@
                 {
                     <div><dt>@Texts.Get("crm.lead.disqualifiedAt")</dt><dd>@CrmLabels.Time(disqualified) · @Lookups.Label(CrmLeadLists.DisqualificationReason, lead.DisqualificationReason)</dd></div>
                 }
-                @foreach (var field in Lookups.FieldsOf(CrmEntityKeys.Lead))
+                @if (CanEdit && lead.StatusReason is { } openReason)
                 {
-                    var text = CustomFieldText.Format(field, lead.Custom);
-                    @if (text.Length > 0)
+                    <div class="span-all"><dt>@Texts.Get("crm.lead.statusReason")</dt><dd class="notes">@openReason</dd></div>
+                }
+                @if (!CanEdit)
+                {
+                    @foreach (var field in Lookups.FieldsOf(CrmEntityKeys.Lead))
                     {
-                        <div><dt>@field.Label</dt><dd>@text</dd></div>
+                        var text = CustomFieldText.Format(field, lead.Custom);
+                        @if (text.Length > 0)
+                        {
+                            <div><dt>@field.Label</dt><dd>@text</dd></div>
+                        }
                     }
                 }
             </dl>
@@ -370,7 +380,6 @@
         set => assignee = value ?? Guid.Empty;
     }
     private int? targetHours;
-    private bool editing;
     private bool addingActivity;
     private bool busy;
 
@@ -389,6 +398,8 @@
         targetHours = (await Api.GetAsync<LeadSettingsDto>("/api/crm/leads/settings")).Value?.FirstContactTargetHours;
         await LoadAsync();
     }
+
+    private bool CanEdit => lead is not null && Session.Can(CrmAccess.LeadsUpdate) && lead.Status != LeadStatus.Converted;
 
     private bool CanAssign => lead is not null && Session.Can(CrmAccess.LeadsAssign) && LeadStatus.IsOpen(lead.Status);
 
@@ -498,11 +509,7 @@
         await LoadAsync();
     }
 
-    private async Task LeadSaved(LeadDto saved)
-    {
-        editing = false;
-        await LoadAsync();
-    }
+    private Task LeadSaved(LeadDto saved) => LoadAsync();
 
     private Task LeadDeleted()
     {

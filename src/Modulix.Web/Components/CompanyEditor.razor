@@ -1,7 +1,8 @@
 @* Firma ekleme/düzenleme formu; Firmalar listesi ve firma detay sayfası kullanır.
    Düzen (referans "Firma kartı" ekranı): üstte yapışkan başlık + İptal / Kaydet, altında yazdıkça güncellenen gösterge şeridi, sonra firmanın
    form düzenine (ADR-0021: sekme / bölüm / alan sırası, genişlik, zorunluluk, görünürlük) göre çizilen bölüm kartları.
-   Her alanın girdisi burada, yeri ve zorunluluğu düzende tanımlıdır; kaydetme davranışı değişmedi. *@
+   Her alanın girdisi burada, yeri ve zorunluluğu düzende tanımlıdır; kaydetme davranışı değişmedi.
+   Gömülü kipte (Embedded) form firma detayının "Genel" sekmesinde doğrudan açık durur: başlık ve özet kartı detay sayfasındadır, "İptal" yerine "Geri al" vardır. *@
 @inject ApiClient Api
 @inject FormLayouts Layouts
 @inject ToastService Toasts
@@ -9,16 +10,26 @@
 <form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
-            <h2>@Texts.Get(Company is null ? "crm.companies.new" : "crm.company.editor.card")</h2>
-            @if (Company is not null)
+            @if (!Embedded)
             {
-                <p>@Company.Name</p>
+                <h2>@Texts.Get(Company is null ? "crm.companies.new" : "crm.company.editor.card")</h2>
+                @if (Company is not null)
+                {
+                    <p>@Company.Name</p>
+                }
             }
         </div>
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+            @if (Embedded)
+            {
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Revert">@Texts.Get("common.view.discard")</button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+            }
+            <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : null)" disabled="@(busy || layout is null)">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -42,8 +53,10 @@
         <p class="shared-note text-muted">@Texts.Get("crm.company.editor.sharedNote")</p>
     }
 
-    <div class="record-layout">
-        @* Şirket özeti: formdaki değerlerle canlı önizleme. *@
+    <div class="@(Embedded ? null : "record-layout")">
+        @* Şirket özeti: formdaki değerlerle canlı önizleme. Gömülü kipte özet kartı detay sayfasındadır. *@
+        @if (!Embedded)
+        {
         <aside class="record-summary" aria-label="@Texts.Get("crm.company.editor.summary")">
             <div class="summary-card">
                 <div class="summary-identity">
@@ -61,8 +74,9 @@
                 </dl>
             </div>
         </aside>
+        }
 
-        <div class="record-main">
+        <div class="@(Embedded ? null : "record-main")">
             <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("crm.company.editor.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
@@ -200,8 +214,11 @@
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+                @if (!Embedded)
+                {
+                    <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
+                }
                 @if (Company is not null)
                 {
                     <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button>
@@ -256,6 +273,17 @@
     [Parameter] public EventCallback Deleted { get; set; }
 
     [Parameter] public EventCallback Cancelled { get; set; }
+
+    /// <summary>Gömülü kip: form firma detayında doğrudan açık durur (başlık, özet kartı ve İptal yok, "Geri al" var).</summary>
+    [Parameter] public bool Embedded { get; set; }
+
+    /// <summary>Kaydedilmemiş değişiklikleri atar, formu kayıttaki değerlere döndürür.</summary>
+    private void Revert()
+    {
+        dirty = false;
+        initialized = false;
+        OnParametersSet();
+    }
 
     private CompanyDto? source;
     private bool initialized;
