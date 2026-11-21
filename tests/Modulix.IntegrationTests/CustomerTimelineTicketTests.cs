@@ -97,12 +97,16 @@ public class CustomerTimelineTicketTests(ModulixApiFactory factory) : IClassFixt
         Assert.DoesNotContain(TicketsSource, withoutTickets.Sources);
         Assert.Empty(withoutTickets.Items);
 
-        // İzin var, kapsam "kendi": kaynak okunur ama başkasının talebi gelmez.
+        // İzin var, kapsam "kendi": kaynak okunur; sahipsiz talep kuyrukta herkese görünür (Destek kuralı), başkasının üstlendiği talep gelmez.
         var ownOnly = await factory.CreateUserAsync(tenant);
         await factory.CreateRoleAsync(tenant.Id, [CompaniesRead, CompaniesWrite, SupportAccess.TicketsRead], Scope.Own, ownOnly);
         using var ownOnlyClient = await LoginAsync(ownOnly);
         var ownCompany = await CreateCompanyAsync(ownOnlyClient, "Temsilcinin firması");
-        await CreateTicketAsync(adminClient, ownCompany.PartyId!.Value, "Yöneticinin açtığı talep");
+        var adminTicket = await CreateTicketAsync(adminClient, ownCompany.PartyId!.Value, "Yöneticinin açtığı talep");
+        var queued = (await ownOnlyClient.GetFromJsonAsync<CustomerTimelineDto>($"/api/crm/companies/{ownCompany.Id}/timeline"))!;
+        Assert.Equal(adminTicket.Id, Assert.Single(queued.Items).RecordId);
+        var taken = await adminClient.PostAsJsonAsync($"/api/support/tickets/{adminTicket.Id}/take", new TicketActionRequest(adminTicket.Version));
+        Assert.True(taken.StatusCode == HttpStatusCode.OK, await taken.Content.ReadAsStringAsync());
         var scoped = (await ownOnlyClient.GetFromJsonAsync<CustomerTimelineDto>($"/api/crm/companies/{ownCompany.Id}/timeline"))!;
         Assert.Contains(TicketsSource, scoped.Sources);
         Assert.Empty(scoped.Items);
