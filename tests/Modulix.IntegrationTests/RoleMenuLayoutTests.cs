@@ -97,12 +97,13 @@ public class RoleMenuLayoutTests(ModulixApiFactory factory) : IClassFixture<Modu
 
         // Olmayan rol 404; sistem rolü (yönetici) 409: yönetici menüyü gizleyerek kendini kilitleyemez.
         Assert.Equal(HttpStatusCode.NotFound, (await managerClient.PutAsJsonAsync($"/api/roles/{Guid.NewGuid()}/menu", body)).StatusCode);
+        // Sistem rolü ilk yönetici atanınca oluşur.
+        var admin = await factory.CreateUserAsync(tenant);
+        await factory.MakeAdministratorAsync(tenant.Id, admin);
         var system = await SystemRoleIdAsync(tenant.Id);
         Assert.Equal(HttpStatusCode.Conflict, (await managerClient.PutAsJsonAsync($"/api/roles/{system}/menu", body)).StatusCode);
 
         // Yöneticinin erişim yanıtında düzen satırı gelmez.
-        var admin = await factory.CreateUserAsync(tenant);
-        await factory.MakeAdministratorAsync(tenant.Id, admin);
         using var adminClient = await LoginAsync(admin);
         var access = (await adminClient.GetFromJsonAsync<MyAccessResponse>("/api/tenant/access"))!;
         Assert.True(access.IsAdministrator);
