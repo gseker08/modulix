@@ -946,7 +946,8 @@ button.hero-stat {
     }
 
     .dash-list-main a:hover {
-        text-decoration: underline;
+        color: var(--mx-brand-primary);
+        text-decoration: none;
     }
 
     .dash-list-main small {

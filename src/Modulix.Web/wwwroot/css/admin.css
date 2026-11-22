@@ -195,8 +195,8 @@
     background: none;
     border: 0;
     padding: 0;
-    color: inherit;
-    text-decoration: underline dotted;
+    color: var(--mx-brand-primary);
+    text-decoration: none;
 }
 
 .audit-detail > td {
@@ -302,7 +302,8 @@
 }
 
 .session-link:hover {
-    text-decoration: underline;
+    color: var(--mx-brand-primary);
+    text-decoration: none;
 }
 
 /* İki adımlı doğrulama (Y7b). */

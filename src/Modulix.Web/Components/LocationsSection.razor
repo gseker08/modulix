@@ -93,7 +93,7 @@
                             @onclick="() => expanded = expanded == item.Id ? null : item.Id">@Texts.Get(expanded == item.Id ? "crm.location.hide" : "crm.location.addressContact")</button>
                     @if (CanWrite)
                     {
-                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(item)">@Texts.Get("common.edit")</button>
+                        <IconAction Icon="square-pen" Label="@Texts.Get("common.edit")" OnClick="() => Open(item)" />
                     }
                 </li>
             }

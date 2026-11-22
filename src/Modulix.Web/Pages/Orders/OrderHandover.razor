@@ -188,7 +188,7 @@
                         @if (item.IsDone && item.DoneAt is { } doneAt) { <small class="text-muted"> · @Lookups.MemberName(item.DoneBy), @CrmLabels.Time(doneAt)</small> }
                         @if (Editable && !item.IsDefault)
                         {
-                            <ConfirmAction Class="btn btn-link btn-sm" Disabled="@busy" OnConfirm="() => DeleteItemAsync(item)">@Texts.Get("common.delete")</ConfirmAction>
+                            <ConfirmAction Icon="trash" AriaLabel="@Texts.Get("common.delete")" Disabled="@busy" OnConfirm="() => DeleteItemAsync(item)">@Texts.Get("common.delete")</ConfirmAction>
                         }
                     </li>
                 }

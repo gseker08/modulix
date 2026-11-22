@@ -86,7 +86,7 @@
                                     </label>
                                     @if (option.Key is null)
                                     {
-                                        <button type="button" class="btn btn-link btn-sm" @onclick="() => form.Options.RemoveAt(index)">@Texts.Get("admin.subProfiles.remove")</button>
+                                        <IconAction Icon="trash" Label="@Texts.Get("admin.subProfiles.remove")" OnClick="() => form.Options.RemoveAt(index)" />
                                     }
                                 </div>
                             }
@@ -142,8 +142,8 @@
                             <td data-label="@Texts.Get("admin.automationRun.col.order")">
                                 @if (!field.Archived)
                                 {
-                                    <button type="button" class="btn btn-link btn-sm" aria-label="@Texts.Get("admin.automationEditor.moveUp")" disabled="@(busy || position == 0)" @onclick="() => MoveAsync(field, -1)">↑</button>
-                                    <button type="button" class="btn btn-link btn-sm" aria-label="@Texts.Get("admin.automationEditor.moveDown")" disabled="@(busy || position == active.Count - 1)" @onclick="() => MoveAsync(field, 1)">↓</button>
+                                    <IconAction Icon="arrow-up" Label="@Texts.Get("admin.automationEditor.moveUp")" Disabled="@(busy || position == 0)" OnClick="() => MoveAsync(field, -1)" />
+                                    <IconAction Icon="arrow-down" Label="@Texts.Get("admin.automationEditor.moveDown")" Disabled="@(busy || position == active.Count - 1)" OnClick="() => MoveAsync(field, 1)" />
                                 }
                             </td>
                             <td class="actions">
