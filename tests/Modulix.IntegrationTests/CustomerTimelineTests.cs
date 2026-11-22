@@ -40,7 +40,7 @@ public class CustomerTimelineTests(ModulixApiFactory factory) : IClassFixture<Mo
         await CreateOpportunityAsync(client, other.Id, "İlgisiz fırsat");
 
         var timeline = (await client.GetFromJsonAsync<CustomerTimelineDto>($"/api/crm/companies/{company.Id}/timeline"))!;
-        Assert.Equal(["crm.activities", "crm.opportunities", "crm.quotes"], timeline.Sources);
+        Assert.Equal(["crm.activities", "crm.leads", "crm.opportunities", "crm.quotes"], timeline.Sources);
         Assert.Equal([CrmEntityKeys.Quote, CrmEntityKeys.Opportunity, CrmEntityKeys.Activity], timeline.Items.Select(i => i.EntityKey));
         Assert.Equal(["Bakım teklifi", "Yıllık bakım", "Tanışma araması"], timeline.Items.Select(i => i.Title));
         Assert.Equal(timeline.Items.OrderByDescending(i => i.OccurredAt).Select(i => i.RecordId), timeline.Items.Select(i => i.RecordId));
@@ -71,10 +71,10 @@ public class CustomerTimelineTests(ModulixApiFactory factory) : IClassFixture<Mo
             (await client.GetAsync($"/api/crm/companies/{company.Id}/timeline?take={CustomerTimelineDto.MaxTake + 1}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/crm/companies/{Guid.NewGuid()}/timeline")).StatusCode);
 
-        // Kaydı olmayan firma: kaynaklar okunabilir, çizelge boştur.
+        // Kaydı olmayan firma: kaynaklar okunabilir (aktivite, müşteri adayı, fırsat, teklif), çizelge boştur.
         var empty = (await client.GetFromJsonAsync<CustomerTimelineDto>($"/api/crm/companies/{company.Id}/timeline"))!;
         Assert.Empty(empty.Items);
-        Assert.Equal(3, empty.Sources.Count);
+        Assert.Equal(4, empty.Sources.Count);
         Assert.Null(empty.NextBefore);
     }
 

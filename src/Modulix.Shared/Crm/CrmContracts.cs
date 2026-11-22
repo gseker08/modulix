@@ -94,6 +94,22 @@ public static class CrmEntityKeys
     public const string Quote = "crm.quote";
 }
 
+/// <summary>
+/// Müşteri zaman çizelgesindeki CRM durum değişikliği satırı türleri (ADR-0053, dilim 4); satırın kayıt kimliği ilgili fırsat, teklif ya da müşteri adayıdır.
+/// Kayıt türü anahtarı değildir (<see cref="CrmEntityKeys"/> ile karışmasın).
+/// </summary>
+public static class CrmTimelineKeys
+{
+    /// <summary>Fırsat kazanıldı ya da kaybedildi (<c>Status</c> ve <c>Type</c> Won/Lost).</summary>
+    public const string OpportunityClosed = "crm.timeline.opportunity-closed";
+
+    /// <summary>Teklif kabul edildi.</summary>
+    public const string QuoteAccepted = "crm.timeline.quote-accepted";
+
+    /// <summary>Müşteri adayı bu firmaya dönüştü.</summary>
+    public const string LeadConverted = "crm.timeline.lead-converted";
+}
+
 /// <summary>CRM'in düzenlenebilir seçim listeleri (Y9b) ve kategorileri; sunucudaki CrmModule ile aynıdır.</summary>
 public static class CrmLists
 {

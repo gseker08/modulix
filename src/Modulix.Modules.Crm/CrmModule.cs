@@ -1247,6 +1247,7 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, ActivityTimelineSource>();
         services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, OpportunityTimelineSource>();
         services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, QuoteTimelineSource>();
+        services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, LeadTimelineSource>();
         services.AddScoped<CrmFollowUpAnchor>();
         services.AddScoped<CrmFollowUpActivities>();
         services.AddScoped<CrmAutomationRecordSource>();
