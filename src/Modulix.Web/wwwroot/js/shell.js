@@ -32,20 +32,25 @@
 
     // Firma vurgu rengi (E8): yalnızca #RRGGBB kabul edilir (sunucu da doğrular); hover ve rgb türetilir, açık temada
     // koyulaştırılır, koyu temada açılır. Renk yoksa ya da geçersizse stil öğesi kaldırılır ve tokens.css geçerli olur.
-    function accentTokens(hex, towards) {
+    function accentTokens(hex, towards, glow) {
         if (!/^#[0-9A-Fa-f]{6}$/.test(hex || '')) {
             return null;
         }
 
         const channels = [1, 3, 5].map(i => parseInt(hex.substr(i, 2), 16));
-        const hover = channels.map(c => Math.round(c + (towards - c) * 0.12));
-        return `--mx-brand-primary:${hex};--mx-brand-primary-rgb:${channels.join(', ')};`
-            + `--mx-brand-primary-hover:rgb(${hover.join(', ')});`;
+        const shade = amount => `rgb(${channels.map(c => Math.round(c + (towards - c) * amount)).join(', ')})`;
+        const rgb = channels.join(', ');
+        // CTA degradesi vurgu renginden türetilir: vurgudan %20 (hover'da %30) koyulaşan/açılan uca doğru gider. Uçlar
+        // vurgudan yalnızca beyaz metne (açık) ya da koyu metne (koyu) doğru uzaklaştığı için sunucudaki kontrast kuralı korunur.
+        return `--mx-brand-primary:${hex};--mx-brand-primary-rgb:${rgb};--mx-brand-primary-hover:${shade(0.12)};`
+            + `--mx-gradient-cta:linear-gradient(135deg, ${hex} 0%, ${shade(0.2)} 100%);`
+            + `--mx-gradient-cta-hover:linear-gradient(135deg, ${shade(0.12)} 0%, ${shade(0.3)} 100%);`
+            + `--mx-shadow-cta:0 6px 16px rgba(${rgb}, ${glow});--mx-shadow-cta-hover:0 8px 20px rgba(${rgb}, ${glow + 0.08});`;
     }
 
     function applyAccent(light, dark) {
-        const lightTokens = accentTokens(light, 0);
-        const darkTokens = accentTokens(dark, 255);
+        const lightTokens = accentTokens(light, 0, 0.28);
+        const darkTokens = accentTokens(dark, 255, 0.18);
         let style = document.getElementById('mx-accent-style');
         if (!lightTokens && !darkTokens) {
             style?.remove();
