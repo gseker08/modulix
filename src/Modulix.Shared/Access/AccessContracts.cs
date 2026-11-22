@@ -25,8 +25,16 @@ public sealed record MyAccessResponse(
     IReadOnlyList<OperatingCompanyDto>? Companies = null,
     Guid? ActiveCompanyId = null,
     IReadOnlyList<ModuleLicenseDto>? Licenses = null,
-    IReadOnlyList<TenantMissingDependencyDto>? MissingDependencies = null)
+    IReadOnlyList<TenantMissingDependencyDto>? MissingDependencies = null,
+    IReadOnlyList<Guid>? RoleIds = null,
+    IReadOnlyList<RoleMenuRowDto>? MenuLayout = null)
 {
+    /// <summary>Kullanıcının bu firmadaki rolleri; menü düzeni (E8) bunlara göre birleştirilir. Yönetici rolünde düzen yoktur.</summary>
+    public IReadOnlyList<Guid> RoleIds { get; init; } = RoleIds ?? [];
+
+    /// <summary>Kullanıcının rollerinin menü düzeni satırları (E8 dilim 2). Gizlemek yetki değildir.</summary>
+    public IReadOnlyList<RoleMenuRowDto> MenuLayout { get; init; } = MenuLayout ?? [];
+
     public IReadOnlyList<OperatingCompanyDto> Companies { get; init; } = Companies ?? [];
 
     /// <summary>Süresi dolmuş, ek sürede ya da yakında dolacak modül hakları (ADR-0028); yöneticiye uyarı için.</summary>
@@ -283,3 +291,15 @@ public static class CoreAccess
          ReadAutomation, ManageAutomation, PublishAutomation, RunAutomation, ReadAutomationLogs, ApproveAutomation, ManageApprovals,
          RunImports, ReadImports, RollbackImports, ImportPeople, ManageHolidays, ManageExchangeRates, ManageNumbering];
 }
+
+/// <summary>Bir rolün menü düzeninde bir satır (E8): öğe anahtarı (arayüz katalog kimliği), sıra (boşsa katalog sırası) ve gizli olup olmadığı.</summary>
+public sealed record RoleMenuItemDto(string ItemKey, int? Order, bool Hidden);
+
+/// <summary>Kullanıcının kendi menüsü için: hangi rolün hangi öğeye koyduğu düzen.</summary>
+public sealed record RoleMenuRowDto(Guid RoleId, string ItemKey, int? Order, bool Hidden);
+
+/// <summary>Rolün menü düzeni; <c>Items</c> boşsa rolün düzeni yoktur (katalog düzeni geçerli).</summary>
+public sealed record RoleMenuResponse(Guid RoleId, IReadOnlyList<RoleMenuItemDto> Items);
+
+/// <summary>Rolün menü düzenini verilen satırlarla değiştirir; boş liste düzeni kaldırır.</summary>
+public sealed record SaveRoleMenuRequest(IReadOnlyList<RoleMenuItemDto> Items);

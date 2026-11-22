@@ -115,6 +115,7 @@ public static class PersistenceSetup
         services.AddScoped<IPlatformTeam, Modulix.Infrastructure.Platform.PlatformTeam>();
         services.AddScoped<AdministratorGuard>();
         services.AddScoped<IRoleService, RoleService>();
+        services.AddScoped<IRoleMenuLayouts, RoleMenuLayouts>();
         services.AddScoped<MembershipPermissions>();
         services.AddScoped<ScopeLimits>();
         services.AddScoped<ScopedRecordTypes>();

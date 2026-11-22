@@ -7754,6 +7754,7 @@
   "meta.field.core.role.scope": "Record scope",
   "meta.field.core.role.assignLevel": "Assignable level",
   "meta.field.core.role.hideOutOfScopeShared": "Hide shared records outside scope",
+  "meta.field.core.role.menu": "Menu layout",
   "meta.field.core.role.scopeOverrides": "Scope by record type",
   "meta.option.core.role.scope.All": "All records",
   "meta.option.core.role.scope.UnitAndBelow": "Records of the department and sub-departments",

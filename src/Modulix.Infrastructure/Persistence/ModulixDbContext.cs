@@ -95,6 +95,8 @@ public class ModulixDbContext(
 
     public DbSet<MembershipRole> MembershipRoles => Set<MembershipRole>();
 
+    public DbSet<RoleMenuItem> RoleMenuItems => Set<RoleMenuItem>();
+
     public DbSet<Team> Teams => Set<Team>();
 
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();

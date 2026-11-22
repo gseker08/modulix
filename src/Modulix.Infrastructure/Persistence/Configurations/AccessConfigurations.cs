@@ -183,3 +183,27 @@ internal sealed class TenantScopeLimitConfiguration : IEntityTypeConfiguration<T
         builder.HasOne<Tenant>().WithMany().HasForeignKey(l => l.TenantId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class RoleMenuItemConfiguration : IEntityTypeConfiguration<RoleMenuItem>
+{
+    public void Configure(EntityTypeBuilder<RoleMenuItem> builder)
+    {
+        // Tenant verisi (E8 dilim 2): core şemasında; Row-Level Security ile korunur (migration: TenantIsolationSql).
+        builder.ToTable("RoleMenuItems", DatabaseSchemas.Core);
+        builder.HasKey(i => i.Id);
+        builder.Property(i => i.Id).ValueGeneratedNever();
+        builder.Property(i => i.TenantId).IsRequired();
+        builder.Property(i => i.ItemKey).HasMaxLength(RoleMenuItem.KeyMaxLength).IsUnicode(false).IsRequired();
+        builder.Property(i => i.Hidden).IsRequired();
+
+        // Bir rolün bir menü öğesinde tek satırı olur; menü hesabı rol kimliklerinden başlar.
+        builder.HasIndex(i => new { i.TenantId, i.RoleId, i.ItemKey }).IsUnique();
+
+        // Rol yabancı anahtarı tenant içindedir: başka tenant'ın rolüne düzen veritabanı düzeyinde de bağlanamaz. Rol silinince düzeni de silinir.
+        builder.HasOne<Role>()
+            .WithMany()
+            .HasForeignKey(i => new { i.TenantId, i.RoleId })
+            .HasPrincipalKey(r => new { r.TenantId, r.Id })
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}

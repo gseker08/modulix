@@ -35,6 +35,8 @@ public static class AccessEndpoints
         roles.MapGet("/scope-types", ListScopeTypesAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
         roles.MapGet("/{roleId:guid}/members", ListMembersAsync)
             .RequireAnyPermission(CoreModule.Permissions.ManageRoles, CoreModule.Permissions.ManageUsers);
+        roles.MapGet("/{roleId:guid}/menu", GetRoleMenuAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
+        roles.MapPut("/{roleId:guid}/menu", SaveRoleMenuAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
         roles.MapPost("/", CreateRoleAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
         roles.MapPut("/{roleId:guid}", UpdateRoleAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
         roles.MapDelete("/{roleId:guid}", DeleteRoleAsync).RequirePermission(CoreModule.Permissions.ManageRoles);
@@ -69,6 +71,7 @@ public static class AccessEndpoints
         IMembershipDirectory directory,
         ICompanyContextAccessor company,
         IModuleLicense license,
+        IRoleMenuLayouts menus,
         TimeProvider time,
         CancellationToken ct)
     {
@@ -97,7 +100,14 @@ public static class AccessEndpoints
             companies,
             company.Current?.ActiveCompanyId,
             await LicenseWarningsAsync(catalog, license, tenant.Current!.TenantId, time.GetUtcNow(), ct),
-            isAdministrator ? MissingDependencies(catalog, enabled) : []));
+            isAdministrator ? MissingDependencies(catalog, enabled) : [])
+        {
+            // Yönetici menüyü her zaman tam görür: düzen satırı gönderilmez.
+            RoleIds = [.. myRoles.Select(r => r.Id)],
+            MenuLayout = isAdministrator
+                ? []
+                : [.. (await menus.GetForRolesAsync([.. myRoles.Select(r => r.Id)], ct)).Select(r => new RoleMenuRowDto(r.RoleId, r.ItemKey, r.Order, r.Hidden))],
+        });
     }
 
     /// <summary>Uyarı penceresi: bitişe bu kadar gün kala yönetici uyarılır; bitmiş haklar (ek süre, salt okunur) her zaman listelenir.</summary>
@@ -222,6 +232,26 @@ public static class AccessEndpoints
             return problem;
         }
     }
+
+    private static async Task<IResult> GetRoleMenuAsync(Guid roleId, IRoleMenuLayouts menus, CancellationToken ct) =>
+        await menus.GetAsync(roleId, ct) is { } items ? Results.Ok(ToMenuDto(roleId, items)) : RoleNotFound();
+
+    private static async Task<IResult> SaveRoleMenuAsync(Guid roleId, SaveRoleMenuRequest request, IRoleMenuLayouts menus, CancellationToken ct)
+    {
+        try
+        {
+            var saved = await menus.SaveAsync(
+                roleId, [.. (request.Items ?? []).Select(i => new RoleMenuEntry(i.ItemKey, i.Order, i.Hidden))], ct);
+            return saved is { } items ? Results.Ok(ToMenuDto(roleId, items)) : RoleNotFound();
+        }
+        catch (Exception ex) when (UserEndpoints.ToProblem(ex) is { } problem)
+        {
+            return problem;
+        }
+    }
+
+    private static RoleMenuResponse ToMenuDto(Guid roleId, IReadOnlyList<RoleMenuEntry> items) =>
+        new(roleId, [.. items.Select(i => new RoleMenuItemDto(i.ItemKey, i.Order, i.Hidden))]);
 
     /// <summary>Üyesi olan rol için <c>moveTo</c> gerekir: üyeler o role taşınır (409 yoksa).</summary>
     private static async Task<IResult> DeleteRoleAsync(

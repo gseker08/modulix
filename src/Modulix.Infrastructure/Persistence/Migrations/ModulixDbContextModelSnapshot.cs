@@ -449,6 +449,37 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Roles", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Authorization.RoleMenuItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("Hidden")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ItemKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "RoleId", "ItemKey")
+                        .IsUnique();
+
+                    b.ToTable("RoleMenuItems", "core");
+                });
+
             modelBuilder.Entity("Modulix.Core.Authorization.RoleScopeOverride", b =>
                 {
                     b.Property<Guid>("Id")
@@ -16560,6 +16591,16 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TenantId", "RoleId")
                         .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Modulix.Core.Authorization.RoleMenuItem", b =>
+                {
+                    b.HasOne("Modulix.Core.Authorization.Role", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "RoleId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
