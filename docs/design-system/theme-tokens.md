@@ -98,16 +98,16 @@ Yazı tipi **Manrope** (OFL lisanslı, değişken ağırlık 400–800). Dosyala
 | Vurgu rengi (açık tema) | `--mx-brand-primary` | firma değeri | Bağlantı, odak, aktif sekme çizgisi, aktif menü çizgisi, `--bs-primary`, `--bs-link-color` |
 | Vurgu rengi (koyu tema) | `--mx-brand-primary` | firma değeri | Aynı; koyu zeminde açık ton gerekir |
 
-Firmadan yalnızca bu iki değer (açık/koyu, `#RRGGBB`) alınır; sunucu şunları **türetir**, firma ayrıca girmez: `--mx-brand-primary-rgb` (rgb üçlüsü), `--mx-brand-primary-hover` (açık temada %12 koyulaştırılmış, koyu temada %12 açılmış ton) ve odak halkası (`--mx-focus-ring` zaten `-rgb`'den üretilir). `--mx-brand-teal*` ile CTA degradesi (`--mx-gradient-cta*`) ve marka degradesi (`--mx-gradient-brand*`) ilk sürümde sabit kalır; sabit onaltılık değerle yazıldıkları için vurgu rengine bağlanmaları ayrı bir kararla ve önce `tokens.css`'te türetmeye çevrilerek yapılır.
+Firmadan yalnızca bu iki değer (açık/koyu, `#RRGGBB`) alınır; Web (`shell.js`) şunları **türetir**, firma ayrıca girmez: `--mx-brand-primary-rgb` (rgb üçlüsü), `--mx-brand-primary-hover` (açık temada %12 koyulaştırılmış, koyu temada %12 açılmış ton) ve odak halkası (`--mx-focus-ring` zaten `-rgb`'den üretilir). `--mx-brand-teal*` ile CTA degradesi (`--mx-gradient-cta*`) ve marka degradesi (`--mx-gradient-brand*`) ilk sürümde sabit kalır; sabit onaltılık değerle yazıldıkları için vurgu rengine bağlanmaları ayrı bir kararla ve önce `tokens.css`'te türetmeye çevrilerek yapılır.
 
 **Kontrast kuralı (sunucuda doğrulanır, geçmeyen renk reddedilir; arayüz yalnızca önizler):**
 
-- Açık tema: vurgu rengi `--mx-surface` (`#FFFFFF`), `--mx-background` (`#F5F8FC`) ve `--mx-surface-muted` (`#EEF5FA`) üzerinde en az 4.5:1 (bağlantı/odak metni) ve `--mx-text-on-brand` (`#FFFFFF`) ile en az 4.5:1 (vurgu dolgulu sayaç rozeti, etkin çip).
+- Açık tema: vurgu rengi `--mx-surface` (`#FFFFFF`) üzerinde en az 4.5:1 (bağlantı/odak metni) ve `--mx-text-on-brand` (`#FFFFFF`) ile en az 4.5:1 (vurgu dolgulu sayaç rozeti, etkin çip). Sayfa zemini ve seçili menü zemini kurala girmez: varsayılan marka rengi de oralarda 4.1–4.3:1 verir (beyazda 4.53:1), kural varsayılandan katı olamaz.
 - Koyu tema: vurgu rengi `--mx-surface` (`#121D33`), `--mx-background` (`#0B1322`) ve `--mx-surface-muted` (`#192842`) üzerinde en az 4.5:1 ve `--mx-text-on-brand` (`#07111F`) ile en az 4.5:1.
 - Kontrast WCAG göreli parlaklığı ile hesaplanır; hesap tek yerde (sunucu) yazılır, Web önizlemesi aynı sonucu API'den alır.
 - Firma yalnızca `#RRGGBB` verebilir (ad, `rgb()`, `var()`, alfa kabul edilmez); değer CSS'e yazılmadan önce bu desenle doğrulanır, bu yüzden CSS enjeksiyonu yoktur.
 
-**Uygulama biçimi:** Web, oturum açıldıktan sonra firma ayarını okur ve `:root`'a yalnızca yukarıdaki üç tokeni (`--mx-brand-primary`, `-hover`, `-rgb`) açık/koyu temaya göre yazar; bileşen CSS'i değişmez. Ayar yoksa hiçbir şey yazılmaz. Marka renginin açık ve koyu temada ekran görüntüsü kontrolü (görsel QA) yeni değer için de yapılır.
+**Uygulama biçimi:** Ayarlar `core.appearance.accent-light` ve `core.appearance.accent-dark` anahtarlarıyla Yönetim > Ayarlar'da tutulur (migration gerekmez, firma ayarı deposu). Web, oturum yüklenince bunları okur ve `<style id="mx-accent-style">` ile yalnızca yukarıdaki üç tokeni (`--mx-brand-primary`, `-hover`, `-rgb`) açık/koyu temaya göre yazar; bileşen CSS'i değişmez. Ayar yoksa hiçbir şey yazılmaz. Marka renginin açık ve koyu temada ekran görüntüsü kontrolü (görsel QA) yeni değer için de yapılır.
 
 **Kapsam dışı (bu liste büyütülmeden eklenmez):** yazı tipi, durum renkleri, yüzey/metin renkleri, köşe ve gölge. Yeni bir token firmaya açılacaksa önce bu tabloya, kontrast kuralıyla birlikte yazılır.
 
