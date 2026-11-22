@@ -1,7 +1,7 @@
 # ADR-0053: Birleşik müşteri zaman çizelgesi
 
 - **Durum:** Dilim 1 (kaynak sözleşmesi, CRM kaynakları, uç nokta, firma kartında sekme) 17 Kasım 2026'da teslim edildi (PR #468).
-  Dilim 2a (Sipariş kaynağı) ve 2b (Sözleşme kaynağı) 17 Kasım 2026'da, 2c (Destek kaynağı) 21 Kasım 2026'da, 2d (Pazarlama kaynağı) 22 Kasım 2026'da (PR #511), dilim 3'ün süzgeç yarısı (kaynak süzgeci) 22 Kasım 2026'da teslim edildi. Diğer dilimler öneridir.
+  Dilim 2a (Sipariş kaynağı) ve 2b (Sözleşme kaynağı) 17 Kasım 2026'da, 2c (Destek kaynağı) 21 Kasım 2026'da, 2d (Pazarlama kaynağı) 22 Kasım 2026'da (PR #511), dilim 3 (kaynak süzgeci PR #515, özet şeridi) 22 Kasım 2026'da teslim edildi. Diğer dilimler öneridir.
 - **Kaynak:** [CRM eksik süreç epic listesi](../crm-eksik-surecler-epicleri.md) E9.
 
 ## Bağlam
@@ -83,7 +83,15 @@ token yoktur. Fırsat ve teklif satırı kendi sayfasına bağlanır; "Daha eski
      listesi yalnızca sorgulananlardan okunabilenleri sayar. Tanınmayan anahtar 400 döner; izni ya da lisansı olmayan kaynağın anahtarı geçerlidir
      ama kaynak listede ve satırlarda yoktur (süzgeç yetkiyi genişletmez). Arayüzde çizelgenin üstünde çok seçimli `chip` süzgeci vardır ("Tümü" ya da
      seçilen türler); çipler süzgeçsiz yüklemenin `sources` listesinden kurulur, tek kaynak okunabiliyorsa gösterilmez. Süzgeç değişince çizelge
-     baştan yüklenir. Özet şeridi sonraki dilimdedir.
+     baştan yüklenir.
+   - **Özet şeridi (22 Kasım 2026):** `GET .../timeline/summary` son hareketi ve kaynak başına açık iş sayısını verir. Sözleşmeye geriye uyumlu,
+     varsayılan uygulamalı `ICustomerTimelineSource.CountOpenAsync` eklendi (`null` = kaynak açık iş bildirmiyor ya da çağıran okuyamıyor; sıfır =
+     "okunabilir, açık iş yok"); sayılar kayıt boru hattının `TotalCount` değeriyle, kaynağın kendi izin, kapsam ve lisans kurallarıyla hesaplanır. Açık iş
+     bildirenler: aktivite (açık durumlar), fırsat (durum Açık), destek talebi (iptal/kapalı/birleştirilmiş hariç) ve sipariş (taslak, onay bekleyen,
+     onaylı). Sözleşme, teklif ve pazarlama açık iş bildirmez. **"Son temas" yerine "son hareket":** şerit müşteriyle gerçekleşmiş bir temas değil,
+     okunabilen kaynaklardaki şimdiden önceki en yeni kaydı gösterir (belge oluşturma da hareket sayılır); ileri tarihli planlı kayıt sayılmaz. Gerçek
+     "son temas" (yalnızca tamamlanmış aktivite, gelen/giden ileti) için kaynak bazlı temas türü tanımı gerekir ve sonraya bırakıldı. CRM'in açık
+     fırsat ve aktivite sayıları firma kartının yan özetinde de vardır; şerit onları çizelgenin içinde, diğer modüllerin sayılarıyla birlikte gösterir.
 4. Durum değişikliği satırları (fırsat kazanıldı/kaybedildi, teklif kabul edildi) ve müşteri adayı geçmişi (dönüşen aday).
 
 ## Yapılmadı / sınırlar

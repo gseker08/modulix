@@ -498,6 +498,19 @@ public sealed record CustomerTimelineDto(
     public const int MaxTake = 100;
 }
 
+/// <summary>Özet şeridinde bir kaynağın açık iş sayısı; <see cref="Source"/> zaman çizelgesi kaynak anahtarıdır (ör. <c>support.tickets</c>).</summary>
+public sealed record CustomerTimelineOpenDto(string Source, int Count);
+
+/// <summary>
+/// Müşteri zaman çizelgesinin özet şeridi (ADR-0053, dilim 3). <see cref="LastEntryAt"/> okunabilen kaynaklardaki en yeni geçmiş kaydın anıdır
+/// (ileri tarihli planlı kayıtlar sayılmaz); okunabilen kaynakta kayıt yoksa <c>null</c>. <see cref="Open"/> yalnızca okunabilen ve açık iş
+/// bildiren kaynakları içerir; izni ya da lisansı olmayan kaynak listede yoktur (sıfır gibi gösterilmez).
+/// </summary>
+public sealed record CustomerTimelineSummaryDto(
+    DateTimeOffset? LastEntryAt,
+    string? LastEntryEntityKey,
+    IReadOnlyList<CustomerTimelineOpenDto> Open);
+
 /// <summary>
 /// Firma–kişi ilişki rolleri (ADR-0011). Kişinin müşteri firmadaki iş rolüdür; uygulamadaki güvenlik rolleriyle ilgisi yoktur.
 /// Bir ilişkiye birden fazla rol atanabilir.
