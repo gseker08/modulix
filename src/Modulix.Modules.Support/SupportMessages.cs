@@ -123,4 +123,50 @@ internal static class SupportMessages
         public static ServerMessage EscalationQueueUnavailable(object ruleId) =>
             ServerMessage.Of("support.server.sla.escalation-queue-unavailable", "'{0}' kuralındaki kuyruk bulunamadı ya da pasif.", ruleId);
     }
+
+    /// <summary>Kategori zorunlu alan listesi doğrulaması.</summary>
+    public static class Category
+    {
+        public static ServerMessage InvalidRequiredFields(string unknown, string allowed) =>
+            ServerMessage.Of("support.server.category.invalid-required-fields", "Geçersiz alan: {0}. İzin verilenler: {1}.", unknown, allowed);
+    }
+
+    /// <summary>SLA eskalasyon kuralı listesi doğrulaması.</summary>
+    public static class Escalation
+    {
+        public static ServerMessage InvalidJson =>
+            ServerMessage.Of("support.server.escalation.invalid-json", "Eskalasyon kuralları geçerli bir JSON listesi olmalıdır.");
+
+        public static ServerMessage TooManyRules(int max) =>
+            ServerMessage.Of("support.server.escalation.too-many-rules", "En çok {0} eskalasyon kuralı tanımlanabilir.", max);
+
+        public static ServerMessage RuleInvalid =>
+            ServerMessage.Of("support.server.escalation.rule-invalid",
+                "Her kural için küçük harf/rakam/tire kimliği, ölçüt (FirstResponse|Resolution), 1-500 yüzde ve geçerli eylem verin.");
+
+        public static ServerMessage NotifyUserNeedsUser =>
+            ServerMessage.Of("support.server.escalation.notify-user-needs-user", "Kullanıcıya bildirim kuralı için kullanıcı seçin.");
+
+        public static ServerMessage ReassignNeedsTarget =>
+            ServerMessage.Of("support.server.escalation.reassign-needs-target", "Yeniden atama kuralı için kullanıcı ve/veya kuyruk seçin.");
+
+        public static ServerMessage DuplicateIds =>
+            ServerMessage.Of("support.server.escalation.duplicate-ids", "Kural kimlikleri benzersiz olmalıdır.");
+    }
+
+    /// <summary>Öncelik matrisi doğrulaması.</summary>
+    public static class Matrix
+    {
+        public static ServerMessage ImpactOneOf(string allowed) =>
+            ServerMessage.Of("support.server.matrix.impact-one-of", "Etki şunlardan biri olmalıdır: {0}.", allowed);
+
+        public static ServerMessage UrgencyOneOf(string allowed) =>
+            ServerMessage.Of("support.server.matrix.urgency-one-of", "Aciliyet şunlardan biri olmalıdır: {0}.", allowed);
+
+        public static ServerMessage PriorityOneOf(string allowed) =>
+            ServerMessage.Of("support.server.matrix.priority-one-of", "Öncelik şunlardan biri olmalıdır: {0}.", allowed);
+
+        public static ServerMessage OneValuePerCell =>
+            ServerMessage.Of("support.server.matrix.one-value-per-cell", "Her etki × aciliyet hücresi için tek değer verilebilir.");
+    }
 }

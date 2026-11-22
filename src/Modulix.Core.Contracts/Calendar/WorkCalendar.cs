@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Core.Contracts.Calendar;
 
@@ -71,17 +72,17 @@ public static class CalendarSpecParser
 
     private sealed record HolidayDto(string Date, string? Name, string? Start, string? End);
 
-    public static (CalendarSpec? Spec, IReadOnlyList<(string Field, string Message)> Errors) Parse(
+    public static (CalendarSpec? Spec, IReadOnlyList<(string Field, ServerMessage Message)> Errors) Parse(
         string timeZoneId, bool alwaysOpen, string? weeklyJson, string? holidaysJson)
     {
-        var errors = new List<(string, string)>();
+        var errors = new List<(string, ServerMessage)>();
         try
         {
             TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
         }
         catch (Exception exception) when (exception is TimeZoneNotFoundException or InvalidTimeZoneException)
         {
-            errors.Add(("timeZoneId", "Geçerli bir saat dilimi kimliği girin (ör. Europe/Istanbul)."));
+            errors.Add(("timeZoneId", ServerMessages.Calendar.TimeZone));
         }
 
         var weekly = new List<DayHours>();
@@ -93,7 +94,7 @@ public static class CalendarSpecParser
                 {
                     if (dto.Day is < 0 or > 6 || !TryTime(dto.Start, out var start) || !TryTime(dto.End, out var end) || end <= start)
                     {
-                        errors.Add(("weeklyHours", "Her çalışma penceresi için gün (0=Pazar … 6=Cumartesi), başlangıç ve daha geç bir bitiş (SS:dd) verin."));
+                        errors.Add(("weeklyHours", ServerMessages.Calendar.WeeklyWindow));
                         break;
                     }
 
@@ -102,7 +103,7 @@ public static class CalendarSpecParser
             }
             catch (JsonException)
             {
-                errors.Add(("weeklyHours", "Çalışma saatleri geçerli bir JSON listesi olmalıdır."));
+                errors.Add(("weeklyHours", ServerMessages.Calendar.WeeklyJson));
             }
         }
 
@@ -113,14 +114,14 @@ public static class CalendarSpecParser
             {
                 if (ordered[i].Start < ordered[i - 1].End)
                 {
-                    errors.Add(("weeklyHours", "Aynı gündeki çalışma pencereleri çakışamaz."));
+                    errors.Add(("weeklyHours", ServerMessages.Calendar.WeeklyOverlap));
                 }
             }
         }
 
         if (!alwaysOpen && weekly.Count == 0)
         {
-            errors.Add(("weeklyHours", "7/24 değilse en az bir çalışma penceresi gerekir."));
+            errors.Add(("weeklyHours", ServerMessages.Calendar.WeeklyRequired));
         }
 
         var holidays = new List<CalendarHoliday>();
@@ -134,7 +135,7 @@ public static class CalendarSpecParser
                     var windowOk = TryTime(dto.Start, out var windowStart) & TryTime(dto.End, out var windowEnd) && windowEnd > windowStart;
                     if (!DateOnly.TryParseExact(dto.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) || (hasWindow && !windowOk))
                     {
-                        errors.Add(("holidays", "Her tatil için tarih (yyyy-MM-dd) verin; yarım gün için başlangıç ve daha geç bir bitiş (SS:dd) gerekir."));
+                        errors.Add(("holidays", ServerMessages.Calendar.HolidayEntry));
                         break;
                     }
 
@@ -144,12 +145,12 @@ public static class CalendarSpecParser
             }
             catch (JsonException)
             {
-                errors.Add(("holidays", "Tatiller geçerli bir JSON listesi olmalıdır."));
+                errors.Add(("holidays", ServerMessages.Calendar.HolidaysJson));
             }
 
             if (holidays.GroupBy(h => h.Date).Any(g => g.Count() > 1))
             {
-                errors.Add(("holidays", "Aynı tarih için tek tatil kaydı olabilir."));
+                errors.Add(("holidays", ServerMessages.Calendar.HolidayDuplicate));
             }
         }
 

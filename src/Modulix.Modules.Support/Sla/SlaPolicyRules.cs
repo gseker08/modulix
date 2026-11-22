@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Support.Sla;
 
@@ -43,9 +44,9 @@ public static class EscalationRuleParser
 
     public const int MaxRules = 20;
 
-    public static (IReadOnlyList<EscalationRule> Rules, IReadOnlyList<(string Field, string Message)> Errors) Parse(string? json)
+    public static (IReadOnlyList<EscalationRule> Rules, IReadOnlyList<(string Field, ServerMessage Message)> Errors) Parse(string? json)
     {
-        var errors = new List<(string, string)>();
+        var errors = new List<(string, ServerMessage)>();
         List<EscalationRule> rules = [];
         if (!string.IsNullOrWhiteSpace(json))
         {
@@ -55,13 +56,13 @@ public static class EscalationRuleParser
             }
             catch (JsonException)
             {
-                return ([], [("escalationRules", "Eskalasyon kuralları geçerli bir JSON listesi olmalıdır.")]);
+                return ([], [("escalationRules", SupportMessages.Escalation.InvalidJson)]);
             }
         }
 
         if (rules.Count > MaxRules)
         {
-            errors.Add(("escalationRules", $"En çok {MaxRules} eskalasyon kuralı tanımlanabilir."));
+            errors.Add(("escalationRules", SupportMessages.Escalation.TooManyRules(MaxRules)));
         }
 
         foreach (var rule in rules)
@@ -69,24 +70,24 @@ public static class EscalationRuleParser
             if (rule.Id is null || !IdPattern.IsMatch(rule.Id) || !SlaMetric.All.Contains(rule.Metric) || rule.Percent is < 1 or > 500
                 || !SlaEscalationAction.All.Contains(rule.Action))
             {
-                errors.Add(("escalationRules", "Her kural için küçük harf/rakam/tire kimliği, ölçüt (FirstResponse|Resolution), 1-500 yüzde ve geçerli eylem verin."));
+                errors.Add(("escalationRules", SupportMessages.Escalation.RuleInvalid));
                 break;
             }
 
             if (rule.Action == SlaEscalationAction.NotifyUser && rule.UserId is null)
             {
-                errors.Add(("escalationRules", "Kullanıcıya bildirim kuralı için kullanıcı seçin."));
+                errors.Add(("escalationRules", SupportMessages.Escalation.NotifyUserNeedsUser));
             }
 
             if (rule.Action == SlaEscalationAction.Reassign && rule.UserId is null && rule.QueueId is null)
             {
-                errors.Add(("escalationRules", "Yeniden atama kuralı için kullanıcı ve/veya kuyruk seçin."));
+                errors.Add(("escalationRules", SupportMessages.Escalation.ReassignNeedsTarget));
             }
         }
 
         if (rules.GroupBy(r => r.Id).Any(g => g.Count() > 1))
         {
-            errors.Add(("escalationRules", "Kural kimlikleri benzersiz olmalıdır."));
+            errors.Add(("escalationRules", SupportMessages.Escalation.DuplicateIds));
         }
 
         return (rules, errors);
