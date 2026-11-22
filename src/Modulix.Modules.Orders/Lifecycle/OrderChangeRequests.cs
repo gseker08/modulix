@@ -5,6 +5,7 @@ using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Orders.Domain;
 using Modulix.Modules.Orders.Records;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Orders.Lifecycle;
 
@@ -252,7 +253,7 @@ internal sealed class OrderChangeRequests(
         var errors = OrderChangeRules.Validate(set, state, amounts);
         if (errors.Count > 0)
         {
-            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.Conflict, "Talep artık uygulanamaz: " + errors[0].Message,
+            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.Conflict, "Talep artık uygulanamaz: " + errors[0].Message.Text,
                 [.. errors.Select(e => new RecordFieldError(e.Field, e.Message))]);
         }
 

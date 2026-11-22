@@ -6,6 +6,7 @@ using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Orders.Domain;
 using Modulix.Modules.Orders.Records;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Orders.Lifecycle;
 
@@ -123,7 +124,7 @@ internal sealed class OrderFulfillment(
                 foreach (var action in DeliveryAction.All)
                 {
                     var rule = FulfillmentTransitions.CanDeliveryAct(action, d.Status, order.Status, rescheduled);
-                    actions.Add(new FulfillmentActionState(action, rule.Allowed, rule.Code, rule.Message, FulfillmentTransitions.DeliveryRequiresReason(action) || action == DeliveryAction.Reschedule));
+                    actions.Add(new FulfillmentActionState(action, rule.Allowed, rule.Code, rule.Message?.Text, FulfillmentTransitions.DeliveryRequiresReason(action) || action == DeliveryAction.Reschedule));
                 }
             }
 
@@ -156,10 +157,10 @@ internal sealed class OrderFulfillment(
                 var rule = FulfillmentTransitions.CanServiceAct(action, start.Status);
                 if (rule.Allowed && action == ServiceAction.Start && blockers.Count > 0)
                 {
-                    rule = OrderRuleResult.Deny("blocked", "Başlangıç engelleniyor: " + blockers[0] + (blockers.Count > 1 ? $" (+{blockers.Count - 1} engel daha)" : string.Empty));
+                    rule = OrderRuleResult.Deny("blocked", blockers.Count > 1 ? OrdersMessages.FulfillmentRule.StartBlockedMore(blockers[0], blockers.Count - 1) : OrdersMessages.FulfillmentRule.StartBlocked(blockers[0]));
                 }
 
-                actions.Add(new FulfillmentActionState(action, rule.Allowed, rule.Code, rule.Message, false));
+                actions.Add(new FulfillmentActionState(action, rule.Allowed, rule.Code, rule.Message?.Text, false));
             }
         }
 
@@ -258,7 +259,7 @@ internal sealed class OrderFulfillment(
         var rule = FulfillmentTransitions.CanDeliveryAct(action, delivery.Status, order.Status, alreadyRescheduled);
         if (!rule.Allowed)
         {
-            return RecordResult<DeliveryView>.Fail(RecordErrorCode.Conflict, rule.Message ?? "Bu işlem şu an yapılamaz.", [new RecordFieldError(rule.Code ?? "status", rule.Message ?? string.Empty)]);
+            return RecordResult<DeliveryView>.Fail(RecordErrorCode.Conflict, rule.Message ?? OrdersMessages.Workflow.NotNow, [new RecordFieldError(rule.Code ?? "status", rule.Message ?? OrdersMessages.Workflow.NotNow)]);
         }
 
         if (action == DeliveryAction.Reschedule)
@@ -604,7 +605,7 @@ internal sealed class OrderFulfillment(
         var rule = FulfillmentTransitions.CanServiceAct(action, start.Status);
         if (!rule.Allowed)
         {
-            return RecordResult<ServiceLineView>.Fail(RecordErrorCode.Conflict, rule.Message ?? "Bu işlem şu an yapılamaz.", [new RecordFieldError(rule.Code ?? "status", rule.Message ?? string.Empty)]);
+            return RecordResult<ServiceLineView>.Fail(RecordErrorCode.Conflict, rule.Message ?? OrdersMessages.Workflow.NotNow, [new RecordFieldError(rule.Code ?? "status", rule.Message ?? OrdersMessages.Workflow.NotNow)]);
         }
 
         var now = time.GetUtcNow();
@@ -748,6 +749,6 @@ internal sealed class OrderFulfillment(
     private static RecordResult<T> FailFrom<T>(IReadOnlyList<DeliveryError> errors) =>
         RecordResult<T>.Fail(RecordErrorCode.ValidationFailed, errors[0].Message, [.. errors.Select(e => new RecordFieldError(e.Field, e.Message))]);
 
-    private static RecordResult<T> Invalid<T>(string field, string message) =>
+    private static RecordResult<T> Invalid<T>(string field, ServerMessage message) =>
         RecordResult<T>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

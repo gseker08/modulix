@@ -5,6 +5,7 @@ using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Orders.Domain;
 using Modulix.Modules.Orders.Records;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Orders.Lifecycle;
 
@@ -140,7 +141,7 @@ internal sealed class OrderHandovers(
         var rule = HandoverRules.Can(action, handover.Status, order.Status, missing);
         if (!rule.Allowed)
         {
-            return RecordResult<OrderHandoverView>.Fail(RecordErrorCode.Conflict, rule.Message ?? "Bu işlem şu an yapılamaz.", [new RecordFieldError(rule.Code ?? "status", rule.Message ?? string.Empty)]);
+            return RecordResult<OrderHandoverView>.Fail(RecordErrorCode.Conflict, rule.Message ?? OrdersMessages.Workflow.NotNow, [new RecordFieldError(rule.Code ?? "status", rule.Message ?? OrdersMessages.Workflow.NotNow)]);
         }
 
         var now = time.GetUtcNow();
@@ -261,7 +262,7 @@ internal sealed class OrderHandovers(
         foreach (var action in HandoverAction.All.Where(a => granted.Contains(PermissionOf[a])))
         {
             var rule = HandoverRules.Can(action, handover.Status, order.Status, missing);
-            actions.Add(new HandoverActionState(action, rule.Allowed, rule.Code, rule.Message, HandoverRules.RequiresNote(action, handover.Status)));
+            actions.Add(new HandoverActionState(action, rule.Allowed, rule.Code, rule.Message?.Text, HandoverRules.RequiresNote(action, handover.Status)));
         }
 
         var events = await reader.HandoverEventsAsync(handover.Id, cancellationToken);

@@ -1,4 +1,5 @@
 using System.Globalization;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Orders.Lifecycle;
 
@@ -22,7 +23,7 @@ public sealed record OrderChangeImpact(
 public sealed record OrderHeaderState(
     string Status, string HandoverStatus, string FulfillmentStatus, string? ContractNumber, IReadOnlyDictionary<string, string?> Values);
 
-public readonly record struct ChangeError(string Field, string Message);
+public readonly record struct ChangeError(string Field, ServerMessage Message);
 
 /// <summary>Değişiklik talebi kuralları (saf): doğrulama, etkisiz değişikliğin ayıklanması ve etki özeti.</summary>
 public static class OrderChangeRules
@@ -72,13 +73,13 @@ public static class OrderChangeRules
         var errors = new List<ChangeError>();
         if (state.Status != OrderStatus.Approved)
         {
-            errors.Add(new ChangeError("status", "Değişiklik talebi yalnızca onaylanmış sipariş için açılır; taslak sipariş doğrudan düzenlenir."));
+            errors.Add(new ChangeError("status", OrdersMessages.ChangeRule.OnlyApproved));
             return errors;
         }
 
         if (effective.IsEmpty)
         {
-            errors.Add(new ChangeError("changes", "Mevcut siparişten farklı en az bir değişiklik gerekir."));
+            errors.Add(new ChangeError("changes", OrdersMessages.ChangeRule.NoDifference));
             return errors;
         }
 
@@ -86,15 +87,15 @@ public static class OrderChangeRules
         {
             if (!HeaderFields.Contains(field))
             {
-                errors.Add(new ChangeError(field, "Bu alan değişiklik talebiyle değiştirilemez."));
+                errors.Add(new ChangeError(field, OrdersMessages.ChangeRule.FieldLocked));
             }
             else if (DateFields.Contains(field) && value is not null && !DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
             {
-                errors.Add(new ChangeError(field, "Tarih yyyy-AA-gg biçiminde olmalıdır."));
+                errors.Add(new ChangeError(field, ServerMessages.Validation.DateFormat));
             }
             else if (value is { Length: > 4000 } || (field is "deliveryAddress" or "location" && value is { Length: > 1000 }))
             {
-                errors.Add(new ChangeError(field, "Metin çok uzun."));
+                errors.Add(new ChangeError(field, OrdersMessages.ChangeRule.TextTooLong));
             }
         }
 
@@ -102,7 +103,7 @@ public static class OrderChangeRules
         if (DateOnly.TryParseExact(Resulting("plannedStartDate"), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start)
             && DateOnly.TryParseExact(Resulting("plannedDeliveryDate"), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var delivery) && delivery < start)
         {
-            errors.Add(new ChangeError("plannedDeliveryDate", "Planlanan teslim tarihi başlangıç tarihinden önce olamaz."));
+            errors.Add(new ChangeError("plannedDeliveryDate", OrdersMessages.ChangeRule.PlannedBeforeStart));
         }
 
         var seen = new HashSet<Guid>();
@@ -111,35 +112,35 @@ public static class OrderChangeRules
             var line = lines.FirstOrDefault(l => l.LineId == change.LineId);
             if (line is null)
             {
-                errors.Add(new ChangeError("lines", "Değişiklikteki kalemlerden biri bu siparişte yok."));
+                errors.Add(new ChangeError("lines", OrdersMessages.ChangeRule.LineMissing));
                 continue;
             }
 
             if (!seen.Add(change.LineId))
             {
-                errors.Add(new ChangeError("lines", $"'{line.Name}' birden çok kez verilemiş."));
+                errors.Add(new ChangeError("lines", OrdersMessages.ChangeRule.LineDuplicate(line.Name)));
             }
 
             if (change.Quantity is { } quantity)
             {
                 if (quantity < 0m)
                 {
-                    errors.Add(new ChangeError("lines", $"'{line.Name}' miktarı negatif olamaz."));
+                    errors.Add(new ChangeError("lines", OrdersMessages.ChangeRule.LineNegative(line.Name)));
                 }
                 else if (quantity > line.Effective)
                 {
-                    errors.Add(new ChangeError("lines", $"'{line.Name}' miktarı artırılamaz (şu an {line.Effective:0.####}); ek kapsam yeni bir tekliften ayrı sipariş olarak açılır."));
+                    errors.Add(new ChangeError("lines", OrdersMessages.ChangeRule.LineIncrease(line.Name, OrdersMessages.Q(line.Effective))));
                 }
                 else if (quantity < line.Delivered)
                 {
-                    errors.Add(new ChangeError("lines", $"'{line.Name}' için {line.Delivered:0.####} zaten teslim edildi; miktar bunun altına indirilemez."));
+                    errors.Add(new ChangeError("lines", OrdersMessages.ChangeRule.LineDelivered(line.Name, OrdersMessages.Q(line.Delivered))));
                 }
             }
         }
 
         if (errors.Count == 0 && lines.Where(l => l.Effective > 0m).All(l => effective.Lines.Any(c => c.LineId == l.LineId && c.Quantity == 0m)))
         {
-            errors.Add(new ChangeError("lines", "Tüm kalemler sıfırlanıyorsa değişiklik talebi yerine siparişi iptal edin."));
+            errors.Add(new ChangeError("lines", OrdersMessages.ChangeRule.AllZero));
         }
 
         return errors;

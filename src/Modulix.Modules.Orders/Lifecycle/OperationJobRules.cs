@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Localization;
+
 namespace Modulix.Modules.Orders.Lifecycle;
 
 public static class JobStatus
@@ -168,43 +170,43 @@ public static class JobTransitions
         switch (action)
         {
             case JobAction.Assign:
-                return JobStatus.IsOpen(s.Status) ? OrderRuleResult.Ok : OrderRuleResult.Deny("final", "Tamamlanmış ya da iptal edilmiş işe atama yapılamaz.");
+                return JobStatus.IsOpen(s.Status) ? OrderRuleResult.Ok : OrderRuleResult.Deny("final", OrdersMessages.JobRule.AssignFinal);
 
             case JobAction.Start:
                 if (s.Status is not (JobStatus.AwaitingAssignment or JobStatus.Planned))
                 {
-                    return OrderRuleResult.Deny("not-startable", s.Status == JobStatus.InProgress ? "İş zaten devam ediyor." : "Tamamlanmış ya da iptal edilmiş iş başlatılamaz.");
+                    return OrderRuleResult.Deny("not-startable", s.Status == JobStatus.InProgress ? OrdersMessages.JobRule.AlreadyRunning : OrdersMessages.JobRule.StartFinal);
                 }
 
                 if (s.OrderStatus != OrderStatus.Approved)
                 {
-                    return OrderRuleResult.Deny("order-not-approved", "Sipariş onaylı olmadığı için iş başlatılamaz.");
+                    return OrderRuleResult.Deny("order-not-approved", OrdersMessages.JobRule.OrderNotApproved);
                 }
 
                 if (!s.HasAssignee)
                 {
-                    return OrderRuleResult.Deny("unassigned", "Önce sorumlu kullanıcı ya da ekip atanmalı.");
+                    return OrderRuleResult.Deny("unassigned", OrdersMessages.JobRule.Unassigned);
                 }
 
                 return s.OpenDependencies > 0
-                    ? OrderRuleResult.Deny("dependency", $"Bağımlı olduğu {s.OpenDependencies} iş tamamlanmadan başlatılamaz.")
+                    ? OrderRuleResult.Deny("dependency", OrdersMessages.JobRule.Dependency(s.OpenDependencies))
                     : OrderRuleResult.Ok;
 
             case JobAction.Complete:
                 if (s.Status != JobStatus.InProgress)
                 {
-                    return OrderRuleResult.Deny("not-in-progress", "Yalnızca devam eden iş tamamlanabilir.");
+                    return OrderRuleResult.Deny("not-in-progress", OrdersMessages.JobRule.NotInProgress);
                 }
 
                 return s.RequiredTasksLeft > 0
-                    ? OrderRuleResult.Deny("tasks", $"{s.RequiredTasksLeft} zorunlu görev tamamlanmadan iş tamamlanamaz.")
+                    ? OrderRuleResult.Deny("tasks", OrdersMessages.JobRule.TasksLeft(s.RequiredTasksLeft))
                     : OrderRuleResult.Ok;
 
             case JobAction.Cancel:
-                return JobStatus.IsOpen(s.Status) ? OrderRuleResult.Ok : OrderRuleResult.Deny("final", "Tamamlanmış ya da zaten iptal edilmiş iş iptal edilemez.");
+                return JobStatus.IsOpen(s.Status) ? OrderRuleResult.Ok : OrderRuleResult.Deny("final", OrdersMessages.JobRule.CancelFinal);
 
             default:
-                return OrderRuleResult.Deny("unknown", "Bilinmeyen eylem.");
+                return OrderRuleResult.Deny("unknown", OrdersMessages.Workflow.UnknownAction);
         }
     }
 

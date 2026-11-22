@@ -3,6 +3,7 @@ using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Orders.Domain;
 using Modulix.Modules.Orders.Records;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Orders.Lifecycle;
 
@@ -74,10 +75,10 @@ internal sealed class OrderWorkflow(
             var rule = OrderTransitions.Can(action, state);
             if (rule.Allowed && OrderAction.IsDecision(action) && await SelfApprovalBlockedAsync(id, cancellationToken))
             {
-                rule = OrderRuleResult.Deny("self-approval", "Kendi onaya gönderdiğiniz siparişi onaylayamazsınız.");
+                rule = OrderRuleResult.Deny("self-approval", OrdersMessages.Workflow.SelfApproval);
             }
 
-            list.Add(new OrderActionState(action, rule.Allowed, rule.Code, rule.Message, OrderTransitions.RequiresReason(action)));
+            list.Add(new OrderActionState(action, rule.Allowed, rule.Code, rule.Message?.Text, OrderTransitions.RequiresReason(action)));
         }
 
         return RecordResult<IReadOnlyList<OrderActionState>>.Ok(list);
@@ -110,13 +111,13 @@ internal sealed class OrderWorkflow(
         var rule = OrderTransitions.Can(action, await StateOfAsync(loaded.Value!, id, cancellationToken));
         if (!rule.Allowed)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, rule.Message ?? "Bu işlem şu an yapılamaz.", [new RecordFieldError(rule.Code ?? "status", rule.Message ?? string.Empty)]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, rule.Message ?? OrdersMessages.Workflow.NotNow, [new RecordFieldError(rule.Code ?? "status", rule.Message ?? OrdersMessages.Workflow.NotNow)]);
         }
 
         if (OrderAction.IsDecision(action) && await SelfApprovalBlockedAsync(id, cancellationToken))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Kendi onaya gönderdiğiniz siparişi onaylayamazsınız.",
-                [new RecordFieldError("status", "Kendi onaya gönderdiğiniz siparişi onaylayamazsınız.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, OrdersMessages.Workflow.SelfApproval,
+                [new RecordFieldError("status", OrdersMessages.Workflow.SelfApproval)]);
         }
 
         var target = OrderTransitions.TargetStatus(action);

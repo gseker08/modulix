@@ -166,9 +166,9 @@ public class OrderChangeRulesTests
     [Fact]
     public void Quantity_cannot_increase_go_below_the_delivered_amount_or_become_negative()
     {
-        Assert.Contains(OrderChangeRules.Validate(Set(null, new OrderLineChange(LineA, 5m)), State(), Lines()), e => e.Field == "lines" && e.Message.Contains("artırılamaz"));
-        Assert.Contains(OrderChangeRules.Validate(Set(null, new OrderLineChange(LineA, 1m)), State(), Lines(deliveredA: 2m)), e => e.Message.Contains("teslim edildi"));
-        Assert.Contains(OrderChangeRules.Validate(Set(null, new OrderLineChange(LineA, -1m)), State(), Lines()), e => e.Message.Contains("negatif"));
+        Assert.Contains(OrderChangeRules.Validate(Set(null, new OrderLineChange(LineA, 5m)), State(), Lines()), e => e.Field == "lines" && e.Message.Text.Contains("artırılamaz"));
+        Assert.Contains(OrderChangeRules.Validate(Set(null, new OrderLineChange(LineA, 1m)), State(), Lines(deliveredA: 2m)), e => e.Message.Text.Contains("teslim edildi"));
+        Assert.Contains(OrderChangeRules.Validate(Set(null, new OrderLineChange(LineA, -1m)), State(), Lines()), e => e.Message.Text.Contains("negatif"));
         Assert.Empty(OrderChangeRules.Validate(Set(null, new OrderLineChange(LineA, 2m)), State(), Lines(deliveredA: 2m)));
     }
 
@@ -177,9 +177,9 @@ public class OrderChangeRulesTests
     {
         Assert.Contains(OrderChangeRules.Validate(Set(new() { ["netTotal"] = "1" }), State(), Lines()), e => e.Field == "netTotal");
         Assert.Contains(OrderChangeRules.Validate(Set(new() { ["plannedDeliveryDate"] = "15/12/2026" }), State(), Lines()), e => e.Field == "plannedDeliveryDate");
-        Assert.Contains(OrderChangeRules.Validate(Set(new() { ["plannedDeliveryDate"] = "2026-11-01" }), State(), Lines()), e => e.Message.Contains("önce olamaz"));
-        Assert.Contains(OrderChangeRules.Validate(Set(null, new OrderLineChange(Guid.NewGuid(), 1m)), State(), Lines()), e => e.Message.Contains("bu siparişte yok"));
-        Assert.Contains(OrderChangeRules.Validate(Set(null, new OrderLineChange(LineA, 0m), new OrderLineChange(LineB, 0m)), State(), Lines()), e => e.Message.Contains("iptal edin"));
+        Assert.Contains(OrderChangeRules.Validate(Set(new() { ["plannedDeliveryDate"] = "2026-11-01" }), State(), Lines()), e => e.Message.Text.Contains("önce olamaz"));
+        Assert.Contains(OrderChangeRules.Validate(Set(null, new OrderLineChange(Guid.NewGuid(), 1m)), State(), Lines()), e => e.Message.Text.Contains("bu siparişte yok"));
+        Assert.Contains(OrderChangeRules.Validate(Set(null, new OrderLineChange(LineA, 0m), new OrderLineChange(LineB, 0m)), State(), Lines()), e => e.Message.Text.Contains("iptal edin"));
     }
 
     [Fact]

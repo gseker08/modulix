@@ -78,7 +78,7 @@ public class OrderHandoverRulesTests
     {
         Assert.Equal("order-not-approved", HandoverRules.Can(HandoverAction.Send, HandoverStatus.Ready, OrderStatus.Draft, []).Code);
         Assert.Equal("missing-info", HandoverRules.Can(HandoverAction.Send, HandoverStatus.Preparing, OrderStatus.Approved, ["Lokasyon yazılmadı.", "Başka"]).Code);
-        Assert.Contains("+1", HandoverRules.Can(HandoverAction.Send, HandoverStatus.Preparing, OrderStatus.Approved, ["a", "b"]).Message);
+        Assert.Contains("+1", HandoverRules.Can(HandoverAction.Send, HandoverStatus.Preparing, OrderStatus.Approved, ["a", "b"]).Message!.Text);
         Assert.Equal("already-sent", HandoverRules.Can(HandoverAction.Send, HandoverStatus.Sent, OrderStatus.Approved, []).Code);
         Assert.Equal("accepted", HandoverRules.Can(HandoverAction.Send, HandoverStatus.Accepted, OrderStatus.Approved, []).Code);
         Assert.True(HandoverRules.Can(HandoverAction.Send, HandoverStatus.Ready, OrderStatus.Approved, []).Allowed);

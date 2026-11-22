@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Localization;
+
 namespace Modulix.Modules.Orders.Lifecycle;
 
 // Sipariş durum sabitleri ve saf kurallar (ADR-0023). Kurallar sunucuda uygulanır; arayüz yalnızca aynı kuralları gösterir.
@@ -88,11 +90,11 @@ public static class OrderEventKinds
     public const string HandoverChanged = "HandoverChanged";
 }
 
-public readonly record struct OrderRuleResult(bool Allowed, string? Code = null, string? Message = null)
+public readonly record struct OrderRuleResult(bool Allowed, string? Code = null, ServerMessage? Message = null)
 {
     public static OrderRuleResult Ok { get; } = new(true);
 
-    public static OrderRuleResult Deny(string code, string message) => new(false, code, message);
+    public static OrderRuleResult Deny(string code, ServerMessage message) => new(false, code, message);
 }
 
 public static class OrderRules
@@ -106,8 +108,8 @@ public static class OrderRules
             ? OrderRuleResult.Ok
             : OrderRuleResult.Deny("locked", status switch
             {
-                OrderStatus.PendingApproval => "Onay bekleyen siparişin ticari alanları değiştirilemez; önce taslağa geri alın.",
-                OrderStatus.Approved => "Onaylanmış siparişin ticari alanları değiştirilemez; değişiklik talebi açın.",
-                _ => "Sonuçlanmış siparişin ticari alanları değiştirilemez.",
+                OrderStatus.PendingApproval => OrdersMessages.Transition.EditPending,
+                OrderStatus.Approved => OrdersMessages.Transition.EditApproved,
+                _ => OrdersMessages.Transition.EditFinal,
             });
 }

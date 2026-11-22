@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Localization;
+
 namespace Modulix.Modules.Orders.Lifecycle;
 
 /// <summary>Ticari durum eylemleri; adlar API yoludur (<c>POST /api/orders/orders/{id}/{eylem}</c>).</summary>
@@ -50,45 +52,45 @@ public static class OrderTransitions
             case OrderAction.SubmitForApproval:
                 if (s.Status != OrderStatus.Draft)
                 {
-                    return OrderRuleResult.Deny("not-draft", "Yalnızca taslak sipariş onaya gönderilebilir.");
+                    return OrderRuleResult.Deny("not-draft", OrdersMessages.Transition.NotDraft);
                 }
 
-                return s.ActiveLines == 0 ? OrderRuleResult.Deny("no-lines", "Onaya göndermek için en az bir etkin kalem gerekir.") : OrderRuleResult.Ok;
+                return s.ActiveLines == 0 ? OrderRuleResult.Deny("no-lines", OrdersMessages.Transition.NoLines) : OrderRuleResult.Ok;
 
             case OrderAction.WithdrawApproval:
             case OrderAction.ReturnToDraft:
             case OrderAction.Approve:
                 return s.Status == OrderStatus.PendingApproval
                     ? OrderRuleResult.Ok
-                    : OrderRuleResult.Deny("not-pending", "Yalnızca onay bekleyen sipariş için yapılabilir.");
+                    : OrderRuleResult.Deny("not-pending", OrdersMessages.Transition.NotPending);
 
             case OrderAction.Cancel:
                 return s.Status is OrderStatus.Draft or OrderStatus.PendingApproval or OrderStatus.Approved
                     ? OrderRuleResult.Ok
-                    : OrderRuleResult.Deny("final", s.Status == OrderStatus.Cancelled ? "Sipariş zaten iptal edilmiş." : "Kapatılmış sipariş iptal edilemez.");
+                    : OrderRuleResult.Deny("final", s.Status == OrderStatus.Cancelled ? OrdersMessages.Transition.AlreadyCancelled : OrdersMessages.Transition.ClosedNoCancel);
 
             case OrderAction.Close:
                 if (s.Status != OrderStatus.Approved)
                 {
-                    return OrderRuleResult.Deny("not-approved", "Yalnızca onaylanmış sipariş kapatılabilir.");
+                    return OrderRuleResult.Deny("not-approved", OrdersMessages.Transition.NotApproved);
                 }
 
                 return s.FulfillmentStatus == FulfillmentStatus.Completed
                     ? OrderRuleResult.Ok
-                    : OrderRuleResult.Deny("obligation-remaining", "Gerçekleşme tamamlanmadığı için sipariş kapatılamaz; kalan yükümlülük var. Yetkiniz varsa gerekçeyle zorla kapatabilirsiniz.");
+                    : OrderRuleResult.Deny("obligation-remaining", OrdersMessages.Transition.ObligationRemaining);
 
             case OrderAction.ForceClose:
                 if (s.Status != OrderStatus.Approved)
                 {
-                    return OrderRuleResult.Deny("not-approved", "Yalnızca onaylanmış sipariş kapatılabilir.");
+                    return OrderRuleResult.Deny("not-approved", OrdersMessages.Transition.NotApproved);
                 }
 
                 return s.FulfillmentStatus == FulfillmentStatus.Completed
-                    ? OrderRuleResult.Deny("nothing-remaining", "Gerçekleşme tamamlandı; zorla kapatma gerekmez, normal kapatın.")
+                    ? OrderRuleResult.Deny("nothing-remaining", OrdersMessages.Transition.NothingRemaining)
                     : OrderRuleResult.Ok;
 
             default:
-                return OrderRuleResult.Deny("unknown", "Bilinmeyen eylem.");
+                return OrderRuleResult.Deny("unknown", OrdersMessages.Workflow.UnknownAction);
         }
     }
 
