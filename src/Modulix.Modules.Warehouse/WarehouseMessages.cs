@@ -326,4 +326,22 @@ internal static class WarehouseMessages
         public static ServerMessage AlreadyBound =>
             ServerMessage.Of("warehouse.server.regime-binding.already-bound", "Bu rejim zaten bir profile bağlı; mevcut bağlamayı düzenleyin.");
     }
+
+    /// <summary>Gümrük uç noktası iletileri.</summary>
+    public static class Customs
+    {
+        public static ServerMessage GtipEmpty =>
+            ServerMessage.Of("warehouse.server.customs.gtip-empty", "GTİP kodu boş olamaz.");
+
+        public static ServerMessage RegimeAndRegistrationRequired =>
+            ServerMessage.Of("warehouse.server.customs.regime-registration-required", "Rejim ve tescil numarası gerekli.");
+    }
+
+
+    /// <summary>Depo panosu.</summary>
+    public static class Dashboard
+    {
+        public static ServerMessage Period =>
+            ServerMessage.Of("warehouse.server.dashboard.period", "Dönem 7, 14 ya da 30 gün olabilir.");
+    }
 }

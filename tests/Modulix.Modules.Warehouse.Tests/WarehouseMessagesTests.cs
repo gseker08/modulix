@@ -34,7 +34,7 @@ public partial class WarehouseMessagesTests
             checkedCount++;
         }
 
-        Assert.True(checkedCount >= 80);
+        Assert.True(checkedCount >= 83);
     }
 
     [Fact]

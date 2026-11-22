@@ -13018,5 +13018,8 @@
   "warehouse.server.notfound.importer": "Importer not found.",
   "warehouse.server.notfound.broker": "Customs broker not found.",
   "warehouse.server.notfound.owner": "Owner not found.",
-  "warehouse.server.notfound.bill-to": "Billed party not found."
+  "warehouse.server.notfound.bill-to": "Billed party not found.",
+  "warehouse.server.customs.gtip-empty": "The GTIP code cannot be empty.",
+  "warehouse.server.customs.regime-registration-required": "The regime and registration number are required.",
+  "warehouse.server.dashboard.period": "The period can be 7, 14 or 30 days."
 }
