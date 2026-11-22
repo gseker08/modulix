@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Warehouse.Domain;
 
@@ -9,7 +10,7 @@ namespace Modulix.Modules.Warehouse.Records;
 /// </summary>
 internal sealed class StockBalanceRecordStore : WarehouseRecordStore<StockBalance>
 {
-    private const string Message = "Bakiye stok hareket defterinden türetilir; doğrudan değiştirilemez. Stok hareketi kaydedin.";
+    private static ServerMessage Message => WarehouseMessages.Balance.Derived;
 
     private readonly IReadOnlyDictionary<string, RecordFilter<StockBalance>> filters;
 
@@ -35,9 +36,9 @@ internal sealed class StockBalanceRecordStore : WarehouseRecordStore<StockBalanc
 
     protected override string WritePermission => WarehouseModule.Permissions.MovementsWrite;
 
-    protected override string? ImmutableMessage => Message;
+    protected override ServerMessage? ImmutableMessage => Message;
 
-    protected override string? CreateBlockedMessage => Message;
+    protected override ServerMessage? CreateBlockedMessage => Message;
 
     protected override IReadOnlyList<RecordField<StockBalance>> Fields { get; } =
     [

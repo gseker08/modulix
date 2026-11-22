@@ -1,8 +1,9 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
-using Modulix.Modules.Warehouse.Contracts.Customs;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
+using Modulix.Modules.Warehouse.Contracts.Customs;
 using Modulix.Modules.Warehouse.Domain;
 
 namespace Modulix.Modules.Warehouse.Records;
@@ -25,7 +26,7 @@ internal sealed class CustomsDeclarationLineRecordStore(WarehouseStoreContext co
 
     protected override IReadOnlyList<RecordField<CustomsDeclarationLine>> Fields { get; } =
     [
-        Field.Reference<CustomsDeclarationLine, CustomsDeclaration>("declarationId", "Beyanname bulunamadı.", l => l.DeclarationId, (l, v) => l.DeclarationId = v!.Value, required: true, createOnly: true),
+        Field.Reference<CustomsDeclarationLine, CustomsDeclaration>("declarationId", WarehouseMessages.NotFound.Declaration, l => l.DeclarationId, (l, v) => l.DeclarationId = v!.Value, required: true, createOnly: true),
         Field.Integer<CustomsDeclarationLine>("lineNo", l => l.LineNo, (l, v) => l.LineNo = v!.Value, min: 1, max: 9999, required: true),
         // Biçim ve uzunluk denetimi AppliedAsync'te (normalleştirme ve ileti tek yerde); burada yalnızca metin sınırı.
         Field.Text<CustomsDeclarationLine>("gtip", 40, l => l.Gtip, (l, v) => l.Gtip = v!, required: true),

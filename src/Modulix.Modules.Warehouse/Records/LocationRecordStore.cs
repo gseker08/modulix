@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Warehouse.Domain;
 
@@ -21,9 +22,9 @@ internal sealed class LocationRecordStore(WarehouseStoreContext context) : Wareh
 
     protected override IReadOnlyList<RecordField<Location>> Fields { get; } =
     [
-        Field.Reference<Location, Facility>("facilityId", "Tesis bulunamadı.", l => l.FacilityId, (l, v) => l.FacilityId = v!.Value, required: true, createOnly: true),
-        Field.Reference<Location, Location>("parentId", "Üst lokasyon bulunamadı.", l => l.ParentId, (l, v) => l.ParentId = v, createOnly: true),
-        Field.Reference<Location, Zone>("zoneId", "Alan bulunamadı.", l => l.ZoneId, (l, v) => l.ZoneId = v),
+        Field.Reference<Location, Facility>("facilityId", WarehouseMessages.NotFound.Facility, l => l.FacilityId, (l, v) => l.FacilityId = v!.Value, required: true, createOnly: true),
+        Field.Reference<Location, Location>("parentId", WarehouseMessages.NotFound.ParentLocation, l => l.ParentId, (l, v) => l.ParentId = v, createOnly: true),
+        Field.Reference<Location, Zone>("zoneId", WarehouseMessages.NotFound.Zone, l => l.ZoneId, (l, v) => l.ZoneId = v),
         Field.Text<Location>("value", Location.ValueMaxLength, l => l.Value, (l, v) => l.Value = v!, required: true, createOnly: true, upperCase: true),
         Field.Integer<Location>("depth", l => l.Depth, (l, v) => l.Depth = v ?? l.Depth, 1, LocationLevel.MaxPosition).AsSystem(),
         Field.Text<Location>("code", Location.CodeMaxLength, l => l.Code, (l, v) => l.Code = v!).AsSystem(),
@@ -76,7 +77,7 @@ internal sealed class LocationRecordStore(WarehouseStoreContext context) : Wareh
             : null;
         if (parent is not null && parent.FacilityId != entity.FacilityId)
         {
-            errors.Add(new RecordFieldError("parentId", "Üst lokasyon başka bir tesise ait."));
+            errors.Add(new RecordFieldError("parentId", WarehouseMessages.Location.ParentOtherFacility));
         }
 
         if (isNew && errors.Count == 0)
@@ -144,14 +145,14 @@ internal sealed class LocationRecordStore(WarehouseStoreContext context) : Wareh
             }
             else if (entity.ZoneId != inherited)
             {
-                errors.Add(new RecordFieldError("zoneId", "Alt lokasyon, üst lokasyonun alanından farklı bir alanda olamaz."));
+                errors.Add(new RecordFieldError("zoneId", WarehouseMessages.Location.ZoneDiffersFromParent));
             }
         }
 
         if (entity.ZoneId is { } zoneId
             && !await data.Set<Zone>().AsNoTracking().AnyAsync(z => z.Id == zoneId && z.FacilityId == entity.FacilityId, cancellationToken))
         {
-            errors.Add(new RecordFieldError("zoneId", "Alan bu tesise ait değil."));
+            errors.Add(new RecordFieldError("zoneId", WarehouseMessages.Location.ZoneOtherFacility));
         }
 
         // Alt düğümleri olan düğümün alanı değişmez: alt ağacın alanı onunla birlikte tutarlı kalmalıdır.
@@ -160,7 +161,7 @@ internal sealed class LocationRecordStore(WarehouseStoreContext context) : Wareh
             var current = await data.Set<Location>().AsNoTracking().Where(l => l.Id == entity.Id).Select(l => l.ZoneId).SingleAsync(cancellationToken);
             if (current != entity.ZoneId && await data.Set<Location>().AsNoTracking().AnyAsync(l => l.ParentId == entity.Id, cancellationToken))
             {
-                errors.Add(new RecordFieldError("zoneId", "Alt lokasyonları olan lokasyonun alanı değiştirilemez."));
+                errors.Add(new RecordFieldError("zoneId", WarehouseMessages.Location.ZoneLockedByChildren));
             }
         }
     }
@@ -169,7 +170,7 @@ internal sealed class LocationRecordStore(WarehouseStoreContext context) : Wareh
     {
         if (await Context.Data.Set<Location>().AsNoTracking().AnyAsync(l => l.ParentId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Alt lokasyonları olan lokasyon silinemez; önce alt lokasyonları silin.");
+            throw new RecordConflictException(WarehouseMessages.Location.HasChildren);
         }
     }
 

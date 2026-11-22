@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Warehouse.Domain;
 
@@ -21,10 +22,10 @@ internal sealed partial class LotRecordStore(WarehouseStoreContext context) : Wa
     protected override IReadOnlyList<RecordField<Lot>> Fields { get; } =
     [
         Field.Text<Lot>("lotNo", Lot.LotNoMaxLength, l => l.LotNo, (l, v) => l.LotNo = v!, required: true, upperCase: true),
-        Field.Reference<Lot, StockItem>("stockItemId", "Stok kartı bulunamadı.", l => l.StockItemId, (l, v) => l.StockItemId = v!.Value, required: true, createOnly: true),
+        Field.Reference<Lot, StockItem>("stockItemId", WarehouseMessages.NotFound.StockItem, l => l.StockItemId, (l, v) => l.StockItemId = v!.Value, required: true, createOnly: true),
         Field.PartyRef<Lot>("ownerPartyId", "Malik bulunamadı.", l => l.OwnerPartyId, (l, v) => l.OwnerPartyId = v!.Value, required: true, createOnly: true),
         Field.PartyRef<Lot>("billToPartyId", "Faturalanan taraf bulunamadı.", l => l.BillToPartyId, (l, v) => l.BillToPartyId = v),
-        Field.Reference<Lot, CustomsDeclarationLine>("declarationLineId", "Beyanname satırı bulunamadı.", l => l.DeclarationLineId, (l, v) => l.DeclarationLineId = v, createOnly: true),
+        Field.Reference<Lot, CustomsDeclarationLine>("declarationLineId", WarehouseMessages.NotFound.DeclarationLine, l => l.DeclarationLineId, (l, v) => l.DeclarationLineId = v, createOnly: true),
         Field.Text<Lot>("description", Lot.DescriptionMaxLength, l => l.Description, (l, v) => l.Description = v),
         Field.Flag<Lot>("isActive", l => l.IsActive, (l, v) => l.IsActive = v),
     ];
