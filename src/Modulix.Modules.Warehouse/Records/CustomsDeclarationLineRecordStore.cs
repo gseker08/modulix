@@ -63,14 +63,14 @@ internal sealed class CustomsDeclarationLineRecordStore(WarehouseStoreContext co
         {
             foreach (var name in RequiredLists.Where(n => values[n] is not JsonValue { } v || string.IsNullOrWhiteSpace(v.ToString())))
             {
-                errors.Add(new RecordFieldError(name, "Bu alan zorunludur."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.Required));
             }
         }
 
         var (gtip, gtipError) = GtipRules.Normalize(entity.Gtip);
         if (gtipError is not null || gtip is null)
         {
-            errors.Add(new RecordFieldError("gtip", gtipError ?? "GTİP zorunludur."));
+            errors.Add(new RecordFieldError("gtip", gtipError ?? WarehouseMessages.DeclarationLine.GtipRequired));
         }
         else
         {
@@ -79,19 +79,19 @@ internal sealed class CustomsDeclarationLineRecordStore(WarehouseStoreContext co
 
         if (!DeclarationLineRules.NetWithinGross(entity.GrossKg, entity.NetKg))
         {
-            errors.Add(new RecordFieldError("netKg", "Net kilo brüt kilodan büyük olamaz."));
+            errors.Add(new RecordFieldError("netKg", WarehouseMessages.DeclarationLine.NetOverGross));
         }
 
         var declaration = await Context.Data.Set<CustomsDeclaration>().AsNoTracking().SingleAsync(d => d.Id == entity.DeclarationId, cancellationToken);
         if (await DeclarationRules.IsCancelledAsync(Context, declaration, cancellationToken))
         {
-            errors.Add(new RecordFieldError("declarationId", "İptal edilmiş beyannamenin satırları değiştirilemez."));
+            errors.Add(new RecordFieldError("declarationId", WarehouseMessages.DeclarationLine.Cancelled));
         }
 
         if (await Context.Data.Set<CustomsDeclarationLine>().AsNoTracking()
             .AnyAsync(l => l.DeclarationId == entity.DeclarationId && l.LineNo == entity.LineNo && l.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("lineNo", "Bu satır numarası beyannamede zaten var."));
+            errors.Add(new RecordFieldError("lineNo", WarehouseMessages.DeclarationLine.LineNoTaken));
         }
 
         if (errors.Count > 0)
@@ -105,7 +105,7 @@ internal sealed class CustomsDeclarationLineRecordStore(WarehouseStoreContext co
         var declaration = await Context.Data.Set<CustomsDeclaration>().AsNoTracking().SingleAsync(d => d.Id == entity.DeclarationId, cancellationToken);
         if (await DeclarationRules.IsCancelledAsync(Context, declaration, cancellationToken))
         {
-            throw new RecordConflictException("İptal edilmiş beyannamenin satırları silinemez.");
+            throw new RecordConflictException(WarehouseMessages.DeclarationLine.CancelledDelete);
         }
     }
 }

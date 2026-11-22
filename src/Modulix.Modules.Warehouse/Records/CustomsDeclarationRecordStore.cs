@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Warehouse.Domain;
@@ -44,8 +45,8 @@ internal sealed partial class CustomsDeclarationRecordStore(WarehouseStoreContex
         Field.Text<CustomsDeclaration>("customsOffice", CustomsDeclaration.OfficeMaxLength, d => d.CustomsOffice, (d, v) => d.CustomsOffice = v),
         Field.ListChoice<CustomsDeclaration>("regimeKey", WarehouseModule.Lists.CustomsRegime, d => d.RegimeKey, (d, v) => d.RegimeKey = v ?? string.Empty),
         Field.ListChoice<CustomsDeclaration>("statusKey", WarehouseModule.Lists.DeclarationStatus, d => d.StatusKey, (d, v) => d.StatusKey = v ?? string.Empty),
-        Field.PartyRef<CustomsDeclaration>("importerPartyId", "İthalatçı bulunamadı.", d => d.ImporterPartyId, (d, v) => d.ImporterPartyId = v!.Value, required: true),
-        Field.PartyRef<CustomsDeclaration>("brokerPartyId", "Gümrük müşaviri bulunamadı.", d => d.BrokerPartyId, (d, v) => d.BrokerPartyId = v),
+        Field.PartyRef<CustomsDeclaration>("importerPartyId", WarehouseMessages.NotFound.Importer, d => d.ImporterPartyId, (d, v) => d.ImporterPartyId = v!.Value, required: true),
+        Field.PartyRef<CustomsDeclaration>("brokerPartyId", WarehouseMessages.NotFound.Broker, d => d.BrokerPartyId, (d, v) => d.BrokerPartyId = v),
         Field.Text<CustomsDeclaration>("externalReference", CustomsDeclaration.ExternalReferenceMaxLength, d => d.ExternalReference, (d, v) => d.ExternalReference = v),
         Field.Text<CustomsDeclaration>("description", CustomsDeclaration.DescriptionMaxLength, d => d.Description, (d, v) => d.Description = v),
     ];
@@ -96,24 +97,24 @@ internal sealed partial class CustomsDeclarationRecordStore(WarehouseStoreContex
 
         if (!RegistrationNoPattern().IsMatch(entity.RegistrationNo))
         {
-            errors.Add(new RecordFieldError("registrationNo", "Tescil numarası yalnızca harf, rakam ve - _ . / karakterlerini içerebilir."));
+            errors.Add(new RecordFieldError("registrationNo", WarehouseMessages.Declaration.RegistrationNoPattern));
         }
         else if (await Context.Data.Set<CustomsDeclaration>().AsNoTracking()
             .AnyAsync(d => d.RegistrationNo == entity.RegistrationNo && d.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("registrationNo", "Bu tescil numarası başka bir beyannamede kullanılıyor."));
+            errors.Add(new RecordFieldError("registrationNo", WarehouseMessages.Declaration.RegistrationNoTaken));
         }
 
         if (entity.ExternalReference is { } reference
             && await Context.Data.Set<CustomsDeclaration>().AsNoTracking()
                 .AnyAsync(d => d.ExternalReference == reference && d.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("externalReference", "Bu dış referans başka bir beyannamede kullanılıyor."));
+            errors.Add(new RecordFieldError("externalReference", WarehouseMessages.Declaration.ExternalReferenceTaken));
         }
 
         if (entity.BrokerPartyId == entity.ImporterPartyId)
         {
-            errors.Add(new RecordFieldError("brokerPartyId", "İthalatçı ve gümrük müşaviri aynı firma olamaz."));
+            errors.Add(new RecordFieldError("brokerPartyId", WarehouseMessages.Party.SameParty));
         }
 
         var stored = isNew
@@ -128,7 +129,7 @@ internal sealed partial class CustomsDeclarationRecordStore(WarehouseStoreContex
             var check = await new RegistrationNoCheck(Context).CheckAsync(entity.RegimeKey, entity.RegistrationNo, cancellationToken);
             if (check.HasRule && check.Violations.Count > 0 && check.Enforcement == nameof(Modulix.Modules.Warehouse.Contracts.Customs.RuleEnforcement.Block))
             {
-                errors.Add(new RecordFieldError("registrationNo", $"{string.Join(" ", check.Violations)} (rejim profili: {check.ProfileName}, sürüm {check.VersionNumber})"));
+                errors.Add(new RecordFieldError("registrationNo", WarehouseMessages.Declaration.RegistrationNoRule(string.Join(" ", check.Violations), check.ProfileName, check.VersionNumber)));
             }
         }
 
@@ -138,13 +139,13 @@ internal sealed partial class CustomsDeclarationRecordStore(WarehouseStoreContex
             if (stored is null || stored.ImporterPartyId != entity.ImporterPartyId)
             {
                 await CheckRoleAsync(entity.ImporterPartyId, WarehouseModule.RelationshipRoles.Importer, "importerPartyId",
-                    "Seçilen firma \"İthalatçı / malik\" ilişki rolüne sahip değil; önce firma kaydından rolü ekleyin.", errors, cancellationToken);
+                    WarehouseMessages.Party.ImporterRole, errors, cancellationToken);
             }
 
             if (entity.BrokerPartyId is { } broker && (stored is null || stored.BrokerPartyId != broker))
             {
                 await CheckRoleAsync(broker, WarehouseModule.RelationshipRoles.Broker, "brokerPartyId",
-                    "Seçilen firma \"Gümrük müşaviri\" ilişki rolüne sahip değil; önce firma kaydından rolü ekleyin.", errors, cancellationToken);
+                    WarehouseMessages.Party.BrokerRole, errors, cancellationToken);
             }
         }
 
@@ -158,11 +159,11 @@ internal sealed partial class CustomsDeclarationRecordStore(WarehouseStoreContex
     {
         if (await Context.Data.Set<CustomsDeclarationLine>().AsNoTracking().AnyAsync(l => l.DeclarationId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Beyannamenin satırları var; önce satırları silin.");
+            throw new RecordConflictException(WarehouseMessages.Declaration.HasLines);
         }
     }
 
-    private async Task CheckRoleAsync(Guid partyId, string role, string field, string message, List<RecordFieldError> errors, CancellationToken cancellationToken)
+    private async Task CheckRoleAsync(Guid partyId, string role, string field, ServerMessage message, List<RecordFieldError> errors, CancellationToken cancellationToken)
     {
         var stored = await Context.Data.Set<Party>().AsNoTracking()
             .Where(p => p.Id == partyId).Select(p => p.RelationshipRoles).SingleOrDefaultAsync(cancellationToken);

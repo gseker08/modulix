@@ -69,11 +69,11 @@ internal sealed partial class StockItemRecordStore(WarehouseStoreContext context
 
         if (!CodePattern().IsMatch(entity.Code))
         {
-            errors.Add(new RecordFieldError("code", "Kod yalnızca harf, rakam ve - _ . / karakterlerini içerebilir."));
+            errors.Add(new RecordFieldError("code", WarehouseMessages.Code.StockCode));
         }
         else if (await Context.Data.Set<StockItem>().AsNoTracking().AnyAsync(s => s.Code == entity.Code && s.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("code", "Bu kod başka bir stok kartında kullanılıyor."));
+            errors.Add(new RecordFieldError("code", WarehouseMessages.StockItem.CodeTaken));
         }
 
         var (gtip, gtipError) = GtipRules.Normalize(entity.Gtip);
