@@ -44,6 +44,8 @@ internal sealed class CampaignResponseRecordStore(MarketingStoreContext context)
         ["deliveryId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(x => x.DeliveryId == id) : null,
         // Hedef (firma/kişi/lead) ya da o hedefteki kişi için yanıtlar; müşteri kartındaki pazarlama geçmişi kullanır.
         ["targetId"] = (q, v, _) => FilterValue.Id(v) is { } id ? q.Where(x => x.TargetId == id || x.PersonId == id) : null,
+        // Müşteri zaman çizelgesinin sayfalama imleci (ADR-0053): verilen andan önce alınan yanıtlar (sınır hariç).
+        ["receivedBefore"] = (q, v, _) => FilterValue.Time(v) is { } time ? q.Where(x => x.ReceivedAt < time) : null,
         ["status"] = (q, v, _) => ResponseStatuses.All.Contains(v) ? q.Where(x => x.Status == v) : null,
         ["kind"] = (q, v, _) => ResponseKinds.All.Contains(v) ? q.Where(x => x.Kind == v) : null,
         ["ownerId"] = (q, v, c) => FilterValue.User(v, c) is { } id ? q.Where(x => x.OwnerId == id) : null,

@@ -1,7 +1,7 @@
 # ADR-0053: Birleşik müşteri zaman çizelgesi
 
 - **Durum:** Dilim 1 (kaynak sözleşmesi, CRM kaynakları, uç nokta, firma kartında sekme) 17 Kasım 2026'da teslim edildi (PR #468).
-  Dilim 2a (Sipariş kaynağı) ve 2b (Sözleşme kaynağı) 17 Kasım 2026'da, 2c (Destek kaynağı) 21 Kasım 2026'da teslim edildi. Diğer dilimler öneridir.
+  Dilim 2a (Sipariş kaynağı) ve 2b (Sözleşme kaynağı) 17 Kasım 2026'da, 2c (Destek kaynağı) 21 Kasım 2026'da, 2d (Pazarlama kaynağı) 22 Kasım 2026'da teslim edildi. Diğer dilimler öneridir.
 - **Kaynak:** [CRM eksik süreç epic listesi](../crm-eksik-surecler-epicleri.md) E9.
 
 ## Bağlam
@@ -72,15 +72,20 @@ token yoktur. Fırsat ve teklif satırı kendi sayfasına bağlanır; "Daha eski
      `createdBefore` süzgeci eklendi. Destek modülü CRM sözleşme projesine başvurur (mimari kural tablosu güncellendi) ve bunu
      `IModule.Dependencies` ile isteğe bağlı bağımlılık olarak beyan eder (ADR-0051); CRM kapalıyken ya da Destek yokken çalışma
      zamanı davranışı değişmez. Arayüzde talep satırı ikon, durum rozeti ve talep sayfası bağlantısıyla çizilir.
-   - Kalan: Pazarlama.
+   - **2d Pazarlama (22 Kasım 2026):** `CampaignTimelineSource` (`marketing.touches`), Pazarlama modülünde; yeni migration yoktur. Müşteriye giden
+     kampanya iletileri (`marketing.campaign-delivery`) ve gelen yanıtlar (`marketing.campaign-response`) iki satır türüdür; kaynak mevcut
+     hedef geçmişini (`ICampaignReports.HistoryAsync`) imleçli dilimle kullanır, böylece rapor ve alıcı görüntüleme izni, kampanya veri kapsamı
+     ve yanıt izni (yoksa yanıt satırı gelmez) aynen uygulanır; izin yoksa kaynak `sources` listesinde yoktur. Satırın kayıt kimliği kampanyadır
+     (kampanya sayfasına bağlanır), başlık kampanya adı, durum teslimat ya da yanıt durumu, tür kodu yanıt türüdür; adres ve ileti içeriği
+     satıra girmez. Yanıt deposuna `receivedBefore` süzgeci eklendi. Teslimat satırının anı kayıt oluşturulma anıdır (gönderim anı değil).
 3. Kaynak türüne göre süzgeç ve özet şeridi (son temas, açık iş sayısı).
 4. Durum değişikliği satırları (fırsat kazanıldı/kaybedildi, teklif kabul edildi) ve müşteri adayı geçmişi (dönüşen aday).
 
 ## Yapılmadı / sınırlar
 
-- Pazarlama satırları yok (Sipariş dilim 2a, Sözleşme dilim 2b, Destek dilim 2c ile geldi); firma kartındaki ilişkili sipariş, destek ve kampanya
-  listeleri yerinde duruyor.
+- Firma kartındaki ilişkili sipariş, destek ve kampanya listeleri yerinde duruyor (Sipariş 2a, Sözleşme 2b, Destek 2c, Pazarlama 2d satırları çizelgeye geldi).
+- Kişiye ya da müşteri adayına giden kampanya iletileri firma çizelgesinde yalnızca kişi, firmanın ortak taraf kimliğiyle eşleşiyorsa görünür; kişi kartında çizelge yoktur.
 - Bir kayıt tek satırdır: fırsatın kazanılması ya da teklifin kabulü ayrı satır üretmez (durum rozeti güncel durumu gösterir).
-- Sipariş, sözleşme ve destek talebi satırları (dilim 2a, 2b, 2c) tarayıcıda gözle doğrulanmadı.
+- Sipariş, sözleşme, destek talebi ve pazarlama satırları (dilim 2a–2d) tarayıcıda gözle doğrulanmadı.
 - Ekran 17 Kasım 2026'da açık ve koyu temada, 1440 px ve 390 px genişlikte gözle doğrulandı. Yeni sekmeyle firma detayının sekme çubuğu
   1440 px'te taşıyordu; "Fırsatlar ve müşteri adayları" sekmesinin adı "Satış" olarak kısaltıldı (kişi detayında da aynı etiket).

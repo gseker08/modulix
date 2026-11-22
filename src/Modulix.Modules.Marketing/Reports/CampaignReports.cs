@@ -21,7 +21,7 @@ public sealed record CampaignReport(IReadOnlyList<CampaignReportRow> Rows, DateT
 
 public sealed record TouchHistoryItem(string Kind, Guid CampaignId, string CampaignName, DateTimeOffset At, string Status, string? Detail);
 
-public sealed record TargetHistory(IReadOnlyList<TouchHistoryItem> Items);
+public sealed record TargetHistory(IReadOnlyList<TouchHistoryItem> Items, bool HasMore = false);
 
 public interface ICampaignReports
 {
@@ -30,6 +30,12 @@ public interface ICampaignReports
 
     /// <summary>Bir firma/kişi/lead kimliğine giden iletiler ve yanıtlar; yalnızca çağıranın görebildiği kampanyalardan. Adres içermez.</summary>
     Task<RecordResult<TargetHistory>> HistoryAsync(Guid targetId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Geçmişin imleçli dilimi (müşteri zaman çizelgesi, ADR-0053): <paramref name="before"/> anından önceki en yeni <paramref name="take"/> öğe;
+    /// daha eski öğe kalmışsa <see cref="TargetHistory.HasMore"/> doludur. İzin ve kapsam kuralları <see cref="HistoryAsync(Guid, CancellationToken)"/> ile aynıdır.
+    /// </summary>
+    Task<RecordResult<TargetHistory>> HistoryAsync(Guid targetId, DateTimeOffset? before, int take, CancellationToken cancellationToken);
 }
 
 internal sealed class CampaignReports(IRecordPipeline pipeline, MarketingStoreContext context, ICurrentAccess permissions, TimeProvider time) : ICampaignReports
@@ -101,8 +107,13 @@ internal sealed class CampaignReports(IRecordPipeline pipeline, MarketingStoreCo
         return RecordResult<CampaignReport>.Ok(new CampaignReport([.. rows.OrderByDescending(r => r.Sent).ThenBy(r => r.Code)], time.GetUtcNow(), visible.Value.Truncated));
     }
 
-    public async Task<RecordResult<TargetHistory>> HistoryAsync(Guid targetId, CancellationToken cancellationToken)
+    public Task<RecordResult<TargetHistory>> HistoryAsync(Guid targetId, CancellationToken cancellationToken) =>
+        HistoryAsync(targetId, null, HistoryLimit, cancellationToken);
+
+    public async Task<RecordResult<TargetHistory>> HistoryAsync(Guid targetId, DateTimeOffset? before, int take, CancellationToken cancellationToken)
     {
+        take = Math.Clamp(take, 1, HistoryLimit);
+        var fetch = take + 1; // bir fazlası "daha eski öğe var mı" sorusunu yanıtlar
         if (!await permissions.HasPermissionAsync(MarketingModule.Permissions.ReportsRead, cancellationToken)
             || !await permissions.HasPermissionAsync(MarketingModule.Permissions.RecipientsRead, cancellationToken))
         {
@@ -124,16 +135,21 @@ internal sealed class CampaignReports(IRecordPipeline pipeline, MarketingStoreCo
         var deliveries = await (
             from d in data.Set<CampaignDelivery>().AsNoTracking()
             join r in data.Set<CampaignRun>().AsNoTracking() on d.RunId equals r.Id
-            where (d.TargetId == targetId || d.PersonId == targetId) && ids.Contains(r.CampaignId)
+            where (d.TargetId == targetId || d.PersonId == targetId) && ids.Contains(r.CampaignId) && (before == null || d.CreatedAt < before)
             orderby d.CreatedAt descending
-            select new { r.CampaignId, d.Status, d.Code, d.CreatedAt }).Take(HistoryLimit).ToListAsync(cancellationToken);
+            select new { r.CampaignId, d.Status, d.Code, d.CreatedAt }).Take(fetch).ToListAsync(cancellationToken);
         items.AddRange(deliveries.Select(d => new TouchHistoryItem("Delivery", d.CampaignId, names[d.CampaignId], d.CreatedAt, d.Status, d.Code)));
 
         // Yanıtlar kayıt boru hattından okunur: yanıt izni ve yanıtın sorumlusuna bağlı veri kapsamı uygulanır; izin yoksa yanıtlar listelenmez.
         if (await permissions.HasPermissionAsync(MarketingModule.Permissions.ResponsesRead, cancellationToken))
         {
-            var responses = await pipeline.QueryAsync(
-                new RecordQuery(MarketingModule.Entities.CampaignResponse, 1, HistoryLimit, null, new Dictionary<string, string> { ["targetId"] = targetId.ToString() }), cancellationToken);
+            var responseFilters = new Dictionary<string, string> { ["targetId"] = targetId.ToString() };
+            if (before is { } edge)
+            {
+                responseFilters["receivedBefore"] = edge.ToString("O", CultureInfo.InvariantCulture);
+            }
+
+            var responses = await pipeline.QueryAsync(new RecordQuery(MarketingModule.Entities.CampaignResponse, 1, fetch, null, responseFilters), cancellationToken);
             if (responses.IsSuccess)
             {
                 foreach (var r in responses.Value!.Items)
@@ -149,7 +165,7 @@ internal sealed class CampaignReports(IRecordPipeline pipeline, MarketingStoreCo
             }
         }
 
-        return RecordResult<TargetHistory>.Ok(new TargetHistory([.. items.OrderByDescending(i => i.At).Take(HistoryLimit)]));
+        return RecordResult<TargetHistory>.Ok(new TargetHistory([.. items.OrderByDescending(i => i.At).Take(take)], items.Count > take));
     }
 
     private sealed record Visible(IReadOnlyList<RecordData> Items, bool Truncated);

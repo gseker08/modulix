@@ -93,4 +93,9 @@ public static class MarketingAccess
     public const string ResponsesRead = "marketing.responses.read";
     public const string ResponsesWrite = "marketing.responses.write";
     public const string ReportsRead = "marketing.reports.read";
+
+    /// <summary>Müşteri zaman çizelgesindeki pazarlama satırı türleri (ADR-0053); satırın kayıt kimliği kampanya kimliğidir.</summary>
+    public const string DeliveryEntityKey = "marketing.campaign-delivery";
+
+    public const string ResponseEntityKey = "marketing.campaign-response";
 }
