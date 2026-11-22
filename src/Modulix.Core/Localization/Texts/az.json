@@ -13048,5 +13048,8 @@
   "warehouse.server.notfound.importer": "İdxalatçı tapılmadı.",
   "warehouse.server.notfound.broker": "Gömrük məsləhətçisi tapılmadı.",
   "warehouse.server.notfound.owner": "Sahib tapılmadı.",
-  "warehouse.server.notfound.bill-to": "Hesab-faktura tərəfi tapılmadı."
+  "warehouse.server.notfound.bill-to": "Hesab-faktura tərəfi tapılmadı.",
+  "warehouse.server.customs.gtip-empty": "GTİP kodu boş ola bilməz.",
+  "warehouse.server.customs.regime-registration-required": "Rejim və qeydiyyat nömrəsi tələb olunur.",
+  "warehouse.server.dashboard.period": "Dövr 7, 14 və ya 30 gün ola bilər."
 }

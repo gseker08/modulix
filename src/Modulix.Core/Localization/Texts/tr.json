@@ -13048,5 +13048,8 @@
   "warehouse.server.notfound.importer": "İthalatçı bulunamadı.",
   "warehouse.server.notfound.broker": "Gümrük müşaviri bulunamadı.",
   "warehouse.server.notfound.owner": "Malik bulunamadı.",
-  "warehouse.server.notfound.bill-to": "Faturalanan taraf bulunamadı."
+  "warehouse.server.notfound.bill-to": "Faturalanan taraf bulunamadı.",
+  "warehouse.server.customs.gtip-empty": "GTİP kodu boş olamaz.",
+  "warehouse.server.customs.regime-registration-required": "Rejim ve tescil numarası gerekli.",
+  "warehouse.server.dashboard.period": "Dönem 7, 14 ya da 30 gün olabilir."
 }

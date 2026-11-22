@@ -32,7 +32,7 @@ internal static class CustomsEndpoints
             var (value, error) = GtipRules.Normalize(code);
             if (value is null)
             {
-                return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: error ?? "GTİP kodu boş olamaz.");
+                return LocalizedProblems.Problem(StatusCodes.Status400BadRequest, error ?? WarehouseMessages.Customs.GtipEmpty);
             }
 
             var check = await catalog.CheckAsync(value, date ?? Today(time), ct);
@@ -53,7 +53,7 @@ internal static class CustomsEndpoints
             {
                 if (string.IsNullOrWhiteSpace(regimeKey) || string.IsNullOrWhiteSpace(registrationNo))
                 {
-                    return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Rejim ve tescil numarası gerekli.");
+                    return LocalizedProblems.Problem(StatusCodes.Status400BadRequest, WarehouseMessages.Customs.RegimeAndRegistrationRequired);
                 }
 
                 var result = await check.CheckAsync(regimeKey.Trim(), registrationNo.Trim(), ct);
