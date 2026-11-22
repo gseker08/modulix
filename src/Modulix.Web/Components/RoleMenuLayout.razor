@@ -1,0 +1,154 @@
+@* Rolün menü düzeni (E8 dilim 2b-2): rol detayında, rolün sol menüsündeki öğelerin sırası ve gizlenmesi. Kapsam öğe düzeyindedir;
+   modül ve bölüm sırası düzenlenmez. Gizlemek yetki değildir. Yönetici (sistem) rolünde düzen tutulmaz (sunucu 409 verir), kontroller kapalıdır. *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject ToastService Toasts
+
+<section class="detail-section">
+    <div class="section-header"><h2>@Texts.Get("admin.roleMenu.title")</h2></div>
+    <p class="text-muted small">@Texts.Get("admin.roleMenu.help")</p>
+
+    @if (IsSystem)
+    {
+        <div class="alert alert-info">@Texts.Get("admin.roleMenu.systemInfo")</div>
+    }
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (editor is null)
+    {
+        if (message is null)
+        {
+            <LoadingState Kind="LoadingKind.Table" />
+        }
+    }
+    else if (editor.Sections.Count == 0)
+    {
+        <EmptyState Title="@Texts.Get("admin.roleMenu.empty")" />
+    }
+    else
+    {
+        @foreach (var block in editor.Sections)
+        {
+            <h3 class="h6 mt-3">@(block.RootName)@(block.GroupName is null ? null : " · " + block.GroupName)</h3>
+            <table class="table record-table">
+                <thead>
+                    <tr>
+                        <th>@Texts.Get("admin.roleMenu.col.item")</th>
+                        <th>@Texts.Get("admin.roleMenu.col.visible")</th>
+                        <th>@Texts.Get("admin.roleMenu.col.order")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in block.Items)
+                    {
+                        var hidden = editor.IsHidden(item.Key);
+                        var switchId = $"menu-{item.Key}";
+                        <tr>
+                            <td data-label="@Texts.Get("admin.roleMenu.col.item")" class="primary">
+                                <AppIcon Name="@item.Icon" Size="16" /> @item.Name
+                            </td>
+                            <td data-label="@Texts.Get("admin.roleMenu.col.visible")">
+                                <div class="form-check form-switch">
+                                    <input id="@switchId" class="form-check-input" type="checkbox" role="switch" checked="@(!hidden)"
+                                           disabled="@(IsSystem || busy)" @onchange="e => SetVisible(item.Key, e.Value is true)" />
+                                    <label class="form-check-label" for="@switchId">@(hidden ? Texts.Get("admin.roleMenu.hidden") : Texts.Get("admin.roleMenu.shown"))</label>
+                                </div>
+                            </td>
+                            <td data-label="@Texts.Get("admin.roleMenu.col.order")" class="actions">
+                                <button type="button" class="btn btn-icon btn-ghost" aria-label="@Texts.Get("admin.roleMenu.moveUp", item.Name)"
+                                        disabled="@(IsSystem || busy || !editor.CanMove(item.Key, -1))" @onclick="() => Move(item.Key, -1)"><AppIcon Name="arrow-up" Size="16" /></button>
+                                <button type="button" class="btn btn-icon btn-ghost" aria-label="@Texts.Get("admin.roleMenu.moveDown", item.Name)"
+                                        disabled="@(IsSystem || busy || !editor.CanMove(item.Key, 1))" @onclick="() => Move(item.Key, 1)"><AppIcon Name="arrow-down" Size="16" /></button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <FieldError Field="items" Errors="errors" />
+
+        @if (!IsSystem)
+        {
+            <div class="form-actions">
+                <ConfirmAction Class="btn btn-outline-secondary" Disabled="@(busy || !editor.IsCustomized)" Question="@Texts.Get("admin.roleMenu.resetQuestion")" OnConfirm="ResetAsync">@Texts.Get("admin.roleMenu.reset")</ConfirmAction>
+                <button type="button" class="btn btn-primary" disabled="@(busy || !editor.IsDirty)" aria-busy="@(busy ? "true" : "false")" @onclick="SaveAsync">@Texts.Get("common.save")</button>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid RoleId { get; set; }
+
+    /// <summary>Yönetici (sistem) rolü: düzen düzenlenemez.</summary>
+    [Parameter] public bool IsSystem { get; set; }
+
+    private RoleMenuEditor? editor;
+    private Guid loadedFor;
+    private bool busy;
+    private string? message;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == RoleId)
+        {
+            return;
+        }
+
+        loadedFor = RoleId;
+        editor = null;
+        message = null;
+        errors = null;
+        var result = await Api.GetAsync<RoleMenuResponse>($"/api/roles/{RoleId}/menu");
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        editor = new RoleMenuEditor(RoleMenuEditor.CatalogItems(Session.IsModuleEnabled), result.Value!.Items);
+    }
+
+    private void SetVisible(string key, bool visible) => editor!.SetHidden(key, !visible);
+
+    private void Move(string key, int delta) => editor!.Move(key, delta);
+
+    private async Task SaveAsync()
+    {
+        await SendAsync(editor!.ToRequest());
+    }
+
+    private async Task ResetAsync()
+    {
+        editor!.Reset();
+        await SendAsync(new SaveRoleMenuRequest([]));
+    }
+
+    private async Task SendAsync(SaveRoleMenuRequest request)
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await Api.PutAsync<RoleMenuResponse>($"/api/roles/{RoleId}/menu", request);
+        busy = false;
+
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            errors = result.FieldErrors;
+            return;
+        }
+
+        editor!.Load(result.Value!.Items);
+
+        // Kendi rolünün düzeni değiştiyse sol menü hemen güncellensin.
+        await Session.RefreshAsync();
+        Toasts.Success(Texts.Get("admin.roleMenu.saved"));
+    }
+}
