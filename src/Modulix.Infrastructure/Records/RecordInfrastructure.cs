@@ -310,6 +310,8 @@ public static class RecordsSetup
         services.AddScoped<IRecordStore, PlaceRecordStore>();
         services.AddScoped<IRecordStore, CredentialRecordStore>();
         services.AddScoped<IRecordStore, HolidayRecordStore>();
+        services.AddScoped<IRecordStore, ExchangeRateRecordStore>();
+        services.AddScoped<Modulix.Core.Contracts.Currency.IExchangeRateReader, ExchangeRateReader>();
         services.AddScoped<Modulix.Core.Contracts.Calendar.IHolidayCalendar, HolidayCalendar>();
         services.AddScoped<Modulix.Core.Contracts.Calendar.ITenantWorkCalendar, TenantWorkCalendar>();
         services.AddScoped<ICredentialDirectory, CredentialDirectory>();

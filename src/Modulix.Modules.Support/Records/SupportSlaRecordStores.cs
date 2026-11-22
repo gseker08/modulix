@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Calendar;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Support.Domain;
@@ -90,13 +91,13 @@ internal sealed class SlaPolicyRecordStore(SupportStoreContext context) : Suppor
         Field.Flag<SlaPolicy>("isDefault", p => p.IsDefault, (p, v) => p.IsDefault = v),
         Field.Integer<SlaPolicy>("precedence", p => p.Precedence, (p, v) => p.Precedence = v ?? 100, max: 1000),
         Field.ListChoice<SlaPolicy>("typeKey", SupportModule.Lists.TicketType, p => p.TypeKey, (p, v) => p.TypeKey = v, required: false),
-        Field.Reference<SlaPolicy, TicketCategory>("categoryId", "Kategori bulunamadı.", p => p.CategoryId, (p, v) => p.CategoryId = v),
+        Field.Reference<SlaPolicy, TicketCategory>("categoryId", SupportMessages.NotFound.Category, p => p.CategoryId, (p, v) => p.CategoryId = v),
         Field.OptionalChoice<SlaPolicy>("priority", TicketPriority.All, p => p.Priority, (p, v) => p.Priority = v),
-        Field.Shared<SlaPolicy, Party>("partyId", "Müşteri bulunamadı.", p => p.PartyId, (p, v) => p.PartyId = v),
+        Field.Shared<SlaPolicy, Party>("partyId", SupportMessages.NotFound.Party, p => p.PartyId, (p, v) => p.PartyId = v),
         Field.Id<SlaPolicy>("contractId", p => p.ContractId, (p, v) => p.ContractId = v),
         Field.Integer<SlaPolicy>("firstResponseMinutes", p => p.FirstResponseMinutes, (p, v) => p.FirstResponseMinutes = v, max: SlaPolicy.MaxMinutes),
         Field.Integer<SlaPolicy>("resolutionMinutes", p => p.ResolutionMinutes, (p, v) => p.ResolutionMinutes = v, max: SlaPolicy.MaxMinutes),
-        Field.Reference<SlaPolicy, SlaCalendar>("calendarId", "Takvim bulunamadı.", p => p.CalendarId, (p, v) => p.CalendarId = v),
+        Field.Reference<SlaPolicy, SlaCalendar>("calendarId", SupportMessages.NotFound.Calendar, p => p.CalendarId, (p, v) => p.CalendarId = v),
         Field.Flag<SlaPolicy>("pauseOnWaitingCustomer", p => p.PauseOnWaitingCustomer, (p, v) => p.PauseOnWaitingCustomer = v),
         Field.Flag<SlaPolicy>("pauseOnWaitingInternal", p => p.PauseOnWaitingInternal, (p, v) => p.PauseOnWaitingInternal = v),
         Field.Text<SlaPolicy>("escalationRules", SlaPolicy.RulesMaxLength, p => p.EscalationRules, (p, v) => p.EscalationRules = v),
@@ -127,29 +128,29 @@ internal sealed class SlaPolicyRecordStore(SupportStoreContext context) : Suppor
         var errors = new List<RecordFieldError>();
         if (entity.FirstResponseMinutes is null && entity.ResolutionMinutes is null)
         {
-            errors.Add(new RecordFieldError("resolutionMinutes", "İlk yanıt ya da çözüm hedeflerinden en az biri girilmelidir."));
+            errors.Add(new RecordFieldError("resolutionMinutes", SupportMessages.Sla.TargetRequired));
         }
 
         if (entity.FirstResponseMinutes is <= 0)
         {
-            errors.Add(new RecordFieldError("firstResponseMinutes", "Hedef 1 dakikadan az olamaz."));
+            errors.Add(new RecordFieldError("firstResponseMinutes", SupportMessages.Sla.TargetTooShort));
         }
 
         if (entity.ResolutionMinutes is <= 0)
         {
-            errors.Add(new RecordFieldError("resolutionMinutes", "Hedef 1 dakikadan az olamaz."));
+            errors.Add(new RecordFieldError("resolutionMinutes", SupportMessages.Sla.TargetTooShort));
         }
 
         if (entity.IsDefault)
         {
             if (entity.TypeKey is not null || entity.CategoryId is not null || entity.Priority is not null || entity.PartyId is not null || entity.ContractId is not null)
             {
-                errors.Add(new RecordFieldError("isDefault", "Varsayılan (yedek) politikada eşleşme kısıtı olamaz."));
+                errors.Add(new RecordFieldError("isDefault", SupportMessages.Sla.DefaultNoMatchConstraint));
             }
 
             if (await Context.Data.Set<SlaPolicy>().AsNoTracking().AnyAsync(p => p.IsDefault && p.Id != entity.Id, cancellationToken))
             {
-                errors.Add(new RecordFieldError("isDefault", "Başka bir politika varsayılan; önce onun varsayılan işaretini kaldırın."));
+                errors.Add(new RecordFieldError("isDefault", SupportMessages.Sla.OtherPolicyIsDefault));
             }
         }
 
@@ -159,11 +160,11 @@ internal sealed class SlaPolicyRecordStore(SupportStoreContext context) : Suppor
             var contract = await Context.ReadRecordAsync(TicketLinkKinds.Contract, contractId, cancellationToken);
             if (contract is null)
             {
-                errors.Add(new RecordFieldError("contractId", "Sözleşme bulunamadı, erişim yetkiniz yok ya da sözleşme modülü kapalı."));
+                errors.Add(new RecordFieldError("contractId", SupportMessages.Sla.ContractUnavailable));
             }
             else if (entity.PartyId is { } policyParty && contract.Values["partyId"]?.ToString() != policyParty.ToString())
             {
-                errors.Add(new RecordFieldError("contractId", "Sözleşme, politikadaki müşteriye ait değil."));
+                errors.Add(new RecordFieldError("contractId", SupportMessages.Sla.ContractNotOfParty));
             }
         }
 
@@ -173,12 +174,12 @@ internal sealed class SlaPolicyRecordStore(SupportStoreContext context) : Suppor
         {
             if (rule.UserId is { } userId && !await Context.Members.IsActiveMemberAsync(userId, cancellationToken))
             {
-                errors.Add(new RecordFieldError("escalationRules", $"'{rule.Id}' kuralındaki kullanıcı bu kuruluşun üyesi değil."));
+                errors.Add(new RecordFieldError("escalationRules", SupportMessages.Sla.EscalationUserNotMember(rule.Id)));
             }
 
             if (rule.QueueId is { } queueId && !await Context.Data.Set<SupportQueue>().AsNoTracking().AnyAsync(q => q.Id == queueId && q.IsActive, cancellationToken))
             {
-                errors.Add(new RecordFieldError("escalationRules", $"'{rule.Id}' kuralındaki kuyruk bulunamadı ya da pasif."));
+                errors.Add(new RecordFieldError("escalationRules", SupportMessages.Sla.EscalationQueueUnavailable(rule.Id)));
             }
         }
 

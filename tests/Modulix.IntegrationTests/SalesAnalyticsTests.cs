@@ -178,7 +178,7 @@ public class SalesAnalyticsTests(ModulixApiFactory factory) : IClassFixture<Modu
         Assert.Equal(4, Issue(data, DataQualityCodes.Stale).Count);   // hiç müşteri etkileşimi yok
         Assert.Equal(0, Issue(data, DataQualityCodes.NoHistory).Count);   // yeni fırsatların tarihçesi var
 
-        await PostAsync<ExchangeRateDto>(s.Admin, "/api/crm/exchange-rates", new SaveExchangeRateRequest("USD", "TRY", 30m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-30)));
+        await ExchangeRateTestData.CreateAsync(s.Admin, "USD", "TRY", 30m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-30));
         Assert.Equal(0, Issue((await GetAsync<DataQualityDto>(s.Admin, "quality")).Data, DataQualityCodes.MissingRate).Count);
 
         // Tutar izni olmayan kullanıcı için tutar/kur/olasılık sorunları hiç hesaplanmaz (eksik sanılmaz).

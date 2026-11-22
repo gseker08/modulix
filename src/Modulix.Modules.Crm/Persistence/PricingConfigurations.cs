@@ -20,23 +20,6 @@ internal sealed class TaxRateConfiguration : IEntityTypeConfiguration<TaxRate>
     }
 }
 
-internal sealed class ExchangeRateConfiguration : IEntityTypeConfiguration<ExchangeRate>
-{
-    public void Configure(EntityTypeBuilder<ExchangeRate> builder)
-    {
-        CrmTables.ConfigureCommon(builder, "ExchangeRates");
-        builder.Property(r => r.FromCurrency).HasMaxLength(3).IsFixedLength().IsUnicode(false).IsRequired();
-        builder.Property(r => r.ToCurrency).HasMaxLength(3).IsFixedLength().IsUnicode(false).IsRequired();
-        builder.Property(r => r.Rate).HasPrecision(28, 10);
-        builder.Property(r => r.ValidOn).HasColumnType("date");
-        builder.Property(r => r.Source).HasMaxLength(20).IsRequired();
-        builder.Property(r => r.Note).HasMaxLength(500);
-        builder.HasIndex(r => new { r.TenantId, r.FromCurrency, r.ToCurrency, r.ValidOn }).IsUnique().HasDatabaseName("UX_ExchangeRates_PairDay");
-        builder.ToTable(t => t.HasCheckConstraint("CK_ExchangeRates_Rate", "[Rate] > 0"));
-        builder.ToTable(t => t.HasCheckConstraint("CK_ExchangeRates_Pair", "[FromCurrency] <> [ToCurrency]"));
-    }
-}
-
 internal sealed class PriceListConfiguration : IEntityTypeConfiguration<PriceList>
 {
     public void Configure(EntityTypeBuilder<PriceList> builder)

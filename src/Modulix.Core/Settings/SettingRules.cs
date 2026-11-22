@@ -1,6 +1,7 @@
 using System.Net.Mail;
 using System.Text.RegularExpressions;
 using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Modules;
 
 namespace Modulix.Core.Settings;
 
@@ -34,6 +35,13 @@ public static partial class SettingRules
         if (definition.Type != SettingType.MultilineText && value.Contains('\n', StringComparison.Ordinal))
         {
             return "Tek satır olmalıdır.";
+        }
+
+        // Vurgu rengi (E8): biçimden sonra açık/koyu temadaki kontrast da sunucuda denetlenir.
+        if (definition.Key is CoreModule.SettingKeys.AccentLight or CoreModule.SettingKeys.AccentDark
+            && Regex.IsMatch(value, AccentColor.Pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)))
+        {
+            return AccentColor.Validate(value, dark: definition.Key == CoreModule.SettingKeys.AccentDark);
         }
 
         return definition.Type switch

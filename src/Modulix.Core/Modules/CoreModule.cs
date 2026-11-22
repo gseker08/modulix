@@ -28,6 +28,9 @@ public sealed class CoreModule : IModule
         /// <summary>Firmanın resmî tatil listesini yazar (ADR-0049 dilim 6a); okumak için izin gerekmez.</summary>
         public const string ManageHolidays = "core.holidays.manage";
 
+        /// <summary>Firmanın döviz kurlarını yazar (ADR-0049 dilim 5a); okumak için izin gerekmez.</summary>
+        public const string ManageExchangeRates = "core.exchange-rates.manage";
+
         /// <summary>Belge serilerini yapılandırır ve sayacı ileri alır (ADR-0049 dilim 2a).</summary>
         public const string ManageNumbering = "core.numbering.manage";
 
@@ -116,6 +119,7 @@ public sealed class CoreModule : IModule
         new(Permissions.ManageRoles, "Rolleri ve izinlerini yönetir", "Roller"),
         new(Permissions.ManageSettings, "Kuruluş ve modül ayarlarını değiştirir", "Kuruluş ayarları"),
         new(Permissions.ManageHolidays, "Firmanın resmî tatil listesini düzenler", "Resmî tatiller"),
+        new(Permissions.ManageExchangeRates, "Firmanın döviz kurlarını düzenler", "Döviz kurları"),
         new(Permissions.ManageNumbering, "Belge numarası serilerini yapılandırır ve sayacı ileri alır", "Belge numaraları"),
         new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
         new(Permissions.ManageCustomization, "Özel alanları ve listeleri düzenler", "Özelleştirme"),
@@ -307,6 +311,11 @@ public sealed class CoreModule : IModule
         public const string Language = "core.regional.language";
         public const string RequireTwoFactor = "core.security.require-two-factor";
 
+        /// <summary>Firmanın vurgu rengi, açık ve koyu tema (E8); kurallar <see cref="Settings.AccentColor"/>'tadır. Boşsa varsayılan marka rengi.</summary>
+        public const string AccentLight = "core.appearance.accent-light";
+
+        public const string AccentDark = "core.appearance.accent-dark";
+
         /// <summary>Firmanın çalışma günleri ve mesai saatleri (ADR-0049 dilim 6c); seçenekler <see cref="Contracts.Calendar.WorkWeek"/>'tedir.</summary>
         public const string WorkDays = "core.calendar.work-days";
 
@@ -335,6 +344,7 @@ public sealed class CoreModule : IModule
     private const string SecurityGroup = "Güvenlik";
     private const string AutomationGroup = "Otomasyon";
     private const string AiGroup = "Yapay zekâ";
+    private const string AppearanceGroup = "Görünüm";
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
     [
@@ -354,6 +364,20 @@ public sealed class CoreModule : IModule
         new(SettingKeys.Address, "Adres", ProfileGroup, SettingType.MultilineText) { MaxLength = 500 },
         new(SettingKeys.Phone, "Telefon", ProfileGroup, SettingType.Phone) { MaxLength = 30 },
         new(SettingKeys.Email, "E-posta", ProfileGroup, SettingType.Email),
+        new(SettingKeys.AccentLight, "Vurgu rengi (açık tema)", AppearanceGroup, SettingType.Text)
+        {
+            Description = "Bağlantı, odak ve etkin sekme rengi; #RRGGBB. Boşsa Modulix rengi kullanılır. Okunabilirlik için açık zeminde en az 4.5:1 kontrast gerekir.",
+            MaxLength = 7,
+            Pattern = Settings.AccentColor.Pattern,
+            PatternMessage = "Renk #RRGGBB biçiminde olmalıdır (ör. #087DB8).",
+        },
+        new(SettingKeys.AccentDark, "Vurgu rengi (koyu tema)", AppearanceGroup, SettingType.Text)
+        {
+            Description = "Koyu temadaki vurgu rengi; #RRGGBB. Boşsa Modulix rengi kullanılır. Koyu zeminde en az 4.5:1 kontrast gerekir.",
+            MaxLength = 7,
+            Pattern = Settings.AccentColor.Pattern,
+            PatternMessage = "Renk #RRGGBB biçiminde olmalıdır (ör. #3BAEE6).",
+        },
         new(SettingKeys.TimeZone, "Saat dilimi", RegionalGroup, SettingType.Choice, RegionalOptions.DefaultTimeZone)
         {
             Description = "Ekranlardaki tarih ve saatler, denetim kaydı ve dışa aktarmalar bu saat dilimini kullanır.",
@@ -504,6 +528,10 @@ public sealed class CoreModule : IModule
         {
             ["date"] = "Tarih", ["name"] = "Ad", ["halfDay"] = "Yarım gün",
         }, "name"),
+        new(Modulix.Core.Contracts.Currency.CurrencyEntities.ExchangeRate, "Döviz kuru", null, new Dictionary<string, string>
+        {
+            ["fromCurrency"] = "Kaynak para birimi", ["toCurrency"] = "Hedef para birimi", ["rate"] = "Kur", ["validOn"] = "Geçerli gün", ["source"] = "Kaynak", ["note"] = "Not",
+        }, "fromCurrency"),
         new(CredentialEntities.Credential, "Süreli belge", null, new Dictionary<string, string>
         {
             ["ownerEntityKey"] = "Sahip kayıt türü", ["ownerId"] = "Sahip kayıt", ["typeKey"] = "Belge türü", ["documentNo"] = "Belge no",

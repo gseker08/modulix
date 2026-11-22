@@ -1,6 +1,6 @@
 # ADR-0049: Ortak iş ana verisi ve belge numaralama
 
-- **Durum:** Dilim 1 (belge numaralama) 15 Kasım 2026'da teslim edildi (PR #395). Dilim 6a (firmanın tatil listesi ve takvim hesabı Core'da) 15 Kasım 2026'da teslim edildi (PR #397). Dilim 6b (destek SLA takvimi firmanın listesini uygular) ve 6c (firmanın haftalık mesai saatleri, firma iş takvimi) 15 Kasım 2026'da teslim edilir. Diğer dilimler öneridir; "Açık kararlar" yanıtlanmadan kodlanmaz.
+- **Durum:** Dilim 1 (belge numaralama) 15 Kasım 2026'da teslim edildi (PR #395). Dilim 6a (firmanın tatil listesi ve takvim hesabı Core'da) 15 Kasım 2026'da teslim edildi (PR #397). Dilim 6b (destek SLA takvimi firmanın listesini uygular) ve 6c (firmanın haftalık mesai saatleri, firma iş takvimi) 15 Kasım 2026'da teslim edilir. Dilim 5'in kararları 22 Kasım 2026'da verildi; dilim 5a (kur Core'da) 22 Kasım 2026'da kodlandı (aşağıda "Dilim 5a uygulaması"). Diğer dilimler öneridir; "Açık kararlar" yanıtlanmadan kodlanmaz.
 - **Kaynak:** [Core mimari değerlendirmesi](../core-mimari-degerlendirme-2026-11.md) H4, H5, H6; yol haritası Ç8.1 (seri yönetimi).
 
 > Numara notu: 15 Kasım 2026'da `main`'de en yüksek numara 0047'ydi, 0048 açık PR #394'te kullanılıyordu. Birleştirmeden önce numara yeniden kontrol edilmeli.
@@ -79,9 +79,55 @@ Teklif, sipariş, operasyon işi ve destek kaydı numaraları bugün rastgele so
 
 Kesintisiz seri isteyen belgeler (fatura, irsaliye) için: numara taslakta değil kesinleştirmede verilir; iptal edilen numara iz bırakır. İlk ihtiyaç duyan belgeyle birlikte.
 
-### Dilim 5: para birimi, kur, vergi oranı, birim
+### Dilim 5: para birimi, kur, vergi oranı, birim (kararlar verildi, 22 Kasım 2026)
 
-Kur tablosu ve tanımları `crm` şemasından `core` şemasına taşınır; CRM, Orders ve Lojistik masraf Core sözleşmesinden okur. Taşıma iki adımlıdır (önce Core tablosu + çift okuma, sonra CRM tablosunun kaldırılması). Saf hesap çekirdeği (`Core.Contracts.Pricing`) yerinde kalır.
+> **Kararlar (22 Kasım 2026, ürün sahibi):** K5.1–K5.5'in hepsi aşağıdaki önerilen cevaplarla kabul edildi. Kod 5a (kur) ile başlar; 5b, 5c ve 5d kendi dilimleriyle gelir. Bu bölümdeki "Karar önerisi" ve "Tasarım" metinleri kabul edilmiş karardır.
+
+**Bugün (kodda doğrulandı):** `ExchangeRate`, `TaxRate` ve `MeasureUnit` `Modulix.Modules.Crm` içinde (`crm` şeması, `CrmEntity` = `ITenantEntity` + `ICompanyShared`); kayıt türleri `crm.exchange-rate`, `crm.tax-rate`, `crm.measure-unit`, hepsi `crm.prices.read` / `crm.products.read` izinlerine bağlı ve ekranı CRM menüsündeki "Vergi ve kur". Okuyan tek yer `PriceCalculator` (CRM). Orders kuru tekliften kopyalar (`OrderFromQuote`: `ExchangeRate`, `ExchangeRateDate`), kendi kur tablosu okumaz. Saf hesap çekirdeği `Core.Contracts.Pricing` zaten Core'da. Para birimi listesi (`RegionalOptions.Currencies`) ve tenant varsayılan para birimi (`DefaultCurrency` ayarı) zaten Core'da. Sonuç: CRM lisansı olmayan firma kur giremez; Lojistik masrafı (ADR-0038 dilim 8) ve İK için kur okuyacak ortak yer yok.
+
+**Karar önerisi:**
+
+1. **Kapsam:** üç tablo üç alt dilimde taşınır: 5a kur, 5b vergi oranı, 5c ölçü birimi. **Ürün/hizmet kataloğu (ürün, kategori, fiyat listesi) bu dilimin dışındadır:** ADR-0018'in sahibi CRM'dir ve CRM'siz katalog ihtiyacı (Lojistik/İK) doğunca ayrı ADR ile ele alınır. Vergi oranı ve birim Core'a geçse de ürünün `TaxCategory` (kod eşleşmesi) ve `BaseUnitId` bağı olduğu gibi kalır.
+2. **Kaynak: elle giriş.** `Source` alanı bugün zaten var (`Manual`); dilim 5 yalnızca elle girişi taşır. Günlük otomatik çekim (TCMB) **5d**'dir ve ayrı karar ister (dış ağ erişimi izni, sağlayıcı sözleşmesi, hata ve gecikme davranışı). Uzak çekim bile tablodaki aynı `Source` alanıyla yazar; okuyanlar değişmez.
+3. **Baz: tenant.** Kur, vergi ve birim tenant başına tutulur (`ICompanyShared`, bugünkü gibi). Şirket başına kur isteyen müşteri yok (dilim 2c ile aynı gerekçe: kullanan olmadan altyapı yazılmaz); ihtiyaç doğarsa `ICompanyScoped`'a geçiş ayrı migration ile eklenir, okuma sözleşmesi şirket parametresini zaten alabilir.
+4. **Okuma kuralı aynen taşınır:** `core.ExchangeRates` için "o güne kadarki en yeni doğrudan kur, yoksa ters kur, hiçbiri yoksa `exchange-rate-not-found`; kur uydurulmaz, çapraz kur yoktur" (ADR-0018). Yeni sözleşme bu kuralı tek yerde uygular; `PriceCalculator` kendi sorgusunu bırakıp sözleşmeyi çağırır.
+
+**Tasarım (5a, kur):**
+
+- **Tablo:** `core.ExchangeRates` (tenant tablosu, RLS altında, `ICompanyShared`; `UNIQUE(TenantId, FromCurrency, ToCurrency, ValidOn)`); alanlar bugünkü `crm.ExchangeRates` ile aynı (çift, kur, geçerlilik günü, `Source`, `Note`), sürüm ve denetim alanları dahil. Yeni tablo için migration'da `TenantIsolationSql.AddTable("core", "ExchangeRates")`.
+- **Sözleşme:** `Modulix.Core.Contracts.Currency` (yeni ad alanı; `CoreContractsNamespaceRulesTests` listesine eklenir). `IExchangeRateReader.FindAsync(from, to, day, ct)` → bulunan kur (kur, kaynak günü, ters mi) ya da yok. Okuma yetkisi çağıranın modülüne bağlıdır; sözleşme izin denetlemez, yalnızca tenant bağlamında çalışır.
+- **Kayıt türü ve izin:** `crm.exchange-rate` → `core.exchange-rate` (kayıt boru hattı, denetim, içe aktarma). İzin: okuma her üyeye açık (Core ana verisi), yazma yeni `core.exchange-rates.manage`; migration bu izni `crm.prices.manage` taşıyan rollere ekler (dilim 6a'daki `core.holidays.manage` örneği).
+- **Ekran:** "Kurlar" Yönetim altına taşınır (CRM modülü kapalıyken de açılır; eski CRM adresi yönlendirir). CRM "Vergi ve kur" ekranında kur sekmesi kalkar, vergi 5b'ye kadar yerinde kalır.
+- **Okuyanlar:** `PriceCalculator` (CRM) sözleşmeye geçer; Lojistik masraf (dilim 8) ve İK ilk kullanıcılar olarak sözleşmeyi hazır bulur. Orders ve teklif belge kurunu kopyalamaya devam eder (belgeye uygulanan kur belgede saklanır, sonradan eklenen kur eski belgeyi değiştirmez; bu kural değişmez).
+- **Veri ve geriye uyum (iki adım, dilim 6a'daki desen):** (1) migration `crm.ExchangeRates` satırlarını kimlik, sürüm ve zamanlarıyla `core.ExchangeRates`'e kopyalar (RLS kopya süresince kapatılır); CRM entity'si modelden çıkar ve `crm.ExchangeRates` tablosu bir sürüm daha durur; (2) sonraki migration'da RLS politikasından çıkarılıp düşürülür (düşürmeden önce Core'da olmayan satırlar bir kez daha kopyalanır). Dağıtım penceresinde eski sürümün yazdığı kur yeni tabloya geçmez: pencerede kur düzenlenmemelidir (`migration-compat.yml` önceki sürümün testlerini yeni şemaya karşı koşar; kur testleri bu pencereye göre yazılır).
+- **Eski kayıt türü anahtarı:** `crm.exchange-rate` için kayıtlı denetim satırları olduğu gibi kalır (geçmiş yeniden yazılmaz); içe aktarma tanımı, rapor veri kümesi ve otomasyon referansı varsa `core.exchange-rate`'e taşınır. Taşıma öncesi kodda bu referanslar taranır.
+
+**5b (vergi) ve 5c (birim):** aynı desen (`core.TaxRates`, `core.MeasureUnits`; sözleşmeler `ITaxRateReader`, `IMeasureUnitReader`). Vergi oranının "aynı kod için geçerlilik aralıkları çakışamaz" kuralı ve birimin "kullanılan birimin grubu/katsayısı değişmez" kuralı Core tarafında korunur; ikincisi ürünü bilmeyeceği için **kullanım sorgusu sözleşmeyle** (ör. `IMeasureUnitUsage`; CRM katalogu sağlar) yapılır, Core CRM tablosuna bakmaz. Bu, 5c'nin 5a/5b'den daha zor tarafıdır; ürün kataloğu CRM'de kaldığı sürece birim taşınması ertelenip yalnızca sözleşme açılabilir.
+
+**Kabul ölçütleri (dört test + iki):**
+1. Mutlu yol: kur Yönetim'den girilir, CRM fiyat hesabı ve (yeni) bir Core okuyucu çağrısı aynı kuru bulur; ters kur ve "kur yok" sonucu mevcut testlerle aynı davranır.
+2. Hata/doğrulama: aynı çift ve gün ikinci kez, sıfır/negatif kur, aynı para birimi çifti (`TRY→TRY`), geçersiz ISO kodu reddedilir.
+3. Tenant izolasyonu: A'nın kuru B'nin okuyucusunda görünmez; RLS ham SQL denemesi `TenantIsolationTests` kapsamındadır.
+4. Yetki: `core.exchange-rates.manage` olmayan üye kur yazamaz; migration ile izin CRM fiyat yöneticisi rollerine geçer.
+5. CRM lisansı olmayan firma Yönetim'den kur girer ve Core okuyucudan okur.
+6. Veri taşıma: migration sonrası kur sayısı ve değerleri eski tabloyla aynı; dağıtım penceresi sınırı belgelenmiş.
+
+#### Dilim 5a uygulaması (kur, 22 Kasım 2026)
+
+- **Tablo ve varlık:** `core.ExchangeRates` (`Modulix.Core.Currency.ExchangeRate`, `ITenantEntity` + `ICompanyShared`); `UNIQUE(TenantId, FromCurrency, ToCurrency, ValidOn)`, kur > 0 ve çift farklı denetimleri, kur duyarlılığı `decimal(28,10)` (CRM tablosuyla aynı). `TenantIsolationSql.AddTable` migration'dadır.
+- **Sözleşme:** `Modulix.Core.Contracts.Currency` (`IExchangeRateReader.FindAsync` / `ListAsync`, `ExchangeRateQuote`, `ExchangeRatePoint`, `ExchangeRateSources`); ad alanı `CoreContractsNamespaceRulesTests` listesine eklendi. Okuma kuralı ADR-0018'dekinin aynısıdır ve tek yerde (`ExchangeRateReader`) uygulanır.
+- **Kayıt türü ve izin:** `core.exchange-rate` (kayıt boru hattı, denetim kaydı); okuma her üyeye açık, yazma `core.exchange-rates.manage`. Doğrulama iletileri `ServerMessages.ExchangeRate` ile üç dilde gelir. `/api/crm/exchange-rates` ve `crm.exchange-rate` kaldırıldı; CRM `PriceCalculator` ve satış raporları (`RateBook.LoadAsync`) okuyucuyu kullanır.
+- **Ekran:** Yönetim > Döviz kurları (`/yonetim/doviz-kurlari`). CRM "Vergi ve kur" ekranı "Vergi oranları" oldu (kur sekmesi kalktı; çeviri anahtarları `crm.taxAndRates.*` → `admin.exchangeRates.*`).
+- **Veri ve geriye uyum (adım 1/2):** `CoreExchangeRates` migration'ı tabloyu açar, `crm.ExchangeRates` satırlarını kimlik, sürüm ve zamanlarıyla kopyalar (RLS kopya süresince kapatılır) ve `core.exchange-rates.manage` iznini `crm.prices.write` taşıyan rollere verir. `RetireCrmExchangeRatesEntity` CRM varlığını modelden çıkarır; **`crm.ExchangeRates` tablosu veritabanında ve RLS politikasında kalır** (önceki sürüm hâlâ okur) ve dağıtım penceresinde yazılmış kurlar için kopyayı bir kez daha çalıştırır. Adım 2: bu sürüm her yerde yayına girdikten sonraki migration'da tablo düşürülür (elle: `TenantIsolationSql.RemoveTable` + `DROP TABLE`). **Dağıtım penceresinde kur düzenlenmemelidir** (K5.5).
+- **Testler:** `ExchangeRateTests` (mutlu yol ve sözleşmeden doğrudan/ters kur okuma, CRM hakkı olmayan firma, doğrulama, tenant izolasyonu, yetki), `PricingTests` ve satış testleri yeni uçla çalışır. Veri kopyası gerçek SQL Server'da elle sınandı: satır tek kez kopyalanır (tekrar güvenli), duyarlılık ve sürüm korunur.
+- **Kalan (5a sonrası):** 5b vergi oranı, 5c ölçü birimi (ürün kullanım sorgusu sözleşmeyle), 5d merkez bankası çekimi (ayrı karar); `crm.ExchangeRates` tablosunu düşüren adım 2.
+
+**Dilim 5 kararları (cevaplandı, 22 Kasım 2026; hepsi öneriyle):**
+- **K5.1 Kapsam: kabul edildi.** Sıra kur → vergi → birim; ürün/hizmet kataloğu dilimin dışındadır, CRM'siz katalog ihtiyacı doğunca ayrı ADR.
+- **K5.2 Kaynak: kabul edildi.** Dilim 5 yalnızca elle girişi taşır; TCMB günlük çekimi ayrı karar isteyen 5d dilimidir.
+- **K5.3 Baz: kabul edildi.** Tenant bazında (`ICompanyShared`); şirket bazı ihtiyaç doğunca ayrı migration ile eklenir.
+- **K5.4 Okuma izni: kabul edildi.** Kur okuma her üyeye açıktır; yazma `core.exchange-rates.manage`. CRM ekranı fiyat/maliyet alanları için kendi iznini korur.
+- **K5.5 Dağıtım penceresi: kabul edildi.** Pencerede kur düzenlemesi yasaktır, çift yazma yapılmaz.
 
 ### Dilim 6: çalışma takvimi
 
@@ -116,7 +162,7 @@ Tek Core takvimi (mesai saatleri + tatil günleri, tenant başına; ileride şir
 ## Açık kararlar
 
 1. **Dilim 3:** teklif, sipariş ve destek numaraları sıralı seriye geçsin mi? Öneri: evet, yalnızca yeni kayıtlar için ve firma ayarıyla (dilim 2'den sonra).
-2. **Dilim 5:** kur kaynağı (elle giriş mi, TCMB'den günlük çekim mi) ve kurun şirket bazında mı tenant bazında mı tutulacağı.
+2. **Dilim 5:** cevaplandı (22 Kasım 2026): elle giriş, tenant bazı, kapsam kur → vergi → birim (K5.1–K5.5, dilim 5 bölümü).
 3. **Dilim 6:** resmî tatiller platform tarafından mı sağlanır (yıllık güncellenen katalog), firma mı girer? Öneri: platform kataloğu + firma eklemeleri.
 4. Seri başına boşluk raporu (hangi numara neden atlandı) hangi belgeler için zorunlu? Mevzuat doğrulaması ister.
 

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Support.Domain;
@@ -43,7 +44,7 @@ internal sealed class PriorityMatrixRecordStore(SupportStoreContext context) : S
     {
         if (await Context.Data.Set<PriorityMatrixEntry>().AsNoTracking().AnyAsync(e => e.Impact == entity.Impact && e.Urgency == entity.Urgency && e.Id != entity.Id, cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError("impact", "Bu etki × aciliyet hücresi zaten tanımlı; mevcut kaydı güncelleyin.")]);
+            throw new RecordValidationException([new RecordFieldError("impact", SupportMessages.Routing.MatrixCellExists)]);
         }
 
         entity.UpdatedBy = Context.CurrentUserId;
@@ -75,10 +76,10 @@ internal sealed class TicketRoutingRuleRecordStore(SupportStoreContext context) 
         Field.Flag<TicketRoutingRule>("isActive", r => r.IsActive, (r, v) => r.IsActive = v),
         Field.OptionalChoice<TicketRoutingRule>("channel", TicketChannels.All, r => r.Channel, (r, v) => r.Channel = v),
         Field.ListChoice<TicketRoutingRule>("typeKey", SupportModule.Lists.TicketType, r => r.TypeKey, (r, v) => r.TypeKey = v, required: false),
-        Field.Reference<TicketRoutingRule, TicketCategory>("categoryId", "Kategori bulunamadı.", r => r.CategoryId, (r, v) => r.CategoryId = v),
+        Field.Reference<TicketRoutingRule, TicketCategory>("categoryId", SupportMessages.NotFound.Category, r => r.CategoryId, (r, v) => r.CategoryId = v),
         Field.OptionalChoice<TicketRoutingRule>("priority", TicketPriority.All, r => r.Priority, (r, v) => r.Priority = v),
-        Field.Shared<TicketRoutingRule, Party>("partyId", "Müşteri bulunamadı.", r => r.PartyId, (r, v) => r.PartyId = v),
-        Field.Reference<TicketRoutingRule, SupportQueue>("queueId", "Kuyruk bulunamadı.", r => r.QueueId, (r, v) => r.QueueId = v),
+        Field.Shared<TicketRoutingRule, Party>("partyId", SupportMessages.NotFound.Party, r => r.PartyId, (r, v) => r.PartyId = v),
+        Field.Reference<TicketRoutingRule, SupportQueue>("queueId", SupportMessages.NotFound.Queue, r => r.QueueId, (r, v) => r.QueueId = v),
         Field.Owner<TicketRoutingRule>("ownerId", r => r.OwnerId, (r, v) => r.OwnerId = v),
         Field.Id<TicketRoutingRule>("createdBy", r => r.CreatedBy, (r, v) => r.CreatedBy = v).AsSystem(),
         Field.Id<TicketRoutingRule>("updatedBy", r => r.UpdatedBy, (r, v) => r.UpdatedBy = v).AsSystem(),
@@ -100,12 +101,12 @@ internal sealed class TicketRoutingRuleRecordStore(SupportStoreContext context) 
         var errors = new List<RecordFieldError>();
         if (entity.QueueId is null && entity.OwnerId is null)
         {
-            errors.Add(new RecordFieldError("queueId", "Kuralın en az bir eylemi olmalıdır: kuyruk ya da sorumlu."));
+            errors.Add(new RecordFieldError("queueId", SupportMessages.Routing.RuleActionRequired));
         }
 
         if (entity.QueueId is { } queueId && !await Context.Data.Set<SupportQueue>().AsNoTracking().AnyAsync(q => q.Id == queueId && q.IsActive, cancellationToken))
         {
-            errors.Add(new RecordFieldError("queueId", "Kuyruk pasif; etkin bir kuyruk seçin."));
+            errors.Add(new RecordFieldError("queueId", SupportMessages.Routing.QueueInactive));
         }
 
         if (errors.Count > 0)

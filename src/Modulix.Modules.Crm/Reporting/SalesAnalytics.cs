@@ -51,7 +51,7 @@ public interface ISalesAnalytics
 /// Hesap saf işlevlerdedir (<see cref="QuoteCohort"/>, <see cref="LeadCohort"/>, <see cref="StageFlow"/>, <see cref="TeamPerformance"/>, <see cref="DataQuality"/>).
 /// </summary>
 internal sealed class SalesAnalytics(
-    SalesOpportunityReader reader, SalesPlanningData planning, IChoiceLists choiceLists, ICurrentAccess access, IRecordAccess recordAccess, TimeProvider time,
+    SalesOpportunityReader reader, SalesPlanningData planning, Modulix.Core.Contracts.Currency.IExchangeRateReader rateReader, IChoiceLists choiceLists, ICurrentAccess access, IRecordAccess recordAccess, TimeProvider time,
     ISalesReportingPolicyProvider? policyProvider = null, IOpportunityPolicyProvider? opportunityPolicy = null) : ISalesAnalytics
 {
     public static IReadOnlyList<string> QuoteDefinitions { get; } =
@@ -106,7 +106,7 @@ internal sealed class SalesAnalytics(
         }
 
         var facts = page.Rows.Select(ToQuoteFact).ToList();
-        var rates = new RateBook(await planning.RatesAsync(cancellationToken));
+        var rates = await RateBook.LoadAsync(rateReader, cancellationToken);
         var data = QuoteCohort.Compute(facts, ctx.From, ctx.ToExclusive, ctx.AsOf, ctx.Currency, rates, ctx.Policy.TimeZone);
         var warnings = Common(ctx, page.Truncated, ctx.AmountsVisible);
         if (!data.Mature)
@@ -213,7 +213,7 @@ internal sealed class SalesAnalytics(
                 ? Math.Max(0, close.DayNumber - ReportPeriods.Today(first.At, ctx.Policy.TimeZone).DayNumber)
                 : null;
 
-        var rates = new RateBook(await planning.RatesAsync(cancellationToken));
+        var rates = await RateBook.LoadAsync(rateReader, cancellationToken);
         var performance = TeamPerformance.Compute([.. rows.Select(r => new OwnerFact(r.OwnerId, r.ToFact(), Cycle(r)))], ctx.Period, ctx.Currency, rates, ctx.Today);
 
         var showTargets = ctx.AmountsVisible && await access.HasPermissionAsync(CrmModule.Permissions.SalesTargetsRead, cancellationToken);
@@ -256,7 +256,7 @@ internal sealed class SalesAnalytics(
 
         var withHistory = await planning.IdsWithHistoryAsync([.. open.Rows.Select(r => r.Id)], cancellationToken);
         var staleDays = (opportunityPolicy is null ? OpportunityPolicy.Default : await opportunityPolicy.GetAsync(cancellationToken)).StaleDays;
-        var rates = new RateBook(await planning.RatesAsync(cancellationToken));
+        var rates = await RateBook.LoadAsync(rateReader, cancellationToken);
         var opportunities = open.Rows.Select(r => new QualityOpportunity(
             r.Id, r.Number, r.Title, r.OwnerId, r.Status, ctx.AmountsVisible ? r.Amount : null, r.Currency, ctx.AmountsVisible ? r.Probability : null,
             r.ExpectedCloseDate, r.LastInteractionAt, withHistory.Contains(r.Id))).ToList();

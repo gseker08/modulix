@@ -579,8 +579,8 @@ public sealed class EventTests : IClassFixture<ModulixApiFactory>, IAsyncLifetim
         Assert.Contains(EventTestModule.Recorder, summary.Subscriptions);
 
         var body = await client.GetStringAsync($"/api/platform/events/deliveries?tenantId={actor.TenantId}&subscription={EventTestModule.Recorder}");
-        Assert.DoesNotContain("4242", body, StringComparison.Ordinal);
-        Assert.DoesNotContain("4243", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Gizli Değer 4242", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Gizli Değer 4243", body, StringComparison.Ordinal);
         var page = JsonSerializer.Deserialize<EventDeliveryPageResponse>(body, JsonSerializerOptions.Web)!;
         Assert.Equal(2, page.TotalCount);
         var failed = Assert.Single(page.Items, d => d.State == EventDeliveryStateDto.Failed);

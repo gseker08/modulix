@@ -63,6 +63,14 @@
                             {
                                 <span class="badge stage-@SupportLabels.StatusBadge(status)">@SupportLabels.Label(SupportLabels.Statuses, status)</span>
                             }
+                            else if (item.EntityKey == MarketingTimelineKeys.Delivery)
+                            {
+                                <span class="timeline-meta">@MarketingLabels.DeliveryStatus(status)</span>
+                            }
+                            else if (item.EntityKey == MarketingTimelineKeys.Response)
+                            {
+                                <span class="timeline-meta">@MarketingLabels.ResponseStatus(status)</span>
+                            }
                             else if (family is not null)
                             {
                                 <span class="timeline-meta">@ActivityLabels.Status(family, status)</span>
@@ -136,6 +144,8 @@
         OrdersAccess.OrderEntityKey => "package",
         ContractsAccess.ContractEntityKey => "clipboard-list",
         SupportAccess.TicketEntityKey => "inbox",
+        MarketingTimelineKeys.Delivery => "mail",
+        MarketingTimelineKeys.Response => "message-square",
         CrmEntityKeys.Activity => ActivityLabels.Icon(family),
         _ => "clock",
     };
@@ -147,6 +157,10 @@
         OrdersAccess.OrderEntityKey => Texts.Get("crm.timeline.kind.order"),
         ContractsAccess.ContractEntityKey => Texts.Get("crm.timeline.kind.contract"),
         SupportAccess.TicketEntityKey => Texts.Get("crm.timeline.kind.ticket"),
+        MarketingTimelineKeys.Delivery => Texts.Get("crm.timeline.kind.delivery"),
+        MarketingTimelineKeys.Response => item.Type is { Length: > 0 } kind
+            ? Texts.Get("marketing.related.response", MarketingLabels.ResponseKind(kind))
+            : Texts.Get("crm.timeline.kind.campaignResponse"),
         CrmEntityKeys.Activity => Texts.Get("crm.timeline.kind.activity"),
         // Arayüzün henüz tanımadığı kaynak: satır yine görünür, türü genel adla yazılır.
         _ => Texts.Get("crm.timeline.kind.other"),
@@ -160,6 +174,8 @@
         OrdersAccess.OrderEntityKey => $"siparisler/{item.RecordId}",
         ContractsAccess.ContractEntityKey => $"sozlesmeler/{item.RecordId}",
         SupportAccess.TicketEntityKey => $"destek/talepler/{item.RecordId}",
+        // Pazarlama satırlarının kayıt kimliği kampanyadır.
+        MarketingTimelineKeys.Delivery or MarketingTimelineKeys.Response => $"pazarlama/kampanyalar/{item.RecordId}",
         _ => null,
     };
 }

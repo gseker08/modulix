@@ -173,7 +173,7 @@ public class ServerMessageLanguageTests(ModulixApiFactory factory) : IClassFixtu
         var tenant = await CrmTenantAsync();
         var english = await factory.CreateUserAsync(tenant);
         var turkish = await factory.CreateUserAsync(tenant);
-        await factory.CreateRoleAsync(tenant.Id, [PricesRead, PricesWrite], english, turkish);
+        await factory.CreateRoleAsync(tenant.Id, [PricesRead, PricesWrite, ManageExchangeRates], english, turkish);
         using var englishClient = await LoginAsync(english, "en");
         using var turkishClient = await LoginAsync(turkish);
 
@@ -217,7 +217,7 @@ public class ServerMessageLanguageTests(ModulixApiFactory factory) : IClassFixtu
 
     private static async Task<JsonObject> SameCurrencyRateAsync(HttpClient client)
     {
-        var response = await client.PostAsJsonAsync("/api/crm/exchange-rates", new SaveExchangeRateRequest("TRY", "TRY", 1m, new DateOnly(2026, 5, 30)));
+        var response = await ExchangeRateTestData.PostAsync(client, "TRY", "TRY", 1m, new DateOnly(2026, 5, 30));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         return await ProblemAsync(response);
     }

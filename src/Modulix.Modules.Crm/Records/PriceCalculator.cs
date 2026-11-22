@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Currency;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Pricing;
 using Modulix.Modules.Crm.Domain;
@@ -7,7 +8,7 @@ using Modulix.Modules.Crm.Pricing;
 namespace Modulix.Modules.Crm.Records;
 
 // Salt okunur fiyat hesabı: veri yalnızca Records katmanından okunur (ModuleDataAccessRulesTests); hiçbir şey kaydedilmez.
-internal sealed class PriceCalculator(IModuleData data, TimeProvider time) : IPriceCalculator
+internal sealed class PriceCalculator(IModuleData data, IExchangeRateReader rates, TimeProvider time) : IPriceCalculator
 {
     public async Task<PriceCalculationOutcome> CalculateAsync(PriceCalculationRequest request, CancellationToken cancellationToken)
     {
@@ -167,19 +168,11 @@ internal sealed class PriceCalculator(IModuleData data, TimeProvider time) : IPr
             return null;
         }
 
-        var direct = await data.Set<ExchangeRate>().AsNoTracking().Where(r => r.FromCurrency == source && r.ToCurrency == to && r.ValidOn <= day)
-            .OrderByDescending(r => r.ValidOn).FirstOrDefaultAsync(cancellationToken);
-        var inverse = direct is null
-            ? await data.Set<ExchangeRate>().AsNoTracking().Where(r => r.FromCurrency == to && r.ToCurrency == source && r.ValidOn <= day)
-                .OrderByDescending(r => r.ValidOn).FirstOrDefaultAsync(cancellationToken)
-            : null;
-        if (direct is null && inverse is null)
-        {
-            throw new PricingException(PriceCalculationErrors.RateNotFound, $"{source} → {to} için {day:yyyy-MM-dd} tarihine kadar kayıtlı kur yok.");
-        }
-
-        var rate = direct?.Rate ?? 1m / inverse!.Rate;
-        var rateDate = direct?.ValidOn ?? inverse!.ValidOn;
+        // Kurlar Core ana verisidir (ADR-0049 dilim 5a): doğrudan kur, yoksa ters kur; hiçbiri yoksa kur uydurulmaz.
+        var quote = await rates.FindAsync(source, to, day, cancellationToken)
+            ?? throw new PricingException(PriceCalculationErrors.RateNotFound, $"{source} → {to} için {day:yyyy-MM-dd} tarihine kadar kayıtlı kur yok.");
+        var rate = quote.Rate;
+        var rateDate = quote.RateDate;
         return new DisplayAmounts(to, rate, rateDate, MoneyRounding.Round(amounts.Net * rate), MoneyRounding.Round(amounts.Tax * rate), MoneyRounding.Round(amounts.Gross * rate));
     }
 }

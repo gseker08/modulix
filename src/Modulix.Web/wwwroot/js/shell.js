@@ -30,6 +30,38 @@
         return value;
     }
 
+    // Firma vurgu rengi (E8): yalnızca #RRGGBB kabul edilir (sunucu da doğrular); hover ve rgb türetilir, açık temada
+    // koyulaştırılır, koyu temada açılır. Renk yoksa ya da geçersizse stil öğesi kaldırılır ve tokens.css geçerli olur.
+    function accentTokens(hex, towards) {
+        if (!/^#[0-9A-Fa-f]{6}$/.test(hex || '')) {
+            return null;
+        }
+
+        const channels = [1, 3, 5].map(i => parseInt(hex.substr(i, 2), 16));
+        const hover = channels.map(c => Math.round(c + (towards - c) * 0.12));
+        return `--mx-brand-primary:${hex};--mx-brand-primary-rgb:${channels.join(', ')};`
+            + `--mx-brand-primary-hover:rgb(${hover.join(', ')});`;
+    }
+
+    function applyAccent(light, dark) {
+        const lightTokens = accentTokens(light, 0);
+        const darkTokens = accentTokens(dark, 255);
+        let style = document.getElementById('mx-accent-style');
+        if (!lightTokens && !darkTokens) {
+            style?.remove();
+            return;
+        }
+
+        if (!style) {
+            style = document.createElement('style');
+            style.id = 'mx-accent-style';
+            document.head.appendChild(style);
+        }
+
+        style.textContent = (lightTokens ? `:root,[data-theme="light"]{${lightTokens}}` : '')
+            + (darkTokens ? `[data-theme="dark"]{${darkTokens}}` : '');
+    }
+
     function applySidebar(collapsed) {
         root.classList.toggle('sidebar-collapsed', collapsed);
         return collapsed;
@@ -52,6 +84,7 @@
     });
 
     window.modulixShell = {
+        setAccent: (light, dark) => applyAccent(light, dark),
         getTheme: () => root.getAttribute('data-theme') || 'light',
         setTheme: theme => {
             const value = applyTheme(theme);

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Support.Domain;
@@ -33,13 +34,13 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         Field.Text<SupportTicket>("description", SupportTicket.TextMaxLength, t => t.Description, (t, v) => t.Description = v),
         Field.ListChoice<SupportTicket>("typeKey", SupportModule.Lists.TicketType, t => t.TypeKey, (t, v) => t.TypeKey = v ?? string.Empty),
         Field.Choice<SupportTicket>("channel", TicketChannels.All, t => t.Channel, (t, v) => t.Channel = v),
-        Field.Shared<SupportTicket, Party>("partyId", "Müşteri bulunamadı.", t => t.PartyId, (t, v) => t.PartyId = v),
-        Field.Shared<SupportTicket, Person>("personId", "Kişi bulunamadı.", t => t.PersonId, (t, v) => t.PersonId = v),
+        Field.Shared<SupportTicket, Party>("partyId", SupportMessages.NotFound.Party, t => t.PartyId, (t, v) => t.PartyId = v),
+        Field.Shared<SupportTicket, Person>("personId", SupportMessages.NotFound.Person, t => t.PersonId, (t, v) => t.PersonId = v),
         Field.Text<SupportTicket>("customerName", SupportTicket.NameMaxLength, t => t.CustomerName, (t, v) => t.CustomerName = v).AsSystem(),
         Field.Text<SupportTicket>("reporterName", SupportTicket.NameMaxLength, t => t.ReporterName, (t, v) => t.ReporterName = v),
         Field.Text<SupportTicket>("reporterEmail", SupportTicket.EmailMaxLength, t => t.ReporterEmail, (t, v) => t.ReporterEmail = v),
         Field.Text<SupportTicket>("reporterPhone", SupportTicket.PhoneMaxLength, t => t.ReporterPhone, (t, v) => t.ReporterPhone = v),
-        Field.Reference<SupportTicket, TicketCategory>("categoryId", "Kategori bulunamadı.", t => t.CategoryId, (t, v) => t.CategoryId = v),
+        Field.Reference<SupportTicket, TicketCategory>("categoryId", SupportMessages.NotFound.Category, t => t.CategoryId, (t, v) => t.CategoryId = v),
         Field.Choice<SupportTicket>("impact", TicketLevel.All, t => t.Impact, (t, v) => t.Impact = v),
         Field.Choice<SupportTicket>("urgency", TicketLevel.All, t => t.Urgency, (t, v) => t.Urgency = v),
         Field.Text<SupportTicket>("priority", SupportTicket.StatusMaxLength, t => t.Priority, (t, v) => t.Priority = v!).AsSystem(),
@@ -49,7 +50,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         Field.Text<SupportTicket>("statusReason", SupportTicket.ReasonMaxLength, t => t.StatusReason, (t, v) => t.StatusReason = v).AsSystem(),
         Field.Id<SupportTicket>("queueId", t => t.QueueId, (t, v) => t.QueueId = v).AsSystem(),
         Field.Owner<SupportTicket>(OwnerField, t => t.OwnerId, (t, v) => t.OwnerId = v).AsSystem(),
-        Field.Reference<SupportTicket, SupportTicket>("parentTicketId", "İlişkili talep bulunamadı.", t => t.ParentTicketId, (t, v) => t.ParentTicketId = v, createOnly: true),
+        Field.Reference<SupportTicket, SupportTicket>("parentTicketId", SupportMessages.NotFound.RelatedTicket, t => t.ParentTicketId, (t, v) => t.ParentTicketId = v, createOnly: true),
         Field.Text<SupportTicket>("clientKey", SupportTicket.ClientKeyMaxLength, t => t.ClientKey, (t, v) => t.ClientKey = v).AsSystem(),
         Field.Id<SupportTicket>("mergedIntoId", t => t.MergedIntoId, (t, v) => t.MergedIntoId = v).AsSystem(),
         Field.Date<SupportTicket>("eventDate", t => t.EventDate, (t, v) => t.EventDate = v),
@@ -204,7 +205,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
     {
         if (Context.Gate.IsOpen)
         {
-            throw new RecordValidationException([new RecordFieldError("subject", "Talep yalnızca talep oluşturma işlemiyle açılır.")]);
+            throw new RecordValidationException([new RecordFieldError("subject", SupportMessages.Ticket.CreateOnlyViaWorkflow)]);
         }
 
         var permissions = await Context.Permissions.GetPermissionsAsync(cancellationToken);
@@ -217,11 +218,11 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         {
             if (!permissions.Contains(SupportModule.Permissions.TicketsAssign))
             {
-                errors.Add(new RecordFieldError(OwnerField, "Talebi oluştururken sorumlu atamak için atama yetkisi gerekir."));
+                errors.Add(new RecordFieldError(OwnerField, SupportMessages.Ticket.OwnerNeedsAssignPermission));
             }
             else if (FilterValue.Id(ownerText) is not { } parsedOwner || !await Context.Members.IsActiveMemberAsync(parsedOwner, cancellationToken))
             {
-                errors.Add(new RecordFieldError(OwnerField, "Kullanıcı bu kuruluşun üyesi değil."));
+                errors.Add(new RecordFieldError(OwnerField, ServerMessages.Validation.NotMember));
             }
             else
             {
@@ -233,11 +234,11 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         {
             if (!permissions.Contains(SupportModule.Permissions.TicketsAssign))
             {
-                errors.Add(new RecordFieldError("queueId", "Talebi oluştururken kuyruk seçmek için atama yetkisi gerekir."));
+                errors.Add(new RecordFieldError("queueId", SupportMessages.Ticket.QueueNeedsAssignPermission));
             }
             else if (FilterValue.Id(queueText) is not { } parsedQueue || !await Context.Data.Set<SupportQueue>().AnyAsync(q => q.Id == parsedQueue && q.IsActive, cancellationToken))
             {
-                errors.Add(new RecordFieldError("queueId", "Kuyruk bulunamadı ya da pasif."));
+                errors.Add(new RecordFieldError("queueId", SupportMessages.Ticket.QueueNotFoundOrInactive));
             }
             else
             {
@@ -251,7 +252,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
             key = key.Trim();
             if (key.Length > SupportTicket.ClientKeyMaxLength)
             {
-                errors.Add(new RecordFieldError("clientKey", $"En fazla {SupportTicket.ClientKeyMaxLength} karakter olabilir."));
+                errors.Add(new RecordFieldError("clientKey", ServerMessages.Validation.MaxLength(SupportTicket.ClientKeyMaxLength)));
             }
             else if (await Context.Data.Set<SupportTicket>().AsNoTracking().Where(t => t.ClientKey == key).Select(t => new { t.Id, t.Number }).FirstOrDefaultAsync(cancellationToken) is { } existing)
             {
@@ -281,7 +282,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
 
         if (!isNew && !workflow && !IsTransfer && entity.Status is TicketStatus.Resolved or TicketStatus.Closed or TicketStatus.Cancelled or TicketStatus.Merged)
         {
-            errors.Add(new RecordFieldError("subject", "Çözülmüş, kapanmış ya da iptal edilmiş talep düzenlenemez; gerekirse önce yeniden açın."));
+            errors.Add(new RecordFieldError("subject", SupportMessages.Ticket.ClosedNotEditable));
         }
 
         // Müşteri adı kopyası: oluştururken ve müşteri/kişi bağlantısı değişirken ortak kayıttan yenilenir.
@@ -297,20 +298,20 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         // Müşteri tanımlı olmalı ya da başvuran adı verilmelidir (gereksiz müşteri kaydı açılmaz, ancak anonim talep de olmaz).
         if (entity.PartyId is null && entity.PersonId is null && string.IsNullOrWhiteSpace(entity.ReporterName))
         {
-            errors.Add(new RecordFieldError("reporterName", "Müşteri seçin ya da başvuranın adını girin."));
+            errors.Add(new RecordFieldError("reporterName", SupportMessages.Ticket.ReporterRequired));
         }
 
         // Bağımlı lookup: kişi, müşteri tarafına bağlı olmalıdır (ADR-0016).
         if (entity.PersonId is { } personId && entity.PartyId is { } partyId && (values.ContainsKey("personId") || values.ContainsKey("partyId"))
             && !await Context.Data.Set<Person>().AsNoTracking().AnyAsync(p => p.Id == personId && p.PartyId == partyId, cancellationToken))
         {
-            errors.Add(new RecordFieldError("personId", "Kişi seçilen müşteriyle ilişkili değil."));
+            errors.Add(new RecordFieldError("personId", SupportMessages.Ticket.PersonNotOfParty));
         }
 
         if (entity.CategoryId is { } categoryId && values.ContainsKey("categoryId") && (isNew || categoryId != beforeCategory)
             && !await Context.Data.Set<TicketCategory>().AsNoTracking().AnyAsync(c => c.Id == categoryId && c.IsActive, cancellationToken))
         {
-            errors.Add(new RecordFieldError("categoryId", "Kategori pasif."));
+            errors.Add(new RecordFieldError("categoryId", SupportMessages.Ticket.CategoryInactive));
         }
 
         if (errors.Count > 0)
@@ -330,7 +331,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
             var missing = await MissingRequiredFieldsAsync(entity, cancellationToken);
             if (missing.Count > 0)
             {
-                throw new RecordValidationException([.. missing.Select(f => new RecordFieldError(f, "Bu kategori için bu alan zorunludur."))]);
+                throw new RecordValidationException([.. missing.Select(f => new RecordFieldError(f, SupportMessages.Ticket.CategoryFieldRequired))]);
             }
         }
 

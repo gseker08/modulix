@@ -89,6 +89,28 @@ Yazı tipi **Manrope** (OFL lisanslı, değişken ağırlık 400–800). Dosyala
 
 `--chart-c0` … `--chart-c5`: mavi, turkuaz, amber, lacivert, kırmızı, gri. Koyu temada açık tonları tanımlıdır.
 
+## Firmanın değiştirebileceği tokenlar (E8, 22.11.2026)
+
+Çalışma alanı rengi (CRM epik E8, R4) için firma yöneticisi tasarım sistemini değil, aşağıdaki **kapalı listeyi** değiştirir. Liste dışındaki her token (yüzey, metin, durum, ton, tipografi, boşluk, köşe, gölge, CTA degradesi) bütün firmalarda aynıdır; firma bileşene ya da ekrana özel renk veremez. Firma ayarı yoksa `tokens.css` varsayılanları geçerlidir.
+
+| Firma ayarı | Etkilediği token | Açık / koyu | Kullanım |
+|---|---|---|---|
+| Vurgu rengi (açık tema) | `--mx-brand-primary` | firma değeri | Bağlantı, odak, aktif sekme çizgisi, aktif menü çizgisi, `--bs-primary`, `--bs-link-color` |
+| Vurgu rengi (koyu tema) | `--mx-brand-primary` | firma değeri | Aynı; koyu zeminde açık ton gerekir |
+
+Firmadan yalnızca bu iki değer (açık/koyu, `#RRGGBB`) alınır; Web (`shell.js`) şunları **türetir**, firma ayrıca girmez: `--mx-brand-primary-rgb` (rgb üçlüsü), `--mx-brand-primary-hover` (açık temada %12 koyulaştırılmış, koyu temada %12 açılmış ton) ve odak halkası (`--mx-focus-ring` zaten `-rgb`'den üretilir). `--mx-brand-teal*` ile CTA degradesi (`--mx-gradient-cta*`) ve marka degradesi (`--mx-gradient-brand*`) ilk sürümde sabit kalır; sabit onaltılık değerle yazıldıkları için vurgu rengine bağlanmaları ayrı bir kararla ve önce `tokens.css`'te türetmeye çevrilerek yapılır.
+
+**Kontrast kuralı (sunucuda doğrulanır, geçmeyen renk reddedilir; arayüz yalnızca önizler):**
+
+- Açık tema: vurgu rengi `--mx-surface` (`#FFFFFF`) üzerinde en az 4.5:1 (bağlantı/odak metni) ve `--mx-text-on-brand` (`#FFFFFF`) ile en az 4.5:1 (vurgu dolgulu sayaç rozeti, etkin çip). Sayfa zemini ve seçili menü zemini kurala girmez: varsayılan marka rengi de oralarda 4.1–4.3:1 verir (beyazda 4.53:1), kural varsayılandan katı olamaz.
+- Koyu tema: vurgu rengi `--mx-surface` (`#121D33`), `--mx-background` (`#0B1322`) ve `--mx-surface-muted` (`#192842`) üzerinde en az 4.5:1 ve `--mx-text-on-brand` (`#07111F`) ile en az 4.5:1.
+- Kontrast WCAG göreli parlaklığı ile hesaplanır; hesap tek yerde (sunucu) yazılır, Web önizlemesi aynı sonucu API'den alır.
+- Firma yalnızca `#RRGGBB` verebilir (ad, `rgb()`, `var()`, alfa kabul edilmez); değer CSS'e yazılmadan önce bu desenle doğrulanır, bu yüzden CSS enjeksiyonu yoktur.
+
+**Uygulama biçimi:** Ayarlar `core.appearance.accent-light` ve `core.appearance.accent-dark` anahtarlarıyla Yönetim > Ayarlar'da tutulur (migration gerekmez, firma ayarı deposu). Web, oturum yüklenince bunları okur ve `<style id="mx-accent-style">` ile yalnızca yukarıdaki üç tokeni (`--mx-brand-primary`, `-hover`, `-rgb`) açık/koyu temaya göre yazar; bileşen CSS'i değişmez. Ayar yoksa hiçbir şey yazılmaz. Marka renginin açık ve koyu temada ekran görüntüsü kontrolü (görsel QA) yeni değer için de yapılır.
+
+**Kapsam dışı (bu liste büyütülmeden eklenmez):** yazı tipi, durum renkleri, yüzey/metin renkleri, köşe ve gölge. Yeni bir token firmaya açılacaksa önce bu tabloya, kontrast kuralıyla birlikte yazılır.
+
 ## Geriye uyumluluk
 
 Eski adlar (`--mx-indigo`, `--mx-lilac`, `--mx-cream`, `--mx-ink`, `--mx-muted`, `--mx-teal`, `--mx-radius`, `--mx-shadow`…) yeni tokenlara takma addır; mevcut CSS çalışmaya devam eder. Adları eski paletten kalmadır (`--mx-indigo` artık birincil maviyi, `--mx-lilac` seçili menü zeminini verir). Yeni kodda kullanılmaz, dokunulan kurallarda yeni adlara geçilir.

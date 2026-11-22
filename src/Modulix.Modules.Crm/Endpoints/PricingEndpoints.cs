@@ -22,8 +22,6 @@ internal static class PricingEndpoints
     {
         ResourceEndpoints.MapResource<TaxRateDto, SaveTaxRateRequest>(crm, "/api/crm", "tax-rates", CrmModule.Entities.TaxRate,
             CrmModule.Permissions.PricesRead, CrmModule.Permissions.PricesWrite);
-        ResourceEndpoints.MapResource<ExchangeRateDto, SaveExchangeRateRequest>(crm, "/api/crm", "exchange-rates", CrmModule.Entities.ExchangeRate,
-            CrmModule.Permissions.PricesRead, CrmModule.Permissions.PricesWrite);
         ResourceEndpoints.MapResource<PriceListDto, SavePriceListRequest>(crm, "/api/crm", "price-lists", CrmModule.Entities.PriceList,
             CrmModule.Permissions.PricesRead, CrmModule.Permissions.PricesWrite);
         ResourceEndpoints.MapResource<PriceListItemDto, SavePriceListItemRequest>(crm, "/api/crm", "price-list-items", CrmModule.Entities.PriceListItem,
