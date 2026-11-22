@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Localization;
 namespace Modulix.Modules.Support.Lifecycle;
 
 // Talep durum sabitleri ve saf kurallar (ADR-0024). Kurallar sunucuda uygulanır; arayüz yalnızca aynı kuralları gösterir.
@@ -183,11 +184,11 @@ public readonly record struct TicketState(
     string Status, bool HasOwner, DateTimeOffset? ClosedAt, DateTimeOffset Now, int ReopenWindowDays);
 
 /// <summary>Bir kuralın sonucu: yapılabilir mi, yapılamıyorsa kod ve açıklama.</summary>
-public sealed record TicketRuleResult(bool Allowed, string? Code, string? Message)
+public sealed record TicketRuleResult(bool Allowed, string? Code, ServerMessage? Message)
 {
     public static TicketRuleResult Ok { get; } = new(true, null, null);
 
-    public static TicketRuleResult Deny(string code, string message) => new(false, code, message);
+    public static TicketRuleResult Deny(string code, ServerMessage message) => new(false, code, message);
 }
 
 /// <summary>
@@ -213,26 +214,26 @@ public static class TicketTransitions
         switch (action)
         {
             case TicketAction.Triage:
-                return s.Status == TicketStatus.New ? TicketRuleResult.Ok : TicketRuleResult.Deny("not-new", "Yalnızca yeni talep sınıflandırmaya alınabilir.");
+                return s.Status == TicketStatus.New ? TicketRuleResult.Ok : TicketRuleResult.Deny("not-new", SupportMessages.Rule.NotNew);
 
             case TicketAction.Assign:
             case TicketAction.Take:
                 return TicketStatus.IsWorking(s.Status)
                     ? TicketRuleResult.Ok
-                    : TicketRuleResult.Deny("not-working", "Çözülmüş, kapanmış ya da iptal edilmiş talebe atama yapılamaz; önce yeniden açın.");
+                    : TicketRuleResult.Deny("not-working", SupportMessages.Rule.AssignNotWorking);
 
             case TicketAction.Transfer:
                 return TicketStatus.IsWorking(s.Status)
                     ? TicketRuleResult.Ok
-                    : TicketRuleResult.Deny("not-working", "Yalnızca çalışılan talep başka kuyruğa devredilebilir.");
+                    : TicketRuleResult.Deny("not-working", SupportMessages.Rule.TransferNotWorking);
 
             case TicketAction.Start:
                 if (s.Status is not (TicketStatus.New or TicketStatus.Triage or TicketStatus.Assigned or TicketStatus.Reopened))
                 {
-                    return TicketRuleResult.Deny("cannot-start", "Talep bu durumdan işleme alınamaz.");
+                    return TicketRuleResult.Deny("cannot-start", SupportMessages.Rule.CannotStart);
                 }
 
-                return s.HasOwner ? TicketRuleResult.Ok : TicketRuleResult.Deny("no-owner", "İşleme almak için önce talebe bir sorumlu atanmalıdır.");
+                return s.HasOwner ? TicketRuleResult.Ok : TicketRuleResult.Deny("no-owner", SupportMessages.Rule.NoOwner);
 
             case TicketAction.WaitCustomer:
             case TicketAction.WaitInternal:
@@ -240,26 +241,26 @@ public static class TicketTransitions
                 var target = TargetStatus(action, s.Status);
                 if (s.Status is not (TicketStatus.Assigned or TicketStatus.InProgress or TicketStatus.WaitingCustomer or TicketStatus.WaitingInternal))
                 {
-                    return TicketRuleResult.Deny("cannot-wait", "Yalnızca atanmış ya da işlemdeki talep bekletilebilir.");
+                    return TicketRuleResult.Deny("cannot-wait", SupportMessages.Rule.CannotWait);
                 }
 
-                return s.Status == target ? TicketRuleResult.Deny("same-status", "Talep zaten bu bekleme durumunda.") : TicketRuleResult.Ok;
+                return s.Status == target ? TicketRuleResult.Deny("same-status", SupportMessages.Rule.SameWaitStatus) : TicketRuleResult.Ok;
             }
 
             case TicketAction.Resume:
                 return s.Status is TicketStatus.WaitingCustomer or TicketStatus.WaitingInternal
                     ? TicketRuleResult.Ok
-                    : TicketRuleResult.Deny("not-waiting", "Yalnızca beklemedeki talep sürdürülebilir.");
+                    : TicketRuleResult.Deny("not-waiting", SupportMessages.Rule.NotWaiting);
 
             case TicketAction.Resolve:
                 return s.Status is TicketStatus.Assigned or TicketStatus.InProgress or TicketStatus.WaitingCustomer or TicketStatus.WaitingInternal or TicketStatus.Reopened
                     ? TicketRuleResult.Ok
-                    : TicketRuleResult.Deny("cannot-resolve", "Talep bu durumdan çözülemez; önce sorumlu atayıp işleme alın.");
+                    : TicketRuleResult.Deny("cannot-resolve", SupportMessages.Rule.CannotResolve);
 
             case TicketAction.Close:
                 return s.Status == TicketStatus.Resolved
                     ? TicketRuleResult.Ok
-                    : TicketRuleResult.Deny("not-resolved", "Yalnızca çözülmüş talep kapatılabilir.");
+                    : TicketRuleResult.Deny("not-resolved", SupportMessages.Rule.CloseNotResolved);
 
             case TicketAction.Reopen:
                 if (s.Status == TicketStatus.Resolved)
@@ -269,25 +270,25 @@ public static class TicketTransitions
 
                 if (s.Status != TicketStatus.Closed)
                 {
-                    return TicketRuleResult.Deny("not-closed", "Yalnızca çözülmüş ya da kapanmış talep yeniden açılabilir.");
+                    return TicketRuleResult.Deny("not-closed", SupportMessages.Rule.ReopenNotClosed);
                 }
 
                 return s.ClosedAt is { } closedAt && s.Now - closedAt <= TimeSpan.FromDays(s.ReopenWindowDays)
                     ? TicketRuleResult.Ok
-                    : TicketRuleResult.Deny("reopen-window", $"Kapanıştan sonra {s.ReopenWindowDays} gün geçtiği için talep yeniden açılamaz; ilişkili yeni talep açın.");
+                    : TicketRuleResult.Deny("reopen-window", SupportMessages.Rule.ReopenWindow(s.ReopenWindowDays));
 
             case TicketAction.Cancel:
                 return TicketStatus.IsWorking(s.Status)
                     ? TicketRuleResult.Ok
-                    : TicketRuleResult.Deny("not-working", "Yalnızca çalışılan talep iptal edilebilir; çözülmüş talep için yeniden açma ya da kapatma kullanın.");
+                    : TicketRuleResult.Deny("not-working", SupportMessages.Rule.CancelNotWorking);
 
             case TicketAction.SetPriority:
                 return TicketStatus.IsFinal(s.Status)
-                    ? TicketRuleResult.Deny("final", "Kapanmış ya da iptal edilmiş talebin önceliği değiştirilemez.")
+                    ? TicketRuleResult.Deny("final", SupportMessages.Rule.FinalPriority)
                     : TicketRuleResult.Ok;
 
             default:
-                return TicketRuleResult.Deny("unknown", "Bilinmeyen eylem.");
+                return TicketRuleResult.Deny("unknown", SupportMessages.Rule.UnknownAction);
         }
     }
 
@@ -327,30 +328,30 @@ public static class PriorityMatrix
 /// <summary>Çözüm alanı kuralları: çözümde açıklama ve çözüm kodu zorunludur; şikâyette kök neden ve düzeltici aksiyon da (politikaya göre).</summary>
 public static class ResolutionRules
 {
-    public static IReadOnlyList<(string Field, string Message)> Validate(
+    public static IReadOnlyList<(string Field, ServerMessage Message)> Validate(
         string? resolutionCode, string? resolutionNote, string? rootCause, string? correctiveAction, bool isComplaint, TicketPolicySettings policy)
     {
-        var errors = new List<(string, string)>();
+        var errors = new List<(string, ServerMessage)>();
         if (string.IsNullOrWhiteSpace(resolutionCode))
         {
-            errors.Add(("resolutionCode", "Çözüm kodu zorunludur."));
+            errors.Add(("resolutionCode", SupportMessages.Resolution.CodeRequired));
         }
 
         if (string.IsNullOrWhiteSpace(resolutionNote))
         {
-            errors.Add(("resolutionNote", "Çözüm açıklaması zorunludur."));
+            errors.Add(("resolutionNote", SupportMessages.Resolution.NoteRequired));
         }
 
         if (isComplaint && policy.RequireRootCauseForComplaint)
         {
             if (string.IsNullOrWhiteSpace(rootCause))
             {
-                errors.Add(("rootCause", "Şikâyetin çözümünde kök neden zorunludur."));
+                errors.Add(("rootCause", SupportMessages.Resolution.RootCauseRequired));
             }
 
             if (string.IsNullOrWhiteSpace(correctiveAction))
             {
-                errors.Add(("correctiveAction", "Şikâyetin çözümünde düzeltici aksiyon zorunludur."));
+                errors.Add(("correctiveAction", SupportMessages.Resolution.CorrectiveActionRequired));
             }
         }
 

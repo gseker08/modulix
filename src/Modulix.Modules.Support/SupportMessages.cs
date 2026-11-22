@@ -294,4 +294,128 @@ internal static class SupportMessages
         public static ServerMessage TicketClosed =>
             ServerMessage.Of("support.server.link.ticket-closed", "Kapanmış, iptal edilmiş ya da birleştirilmiş talebin bağlantıları değiştirilemez.");
     }
+
+    /// <summary>Talep durum geçişi ve birleştirme kuralları (eylem durumu ve engel iletileri).</summary>
+    public static class Rule
+    {
+        public static ServerMessage NotNew =>
+            ServerMessage.Of("support.server.rule.not-new", "Yalnızca yeni talep sınıflandırmaya alınabilir.");
+
+        public static ServerMessage AssignNotWorking =>
+            ServerMessage.Of("support.server.rule.assign-not-working", "Çözülmüş, kapanmış ya da iptal edilmiş talebe atama yapılamaz; önce yeniden açın.");
+
+        public static ServerMessage TransferNotWorking =>
+            ServerMessage.Of("support.server.rule.transfer-not-working", "Yalnızca çalışılan talep başka kuyruğa devredilebilir.");
+
+        public static ServerMessage CannotStart =>
+            ServerMessage.Of("support.server.rule.cannot-start", "Talep bu durumdan işleme alınamaz.");
+
+        public static ServerMessage NoOwner =>
+            ServerMessage.Of("support.server.rule.no-owner", "İşleme almak için önce talebe bir sorumlu atanmalıdır.");
+
+        public static ServerMessage CannotWait =>
+            ServerMessage.Of("support.server.rule.cannot-wait", "Yalnızca atanmış ya da işlemdeki talep bekletilebilir.");
+
+        public static ServerMessage SameWaitStatus =>
+            ServerMessage.Of("support.server.rule.same-wait-status", "Talep zaten bu bekleme durumunda.");
+
+        public static ServerMessage NotWaiting =>
+            ServerMessage.Of("support.server.rule.not-waiting", "Yalnızca beklemedeki talep sürdürülebilir.");
+
+        public static ServerMessage CannotResolve =>
+            ServerMessage.Of("support.server.rule.cannot-resolve", "Talep bu durumdan çözülemez; önce sorumlu atayıp işleme alın.");
+
+        public static ServerMessage CloseNotResolved =>
+            ServerMessage.Of("support.server.rule.close-not-resolved", "Yalnızca çözülmüş talep kapatılabilir.");
+
+        public static ServerMessage ReopenNotClosed =>
+            ServerMessage.Of("support.server.rule.reopen-not-closed", "Yalnızca çözülmüş ya da kapanmış talep yeniden açılabilir.");
+
+        public static ServerMessage ReopenWindow(int days) =>
+            ServerMessage.Of("support.server.rule.reopen-window", "Kapanıştan sonra {0} gün geçtiği için talep yeniden açılamaz; ilişkili yeni talep açın.", days);
+
+        public static ServerMessage CancelNotWorking =>
+            ServerMessage.Of("support.server.rule.cancel-not-working", "Yalnızca çalışılan talep iptal edilebilir; çözülmüş talep için yeniden açma ya da kapatma kullanın.");
+
+        public static ServerMessage FinalPriority =>
+            ServerMessage.Of("support.server.rule.final-priority", "Kapanmış ya da iptal edilmiş talebin önceliği değiştirilemez.");
+
+        public static ServerMessage UnknownAction =>
+            ServerMessage.Of("support.server.rule.unknown-action", "Bilinmeyen eylem.");
+
+        public static ServerMessage MergeSelf =>
+            ServerMessage.Of("support.server.rule.merge-self", "Talep kendisiyle birleştirilemez.");
+
+        public static ServerMessage MergeSourceClosed =>
+            ServerMessage.Of("support.server.rule.merge-source-closed", "Çözülmüş, kapanmış, iptal edilmiş ya da zaten birleştirilmiş talep birleştirilemez.");
+
+        public static ServerMessage MergeTargetClosed =>
+            ServerMessage.Of("support.server.rule.merge-target-closed", "Kapanmış, iptal edilmiş ya da birleştirilmiş talebe birleştirilemez; hedef talebi önce yeniden açın.");
+
+        public static ServerMessage MergeDifferentCustomer =>
+            ServerMessage.Of("support.server.rule.merge-different-customer", "Farklı müşterilerin talepleri birleştirilemez; ilişkili talep olarak bağlayın.");
+
+        public static ServerMessage ActionNotAllowed =>
+            ServerMessage.Of("support.server.rule.action-not-allowed", "Bu işlem şu an yapılamaz.");
+
+        public static ServerMessage MergeNotAllowed =>
+            ServerMessage.Of("support.server.rule.merge-not-allowed", "Bu talepler birleştirilemez.");
+
+        public static ServerMessage AlreadyYours =>
+            ServerMessage.Of("support.server.rule.already-yours", "Talep zaten sizin üzerinizde.");
+
+        public static ServerMessage Owned =>
+            ServerMessage.Of("support.server.rule.owned", "Talebin sorumlusu var; devralmak için atama yetkisi olan biri atamalıdır.");
+
+        public static ServerMessage BlockingTasks(int count) =>
+            ServerMessage.Of("support.server.rule.blocking-tasks", "{0} engelleyici alt iş açık; talebi çözmeden önce bunları tamamlayın.", count);
+    }
+
+    /// <summary>Çözüm alanı doğrulaması.</summary>
+    public static class Resolution
+    {
+        public static ServerMessage CodeRequired =>
+            ServerMessage.Of("support.server.resolution.code-required", "Çözüm kodu zorunludur.");
+
+        public static ServerMessage NoteRequired =>
+            ServerMessage.Of("support.server.resolution.note-required", "Çözüm açıklaması zorunludur.");
+
+        public static ServerMessage RootCauseRequired =>
+            ServerMessage.Of("support.server.resolution.root-cause-required", "Şikâyetin çözümünde kök neden zorunludur.");
+
+        public static ServerMessage CorrectiveActionRequired =>
+            ServerMessage.Of("support.server.resolution.corrective-action-required", "Şikâyetin çözümünde düzeltici aksiyon zorunludur.");
+    }
+
+    /// <summary>Talep iş akışı eylemlerinin doğrulamaları.</summary>
+    public static class Workflow
+    {
+        public static ServerMessage ReasonRequired =>
+            ServerMessage.Of("support.server.workflow.reason-required", "Gerekçe zorunludur.");
+
+        public static ServerMessage OwnerOrQueueRequired =>
+            ServerMessage.Of("support.server.workflow.owner-or-queue-required", "Sorumlu ya da kuyruk seçin.");
+
+        public static ServerMessage ReassignReasonRequired =>
+            ServerMessage.Of("support.server.workflow.reassign-reason-required", "Sorumlusu olan talebin sorumlusunu değiştirmek için gerekçe zorunludur.");
+
+        public static ServerMessage TransferQueueRequired =>
+            ServerMessage.Of("support.server.workflow.transfer-queue-required", "Devredilecek kuyruğu seçin (aktif olmalı).");
+
+        public static ServerMessage AlreadyInQueue =>
+            ServerMessage.Of("support.server.workflow.already-in-queue", "Talep zaten bu kuyrukta.");
+
+        public static ServerMessage ResolutionIncomplete =>
+            ServerMessage.Of("support.server.workflow.resolution-incomplete", "Çözüm bilgileri eksik.");
+
+        public static ServerMessage SamePriority =>
+            ServerMessage.Of("support.server.workflow.same-priority", "Talep zaten bu önceliğe sahip.");
+    }
+
+    /// <summary>Talep birleştirme.</summary>
+    public static class Merge
+    {
+        public static ServerMessage TargetUnavailable =>
+            ServerMessage.Of("support.server.merge.target-unavailable", "Hedef talep bulunamadı ya da erişim yetkiniz yok.");
+    }
 }

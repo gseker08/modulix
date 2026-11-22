@@ -138,22 +138,22 @@ public static class MergeRules
     {
         if (source.Id == target.Id)
         {
-            return TicketRuleResult.Deny("same-ticket", "Talep kendisiyle birleştirilemez.");
+            return TicketRuleResult.Deny("same-ticket", SupportMessages.Rule.MergeSelf);
         }
 
         if (TicketStatus.IsFinal(source.Status) || source.Status == TicketStatus.Resolved)
         {
-            return TicketRuleResult.Deny("source-closed", "Çözülmüş, kapanmış, iptal edilmiş ya da zaten birleştirilmiş talep birleştirilemez.");
+            return TicketRuleResult.Deny("source-closed", SupportMessages.Rule.MergeSourceClosed);
         }
 
         if (TicketStatus.IsFinal(target.Status))
         {
-            return TicketRuleResult.Deny("target-closed", "Kapanmış, iptal edilmiş ya da birleştirilmiş talebe birleştirilemez; hedef talebi önce yeniden açın.");
+            return TicketRuleResult.Deny("target-closed", SupportMessages.Rule.MergeTargetClosed);
         }
 
         return SameApplicant(source, target)
             ? TicketRuleResult.Ok
-            : TicketRuleResult.Deny("different-customer", "Farklı müşterilerin talepleri birleştirilemez; ilişkili talep olarak bağlayın.");
+            : TicketRuleResult.Deny("different-customer", SupportMessages.Rule.MergeDifferentCustomer);
     }
 
     public static bool SameApplicant(MergeFacts a, MergeFacts b)
