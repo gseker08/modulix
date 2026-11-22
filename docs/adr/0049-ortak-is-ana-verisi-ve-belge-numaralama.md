@@ -1,6 +1,6 @@
 # ADR-0049: Ortak iş ana verisi ve belge numaralama
 
-- **Durum:** Dilim 1 (belge numaralama) 15 Kasım 2026'da teslim edildi (PR #395). Dilim 6a (firmanın tatil listesi ve takvim hesabı Core'da) 15 Kasım 2026'da teslim edildi (PR #397). Dilim 6b (destek SLA takvimi firmanın listesini uygular) ve 6c (firmanın haftalık mesai saatleri, firma iş takvimi) 15 Kasım 2026'da teslim edilir. Diğer dilimler öneridir; "Açık kararlar" yanıtlanmadan kodlanmaz.
+- **Durum:** Dilim 1 (belge numaralama) 15 Kasım 2026'da teslim edildi (PR #395). Dilim 6a (firmanın tatil listesi ve takvim hesabı Core'da) 15 Kasım 2026'da teslim edildi (PR #397). Dilim 6b (destek SLA takvimi firmanın listesini uygular) ve 6c (firmanın haftalık mesai saatleri, firma iş takvimi) 15 Kasım 2026'da teslim edilir. Dilim 5'in kararları 22 Kasım 2026'da verildi (kodu başlamadı). Diğer dilimler öneridir; "Açık kararlar" yanıtlanmadan kodlanmaz.
 - **Kaynak:** [Core mimari değerlendirmesi](../core-mimari-degerlendirme-2026-11.md) H4, H5, H6; yol haritası Ç8.1 (seri yönetimi).
 
 > Numara notu: 15 Kasım 2026'da `main`'de en yüksek numara 0047'ydi, 0048 açık PR #394'te kullanılıyordu. Birleştirmeden önce numara yeniden kontrol edilmeli.
@@ -79,9 +79,9 @@ Teklif, sipariş, operasyon işi ve destek kaydı numaraları bugün rastgele so
 
 Kesintisiz seri isteyen belgeler (fatura, irsaliye) için: numara taslakta değil kesinleştirmede verilir; iptal edilen numara iz bırakır. İlk ihtiyaç duyan belgeyle birlikte.
 
-### Dilim 5: para birimi, kur, vergi oranı, birim (taslak, 22 Kasım 2026; karar bekler)
+### Dilim 5: para birimi, kur, vergi oranı, birim (kararlar verildi, 22 Kasım 2026)
 
-> Bu bölüm **taslaktır**: "Dilim 5 kararları" cevaplanmadan kodlanmaz. Aşağıdaki kararlar öneridir; kabul edilen seçenek bu bölümde güncellenir.
+> **Kararlar (22 Kasım 2026, ürün sahibi):** K5.1–K5.5'in hepsi aşağıdaki önerilen cevaplarla kabul edildi. Kod 5a (kur) ile başlar; 5b, 5c ve 5d kendi dilimleriyle gelir. Bu bölümdeki "Karar önerisi" ve "Tasarım" metinleri kabul edilmiş karardır.
 
 **Bugün (kodda doğrulandı):** `ExchangeRate`, `TaxRate` ve `MeasureUnit` `Modulix.Modules.Crm` içinde (`crm` şeması, `CrmEntity` = `ITenantEntity` + `ICompanyShared`); kayıt türleri `crm.exchange-rate`, `crm.tax-rate`, `crm.measure-unit`, hepsi `crm.prices.read` / `crm.products.read` izinlerine bağlı ve ekranı CRM menüsündeki "Vergi ve kur". Okuyan tek yer `PriceCalculator` (CRM). Orders kuru tekliften kopyalar (`OrderFromQuote`: `ExchangeRate`, `ExchangeRateDate`), kendi kur tablosu okumaz. Saf hesap çekirdeği `Core.Contracts.Pricing` zaten Core'da. Para birimi listesi (`RegionalOptions.Currencies`) ve tenant varsayılan para birimi (`DefaultCurrency` ayarı) zaten Core'da. Sonuç: CRM lisansı olmayan firma kur giremez; Lojistik masrafı (ADR-0038 dilim 8) ve İK için kur okuyacak ortak yer yok.
 
@@ -112,12 +112,12 @@ Kesintisiz seri isteyen belgeler (fatura, irsaliye) için: numara taslakta deği
 5. CRM lisansı olmayan firma Yönetim'den kur girer ve Core okuyucudan okur.
 6. Veri taşıma: migration sonrası kur sayısı ve değerleri eski tabloyla aynı; dağıtım penceresi sınırı belgelenmiş.
 
-**Dilim 5 kararları (cevap bekleyen):**
-- **K5.1 Kapsam:** yukarıdaki gibi kur → vergi → birim sırası ve katalogun dışarıda bırakılması mı, yoksa katalog da bu dilime mi girsin? (Öneri: dışarıda.)
-- **K5.2 Kaynak:** yalnızca elle giriş mi (öneri), TCMB 5d olarak planlansın mı, yoksa hiç planlanmasın mı?
-- **K5.3 Baz:** tenant (öneri) mı, şirket başına mı?
-- **K5.4 Okuma izni:** kur okuma her üyeye açık (öneri) mı, yoksa `core.exchange-rates.read` ile sınırlı mı? (Kur hassas veri değildir; ama maliyet/fiyat alanlarıyla birlikte gösteriliyorsa CRM ekranı kendi iznini korur.)
-- **K5.5 Dağıtım penceresi:** kur düzenlemesini pencerede yasaklamak yeterli mi, yoksa eski tabloya yazma çift yazma ile desteklensin mi? (Öneri: yasak; kur günde birkaç kez değişir, çift yazma karmaşıklığa değmez.)
+**Dilim 5 kararları (cevaplandı, 22 Kasım 2026; hepsi öneriyle):**
+- **K5.1 Kapsam: kabul edildi.** Sıra kur → vergi → birim; ürün/hizmet kataloğu dilimin dışındadır, CRM'siz katalog ihtiyacı doğunca ayrı ADR.
+- **K5.2 Kaynak: kabul edildi.** Dilim 5 yalnızca elle girişi taşır; TCMB günlük çekimi ayrı karar isteyen 5d dilimidir.
+- **K5.3 Baz: kabul edildi.** Tenant bazında (`ICompanyShared`); şirket bazı ihtiyaç doğunca ayrı migration ile eklenir.
+- **K5.4 Okuma izni: kabul edildi.** Kur okuma her üyeye açıktır; yazma `core.exchange-rates.manage`. CRM ekranı fiyat/maliyet alanları için kendi iznini korur.
+- **K5.5 Dağıtım penceresi: kabul edildi.** Pencerede kur düzenlemesi yasaktır, çift yazma yapılmaz.
 
 ### Dilim 6: çalışma takvimi
 
@@ -152,7 +152,7 @@ Tek Core takvimi (mesai saatleri + tatil günleri, tenant başına; ileride şir
 ## Açık kararlar
 
 1. **Dilim 3:** teklif, sipariş ve destek numaraları sıralı seriye geçsin mi? Öneri: evet, yalnızca yeni kayıtlar için ve firma ayarıyla (dilim 2'den sonra).
-2. **Dilim 5:** kur kaynağı, baz ve kapsam; taslak ve önerilen cevaplar dilim 5 bölümünde (K5.1–K5.5).
+2. **Dilim 5:** cevaplandı (22 Kasım 2026): elle giriş, tenant bazı, kapsam kur → vergi → birim (K5.1–K5.5, dilim 5 bölümü).
 3. **Dilim 6:** resmî tatiller platform tarafından mı sağlanır (yıllık güncellenen katalog), firma mı girer? Öneri: platform kataloğu + firma eklemeleri.
 4. Seri başına boşluk raporu (hangi numara neden atlandı) hangi belgeler için zorunlu? Mevzuat doğrulaması ister.
 
