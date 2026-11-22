@@ -33,7 +33,7 @@ public partial class SupportMessagesTests
             checkedCount++;
         }
 
-        Assert.True(checkedCount >= 30);
+        Assert.True(checkedCount >= 40);
     }
 
     [Fact]

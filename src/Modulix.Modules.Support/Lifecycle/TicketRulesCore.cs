@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Support.Lifecycle;
 
@@ -10,27 +11,27 @@ namespace Modulix.Modules.Support.Lifecycle;
 public static class PriorityMatrixRules
 {
     /// <summary>Hücre geçersizse (bilinmeyen düzey/öncelik) hata; eksik hücre yerleşik matristen alınır.</summary>
-    public static IReadOnlyList<(string Field, string Message)> Validate(IReadOnlyCollection<(string Impact, string Urgency, string Priority)> cells)
+    public static IReadOnlyList<(string Field, ServerMessage Message)> Validate(IReadOnlyCollection<(string Impact, string Urgency, string Priority)> cells)
     {
-        var errors = new List<(string, string)>();
+        var errors = new List<(string, ServerMessage)>();
         if (cells.Any(c => !TicketLevel.All.Contains(c.Impact)))
         {
-            errors.Add(("impact", $"Etki şunlardan biri olmalıdır: {string.Join(", ", TicketLevel.All)}."));
+            errors.Add(("impact", SupportMessages.Matrix.ImpactOneOf(string.Join(", ", TicketLevel.All))));
         }
 
         if (cells.Any(c => !TicketLevel.All.Contains(c.Urgency)))
         {
-            errors.Add(("urgency", $"Aciliyet şunlardan biri olmalıdır: {string.Join(", ", TicketLevel.All)}."));
+            errors.Add(("urgency", SupportMessages.Matrix.UrgencyOneOf(string.Join(", ", TicketLevel.All))));
         }
 
         if (cells.Any(c => !TicketPriority.All.Contains(c.Priority)))
         {
-            errors.Add(("priority", $"Öncelik şunlardan biri olmalıdır: {string.Join(", ", TicketPriority.All)}."));
+            errors.Add(("priority", SupportMessages.Matrix.PriorityOneOf(string.Join(", ", TicketPriority.All))));
         }
 
         if (cells.GroupBy(c => (c.Impact, c.Urgency)).Any(g => g.Count() > 1))
         {
-            errors.Add(("cells", "Her etki × aciliyet hücresi için tek değer verilebilir."));
+            errors.Add(("cells", SupportMessages.Matrix.OneValuePerCell));
         }
 
         return errors;
@@ -78,10 +79,10 @@ public static class CategoryFieldRules
     public static IReadOnlyList<string> Parse(string? csv) =>
         string.IsNullOrWhiteSpace(csv) ? [] : [.. csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.Ordinal)];
 
-    public static IReadOnlyList<(string Field, string Message)> Validate(string? csv)
+    public static IReadOnlyList<(string Field, ServerMessage Message)> Validate(string? csv)
     {
         var unknown = Parse(csv).Where(f => !Allowed.Contains(f)).ToList();
-        return unknown.Count == 0 ? [] : [("requiredFields", $"Geçersiz alan: {string.Join(", ", unknown)}. İzin verilenler: {string.Join(", ", Allowed)}.")];
+        return unknown.Count == 0 ? [] : [("requiredFields", SupportMessages.Category.InvalidRequiredFields(string.Join(", ", unknown), string.Join(", ", Allowed)))];
     }
 
     /// <summary>Zorunlu alanların hangileri boş: <paramref name="isFilled"/> alan adı → dolu mu.</summary>

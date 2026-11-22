@@ -225,4 +225,32 @@ public static class ServerMessages
         public static ServerMessage TwoFactorRequiredDetail =>
             ServerMessage.Of("server.access.two-factor-required.detail", "Devam etmeden önce Hesabım sayfasından iki adımlı doğrulamayı açın.");
     }
+
+    /// <summary>İş takvimi tanımının doğrulama iletileri (<c>CalendarSpecParser</c>; SLA, izin ve onay takvimleri ortak kullanır).</summary>
+    public static class Calendar
+    {
+        public static ServerMessage TimeZone =>
+            ServerMessage.Of("server.calendar.time-zone", "Geçerli bir saat dilimi kimliği girin (ör. Europe/Istanbul).");
+
+        public static ServerMessage WeeklyWindow =>
+            ServerMessage.Of("server.calendar.weekly-window", "Her çalışma penceresi için gün (0=Pazar … 6=Cumartesi), başlangıç ve daha geç bir bitiş (SS:dd) verin.");
+
+        public static ServerMessage WeeklyJson =>
+            ServerMessage.Of("server.calendar.weekly-json", "Çalışma saatleri geçerli bir JSON listesi olmalıdır.");
+
+        public static ServerMessage WeeklyOverlap =>
+            ServerMessage.Of("server.calendar.weekly-overlap", "Aynı gündeki çalışma pencereleri çakışamaz.");
+
+        public static ServerMessage WeeklyRequired =>
+            ServerMessage.Of("server.calendar.weekly-required", "7/24 değilse en az bir çalışma penceresi gerekir.");
+
+        public static ServerMessage HolidayEntry =>
+            ServerMessage.Of("server.calendar.holiday-entry", "Her tatil için tarih (yyyy-MM-dd) verin; yarım gün için başlangıç ve daha geç bir bitiş (SS:dd) gerekir.");
+
+        public static ServerMessage HolidaysJson =>
+            ServerMessage.Of("server.calendar.holidays-json", "Tatiller geçerli bir JSON listesi olmalıdır.");
+
+        public static ServerMessage HolidayDuplicate =>
+            ServerMessage.Of("server.calendar.holiday-duplicate", "Aynı tarih için tek tatil kaydı olabilir.");
+    }
 }
