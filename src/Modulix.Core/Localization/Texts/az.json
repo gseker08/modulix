@@ -12900,5 +12900,19 @@
   "support.server.corrective.result-note-required": "Nəticə qeydi məcburidir (nə edildi, necə yoxlanıldı).",
   "support.server.corrective.complaint-only": "Düzəldici tədbir yalnız şikayət növündəki sorğuda açılır.",
   "support.server.corrective.not-complaint": "Sorğu şikayət növündə deyil.",
-  "support.server.corrective.ticket-closed": "Ləğv edilmiş və ya birləşdirilmiş sorğuda düzəldici tədbir dəyişdirilə bilməz."
+  "support.server.corrective.ticket-closed": "Ləğv edilmiş və ya birləşdirilmiş sorğuda düzəldici tədbir dəyişdirilə bilməz.",
+  "support.server.inbound.message-id-required": "Mesaj identifikatoru məcburidir (ən çoxu {0} simvol).",
+  "support.server.inbound.from-address-invalid": "Göndərən ünvanı etibarlı e-poçt olmalıdır.",
+  "support.server.inbound.from-address-required": "E-poçt kanalında göndərən ünvanı məcburidir.",
+  "support.server.file.name-required": "Fayl adı məcburidir.",
+  "support.server.file.empty": "Fayl boş ola bilməz.",
+  "support.server.file.too-large": "Fayl ən çoxu {0} MB ola bilər.",
+  "support.server.file.type-not-allowed": "Bu fayl növünə icazə verilmir. İcazəli növlər: {0}.",
+  "support.server.file.dangerous-name": "Fayl adı icra edilə bilən və ya skript uzantısı ehtiva edə bilməz.",
+  "support.server.file.content-mismatch": "Faylın məzmunu uzantısı ilə uyğun gəlmir.",
+  "support.server.file.binary-in-text": "Mətn faylı ikili məzmun ehtiva edə bilməz.",
+  "support.server.report.start-after-end": "Başlanğıc tarixi bitmə tarixindən sonra ola bilməz.",
+  "support.server.report.end-in-future": "Bitmə tarixi bu gündən sonra ola bilməz.",
+  "support.server.report.period-too-long": "Dövr ən çoxu {0} gün ola bilər.",
+  "support.server.report.min-occurrences-range": "Təkrar həddi 2-100 arasında olmalıdır."
 }

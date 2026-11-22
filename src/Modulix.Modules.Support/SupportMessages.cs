@@ -483,4 +483,58 @@ internal static class SupportMessages
         public static ServerMessage TicketClosed =>
             ServerMessage.Of("support.server.corrective.ticket-closed", "İptal edilmiş ya da birleştirilmiş talepte düzeltici aksiyon değiştirilemez.");
     }
+
+    /// <summary>Gelen kanal (e-posta vb.) mesajı doğrulaması.</summary>
+    public static class Inbound
+    {
+        public static ServerMessage MessageIdRequired(int max) =>
+            ServerMessage.Of("support.server.inbound.message-id-required", "Mesaj kimliği zorunludur (en fazla {0} karakter).", max);
+
+        public static ServerMessage FromAddressInvalid =>
+            ServerMessage.Of("support.server.inbound.from-address-invalid", "Gönderen adresi geçerli bir e-posta olmalıdır.");
+
+        public static ServerMessage FromAddressRequired =>
+            ServerMessage.Of("support.server.inbound.from-address-required", "E-posta kanalında gönderen adresi zorunludur.");
+    }
+
+    /// <summary>Ek dosya doğrulaması (ad, boyut, tür, içerik).</summary>
+    public static class File
+    {
+        public static ServerMessage NameRequired =>
+            ServerMessage.Of("support.server.file.name-required", "Dosya adı zorunludur.");
+
+        public static ServerMessage Empty =>
+            ServerMessage.Of("support.server.file.empty", "Dosya boş olamaz.");
+
+        public static ServerMessage TooLarge(int megabytes) =>
+            ServerMessage.Of("support.server.file.too-large", "Dosya en fazla {0} MB olabilir.", megabytes);
+
+        public static ServerMessage TypeNotAllowed(string allowed) =>
+            ServerMessage.Of("support.server.file.type-not-allowed", "Bu dosya türüne izin verilmez. İzinli türler: {0}.", allowed);
+
+        public static ServerMessage DangerousName =>
+            ServerMessage.Of("support.server.file.dangerous-name", "Dosya adı çalıştırılabilir ya da betik uzantısı içeremez.");
+
+        public static ServerMessage ContentMismatch =>
+            ServerMessage.Of("support.server.file.content-mismatch", "Dosya içeriği uzantısıyla uyuşmuyor.");
+
+        public static ServerMessage BinaryInText =>
+            ServerMessage.Of("support.server.file.binary-in-text", "Metin dosyası ikili içerik barındıramaz.");
+    }
+
+    /// <summary>Destek raporu girdileri.</summary>
+    public static class Report
+    {
+        public static ServerMessage StartAfterEnd =>
+            ServerMessage.Of("support.server.report.start-after-end", "Başlangıç tarihi bitişten sonra olamaz.");
+
+        public static ServerMessage EndInFuture =>
+            ServerMessage.Of("support.server.report.end-in-future", "Bitiş tarihi bugünden sonra olamaz.");
+
+        public static ServerMessage PeriodTooLong(int max) =>
+            ServerMessage.Of("support.server.report.period-too-long", "Dönem en çok {0} gün olabilir.", max);
+
+        public static ServerMessage MinOccurrencesRange =>
+            ServerMessage.Of("support.server.report.min-occurrences-range", "Tekrar eşiği 2-100 arasında olmalıdır.");
+    }
 }

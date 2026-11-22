@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Support.Domain;
 using Modulix.Modules.Support.Records;
@@ -39,7 +40,7 @@ internal sealed class TicketInbound(
         {
             if (!await access.HasPermissionAsync(permission, cancellationToken))
             {
-                return RecordResult<InboundResult>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir.");
+                return RecordResult<InboundResult>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission));
             }
         }
 
@@ -247,27 +248,27 @@ internal sealed class TicketInbound(
     {
         if (string.IsNullOrWhiteSpace(m.Channel) || !Channels.Contains(m.Channel.Trim(), StringComparer.OrdinalIgnoreCase))
         {
-            return Invalid("channel", $"Şunlardan biri olmalıdır: {string.Join(", ", Channels)}.");
+            return Invalid("channel", ServerMessages.Validation.OneOf(string.Join(", ", Channels)));
         }
 
         if (string.IsNullOrWhiteSpace(m.ExternalMessageId) || m.ExternalMessageId.Trim().Length > InboundRules.MaxMessageIdLength)
         {
-            return Invalid("externalMessageId", $"Mesaj kimliği zorunludur (en fazla {InboundRules.MaxMessageIdLength} karakter).");
+            return Invalid("externalMessageId", SupportMessages.Inbound.MessageIdRequired(InboundRules.MaxMessageIdLength));
         }
 
         if (string.IsNullOrWhiteSpace(m.Body))
         {
-            return Invalid("body", "Mesaj metni zorunludur.");
+            return Invalid("body", SupportMessages.Message.BodyRequired);
         }
 
         if (!string.IsNullOrWhiteSpace(m.FromAddress) && NormalizeAddress(m.FromAddress) is null)
         {
-            return Invalid("fromAddress", "Gönderen adresi geçerli bir e-posta olmalıdır.");
+            return Invalid("fromAddress", SupportMessages.Inbound.FromAddressInvalid);
         }
 
         if (m.Channel.Trim().Equals("Email", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(m.FromAddress))
         {
-            return Invalid("fromAddress", "E-posta kanalında gönderen adresi zorunludur.");
+            return Invalid("fromAddress", SupportMessages.Inbound.FromAddressRequired);
         }
 
         return null;
@@ -289,6 +290,6 @@ internal sealed class TicketInbound(
     private static string ClientKey(string channel, string externalId) =>
         "in:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{channel}|{externalId}")))[..40];
 
-    private static RecordResult<InboundResult> Invalid(string field, string message) =>
+    private static RecordResult<InboundResult> Invalid(string field, ServerMessage message) =>
         RecordResult<InboundResult>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }
