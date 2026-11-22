@@ -1,7 +1,7 @@
 # ADR-0053: Birleşik müşteri zaman çizelgesi
 
 - **Durum:** Dilim 1 (kaynak sözleşmesi, CRM kaynakları, uç nokta, firma kartında sekme) 17 Kasım 2026'da teslim edildi (PR #468).
-  Dilim 2a (Sipariş kaynağı) ve 2b (Sözleşme kaynağı) 17 Kasım 2026'da, 2c (Destek kaynağı) 21 Kasım 2026'da, 2d (Pazarlama kaynağı) 22 Kasım 2026'da teslim edildi. Diğer dilimler öneridir.
+  Dilim 2a (Sipariş kaynağı) ve 2b (Sözleşme kaynağı) 17 Kasım 2026'da, 2c (Destek kaynağı) 21 Kasım 2026'da, 2d (Pazarlama kaynağı) 22 Kasım 2026'da (PR #511), dilim 3'ün süzgeç yarısı (kaynak süzgeci) 22 Kasım 2026'da teslim edildi. Diğer dilimler öneridir.
 - **Kaynak:** [CRM eksik süreç epic listesi](../crm-eksik-surecler-epicleri.md) E9.
 
 ## Bağlam
@@ -79,6 +79,11 @@ token yoktur. Fırsat ve teklif satırı kendi sayfasına bağlanır; "Daha eski
      (kampanya sayfasına bağlanır), başlık kampanya adı, durum teslimat ya da yanıt durumu, tür kodu yanıt türüdür; adres ve ileti içeriği
      satıra girmez. Yanıt deposuna `receivedBefore` süzgeci eklendi. Teslimat satırının anı kayıt oluşturulma anıdır (gönderim anı değil).
 3. Kaynak türüne göre süzgeç ve özet şeridi (son temas, açık iş sayısı).
+   - **Süzgeç (22 Kasım 2026):** `GET .../timeline?sources=a,b` kaynak anahtarlarıyla süzer; seçilmeyen kaynak hiç okunmaz, yanıttaki `sources`
+     listesi yalnızca sorgulananlardan okunabilenleri sayar. Tanınmayan anahtar 422 döner; izni ya da lisansı olmayan kaynağın anahtarı geçerlidir
+     ama kaynak listede ve satırlarda yoktur (süzgeç yetkiyi genişletmez). Arayüzde çizelgenin üstünde çok seçimli `chip` süzgeci vardır ("Tümü" ya da
+     seçilen türler); çipler süzgeçsiz yüklemenin `sources` listesinden kurulur, tek kaynak okunabiliyorsa gösterilmez. Süzgeç değişince çizelge
+     baştan yüklenir. Özet şeridi sonraki dilimdedir.
 4. Durum değişikliği satırları (fırsat kazanıldı/kaybedildi, teklif kabul edildi) ve müşteri adayı geçmişi (dönüşen aday).
 
 ## Yapılmadı / sınırlar

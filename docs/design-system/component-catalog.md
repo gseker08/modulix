@@ -90,7 +90,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Satış hunisi | Var | `SalesPipeline.razor` — `Stages`, `Current`, `Status`, `CanChangeStage`, `CanClose`, `OnChoose` |
 | Takvim | Var | `ActivityCalendar.razor`: ay ızgarası, hafta/gün saat çizelgesi (`cal-time-*`, çakışanlar yan yana, şimdiki zaman çizgisi), ajanda; renk `FamilyOf` → `fam-*` |
 | Günün ajandası | Var | `TodayActivities.razor` |
-| Müşteri zaman çizelgesi | Var | `CustomerTimeline.razor` (ADR-0053): `ol.activity-timeline` + `timeline-item`/`timeline-icon`/`timeline-body`/`timeline-meta`; aktivite satırında `fam-*` rengi, fırsat/teklif durumunda `badge stage-*`; sonraki sayfa `btn btn-tonal btn-sm` |
+| Müşteri zaman çizelgesi | Var | `CustomerTimeline.razor` (ADR-0053): `ol.activity-timeline` + `timeline-item`/`timeline-icon`/`timeline-body`/`timeline-meta`; aktivite satırında `fam-*` rengi, fırsat/teklif durumunda `badge stage-*`; sonraki sayfa `btn btn-tonal btn-sm`; üstte kaynak türü süzgeci `filters` + `chip` (çok seçimli, `aria-pressed`; "Tümü" hiçbir tür seçili değilken etkin) |
 | Grafikler | Var | `BarChart.razor` (`WideValues`: tutar gibi uzun değerlerde değer sütunu genişler, sınıf `bar-chart-wide`), `DonutChart.razor` (`--chart-c*`) |
 | Kişi kartları (rehber) | Var | `ul.profile-cards` + `li.profile-card`; kişi satırı `owner-cell` + `avatar avatar-tone-*` (baş harfler). Örnek: `Hr/Directory.razor` |
 | Organizasyon ağacı | Var | `ul.org-tree` (rol `tree`, alt düğümler `ul[role=group]`): her düğüm `org-node` (avatar + ad + ikincil satır), alt düzeyler sol kenarda ince çizgiyle girintili; vurgulanan düğüm `org-node active` (marka tonu zemin). Renk, köşe ve çizgi yalnızca `--mx-*` tokenlarından. Örnek: `Hr/OrgChart.razor` (13.11.2026) |
