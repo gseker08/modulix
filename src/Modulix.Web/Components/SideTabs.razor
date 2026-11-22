@@ -7,12 +7,17 @@
         var active = tab.Key == State.Active;
         <button type="button" role="tab" id="tab-@tab.Key" class="side-tab @(active ? "active" : null)"
                 aria-selected="@(active ? "true" : "false")" aria-controls="tabpanel-@tab.Key"
-                @onclick="() => State.Select(tab.Key)">
+                @onclick="() => SelectAsync(tab.Key)">
             <AppIcon Name="@tab.Icon" Size="18" />
             <span>@tab.Label</span>
             @if (tab.Count is { } count)
             {
                 <span class="record-tab-count">@count</span>
+            }
+            @if (tab.Errors > 0)
+            {
+                @* Hata renk dışında "!" işareti ve gizli metinle de anlatılır. *@
+                <span class="record-tab-count record-tab-invalid"><span aria-hidden="true">!</span><span class="visually-hidden">@Texts.Get("common.tab.invalid", tab.Errors)</span></span>
             }
         </button>
     }
@@ -25,4 +30,13 @@
 
     /// <summary>Ekran okuyucu için sekme grubunun adı.</summary>
     [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    /// <summary>Sekme değişince çağrılır; sayfa etkin sekmeye göre panel dışında bir şey çiziyorsa bununla yeniden çizilir.</summary>
+    [Parameter] public EventCallback<string> Changed { get; set; }
+
+    private async Task SelectAsync(string key)
+    {
+        State.Select(key);
+        await Changed.InvokeAsync(key);
+    }
 }

@@ -981,6 +981,16 @@ code {
         font-weight: 700;
     }
 
+    .side-tab .record-tab-count.record-tab-invalid,
+    .side-tab.active .record-tab-count.record-tab-invalid {
+        background: var(--mx-tone-danger-bg);
+        color: var(--mx-tone-danger-fg);
+    }
+
+    .side-tab .record-tab-count + .record-tab-count {
+        margin-left: 0;
+    }
+
 .side-content {
     min-width: 0;
 }

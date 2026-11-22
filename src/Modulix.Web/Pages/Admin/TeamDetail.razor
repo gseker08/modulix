@@ -27,10 +27,19 @@
     }
     else
     {
-        <div class="page-header">
-            <h1>@team.Name</h1>
+        @* Kimlik kartı + sol sekmeli düzen (docs/design-system/component-catalog.md → SideTabs). *@
+        <div class="identity-card">
+            <OwnerCell Name="@team.Name" AvatarOnly="true" />
+            <div class="identity-main">
+                <h1>@team.Name</h1>
+                <span class="identity-sub"><AppIcon Name="users" Size="16" /> @Texts.Get("admin.userDetail.memberCount", team.Members.Count)</span>
+            </div>
         </div>
 
+        <div class="side-layout">
+            <SideTabs Tabs="Sections" State="tabs" Label="@Texts.Get("admin.teams.sections")" />
+            <div class="side-content">
+        <TabPanel State="tabs" Key="genel">
         <form class="record-form settings-group" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
             <h2>@Texts.Get("admin.teams.section")</h2>
             <FormTabs Title="@Texts.Get("admin.teams.section")" Label="@Texts.Get("admin.teams.sections")">
@@ -53,6 +62,28 @@
             </div>
         </form>
 
+        <section class="detail-section">
+            <div class="section-header"><h2>@Texts.Get("admin.teamDetail.delete")</h2></div>
+            @if (!deleting)
+            {
+                <div class="account-actions">
+                    <div>
+                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => deleting = true">@Texts.Get("admin.teamDetail.delete")</button>
+                        <small class="text-muted">@Texts.Get("admin.teamDetail.deleteHint")</small>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-warning confirm" role="alertdialog">
+                    <p>@Texts.Get("admin.teamDetail.deleteQuestion", team.Name)</p>
+                    <button type="button" class="btn btn-danger" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("admin.teamDetail.delete")</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => deleting = false">@Texts.Get("common.dismiss")</button>
+                </div>
+            }
+        </section>
+        </TabPanel>
+        <TabPanel State="tabs" Key="uyeler">
         @* Üyeler sayfada özet olarak durur; ekleme/çıkarma atama penceresinde (PickDialog) yapılır. *@
         <section class="detail-section">
             <div class="section-header">
@@ -87,32 +118,14 @@
                 </div>
             }
         </section>
+        </TabPanel>
+            </div>
+        </div>
 
         <PickDialog TKey="Guid" Open="pickingMembers" Title="@Texts.Get("admin.teamDetail.assignMembers")" Subtitle="@team.Name"
                     SearchPlaceholder="@Texts.Get("admin.teamDetail.searchMembers")" Icon="user" Items="MemberItems"
                     Selected="team.Members.Select(m => m.MembershipId)"
                     Busy="busy" Error="@dialogError" OnSave="SaveMembersAsync" OnClose="CloseMembers" />
-
-        <section class="detail-section">
-            <div class="section-header"><h2>@Texts.Get("admin.teamDetail.delete")</h2></div>
-            @if (!deleting)
-            {
-                <div class="account-actions">
-                    <div>
-                        <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => deleting = true">@Texts.Get("admin.teamDetail.delete")</button>
-                        <small class="text-muted">@Texts.Get("admin.teamDetail.deleteHint")</small>
-                    </div>
-                </div>
-            }
-            else
-            {
-                <div class="alert alert-warning confirm" role="alertdialog">
-                    <p>@Texts.Get("admin.teamDetail.deleteQuestion", team.Name)</p>
-                    <button type="button" class="btn btn-danger" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("admin.teamDetail.delete")</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => deleting = false">@Texts.Get("common.dismiss")</button>
-                </div>
-            }
-        </section>
     }
 </AuthGate>
 
@@ -122,6 +135,13 @@
     private TeamDetailDto? team;
     private List<UserDto>? members;
     private bool pickingMembers;
+    private readonly TabState tabs = new("genel");
+
+    private IReadOnlyList<SideTabItem> Sections =>
+    [
+        new("genel", Texts.Get("admin.userDetail.tab.general"), "sliders", Errors: errors?.Count ?? 0),
+        new("uyeler", Texts.Get("admin.roles.col.members"), "users", team?.Members.Count),
+    ];
     private string? dialogError;
     private string name = string.Empty;
     private string? description;
