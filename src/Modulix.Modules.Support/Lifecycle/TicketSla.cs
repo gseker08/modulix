@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Support.Domain;
@@ -101,33 +102,33 @@ internal sealed class TicketSla(
     {
         if (!await access.HasPermissionAsync(SupportModule.Permissions.SlaManage, cancellationToken))
         {
-            return RecordResult<SlaPreviewResult>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{SupportModule.Permissions.SlaManage}' izni gerekir.");
+            return RecordResult<SlaPreviewResult>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(SupportModule.Permissions.SlaManage));
         }
 
         var errors = new List<RecordFieldError>();
         if ((await choiceLists.GetAsync(SupportModule.Lists.TicketType, cancellationToken)).Find(input.TypeKey ?? string.Empty) is null)
         {
-            errors.Add(new RecordFieldError("typeKey", "Listede olmayan değer."));
+            errors.Add(new RecordFieldError("typeKey", ServerMessages.Validation.NotInList));
         }
 
         if (!TicketPriority.All.Contains(input.Priority ?? string.Empty))
         {
-            errors.Add(new RecordFieldError("priority", $"Şunlardan biri olmalıdır: {string.Join(", ", TicketPriority.All)}."));
+            errors.Add(new RecordFieldError("priority", ServerMessages.Validation.OneOf(string.Join(", ", TicketPriority.All))));
         }
 
         if (input.CategoryId is { } categoryId && !await storeContext.Data.Set<TicketCategory>().AsNoTracking().AnyAsync(c => c.Id == categoryId, cancellationToken))
         {
-            errors.Add(new RecordFieldError("categoryId", "Kategori bulunamadı."));
+            errors.Add(new RecordFieldError("categoryId", SupportMessages.NotFound.Category));
         }
 
         if (input.PartyId is { } partyId && !await storeContext.Data.Set<Modulix.Core.Contracts.SharedRecords.Party>().AsNoTracking().AnyAsync(p => p.Id == partyId, cancellationToken))
         {
-            errors.Add(new RecordFieldError("partyId", "Müşteri bulunamadı."));
+            errors.Add(new RecordFieldError("partyId", SupportMessages.NotFound.Party));
         }
 
         if (errors.Count > 0)
         {
-            return RecordResult<SlaPreviewResult>.Fail(RecordErrorCode.ValidationFailed, "Önizleme girdileri geçersiz.", errors);
+            return RecordResult<SlaPreviewResult>.Fail(RecordErrorCode.ValidationFailed, SupportMessages.Sla.PreviewInvalid, errors);
         }
 
         var selection = await SlaEngine.SelectAsync(storeContext, input.TypeKey!, input.CategoryId, input.Priority!, input.PartyId, cancellationToken, input.ContractId is { } previewContract ? [previewContract] : null);
@@ -172,20 +173,20 @@ internal sealed class TicketSla(
         var permission = SupportModule.Permissions.SlaRecalculate;
         if (!await access.HasPermissionAsync(permission, cancellationToken))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission));
         }
 
         var text = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         if (text is null)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", [new RecordFieldError("reason", "Gerekçe zorunludur.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, SupportMessages.Workflow.ReasonRequired, [new RecordFieldError("reason", SupportMessages.Workflow.ReasonRequired)]);
         }
 
         var openCount = await storeContext.Data.Set<SlaInstance>().AsNoTracking()
             .CountAsync(i => i.TicketId == ticketId && (i.Status == SlaStatus.Running || i.Status == SlaStatus.Paused), cancellationToken);
         if (openCount == 0)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Yeniden hesaplanacak açık SLA örneği yok.", [new RecordFieldError("status", "Açık SLA örneği yok.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, SupportMessages.Sla.NoOpenInstance, [new RecordFieldError("status", SupportMessages.Sla.NoOpenInstanceField)]);
         }
 
         var values = new JsonObject { ["lastActivityAt"] = storeContext.Time.GetUtcNow().ToString("O", CultureInfo.InvariantCulture) };

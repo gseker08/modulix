@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Support.Domain;
@@ -32,7 +33,7 @@ internal sealed class TicketDuplicates(IRecordPipeline pipeline, SupportStoreCon
         var phone = string.IsNullOrWhiteSpace(probe.ReporterPhone) ? null : probe.ReporterPhone.Trim();
         if (probe.PartyId is null && email is null && phone is null)
         {
-            return RecordResult<IReadOnlyList<DuplicateCandidate>>.Fail(RecordErrorCode.ValidationFailed, "Müşteri, e-posta ya da telefon verin.", [new RecordFieldError("partyId", "Başvuran kimliği gerekir.")]);
+            return RecordResult<IReadOnlyList<DuplicateCandidate>>.Fail(RecordErrorCode.ValidationFailed, SupportMessages.Duplicate.ProbeRequired, [new RecordFieldError("partyId", SupportMessages.Duplicate.ApplicantRequired)]);
         }
 
         var found = new Dictionary<Guid, (RecordData Data, string Reason)>();
@@ -116,13 +117,13 @@ internal sealed class PriorityMatrixService(IRecordPipeline pipeline, ICurrentAc
     {
         if (!await access.HasPermissionAsync(SupportModule.Permissions.SettingsManage, cancellationToken))
         {
-            return RecordResult<IReadOnlyList<PriorityCell>>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{SupportModule.Permissions.SettingsManage}' izni gerekir.");
+            return RecordResult<IReadOnlyList<PriorityCell>>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(SupportModule.Permissions.SettingsManage));
         }
 
         var errors = PriorityMatrixRules.Validate([.. cells.Select(c => (c.Impact, c.Urgency, c.Priority))]);
         if (errors.Count > 0)
         {
-            return RecordResult<IReadOnlyList<PriorityCell>>.Fail(RecordErrorCode.ValidationFailed, "Matris geçersiz.", [.. errors.Select(e => new RecordFieldError(e.Field, e.Message))]);
+            return RecordResult<IReadOnlyList<PriorityCell>>.Fail(RecordErrorCode.ValidationFailed, SupportMessages.Matrix.Invalid, [.. errors.Select(e => new RecordFieldError(e.Field, e.Message))]);
         }
 
         var existing = await pipeline.QueryAsync(new RecordQuery(Key, 1, 50, null, null), cancellationToken);
@@ -166,38 +167,38 @@ internal sealed class TicketRoutingPreview(ICurrentAccess access, SupportStoreCo
     {
         if (!await access.HasPermissionAsync(SupportModule.Permissions.SettingsManage, cancellationToken))
         {
-            return RecordResult<RoutingPreviewResult>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{SupportModule.Permissions.SettingsManage}' izni gerekir.");
+            return RecordResult<RoutingPreviewResult>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(SupportModule.Permissions.SettingsManage));
         }
 
         var errors = new List<RecordFieldError>();
         if (!TicketChannels.All.Contains(input.Channel ?? string.Empty))
         {
-            errors.Add(new RecordFieldError("channel", $"Şunlardan biri olmalıdır: {string.Join(", ", TicketChannels.All)}."));
+            errors.Add(new RecordFieldError("channel", ServerMessages.Validation.OneOf(string.Join(", ", TicketChannels.All))));
         }
 
         if ((await choiceLists.GetAsync(SupportModule.Lists.TicketType, cancellationToken)).Find(input.TypeKey ?? string.Empty) is null)
         {
-            errors.Add(new RecordFieldError("typeKey", "Listede olmayan değer."));
+            errors.Add(new RecordFieldError("typeKey", ServerMessages.Validation.NotInList));
         }
 
         if (!TicketPriority.All.Contains(input.Priority ?? string.Empty))
         {
-            errors.Add(new RecordFieldError("priority", $"Şunlardan biri olmalıdır: {string.Join(", ", TicketPriority.All)}."));
+            errors.Add(new RecordFieldError("priority", ServerMessages.Validation.OneOf(string.Join(", ", TicketPriority.All))));
         }
 
         if (input.CategoryId is { } categoryId && !await context.Data.Set<TicketCategory>().AsNoTracking().AnyAsync(c => c.Id == categoryId, cancellationToken))
         {
-            errors.Add(new RecordFieldError("categoryId", "Kategori bulunamadı."));
+            errors.Add(new RecordFieldError("categoryId", SupportMessages.NotFound.Category));
         }
 
         if (input.PartyId is { } partyId && !await context.Data.Set<Modulix.Core.Contracts.SharedRecords.Party>().AsNoTracking().AnyAsync(p => p.Id == partyId, cancellationToken))
         {
-            errors.Add(new RecordFieldError("partyId", "Müşteri bulunamadı."));
+            errors.Add(new RecordFieldError("partyId", SupportMessages.NotFound.Party));
         }
 
         if (errors.Count > 0)
         {
-            return RecordResult<RoutingPreviewResult>.Fail(RecordErrorCode.ValidationFailed, "Deneme girdileri geçersiz.", errors);
+            return RecordResult<RoutingPreviewResult>.Fail(RecordErrorCode.ValidationFailed, SupportMessages.Routing.PreviewInvalid, errors);
         }
 
         // Geçici (kaydedilmeyen) talep: gerçek yönlendirmeyle aynı kod yolu.

@@ -70,6 +70,9 @@ internal static class SupportMessages
     /// <summary>Öncelik matrisi ve yönlendirme kuralı kayıtları.</summary>
     public static class Routing
     {
+        public static ServerMessage PreviewInvalid =>
+            ServerMessage.Of("support.server.routing.preview-invalid", "Deneme girdileri geçersiz.");
+
         public static ServerMessage MatrixCellExists =>
             ServerMessage.Of("support.server.routing.matrix-cell-exists", "Bu etki × aciliyet hücresi zaten tanımlı; mevcut kaydı güncelleyin.");
 
@@ -102,6 +105,15 @@ internal static class SupportMessages
     /// <summary>SLA politikası kayıtları.</summary>
     public static class Sla
     {
+        public static ServerMessage PreviewInvalid =>
+            ServerMessage.Of("support.server.sla.preview-invalid", "Önizleme girdileri geçersiz.");
+
+        public static ServerMessage NoOpenInstance =>
+            ServerMessage.Of("support.server.sla.no-open-instance", "Yeniden hesaplanacak açık SLA örneği yok.");
+
+        public static ServerMessage NoOpenInstanceField =>
+            ServerMessage.Of("support.server.sla.no-open-instance-field", "Açık SLA örneği yok.");
+
         public static ServerMessage TargetRequired =>
             ServerMessage.Of("support.server.sla.target-required", "İlk yanıt ya da çözüm hedeflerinden en az biri girilmelidir.");
 
@@ -160,6 +172,9 @@ internal static class SupportMessages
     /// <summary>Öncelik matrisi doğrulaması.</summary>
     public static class Matrix
     {
+        public static ServerMessage Invalid =>
+            ServerMessage.Of("support.server.matrix.invalid", "Matris geçersiz.");
+
         public static ServerMessage ImpactOneOf(string allowed) =>
             ServerMessage.Of("support.server.matrix.impact-one-of", "Etki şunlardan biri olmalıdır: {0}.", allowed);
 
@@ -417,5 +432,55 @@ internal static class SupportMessages
     {
         public static ServerMessage TargetUnavailable =>
             ServerMessage.Of("support.server.merge.target-unavailable", "Hedef talep bulunamadı ya da erişim yetkiniz yok.");
+    }
+
+    /// <summary>Olası mükerrer talep araması.</summary>
+    public static class Duplicate
+    {
+        public static ServerMessage ProbeRequired =>
+            ServerMessage.Of("support.server.duplicate.probe-required", "Müşteri, e-posta ya da telefon verin.");
+
+        public static ServerMessage ApplicantRequired =>
+            ServerMessage.Of("support.server.duplicate.applicant-required", "Başvuran kimliği gerekir.");
+    }
+
+    /// <summary>Düzeltici aksiyonlar (şikâyet).</summary>
+    public static class Corrective
+    {
+        public static ServerMessage TitleRequired =>
+            ServerMessage.Of("support.server.corrective.title-required", "Aksiyon başlığı zorunludur.");
+
+        public static ServerMessage OwnerRequired =>
+            ServerMessage.Of("support.server.corrective.owner-required", "Sorumlu zorunludur ve bu kuruluşun etkin üyesi olmalıdır.");
+
+        public static ServerMessage DueDateRequired =>
+            ServerMessage.Of("support.server.corrective.due-date-required", "Son tarih zorunludur.");
+
+        public static ServerMessage DueDatePast =>
+            ServerMessage.Of("support.server.corrective.due-date-past", "Son tarih geçmişte olamaz.");
+
+        public static ServerMessage DueDateTooFar =>
+            ServerMessage.Of("support.server.corrective.due-date-too-far", "Son tarih en çok 2 yıl sonrası olabilir.");
+
+        public static ServerMessage MaxPerTicket(int max) =>
+            ServerMessage.Of("support.server.corrective.max-per-ticket", "Bir talepte en fazla {0} düzeltici aksiyon olabilir.", max);
+
+        public static ServerMessage NotFound =>
+            ServerMessage.Of("support.server.corrective.not-found", "Düzeltici aksiyon bulunamadı.");
+
+        public static ServerMessage AlreadyInStatus =>
+            ServerMessage.Of("support.server.corrective.already-in-status", "Aksiyon zaten bu durumda.");
+
+        public static ServerMessage ResultNoteRequired =>
+            ServerMessage.Of("support.server.corrective.result-note-required", "Sonuç notu zorunludur (ne yapıldı, nasıl doğrulandı).");
+
+        public static ServerMessage ComplaintOnly =>
+            ServerMessage.Of("support.server.corrective.complaint-only", "Düzeltici aksiyon yalnızca şikâyet türündeki talepte açılır.");
+
+        public static ServerMessage NotComplaint =>
+            ServerMessage.Of("support.server.corrective.not-complaint", "Talep şikâyet türünde değil.");
+
+        public static ServerMessage TicketClosed =>
+            ServerMessage.Of("support.server.corrective.ticket-closed", "İptal edilmiş ya da birleştirilmiş talepte düzeltici aksiyon değiştirilemez.");
     }
 }

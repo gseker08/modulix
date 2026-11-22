@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Support.Domain;
 using Modulix.Modules.Support.Records;
@@ -50,38 +51,38 @@ internal sealed class CorrectiveActions(IRecordPipeline pipeline, TicketWorkflow
         var text = title?.Trim();
         if (string.IsNullOrEmpty(text))
         {
-            return Invalid("title", "Aksiyon başlığı zorunludur.");
+            return Invalid("title", SupportMessages.Corrective.TitleRequired);
         }
 
         if (text.Length > CorrectiveAction.TitleMaxLength)
         {
-            return Invalid("title", $"En fazla {CorrectiveAction.TitleMaxLength} karakter olabilir.");
+            return Invalid("title", ServerMessages.Validation.MaxLength(CorrectiveAction.TitleMaxLength));
         }
 
         if (ownerId is not { } owner || !await context.Members.IsActiveMemberAsync(owner, cancellationToken))
         {
-            return Invalid("ownerId", "Sorumlu zorunludur ve bu kuruluşun etkin üyesi olmalıdır.");
+            return Invalid("ownerId", SupportMessages.Corrective.OwnerRequired);
         }
 
         var today = ReportPeriod.LocalDate(context.Time.GetUtcNow());
         if (dueDate is not { } due)
         {
-            return Invalid("dueDate", "Son tarih zorunludur.");
+            return Invalid("dueDate", SupportMessages.Corrective.DueDateRequired);
         }
 
         if (due < today)
         {
-            return Invalid("dueDate", "Son tarih geçmişte olamaz.");
+            return Invalid("dueDate", SupportMessages.Corrective.DueDatePast);
         }
 
         if (due > today.AddYears(2))
         {
-            return Invalid("dueDate", "Son tarih en çok 2 yıl sonrası olabilir.");
+            return Invalid("dueDate", SupportMessages.Corrective.DueDateTooFar);
         }
 
         if (await context.Data.Set<CorrectiveAction>().CountAsync(a => a.TicketId == ticketId, cancellationToken) >= CorrectiveAction.MaxPerTicket)
         {
-            return Invalid("title", $"Bir talepte en fazla {CorrectiveAction.MaxPerTicket} düzeltici aksiyon olabilir.");
+            return Invalid("title", SupportMessages.Corrective.MaxPerTicket(CorrectiveAction.MaxPerTicket));
         }
 
         return await WriteAsync(ticketId, TicketEventKinds.CorrectiveActionAdded, $"{text} (son tarih {due:dd.MM.yyyy})", (ctx, ticket, ct) =>
@@ -101,29 +102,29 @@ internal sealed class CorrectiveActions(IRecordPipeline pipeline, TicketWorkflow
 
         if (status is null || !CorrectiveActionStatus.All.Contains(status))
         {
-            return Invalid("status", $"Şunlardan biri olmalıdır: {string.Join(", ", CorrectiveActionStatus.All)}.");
+            return Invalid("status", ServerMessages.Validation.OneOf(string.Join(", ", CorrectiveActionStatus.All)));
         }
 
         var action = await context.Data.Set<CorrectiveAction>().AsNoTracking().FirstOrDefaultAsync(a => a.Id == actionId && a.TicketId == ticketId, cancellationToken);
         if (action is null)
         {
-            return RecordResult<IReadOnlyList<CorrectiveActionItem>>.Fail(RecordErrorCode.NotFound, "Düzeltici aksiyon bulunamadı.");
+            return RecordResult<IReadOnlyList<CorrectiveActionItem>>.Fail(RecordErrorCode.NotFound, SupportMessages.Corrective.NotFound);
         }
 
         if (action.Status == status)
         {
-            return RecordResult<IReadOnlyList<CorrectiveActionItem>>.Fail(RecordErrorCode.Conflict, "Aksiyon zaten bu durumda.", [new RecordFieldError("status", "Durum değişmedi.")]);
+            return RecordResult<IReadOnlyList<CorrectiveActionItem>>.Fail(RecordErrorCode.Conflict, SupportMessages.Corrective.AlreadyInStatus, [new RecordFieldError("status", SupportMessages.Task.StatusUnchanged)]);
         }
 
         var text = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
         if (text is null)
         {
-            return Invalid("note", status == CorrectiveActionStatus.Done ? "Sonuç notu zorunludur (ne yapıldı, nasıl doğrulandı)." : "Gerekçe zorunludur.");
+            return Invalid("note", status == CorrectiveActionStatus.Done ? SupportMessages.Corrective.ResultNoteRequired : SupportMessages.Workflow.ReasonRequired);
         }
 
         if (text.Length > CorrectiveAction.NoteMaxLength)
         {
-            return Invalid("note", $"En fazla {CorrectiveAction.NoteMaxLength} karakter olabilir.");
+            return Invalid("note", ServerMessages.Validation.MaxLength(CorrectiveAction.NoteMaxLength));
         }
 
         var kind = status switch
@@ -154,7 +155,7 @@ internal sealed class CorrectiveActions(IRecordPipeline pipeline, TicketWorkflow
 
         if (!await access.HasPermissionAsync(SupportModule.Permissions.ComplaintsManage, cancellationToken))
         {
-            return RecordResult<IReadOnlyList<CorrectiveActionItem>>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{SupportModule.Permissions.ComplaintsManage}' izni gerekir.");
+            return RecordResult<IReadOnlyList<CorrectiveActionItem>>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(SupportModule.Permissions.ComplaintsManage));
         }
 
         var typeKey = TicketWorkflow.Text(ticket.Value!, "typeKey");
@@ -162,14 +163,14 @@ internal sealed class CorrectiveActions(IRecordPipeline pipeline, TicketWorkflow
         if (typeKey is null || types.Find(typeKey)?.Category != SupportModule.TypeCategories.Complaint)
         {
             return RecordResult<IReadOnlyList<CorrectiveActionItem>>.Fail(
-                RecordErrorCode.Conflict, "Düzeltici aksiyon yalnızca şikâyet türündeki talepte açılır.", [new RecordFieldError("typeKey", "Talep şikâyet türünde değil.")]);
+                RecordErrorCode.Conflict, SupportMessages.Corrective.ComplaintOnly, [new RecordFieldError("typeKey", SupportMessages.Corrective.NotComplaint)]);
         }
 
         var status = TicketWorkflow.Text(ticket.Value!, "status") ?? TicketStatus.New;
         if (status is TicketStatus.Cancelled or TicketStatus.Merged)
         {
             return RecordResult<IReadOnlyList<CorrectiveActionItem>>.Fail(
-                RecordErrorCode.Conflict, "İptal edilmiş ya da birleştirilmiş talepte düzeltici aksiyon değiştirilemez.", [new RecordFieldError("status", "Talep kapalı.")]);
+                RecordErrorCode.Conflict, SupportMessages.Corrective.TicketClosed, [new RecordFieldError("status", SupportMessages.Ticket.Closed)]);
         }
 
         return null;
@@ -200,6 +201,6 @@ internal sealed class CorrectiveActions(IRecordPipeline pipeline, TicketWorkflow
             a.Status == CorrectiveActionStatus.Open ? CorrectiveActionStatus.DaysOverdue(a.DueDate, today) : 0, a.Note, a.ClosedAt, a.ClosedBy, a.CreatedBy, a.CreatedAt))];
     }
 
-    private static RecordResult<IReadOnlyList<CorrectiveActionItem>> Invalid(string field, string message) =>
+    private static RecordResult<IReadOnlyList<CorrectiveActionItem>> Invalid(string field, ServerMessage message) =>
         RecordResult<IReadOnlyList<CorrectiveActionItem>>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }
