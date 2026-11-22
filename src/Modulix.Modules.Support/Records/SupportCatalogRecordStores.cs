@@ -41,12 +41,12 @@ internal sealed class SupportQueueRecordStore(SupportStoreContext context) : Sup
         var errors = new List<RecordFieldError>();
         if (entity.IsDefault && !entity.IsActive)
         {
-            errors.Add(new RecordFieldError("isActive", "Varsayılan kuyruk pasif olamaz; önce başka bir kuyruğu varsayılan yapın."));
+            errors.Add(new RecordFieldError("isActive", SupportMessages.Catalog.DefaultQueueInactive));
         }
 
         if (entity.IsDefault && await Context.Data.Set<SupportQueue>().AsNoTracking().AnyAsync(q => q.IsDefault && q.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("isDefault", "Başka bir kuyruk varsayılan; önce onun varsayılan işaretini kaldırın."));
+            errors.Add(new RecordFieldError("isDefault", SupportMessages.Catalog.OtherQueueIsDefault));
         }
 
         if (errors.Count > 0)
@@ -114,15 +114,15 @@ internal sealed class TicketCategoryRecordStore(SupportStoreContext context) : S
         {
             if (parentId == entity.Id)
             {
-                errors.Add(new RecordFieldError("parentId", "Kategori kendi üstü olamaz."));
+                errors.Add(new RecordFieldError("parentId", SupportMessages.Catalog.CategorySelfParent));
             }
             else if (!await Context.Data.Set<TicketCategory>().AsNoTracking().AnyAsync(c => c.Id == parentId && c.ParentId == null, cancellationToken))
             {
-                errors.Add(new RecordFieldError("parentId", "Üst kategori ana kategori olmalıdır (en çok iki düzey)."));
+                errors.Add(new RecordFieldError("parentId", SupportMessages.Catalog.ParentMustBeRoot));
             }
             else if (!isNew && await Context.Data.Set<TicketCategory>().AsNoTracking().AnyAsync(c => c.ParentId == entity.Id, cancellationToken))
             {
-                errors.Add(new RecordFieldError("parentId", "Alt kategorisi olan kategori başka bir kategorinin altına taşınamaz."));
+                errors.Add(new RecordFieldError("parentId", SupportMessages.Catalog.CategoryHasChildren));
             }
         }
 
