@@ -90,7 +90,7 @@ internal static class Field
         new(name, required: false, nullable: true, node =>
                 node.GetValueKind() is JsonValueKind.True or JsonValueKind.False
                     ? ParsedValue.Of(node.GetValue<bool>())
-                    : ParsedValue.Fail("true veya false olmalıdır."),
+                    : ParsedValue.Fail(ServerMessages.Validation.Flag),
             e => JsonValue.Create(get(e)),
             (e, v) => set(e, v is true));
 
@@ -99,7 +99,7 @@ internal static class Field
         new(name, required, nullable: !required, node =>
                 node.GetValueKind() == JsonValueKind.Number && node.AsValue().TryGetValue<int>(out var value) && value >= min && value <= max
                     ? ParsedValue.Of(value)
-                    : ParsedValue.Fail($"{min} ile {max} arasında bir tam sayı girin."),
+                    : ParsedValue.Fail(ServerMessages.Validation.IntegerRange(min, max)),
             e => get(e) is { } value ? JsonValue.Create(value) : null,
             (e, v) => set(e, (int?)v));
 

@@ -42,7 +42,7 @@ internal sealed class RegimeBindingRecordStore(WarehouseStoreContext context) : 
     {
         if (await Context.Data.Set<RegimeBinding>().AsNoTracking().AnyAsync(b => b.RegimeKey == entity.RegimeKey && b.Id != entity.Id, cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError("regimeKey", "Bu rejim zaten bir profile bağlı; mevcut bağlamayı düzenleyin.")]);
+            throw new RecordValidationException([new RecordFieldError("regimeKey", WarehouseMessages.RegimeBinding.AlreadyBound)]);
         }
     }
 }
