@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Orders.Domain;
 using Modulix.Modules.Orders.Lifecycle;
@@ -64,14 +65,14 @@ internal static class HandoverSync
         if (!HandoverRules.CanEdit(handover.Status))
         {
             throw new RecordValidationException([new RecordFieldError(field, handover.Status == HandoverStatus.Accepted
-                ? "Kabul edilen devir değiştirilemez; değişiklik için sipariş değişiklik talebi açın."
-                : "Operasyona gönderilen devir karara bağlanana kadar değiştirilemez.")]);
+                ? OrdersMessages.Handover.AcceptedLocked
+                : OrdersMessages.Handover.SubmittedLocked)]);
         }
 
         var status = await context.Data.Set<SalesOrder>().AsNoTracking().Where(o => o.Id == handover.OrderId).Select(o => o.Status).SingleOrDefaultAsync(cancellationToken);
         if (status is null || OrderStatus.IsFinal(status))
         {
-            throw new RecordValidationException([new RecordFieldError(field, "Sonuçlanmış siparişin devri değiştirilemez.")]);
+            throw new RecordValidationException([new RecordFieldError(field, OrdersMessages.Handover.OrderFinalLocked)]);
         }
     }
 }
@@ -97,7 +98,7 @@ internal sealed class OrderHandoverRecordStore(OrdersStoreContext context) : Ord
 
     protected override IReadOnlyList<RecordField<OrderHandover>> Fields { get; } =
     [
-        Field.Reference<OrderHandover, SalesOrder>("orderId", "Sipariş bulunamadı.", h => h.OrderId, (h, v) => h.OrderId = v!.Value, required: true, createOnly: true),
+        Field.Reference<OrderHandover, SalesOrder>("orderId", OrdersMessages.NotFound.Order, h => h.OrderId, (h, v) => h.OrderId = v!.Value, required: true, createOnly: true),
         Field.Text<OrderHandover>("status", SalesOrder.StatusMaxLength, h => h.Status, (h, v) => h.Status = v!).AsSystem(),
         Field.Integer<OrderHandover>("round", h => h.Round, (h, v) => h.Round = v ?? 0).AsSystem(),
         Field.Text<OrderHandover>("scope", OrderHandover.TextMaxLength, h => h.Scope, (h, v) => h.Scope = v),
@@ -168,7 +169,7 @@ internal sealed class OrderHandoverRecordStore(OrdersStoreContext context) : Ord
     {
         if (!Context.Gate.IsOpen)
         {
-            throw new RecordValidationException([new RecordFieldError("orderId", "Devir kaydı yalnızca sipariş ekranındaki devir hazırlama işlemiyle açılır.")]);
+            throw new RecordValidationException([new RecordFieldError("orderId", OrdersMessages.Handover.ViaPrepareOnly)]);
         }
 
         entity.CreatedBy = Context.CurrentUserId;
@@ -186,12 +187,12 @@ internal sealed class OrderHandoverRecordStore(OrdersStoreContext context) : Ord
         var errors = new List<RecordFieldError>();
         if (entity.TargetStartDate is { } start && entity.TargetEndDate is { } end && end < start)
         {
-            errors.Add(new RecordFieldError("targetEndDate", "Hedef bitiş tarihi başlangıçtan önce olamaz."));
+            errors.Add(new RecordFieldError("targetEndDate", OrdersMessages.Handover.TargetEndBeforeStart));
         }
 
         if (!string.IsNullOrWhiteSpace(entity.ContactEmail) && !entity.ContactEmail.Contains('@'))
         {
-            errors.Add(new RecordFieldError("contactEmail", "Geçerli bir e-posta adresi girin."));
+            errors.Add(new RecordFieldError("contactEmail", ServerMessages.Validation.Email));
         }
 
         if (errors.Count > 0)
@@ -222,7 +223,7 @@ internal sealed class OrderHandoverRecordStore(OrdersStoreContext context) : Ord
         var order = await Context.Data.Set<SalesOrder>().AsNoTracking().SingleOrDefaultAsync(o => o.Id == entity.OrderId, cancellationToken);
         if (order is null || OrderStatus.IsFinal(order.Status))
         {
-            throw new RecordValidationException([new RecordFieldError("orderId", "Sonuçlanmış sipariş için devir hazırlanamaz.")]);
+            throw new RecordValidationException([new RecordFieldError("orderId", OrdersMessages.Handover.OrderFinalNoPrepare)]);
         }
 
         entity.Status = HandoverStatus.Preparing;
@@ -238,7 +239,7 @@ internal sealed class OrderHandoverRecordStore(OrdersStoreContext context) : Ord
     }
 
     protected override Task BeforeDeleteAsync(OrderHandover entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Devir kaydı silinemez; geçmişi korunur.");
+        throw new RecordConflictException(OrdersMessages.Handover.NoDelete);
 }
 
 /// <summary>
@@ -262,7 +263,7 @@ internal sealed class OrderHandoverItemRecordStore(OrdersStoreContext context) :
 
     protected override IReadOnlyList<RecordField<OrderHandoverItem>> Fields { get; } =
     [
-        Field.Reference<OrderHandoverItem, OrderHandover>("handoverId", "Devir kaydı bulunamadı.", i => i.HandoverId, (i, v) => i.HandoverId = v!.Value, required: true, createOnly: true),
+        Field.Reference<OrderHandoverItem, OrderHandover>("handoverId", OrdersMessages.NotFound.Handover, i => i.HandoverId, (i, v) => i.HandoverId = v!.Value, required: true, createOnly: true),
         Field.Integer<OrderHandoverItem>("position", i => i.Position, (i, v) => i.Position = v ?? 0, max: 9999).AsSystem(),
         Field.Text<OrderHandoverItem>("text", OrderHandoverItem.TextMaxLength, i => i.Text, (i, v) => i.Text = v!, required: true),
         Field.Flag<OrderHandoverItem>("isRequired", i => i.IsRequired, (i, v) => i.IsRequired = v).AsSystem(),
@@ -323,11 +324,11 @@ internal sealed class OrderHandoverItemRecordStore(OrdersStoreContext context) :
     protected override async Task AppliedAsync(OrderHandoverItem entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
         var parent = await Context.Data.Set<OrderHandover>().SingleOrDefaultAsync(h => h.Id == entity.HandoverId, cancellationToken)
-            ?? throw new RecordValidationException([new RecordFieldError("handoverId", "Devir kaydı bulunamadı.")]);
+            ?? throw new RecordValidationException([new RecordFieldError("handoverId", OrdersMessages.NotFound.Handover)]);
         await HandoverSync.EnsureEditableAsync(Context, parent, "handoverId", cancellationToken);
         if (!isNew && entity.IsDefault && entity.Text != textBefore)
         {
-            throw new RecordValidationException([new RecordFieldError("text", "Varsayılan kontrol listesi maddesinin metni değiştirilemez.")]);
+            throw new RecordValidationException([new RecordFieldError("text", OrdersMessages.Handover.ItemTextLocked)]);
         }
 
         if (values.ContainsKey("isDone"))
@@ -343,7 +344,7 @@ internal sealed class OrderHandoverItemRecordStore(OrdersStoreContext context) :
     {
         if (entity.IsDefault)
         {
-            throw new RecordConflictException("Varsayılan kontrol listesi maddesi silinemez; yalnızca tamamlandı olarak işaretlenir.");
+            throw new RecordConflictException(OrdersMessages.Handover.ItemNoDelete);
         }
 
         var handover = await Context.Data.Set<OrderHandover>().SingleAsync(h => h.Id == entity.HandoverId, cancellationToken);
