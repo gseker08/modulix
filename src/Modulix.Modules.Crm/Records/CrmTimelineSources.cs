@@ -42,6 +42,27 @@ internal abstract class CrmTimelineSource(IRecordPipeline pipeline) : ICustomerT
         return new CustomerTimelineSlice(entries, page.Value.TotalCount > page.Value.Items.Count);
     }
 
+    /// <summary>Açık iş süzgeci (<c>open=true</c>); türün açık işi yoksa <c>null</c>.</summary>
+    protected virtual bool CountsOpen => false;
+
+    public async Task<int?> CountOpenAsync(CustomerTimelineQuery query, CancellationToken cancellationToken)
+    {
+        if (!CountsOpen)
+        {
+            return null;
+        }
+
+        var filters = Filters(query, before: null);
+        filters.Remove("sort");
+        filters["open"] = "true";
+        var page = await pipeline.QueryAsync(new RecordQuery(EntityKey, 1, 1, Filters: filters), cancellationToken);
+        return page.IsSuccess
+            ? page.Value!.TotalCount
+            : page.Error!.Code is RecordErrorCode.PermissionDenied or RecordErrorCode.FeatureNotLicensed
+                ? null
+                : throw new InvalidOperationException($"Açık iş sayılamadı ({Key}): {page.Error.Message}");
+    }
+
     protected static string? Text(JsonObject values, string name) => values[name]?.GetValue<string>();
 
     protected static Guid? Id(JsonObject values, string name) => Guid.TryParse(Text(values, name), out var id) ? id : null;
@@ -53,6 +74,8 @@ internal abstract class CrmTimelineSource(IRecordPipeline pipeline) : ICustomerT
 internal sealed class ActivityTimelineSource(IRecordPipeline pipeline, IModuleData data) : CrmTimelineSource(pipeline)
 {
     public override string Key => "crm.activities";
+
+    protected override bool CountsOpen => true;
 
     protected override string EntityKey => CrmModule.Entities.Activity;
 
@@ -94,6 +117,8 @@ internal sealed class ActivityTimelineSource(IRecordPipeline pipeline, IModuleDa
 internal sealed class OpportunityTimelineSource(IRecordPipeline pipeline, IModuleData data) : CrmTimelineSource(pipeline)
 {
     public override string Key => "crm.opportunities";
+
+    protected override bool CountsOpen => true;
 
     protected override string EntityKey => CrmModule.Entities.Opportunity;
 

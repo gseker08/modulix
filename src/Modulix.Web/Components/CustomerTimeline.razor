@@ -6,6 +6,23 @@
     <div class="section-header">
         <h2 id="customer-timeline-title">@Texts.Get("crm.company.tab.timeline")</h2>
     </div>
+    @if (summary is not null && (summary.LastEntryAt is not null || summary.Open.Count > 0))
+    {
+        <div class="summary" role="group" aria-label="@Texts.Get("crm.timeline.summary.aria")">
+            <div class="summary-item">
+                <span>@Texts.Get("crm.timeline.summary.last")</span>
+                <strong>@(summary.LastEntryAt is { } last ? CrmLabels.Time(last) : "—")</strong>
+                <small>@(summary.LastEntryEntityKey is { } lastKey ? KindOf(lastKey, null) : string.Empty)</small>
+            </div>
+            @foreach (var open in summary.Open)
+            {
+                <div class="summary-item">
+                    <span>@OpenLabel(open.Source)</span>
+                    <strong>@open.Count</strong>
+                </div>
+            }
+        </div>
+    }
     @if (available.Count > 1)
     {
         <div class="filters" role="group" aria-label="@Texts.Get("crm.timeline.filter.label")">
@@ -108,6 +125,7 @@
 @code {
     private readonly SortedSet<string> available = new(StringComparer.Ordinal);
     private readonly SortedSet<string> selected = new(StringComparer.Ordinal);
+    private CustomerTimelineSummaryDto? summary;
     private List<CustomerTimelineItemDto>? items;
     private DateTimeOffset? nextBefore;
     private string? error;
@@ -133,8 +151,25 @@
         nextBefore = null;
         available.Clear();
         selected.Clear();
+        summary = null;
+        // Özet şeridi süzgeçten bağımsızdır ve yüklenemezse çizelge yine çalışır (şerit çizilmez).
+        var summaryTask = LoadSummaryAsync();
         await LoadAsync(null);
+        await summaryTask;
     }
+
+    private async Task LoadSummaryAsync() =>
+        summary = (await Api.GetAsync<CustomerTimelineSummaryDto>($"/api/crm/companies/{CompanyId}/timeline/summary")).Value;
+
+    // Açık iş sayısının görünen adı; arayüzün tanımadığı kaynak anahtarıyla yazılır.
+    private static string OpenLabel(string key) => key switch
+    {
+        "crm.activities" => Texts.Get("crm.timeline.open.activities"),
+        "crm.opportunities" => Texts.Get("crm.timeline.open.opportunities"),
+        "support.tickets" => Texts.Get("crm.timeline.open.tickets"),
+        "orders.orders" => Texts.Get("crm.timeline.open.orders"),
+        _ => key,
+    };
 
     private async Task ToggleSourceAsync(string key)
     {
@@ -222,7 +257,9 @@
         _ => "clock",
     };
 
-    private static string Kind(CustomerTimelineItemDto item) => item.EntityKey switch
+    private static string Kind(CustomerTimelineItemDto item) => KindOf(item.EntityKey, item.Type);
+
+    private static string KindOf(string entityKey, string? type) => entityKey switch
     {
         CrmEntityKeys.Opportunity => Texts.Get("crm.timeline.kind.opportunity"),
         CrmEntityKeys.Quote => Texts.Get("crm.timeline.kind.quote"),
@@ -230,7 +267,7 @@
         ContractsAccess.ContractEntityKey => Texts.Get("crm.timeline.kind.contract"),
         SupportAccess.TicketEntityKey => Texts.Get("crm.timeline.kind.ticket"),
         MarketingTimelineKeys.Delivery => Texts.Get("crm.timeline.kind.delivery"),
-        MarketingTimelineKeys.Response => item.Type is { Length: > 0 } kind
+        MarketingTimelineKeys.Response => type is { Length: > 0 } kind
             ? Texts.Get("marketing.related.response", MarketingLabels.ResponseKind(kind))
             : Texts.Get("crm.timeline.kind.campaignResponse"),
         CrmEntityKeys.Activity => Texts.Get("crm.timeline.kind.activity"),

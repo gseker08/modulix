@@ -6,6 +6,7 @@ using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Contracts.Timeline;
 using Modulix.Modules.Orders.Domain;
+using Modulix.Modules.Orders.Lifecycle;
 
 namespace Modulix.Modules.Orders.Records;
 
@@ -58,6 +59,27 @@ internal sealed class OrderTimelineSource(IRecordPipeline pipeline, IModuleData 
                     Reference: Text(i.Values, "number"))),
             ],
             page.Value.TotalCount > items.Count);
+    }
+
+    public async Task<int?> CountOpenAsync(CustomerTimelineQuery query, CancellationToken cancellationToken)
+    {
+        if (query.PartyId is not { } partyId)
+        {
+            return 0;
+        }
+
+        // Açık sipariş: taslak, onay bekleyen ve onaylanmış (iptal edilmiş ve kapanmış olanlar hariç).
+        var filters = new Dictionary<string, string>
+        {
+            ["partyId"] = partyId.ToString(),
+            ["status"] = string.Join(',', OrderStatus.Draft, OrderStatus.PendingApproval, OrderStatus.Approved),
+        };
+        var page = await pipeline.QueryAsync(new RecordQuery(OrdersModule.Entities.Order, 1, 1, Filters: filters), cancellationToken);
+        return page.IsSuccess
+            ? page.Value!.TotalCount
+            : page.Error!.Code is RecordErrorCode.PermissionDenied or RecordErrorCode.FeatureNotLicensed
+                ? null
+                : throw new InvalidOperationException($"Açık iş sayılamadı ({Key}): {page.Error.Message}");
     }
 
     private static string? Text(JsonObject values, string name) => values[name]?.GetValue<string>();

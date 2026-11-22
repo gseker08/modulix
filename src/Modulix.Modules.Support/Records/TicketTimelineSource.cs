@@ -60,5 +60,22 @@ internal sealed class TicketTimelineSource(IRecordPipeline pipeline, IModuleData
             page.Value.TotalCount > items.Count);
     }
 
+    public async Task<int?> CountOpenAsync(CustomerTimelineQuery query, CancellationToken cancellationToken)
+    {
+        if (query.PartyId is not { } partyId)
+        {
+            return 0;
+        }
+
+        // Açık talep: iptal edilmemiş, kapanmamış ve birleştirilmemiş (çözüldü, müşteri teyidini beklerken açık sayılır).
+        var filters = new Dictionary<string, string> { ["partyId"] = partyId.ToString(), ["open"] = "true" };
+        var page = await pipeline.QueryAsync(new RecordQuery(SupportModule.Entities.Ticket, 1, 1, Filters: filters), cancellationToken);
+        return page.IsSuccess
+            ? page.Value!.TotalCount
+            : page.Error!.Code is RecordErrorCode.PermissionDenied or RecordErrorCode.FeatureNotLicensed
+                ? null
+                : throw new InvalidOperationException($"Açık iş sayılamadı ({Key}): {page.Error.Message}");
+    }
+
     private static string? Text(JsonObject values, string name) => values[name]?.GetValue<string>();
 }

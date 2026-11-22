@@ -40,4 +40,11 @@ public interface ICustomerTimelineSource
     string Key { get; }
 
     Task<CustomerTimelineSlice?> ReadAsync(CustomerTimelineQuery query, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Özet şeridi için (ADR-0053, dilim 3): müşterinin bu kaynaktaki açık iş sayısı (ör. kapanmamış destek talebi). Aynı izin, veri kapsamı ve lisans
+    /// kuralıyla sayılır. <c>null</c>: kaynak "açık iş" kavramı bildirmiyor ya da çağıran okuyamıyor; sıfır "okunabilir, açık iş yok" demektir.
+    /// <paramref name="query"/> içindeki <c>Before</c> ve <c>Take</c> yok sayılır. Varsayılan uygulama bildirmez; kaynaklar isteğe bağlı olarak ezer.
+    /// </summary>
+    Task<int?> CountOpenAsync(CustomerTimelineQuery query, CancellationToken cancellationToken) => Task.FromResult<int?>(null);
 }
