@@ -626,7 +626,7 @@
                                         }
                                         else if (Session.Can(CrmAccess.OpportunitiesWrite) && isPrimary)
                                         {
-                                            <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => SetPrimaryAsync(null)">@Texts.Get("crm.opp.removePrimary")</button>
+                                            <IconAction Icon="x" Label="@Texts.Get("crm.opp.removePrimary")" Disabled="@busy" OnClick="() => SetPrimaryAsync(null)" />
                                         }
                                     </td>
                                 </tr>

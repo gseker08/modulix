@@ -238,7 +238,7 @@
                                         </div>
                                         <div class="form-actions">
                                             <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
-                                            <button type="button" class="btn btn-link" @onclick="CloseForms">@Texts.Get("common.dismiss")</button>
+                                            <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="CloseForms" />
                                         </div>
                                     </form>
                                 </td>
@@ -253,7 +253,7 @@
                                         <input id="wv-reason" class="form-control" maxlength="500" @bind="reasonText" />
                                         <div class="form-actions">
                                             <button type="submit" class="btn btn-danger" disabled="@busy">@Texts.Get("contracts.commitmentsPanel.waive")</button>
-                                            <button type="button" class="btn btn-link" @onclick="CloseForms">@Texts.Get("common.dismiss")</button>
+                                            <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="CloseForms" />
                                         </div>
                                     </form>
                                 </td>
@@ -275,7 +275,7 @@
                         <input id="cn-reason" class="form-control" maxlength="500" @bind="reasonText" />
                         <div class="form-actions">
                             <button type="submit" class="btn btn-danger" disabled="@busy">@Texts.Get("contracts.commitmentsPanel.cancelConfirm")</button>
-                            <button type="button" class="btn btn-link" @onclick="CloseForms">@Texts.Get("common.dismiss")</button>
+                            <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="CloseForms" />
                         </div>
                     </form>
                 }

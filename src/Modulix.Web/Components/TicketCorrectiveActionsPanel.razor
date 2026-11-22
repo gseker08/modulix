@@ -57,7 +57,7 @@
                 </fieldset>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-outline-secondary" disabled="@busy">@Texts.Get("common.save")</button>
-                    <button type="button" class="btn btn-link" @onclick="() => pending = null">@Texts.Get("common.dismiss")</button>
+                    <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="() => pending = null" />
                 </div>
             </form>
         }

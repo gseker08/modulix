@@ -209,7 +209,7 @@
                 @if (usePartyId is not null)
                 {
                     <p class="alert alert-info mt-2">@Texts.Get("crm.company.editor.usePartyNote")
-                        <button type="button" class="btn btn-link btn-sm" @onclick="() => usePartyId = null">@Texts.Get("common.dismiss")</button></p>
+                        <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="() => usePartyId = null" /></p>
                 }
             </div>
 

@@ -77,7 +77,7 @@
                                     <button type="button" class="btn btn-primary btn-sm" disabled="@(busy || cannotDecide)" @onclick="() => DecideAsync(item, ContractActionNames.Approve)">@Texts.Get("crm.quoteApprovals.approve")</button>
                                     <button type="button" class="btn btn-outline-danger btn-sm" disabled="@(busy || cannotDecide)" @onclick="() => DecideAsync(item, ContractActionNames.Reject)">@Texts.Get("crm.quoteApprovals.reject")</button>
                                     <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(busy || cannotDecide)" @onclick="() => DecideAsync(item, ContractActionNames.Return)">@Texts.Get("crm.quoteApprovals.requestChanges")</button>
-                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => active = null">@Texts.Get("common.dismiss")</button>
+                                    <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="() => active = null" />
                                 </form>
                             }
                             else

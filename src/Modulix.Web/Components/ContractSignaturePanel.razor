@@ -121,7 +121,7 @@
                     <div class="form-actions">
                         <button type="button" class="btn btn-outline-secondary" @onclick="() => startForm.Signatories.Add(new SignatoryForm())">@Texts.Get("contracts.signaturePanel.addSignatory")</button>
                         <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("contracts.signaturePanel.start")</button>
-                        <button type="button" class="btn btn-link" @onclick="() => startForm = null">@Texts.Get("common.dismiss")</button>
+                        <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="() => startForm = null" />
                     </div>
                 </form>
             }
@@ -215,7 +215,7 @@
                                             <p class="small text-muted">@Texts.Get("contracts.signaturePanel.manualNote")</p>
                                             <div class="form-actions">
                                                 <button type="submit" class="btn btn-primary" disabled="@(busy || manualContent is null)">@Texts.Get("contracts.signaturePanel.saveAndVerify")</button>
-                                                <button type="button" class="btn btn-link" @onclick="CloseForms">@Texts.Get("common.dismiss")</button>
+                                                <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="CloseForms" />
                                             </div>
                                         </form>
                                     </td>
@@ -230,7 +230,7 @@
                                             <input id="d-reason" class="form-control" maxlength="500" @bind="reasonText" />
                                             <div class="form-actions">
                                                 <button type="submit" class="btn btn-danger" disabled="@busy">@Texts.Get("contracts.signaturePanel.recordDecline")</button>
-                                                <button type="button" class="btn btn-link" @onclick="CloseForms">@Texts.Get("common.dismiss")</button>
+                                                <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="CloseForms" />
                                             </div>
                                         </form>
                                     </td>
@@ -256,7 +256,7 @@
                             <input id="c-reason" class="form-control" maxlength="500" @bind="reasonText" />
                             <div class="form-actions">
                                 <button type="submit" class="btn btn-danger" disabled="@busy">@Texts.Get("contracts.commitmentsPanel.cancelConfirm")</button>
-                                <button type="button" class="btn btn-link" @onclick="CloseForms">@Texts.Get("common.dismiss")</button>
+                                <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="CloseForms" />
                             </div>
                         </form>
                     }
