@@ -1,7 +1,7 @@
 # ADR-0053: Birleşik müşteri zaman çizelgesi
 
 - **Durum:** Dilim 1 (kaynak sözleşmesi, CRM kaynakları, uç nokta, firma kartında sekme) 17 Kasım 2026'da teslim edildi (PR #468).
-  Dilim 2a (Sipariş kaynağı) ve 2b (Sözleşme kaynağı) 17 Kasım 2026'da, 2c (Destek kaynağı) 21 Kasım 2026'da, 2d (Pazarlama kaynağı) 22 Kasım 2026'da (PR #511), dilim 3 (kaynak süzgeci PR #515, özet şeridi) 22 Kasım 2026'da teslim edildi. Diğer dilimler öneridir.
+  Dilim 2a (Sipariş kaynağı) ve 2b (Sözleşme kaynağı) 17 Kasım 2026'da, 2c (Destek kaynağı) 21 Kasım 2026'da, 2d (Pazarlama kaynağı) 22 Kasım 2026'da (PR #511), dilim 3 (kaynak süzgeci PR #515, özet şeridi) ve dilim 4 (durum satırları) 22 Kasım 2026'da teslim edildi. Diğer dilimler öneridir.
 - **Kaynak:** [CRM eksik süreç epic listesi](../crm-eksik-surecler-epicleri.md) E9.
 
 ## Bağlam
@@ -93,12 +93,20 @@ token yoktur. Fırsat ve teklif satırı kendi sayfasına bağlanır; "Daha eski
      "son temas" (yalnızca tamamlanmış aktivite, gelen/giden ileti) için kaynak bazlı temas türü tanımı gerekir ve sonraya bırakıldı. CRM'in açık
      fırsat ve aktivite sayıları firma kartının yan özetinde de vardır; şerit onları çizelgenin içinde, diğer modüllerin sayılarıyla birlikte gösterir.
 4. Durum değişikliği satırları (fırsat kazanıldı/kaybedildi, teklif kabul edildi) ve müşteri adayı geçmişi (dönüşen aday).
+   - **Dilim 4 (22 Kasım 2026), migration yok:** durum satırları mevcut tarihçelerden okunur. *Fırsat kazanıldı/kaybedildi* `OpportunityHistory`
+     (`ToStatus` Won/Lost; yeniden açılıp tekrar kapanan fırsat her kapanışta ayrı satır verir; iptal ve beklemeye alma satır vermez), *teklif kabul edildi*
+     `QuoteEvent` (`ToStatus` Accepted; her revizyonun kabulü ayrı satır), *müşteri adayı dönüştü* adayın `ConvertedAt` değeridir (yeni `crm.leads`
+     kaynağı; yalnızca bu firmaya dönüşen adaylar). Satır türleri `CrmTimelineKeys`'tedir (`crm.timeline.opportunity-closed`, `...quote-accepted`,
+     `...lead-converted`); satırın kayıt kimliği fırsat, teklif ya da adaydır. **Yetki:** durum satırı yalnızca kaydın kendisi çağıranın kayıt boru hattında
+     görünürse (izin ve veri kapsamı) üretilir; görünmeyen fırsatın kapanışı çizelgeye girmez. Satırlar tutar ve gerekçe taşımaz (`OpportunityHistory.Details`
+     hassas tutar içerir, okunmaz). Durum satırları kayıt satırının kendi kaynağındadır: süzgeçte "Fırsatlar" ve "Teklifler" çipi hem kayıt hem durum
+     satırını getirir. Sınır: durum satırı için firmanın kayıtlarının görünür kısmı okunur, en çok 1000 fırsat ya da teklif.
 
 ## Yapılmadı / sınırlar
 
 - Firma kartındaki ilişkili sipariş, destek ve kampanya listeleri yerinde duruyor (Sipariş 2a, Sözleşme 2b, Destek 2c, Pazarlama 2d satırları çizelgeye geldi).
 - Kişiye ya da müşteri adayına giden kampanya iletileri firma çizelgesinde yalnızca kişi, firmanın ortak taraf kimliğiyle eşleşiyorsa görünür; kişi kartında çizelge yoktur.
-- Bir kayıt tek satırdır: fırsatın kazanılması ya da teklifin kabulü ayrı satır üretmez (durum rozeti güncel durumu gösterir).
+- Bir kayıt, kayıt satırının yanında yalnızca bu üç durum değişikliğinde ek satır üretir (fırsat kazanıldı/kaybedildi, teklif kabul edildi, aday dönüştü); diğer geçişler (aşama, iptal, red, süre dolumu) satır vermez ve rozet güncel durumu gösterir.
 - Sipariş, sözleşme, destek talebi ve pazarlama satırları (dilim 2a–2d) tarayıcıda gözle doğrulanmadı.
 - Ekran 17 Kasım 2026'da açık ve koyu temada, 1440 px ve 390 px genişlikte gözle doğrulandı. Yeni sekmeyle firma detayının sekme çubuğu
   1440 px'te taşıyordu; "Fırsatlar ve müşteri adayları" sekmesinin adı "Satış" olarak kısaltıldı (kişi detayında da aynı etiket).
