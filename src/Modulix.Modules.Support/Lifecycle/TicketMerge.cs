@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Support.Domain;
 using Modulix.Modules.Support.Records;
@@ -35,25 +36,25 @@ internal sealed class TicketMerge(IRecordPipeline pipeline, TicketWorkflowGate g
         var permission = SupportModule.Permissions.TicketsMerge;
         if (!await access.HasPermissionAsync(permission, cancellationToken))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission));
         }
 
         var text = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         if (text is null)
         {
-            return Invalid("reason", "Gerekçe zorunludur.");
+            return Invalid("reason", SupportMessages.Workflow.ReasonRequired);
         }
 
         var target = await pipeline.GetAsync(new RecordRef(Key, targetId), cancellationToken);
         if (!target.IsSuccess)
         {
-            return Invalid("targetId", "Hedef talep bulunamadı ya da erişim yetkiniz yok.");
+            return Invalid("targetId", SupportMessages.Merge.TargetUnavailable);
         }
 
         var rule = MergeRules.Can(FactsOf(source.Value!), FactsOf(target.Value!));
         if (!rule.Allowed)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, rule.Message ?? "Bu talepler birleştirilemez.", [new RecordFieldError(rule.Code ?? "status", rule.Message ?? string.Empty)]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, rule.Message ?? SupportMessages.Rule.MergeNotAllowed, [new RecordFieldError(rule.Code ?? "status", rule.Message ?? SupportMessages.Rule.MergeNotAllowed)]);
         }
 
         var targetNumber = TicketWorkflow.Text(target.Value!, "number");
@@ -101,6 +102,6 @@ internal sealed class TicketMerge(IRecordPipeline pipeline, TicketWorkflowGate g
 
     private static string Truncate(string value) => value.Length > SupportTicket.ReasonMaxLength ? value[..SupportTicket.ReasonMaxLength] : value;
 
-    private static RecordResult<RecordData> Invalid(string field, string message) =>
+    private static RecordResult<RecordData> Invalid(string field, ServerMessage message) =>
         RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

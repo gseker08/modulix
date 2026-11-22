@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Support.Domain;
@@ -108,7 +109,7 @@ internal sealed class TicketWorkflow(
                 rule = BlockedByTasks(blockers);
             }
 
-            list.Add(new TicketActionState(action, rule.Allowed, rule.Code, rule.Message, TicketTransitions.RequiresReason(action)));
+            list.Add(new TicketActionState(action, rule.Allowed, rule.Code, rule.Message?.Text, TicketTransitions.RequiresReason(action)));
         }
 
         return RecordResult<IReadOnlyList<TicketActionState>>.Ok(list);
@@ -118,7 +119,7 @@ internal sealed class TicketWorkflow(
     {
         if (!PermissionOf.TryGetValue(action, out var permission))
         {
-            return Invalid("action", "Bilinmeyen eylem.");
+            return Invalid("action", SupportMessages.Rule.UnknownAction);
         }
 
         // Kayıt önce kapsamla okunur: kapsam dışı talep 404 olur; izinsiz eylem 403.
@@ -130,13 +131,13 @@ internal sealed class TicketWorkflow(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(permission))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission));
         }
 
         var reason = string.IsNullOrWhiteSpace(input.Reason) ? null : input.Reason.Trim();
         if (TicketTransitions.RequiresReason(action) && reason is null)
         {
-            return Invalid("reason", "Gerekçe zorunludur.");
+            return Invalid("reason", SupportMessages.Workflow.ReasonRequired);
         }
 
         var settings = await PolicyAsync(cancellationToken);
@@ -145,7 +146,7 @@ internal sealed class TicketWorkflow(
         var rule = Evaluate(action, state, record);
         if (!rule.Allowed)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, rule.Message ?? "Bu işlem şu an yapılamaz.", [new RecordFieldError(rule.Code ?? "status", rule.Message ?? string.Empty)]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, rule.Message ?? SupportMessages.Rule.ActionNotAllowed, [new RecordFieldError(rule.Code ?? "status", rule.Message ?? SupportMessages.Rule.ActionNotAllowed)]);
         }
 
         // Engelleyici açık alt iş varken talep çözülemez (sunucuda uygulanır).
@@ -166,17 +167,17 @@ internal sealed class TicketWorkflow(
             {
                 if (input.OwnerId is null && input.QueueId is null)
                 {
-                    return Invalid("ownerId", "Sorumlu ya da kuyruk seçin.");
+                    return Invalid("ownerId", SupportMessages.Workflow.OwnerOrQueueRequired);
                 }
 
                 if (input.OwnerId is { } owner && currentOwner is not null && owner != currentOwner && reason is null)
                 {
-                    return Invalid("reason", "Sorumlusu olan talebin sorumlusunu değiştirmek için gerekçe zorunludur.");
+                    return Invalid("reason", SupportMessages.Workflow.ReassignReasonRequired);
                 }
 
                 if (input.QueueId is { } assignQueue && !await QueueIsActiveAsync(assignQueue, cancellationToken))
                 {
-                    return Invalid("queueId", "Kuyruk bulunamadı ya da pasif.");
+                    return Invalid("queueId", SupportMessages.Ticket.QueueNotFoundOrInactive);
                 }
 
                 if (input.OwnerId is not null)
@@ -205,12 +206,12 @@ internal sealed class TicketWorkflow(
             {
                 if (input.QueueId is not { } queue || !await QueueIsActiveAsync(queue, cancellationToken))
                 {
-                    return Invalid("queueId", "Devredilecek kuyruğu seçin (aktif olmalı).");
+                    return Invalid("queueId", SupportMessages.Workflow.TransferQueueRequired);
                 }
 
                 if (queue == currentQueue && (input.OwnerId is null || input.OwnerId == currentOwner))
                 {
-                    return Invalid("queueId", "Talep zaten bu kuyrukta.");
+                    return Invalid("queueId", SupportMessages.Workflow.AlreadyInQueue);
                 }
 
                 values["queueId"] = queue.ToString();
@@ -240,7 +241,7 @@ internal sealed class TicketWorkflow(
                 if (errors.Count > 0)
                 {
                     return RecordResult<RecordData>.Fail(
-                        RecordErrorCode.ValidationFailed, "Çözüm bilgileri eksik.", [.. errors.Select(e => new RecordFieldError(e.Field, e.Message))]);
+                        RecordErrorCode.ValidationFailed, SupportMessages.Workflow.ResolutionIncomplete, [.. errors.Select(e => new RecordFieldError(e.Field, e.Message))]);
                 }
 
                 values["resolutionCode"] = input.ResolutionCode!.Trim();
@@ -267,12 +268,12 @@ internal sealed class TicketWorkflow(
             {
                 if (input.Priority is null || !TicketPriority.All.Contains(input.Priority))
                 {
-                    return Invalid("priority", $"Şunlardan biri olmalıdır: {string.Join(", ", TicketPriority.All)}.");
+                    return Invalid("priority", ServerMessages.Validation.OneOf(string.Join(", ", TicketPriority.All)));
                 }
 
                 if (input.Priority == Text(record, "priority"))
                 {
-                    return Invalid("priority", "Talep zaten bu önceliğe sahip.");
+                    return Invalid("priority", SupportMessages.Workflow.SamePriority);
                 }
 
                 values["priority"] = input.Priority;
@@ -309,12 +310,12 @@ internal sealed class TicketWorkflow(
         {
             if (owner is not null && owner == storeContext.CurrentUserId)
             {
-                return TicketRuleResult.Deny("already-yours", "Talep zaten sizin üzerinizde.");
+                return TicketRuleResult.Deny("already-yours", SupportMessages.Rule.AlreadyYours);
             }
 
             if (owner is not null)
             {
-                return TicketRuleResult.Deny("owned", "Talebin sorumlusu var; devralmak için atama yetkisi olan biri atamalıdır.");
+                return TicketRuleResult.Deny("owned", SupportMessages.Rule.Owned);
             }
         }
 
@@ -325,7 +326,7 @@ internal sealed class TicketWorkflow(
         storeContext.Data.Set<TicketTask>().AsNoTracking().CountAsync(t => t.TicketId == ticketId && t.IsBlocking && !t.IsDone, cancellationToken);
 
     private static TicketRuleResult BlockedByTasks(int count) =>
-        TicketRuleResult.Deny("blocking-tasks", $"{count} engelleyici alt iş açık; talebi çözmeden önce bunları tamamlayın.");
+        TicketRuleResult.Deny("blocking-tasks", SupportMessages.Rule.BlockingTasks(count));
 
     private async Task<TicketPolicySettings> PolicyAsync(CancellationToken cancellationToken) =>
         policy is null ? TicketPolicySettings.Default : await policy.GetAsync(cancellationToken);
@@ -339,7 +340,7 @@ internal sealed class TicketWorkflow(
     private static TicketState StateOf(RecordData ticket, TicketPolicySettings settings) =>
         new(Text(ticket, "status") ?? TicketStatus.New, Id(ticket, "ownerId") is not null, Time(ticket, "closedAt"), DateTimeOffset.UtcNow, settings.ReopenWindowDays);
 
-    private static RecordResult<RecordData> Invalid(string field, string message) =>
+    private static RecordResult<RecordData> Invalid(string field, ServerMessage message) =>
         RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 
     internal static string? Text(RecordData data, string field) => data.Values[field] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
