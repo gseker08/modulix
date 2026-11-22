@@ -25,24 +25,36 @@
     }
     else if (IsNew || role is not null)
     {
-        <div class="page-header">
-            <h1>@(IsNew ? Texts.Get("admin.roles.new") : role!.Name)</h1>
+        @* Kimlik kartı + sol sekmeli düzen (docs/design-system/component-catalog.md → SideTabs). Form bölümleri (genel, izinler, kapsam)
+           aynı formun sekmeleridir; üyeler ve menü düzeni kendi kayıtlarıyla ayrı sekmelerdedir. *@
+        <div class="identity-card">
+            <OwnerCell Name="@(IsNew ? Texts.Get("admin.roles.new") : role!.Name)" AvatarOnly="true" />
+            <div class="identity-main">
+                <h1>@(IsNew ? Texts.Get("admin.roles.new") : role!.Name)</h1>
+                @if (role is not null)
+                {
+                    <span class="identity-sub"><AppIcon Name="users" Size="16" /> @Texts.Get("admin.userDetail.memberCount", role.MemberCount)</span>
+                }
+            </div>
             @if (role is { IsSystem: false })
             {
                 <a class="btn btn-outline-secondary" href="yonetim/roller/yeni?kopya=@role.Id">@Texts.Get("admin.roleDetail.copy")</a>
             }
         </div>
 
+        <div class="side-layout">
+            <SideTabs Tabs="Sections" State="tabs" Label="@Texts.Get("admin.roleDetail.sections")" Changed="_ => { }" />
+            <div class="side-content">
         @if (role is { IsSystem: true })
         {
+            <TabPanel State="tabs" Key="form-izin">
             <div class="alert alert-info">@Texts.Get("admin.roleDetail.systemInfo")</div>
             <PermissionMatrix Permissions="permissions" Selected="AllKeys" ReadOnly="true" />
-            <RoleMembers RoleId="role.Id" />
+            </TabPanel>
         }
         else
         {
             <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-                <TabBar Tabs="FormTabs" State="tabs" Label="@Texts.Get("admin.roleDetail.sections")" Changed="_ => { }" />
                 <TabPanel State="tabs" Key="form-genel">
                 <div class="form-grid">
                     @if (IsNew && templates.Count > 0)
@@ -209,7 +221,8 @@
                 </fieldset>
                 </TabPanel>
 
-                <div class="form-actions">
+                @* Üyeler ve menü düzeni sekmeleri formun parçası değildir; kaydet satırı yalnızca form sekmelerinde görünür. *@
+                <div class="form-actions" hidden="@(!OnFormTab)">
                     <button type="submit" class="btn btn-primary" disabled="@busy">@(IsNew ? Texts.Get("admin.roleDetail.create") : Texts.Get("common.save"))</button>
                     <a class="btn btn-outline-secondary" href="yonetim/roller">@Texts.Get("common.dismiss")</a>
                 </div>
@@ -222,9 +235,7 @@
 
             @if (role is not null)
             {
-                <RoleMembers RoleId="role.Id" />
-                <RoleMenuLayout RoleId="role.Id" />
-
+                <div hidden="@tabs.Hidden("form-genel")">
                 <section class="detail-section">
                     <div class="section-header"><h2>@Texts.Get("admin.roleDetail.delete")</h2></div>
                     @if (!deleting)
@@ -269,8 +280,24 @@
                         </div>
                     }
                 </section>
+                </div>
             }
         }
+
+        @if (role is not null)
+        {
+            <TabPanel State="tabs" Key="uyeler">
+                <RoleMembers RoleId="role.Id" />
+            </TabPanel>
+            @if (!role.IsSystem)
+            {
+                <TabPanel State="tabs" Key="menu">
+                    <RoleMenuLayout RoleId="role.Id" />
+                </TabPanel>
+            }
+        }
+            </div>
+        </div>
     }
 </AuthGate>
 
@@ -318,6 +345,31 @@
         new("form-izin", Texts.Get("admin.roles.col.permissions"), Errors: ErrorCount("permissions")),
         new("form-kapsam", Texts.Get("admin.roleDetail.tab.scope"), Errors: ErrorCount("scope", "scopeOverrides", "assignLevel", "hideOutOfScopeShared")),
     ];
+
+    private bool OnFormTab => tabs.Active.StartsWith("form-", StringComparison.Ordinal);
+
+    /// <summary>Sol sekmeler: form bölümleri (hata rozetleriyle), kayıtlı rolde üyeler ve menü düzeni. Sistem rolünde yalnızca izinler ve üyeler.</summary>
+    private IReadOnlyList<SideTabItem> Sections
+    {
+        get
+        {
+            string[] icons = ["sliders", "key", "shield"];
+            List<SideTabItem> items = role is { IsSystem: true }
+                ? [new("form-izin", Texts.Get("admin.roles.col.permissions"), "key")]
+                : FormTabs.Select((t, i) => new SideTabItem(
+                    t.Key, t.Label, icons[i], t.Key == "form-izin" ? selected.Count - HiddenCount : null, t.Errors)).ToList();
+            if (role is not null)
+            {
+                items.Add(new("uyeler", Texts.Get("admin.roles.col.members"), "users", role.MemberCount));
+                if (!role.IsSystem)
+                {
+                    items.Add(new("menu", Texts.Get("admin.roleMenu.title"), "list"));
+                }
+            }
+
+            return items;
+        }
+    }
 
     private bool pickingPermissions;
 
@@ -413,6 +465,12 @@
             skippedFromTemplate = 0;
             templates = source is null ? (await Api.GetAsync<List<RoleTemplateDto>>("/api/roles/templates")).Value ?? [] : [];
             ApplyTemplate(TemplateKey);
+        }
+
+        // Sistem rolünde form yoktur; ilk sekme izinlerdir.
+        if (role is { IsSystem: true })
+        {
+            tabs.Select("form-izin");
         }
 
         loaded = true;
