@@ -104,6 +104,10 @@
                                     <textarea id="@id" class="form-control" rows="3" maxlength="@setting.MaxLength" disabled="@(!canEdit)"
                                               value="@values[setting.Key]" @onchange="e => Set(setting, e.Value)"></textarea>
                                     break;
+                                case SettingKind.Text when setting.Key is SettingKeys.AccentLight or SettingKeys.AccentDark:
+                                    <AccentColorField Id="@id" Value="@values[setting.Key]" Dark="@(setting.Key == SettingKeys.AccentDark)"
+                                                      Disabled="@(!canEdit)" ValueChanged="v => Set(setting, v)" />
+                                    break;
                                 default:
                                     <input id="@id" class="form-control" type="@InputType(setting.Kind)" maxlength="@setting.MaxLength"
                                            disabled="@(!canEdit)" value="@values[setting.Key]" @onchange="e => Set(setting, e.Value)" />
