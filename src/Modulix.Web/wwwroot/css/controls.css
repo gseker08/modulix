@@ -663,3 +663,224 @@ code {
     .alert.alert-inline .app-icon {
         flex: none;
     }
+
+/* Pencere (Modal): ortada açılır; lacivert başlık bandı, kaydırılabilir gövde, altta eylem satırı. Telefonda tam ekran. */
+.mx-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1060;
+    background: rgba(17, 24, 39, 0.35);
+}
+
+.mx-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 1070;
+    display: flex;
+    flex-direction: column;
+    width: min(34rem, calc(100vw - 2 * var(--mx-space-4)));
+    max-height: calc(100vh - 2 * var(--mx-space-6));
+    overflow: hidden;
+    border-radius: var(--mx-radius-modal);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow-popover);
+    transform: translate(-50%, -50%);
+}
+
+    .mx-modal.wide {
+        width: min(46rem, calc(100vw - 2 * var(--mx-space-4)));
+    }
+
+    .mx-modal:focus {
+        outline: none;
+    }
+
+.mx-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mx-space-3);
+    padding: var(--mx-space-3) var(--mx-space-5);
+    background: var(--mx-navy);
+    color: var(--mx-text-on-hero);
+}
+
+    .mx-modal-head h2 {
+        margin: 0;
+        color: inherit;
+        font-size: var(--mx-fs-card-title);
+        font-weight: 700;
+    }
+
+    .mx-modal-head small {
+        margin-left: var(--mx-space-2);
+        color: var(--mx-text-on-hero-muted);
+        font-weight: 500;
+    }
+
+.mx-modal-close {
+    --bs-btn-color: var(--mx-text-on-hero);
+    --bs-btn-hover-color: var(--mx-text-on-hero);
+    --bs-btn-hover-bg: var(--mx-navy-soft);
+    --bs-btn-active-color: var(--mx-text-on-hero);
+    --bs-btn-active-bg: var(--mx-navy-soft);
+    flex: none;
+}
+
+.mx-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--mx-space-4) var(--mx-space-5);
+}
+
+.mx-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--mx-space-2);
+    padding: var(--mx-space-3) var(--mx-space-5);
+    border-top: 1px solid var(--mx-border);
+}
+
+/* Atama penceresi (PickDialog): seçilenler üstte etiket, altında arama ve işaret kutulu tek liste. */
+.pick-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mx-space-2);
+    margin-bottom: var(--mx-space-3);
+}
+
+.pick-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mx-space-2);
+    margin-bottom: var(--mx-space-3);
+}
+
+.pick-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-1);
+    color: var(--mx-tone-brand-fg);
+}
+
+.pick-filters {
+    display: flex;
+    gap: var(--mx-space-2);
+    margin-bottom: var(--mx-space-3);
+}
+
+    .pick-filters .form-select {
+        flex: 0 1 14rem;
+    }
+
+.pick-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mx-space-2);
+}
+
+.pick-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-2) var(--mx-space-3);
+    padding: var(--mx-space-2) var(--mx-space-3);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-input);
+    background: var(--mx-surface);
+}
+
+    .pick-item.selected {
+        border-color: var(--mx-brand-primary);
+        background: var(--mx-tone-brand-bg);
+    }
+
+    .pick-item > .form-check {
+        display: flex;
+        flex: 1 1 14rem;
+        align-items: center;
+        gap: var(--mx-space-2);
+        min-width: 0;
+        min-height: 0;
+        margin: 0;
+        padding: 0;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+        .pick-item > .form-check .form-check-input {
+            flex: none;
+            float: none;
+            margin: 0;
+        }
+
+        .pick-item > .form-check .app-icon {
+            flex: none;
+            color: var(--mx-brand-teal-dark);
+        }
+
+.pick-item-extra {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mx-space-2);
+}
+
+    .pick-item-extra label {
+        display: flex;
+        flex-direction: column;
+        gap: var(--mx-space-1);
+        color: var(--mx-text-secondary);
+        font-size: var(--mx-fs-helper);
+    }
+
+.pick-group + .pick-group {
+    margin-top: var(--mx-space-4);
+}
+
+.pick-group > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mx-space-2);
+    margin-bottom: var(--mx-space-2);
+}
+
+    .pick-group > header h3 {
+        margin: 0;
+        font-size: var(--mx-fs-label);
+        font-weight: 700;
+    }
+
+    .pick-group > header .form-check {
+        margin: 0;
+    }
+
+/* Sayfadaki atanmış öğeler (roller, ekipler, üyeler): etiket satırı; düzenleme atama penceresinde yapılır. */
+.assigned-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mx-space-2);
+    margin-bottom: var(--mx-space-3);
+}
+
+@media (max-width: 640.98px) {
+    .mx-modal,
+    .mx-modal.wide {
+        inset: 0;
+        width: 100vw;
+        max-height: none;
+        border-radius: 0;
+        transform: none;
+    }
+
+    .pick-filters {
+        flex-direction: column;
+    }
+
+        .pick-filters .form-select {
+            flex: none;
+        }
+}
