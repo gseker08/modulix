@@ -466,6 +466,8 @@
   "crm.timeline.kind.order": "Order",
   "crm.timeline.kind.contract": "Contract",
   "crm.timeline.kind.ticket": "Support ticket",
+  "crm.timeline.kind.delivery": "Campaign message",
+  "crm.timeline.kind.campaignResponse": "Campaign response",
   "crm.timeline.kind.other": "Record",
   "crm.company.tabs.aria": "Company sections",
   "crm.company.tickets": "Support tickets",

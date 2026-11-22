@@ -367,6 +367,8 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
         services.AddScoped<IRecordStore, CampaignResponseRecordStore>();
         services.AddScoped<ICampaignResponses, CampaignResponses>();
         services.AddScoped<ICampaignReports, CampaignReports>();
+        // Müşteri zaman çizelgesinin pazarlama kaynağı (ADR-0053); CRM kayıtlı kaynakları birleştirir.
+        services.AddScoped<Modulix.Modules.Crm.Contracts.Timeline.ICustomerTimelineSource, CampaignTimelineSource>();
         services.AddScoped<IMessageProvider, FakeMessageProvider>();
     }
 }
