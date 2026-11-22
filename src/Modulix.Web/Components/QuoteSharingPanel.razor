@@ -50,7 +50,7 @@
                         <label class="visually-hidden" for="share-url">@Texts.Get("crm.quoteShare.urlLabel")</label>
                         <input id="share-url" class="form-control" readonly value="@FullUrl(created)" />
                         <button type="button" class="btn btn-outline-primary" @onclick="() => CopyAsync(created)">@Texts.Get("crm.quoteShare.copy")</button>
-                        <button type="button" class="btn btn-link" @onclick="() => created = null">@Texts.Get("common.close")</button>
+                        <IconAction Icon="x" Label="@Texts.Get("common.close")" OnClick="() => created = null" />
                     </div>
                     <div class="small text-muted">@Texts.Get("crm.quoteShare.tokenNote")</div>
                 </div>
@@ -95,7 +95,7 @@
                                                 <label class="visually-hidden" for="revoke-@link.Id">@Texts.Get("crm.quoteShare.revokeReasonLabel")</label>
                                                 <input id="revoke-@link.Id" class="form-control form-control-sm" maxlength="500" placeholder="@Texts.Get("crm.quoteShare.revokeReasonPlaceholder")" @bind="revokeReason" />
                                                 <button type="submit" class="btn btn-outline-danger btn-sm" disabled="@busy">@Texts.Get("crm.quoteShare.revoke")</button>
-                                                <button type="button" class="btn btn-link btn-sm" @onclick="() => revoking = null">@Texts.Get("common.dismiss")</button>
+                                                <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="() => revoking = null" />
                                             </form>
                                         }
                                         else

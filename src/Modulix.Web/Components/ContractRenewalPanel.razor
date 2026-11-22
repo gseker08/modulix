@@ -96,7 +96,7 @@
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("contracts.renewalPanel.createDraftSubmit")</button>
-                    <button type="button" class="btn btn-link" @onclick="Close">@Texts.Get("common.dismiss")</button>
+                    <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="Close" />
                 </div>
             </form>
         }
@@ -121,7 +121,7 @@
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-danger" disabled="@busy">@Texts.Get("contracts.renewalPanel.saveDecision")</button>
-                    <button type="button" class="btn btn-link" @onclick="Close">@Texts.Get("common.dismiss")</button>
+                    <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="Close" />
                 </div>
             </form>
         }
@@ -152,7 +152,7 @@
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-danger" disabled="@busy">@Texts.Get("contracts.renewalPanel.terminate")</button>
-                    <button type="button" class="btn btn-link" @onclick="Close">@Texts.Get("common.dismiss")</button>
+                    <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="Close" />
                 </div>
             </form>
         }

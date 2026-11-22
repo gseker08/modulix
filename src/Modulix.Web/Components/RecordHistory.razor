@@ -62,7 +62,7 @@
         </ul>
         @if (entries.Count < total)
         {
-            <button type="button" class="btn btn-link btn-sm" disabled="@loading" @onclick="MoreAsync">@Texts.Get("common.history.older")</button>
+            <IconAction Icon="chevron-down" Label="@Texts.Get("common.history.older")" Disabled="@loading" OnClick="MoreAsync" />
         }
     }
 </section>

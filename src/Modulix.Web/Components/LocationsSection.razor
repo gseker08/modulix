@@ -89,8 +89,8 @@
                             <ContactPointsSection CompanyId="CompanyId" LocationId="item.Id" Title="@Texts.Get("crm.location.contactPoints")" CanWrite="CanWrite" />
                         }
                     </div>
-                    <button type="button" class="btn btn-link btn-sm" aria-expanded="@(expanded == item.Id)"
-                            @onclick="() => expanded = expanded == item.Id ? null : item.Id">@Texts.Get(expanded == item.Id ? "crm.location.hide" : "crm.location.addressContact")</button>
+                    <IconAction Icon="@(expanded == item.Id ? "chevron-down" : "chevron-right")" Label="@Texts.Get(expanded == item.Id ? "crm.location.hide" : "crm.location.addressContact")"
+                                aria-expanded="@(expanded == item.Id ? "true" : "false")" OnClick="() => expanded = expanded == item.Id ? null : item.Id" />
                     @if (CanWrite)
                     {
                         <IconAction Icon="square-pen" Label="@Texts.Get("common.edit")" OnClick="() => Open(item)" />
