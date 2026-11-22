@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Fleet.Domain;
@@ -100,11 +101,11 @@ internal sealed partial class VehicleRecordStore(FleetStoreContext context) : Fl
         entity.Plate = Normalize(entity.Plate);
         if (!PlatePattern().IsMatch(entity.Plate))
         {
-            errors.Add(new RecordFieldError("plate", "Plaka yalnızca harf ve rakam içerebilir (boşluklar kaldırılır)."));
+            errors.Add(new RecordFieldError("plate", FleetMessages.Vehicle.PlateFormat));
         }
         else if (await Context.Data.Set<Vehicle>().AsNoTracking().AnyAsync(v => v.Plate == entity.Plate && v.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("plate", "Bu plaka başka bir araçta kayıtlı."));
+            errors.Add(new RecordFieldError("plate", FleetMessages.Vehicle.PlateTaken));
         }
 
         if (entity.Vin is { } vin)
@@ -112,11 +113,11 @@ internal sealed partial class VehicleRecordStore(FleetStoreContext context) : Fl
             entity.Vin = Normalize(vin);
             if (!VinPattern().IsMatch(entity.Vin))
             {
-                errors.Add(new RecordFieldError("vin", "Şasi numarası 17 karakter olmalı; I, O ve Q harflerini içermez."));
+                errors.Add(new RecordFieldError("vin", FleetMessages.Vehicle.VinFormat));
             }
             else if (await Context.Data.Set<Vehicle>().AsNoTracking().AnyAsync(v => v.Vin == entity.Vin && v.Id != entity.Id, cancellationToken))
             {
-                errors.Add(new RecordFieldError("vin", "Bu şasi numarası başka bir araçta kayıtlı."));
+                errors.Add(new RecordFieldError("vin", FleetMessages.Vehicle.VinTaken));
             }
         }
 
@@ -124,7 +125,7 @@ internal sealed partial class VehicleRecordStore(FleetStoreContext context) : Fl
         {
             if (entity.CarrierPartyId is not { } carrier)
             {
-                errors.Add(new RecordFieldError("carrierPartyId", "Taşeron araçta taşıyıcı firma seçilmelidir."));
+                errors.Add(new RecordFieldError("carrierPartyId", FleetMessages.Vehicle.CarrierRequired));
             }
             else if (values.ContainsKey("carrierPartyId") || values.ContainsKey("ownership") || isNew)
             {
@@ -141,7 +142,7 @@ internal sealed partial class VehicleRecordStore(FleetStoreContext context) : Fl
         }
         else if (entity.CarrierPartyId is not null)
         {
-            errors.Add(new RecordFieldError("carrierPartyId", "Taşıyıcı firma yalnızca taşeron araçta seçilir."));
+            errors.Add(new RecordFieldError("carrierPartyId", FleetMessages.Vehicle.CarrierOnlySubcontract));
         }
 
         if (errors.Count > 0)
@@ -151,7 +152,7 @@ internal sealed partial class VehicleRecordStore(FleetStoreContext context) : Fl
     }
 
     protected override Task BeforeDeleteAsync(Vehicle entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Araçlar silinmez; kullanım dışı aracın durumunu \"Pasif\" yapın.");
+        throw new RecordConflictException(FleetMessages.Vehicle.NoDelete);
 
     private static JsonNode? Day(DateOnly? day) => day is { } d ? JsonValue.Create(d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)) : null;
 

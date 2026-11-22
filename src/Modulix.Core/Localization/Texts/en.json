@@ -12914,5 +12914,18 @@
   "support.server.report.start-after-end": "The start date cannot be after the end date.",
   "support.server.report.end-in-future": "The end date cannot be after today.",
   "support.server.report.period-too-long": "The period can be at most {0} days.",
-  "support.server.report.min-occurrences-range": "The repeat threshold must be between 2 and 100."
+  "support.server.report.min-occurrences-range": "The repeat threshold must be between 2 and 100.",
+  "fleet.server.field.max-decimals": "At most {0} decimal places are allowed.",
+  "fleet.server.notfound.vehicle": "Vehicle not found.",
+  "fleet.server.maintenance.performed-in-future": "The maintenance date cannot be in the future; enter planned maintenance in the \"Next maintenance date\" field.",
+  "fleet.server.maintenance.next-due-date-order": "The next maintenance date must be after the maintenance date.",
+  "fleet.server.maintenance.next-due-km-order": "The next maintenance mileage must be greater than the maintenance mileage.",
+  "fleet.server.maintenance.currency-required": "A currency is required when an amount is entered.",
+  "fleet.server.vehicle.plate-format": "The plate can contain only letters and digits (spaces are removed).",
+  "fleet.server.vehicle.plate-taken": "This plate is registered on another vehicle.",
+  "fleet.server.vehicle.vin-format": "The chassis number must be 17 characters and cannot contain the letters I, O or Q.",
+  "fleet.server.vehicle.vin-taken": "This chassis number is registered on another vehicle.",
+  "fleet.server.vehicle.carrier-required": "A carrier company must be selected for a subcontracted vehicle.",
+  "fleet.server.vehicle.carrier-only-subcontract": "A carrier company is only selected on a subcontracted vehicle.",
+  "fleet.server.vehicle.no-delete": "Vehicles cannot be deleted; set the status of an out-of-service vehicle to \"Inactive\"."
 }
