@@ -44,7 +44,7 @@ internal sealed class PriorityMatrixRecordStore(SupportStoreContext context) : S
     {
         if (await Context.Data.Set<PriorityMatrixEntry>().AsNoTracking().AnyAsync(e => e.Impact == entity.Impact && e.Urgency == entity.Urgency && e.Id != entity.Id, cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError("impact", "Bu etki × aciliyet hücresi zaten tanımlı; mevcut kaydı güncelleyin.")]);
+            throw new RecordValidationException([new RecordFieldError("impact", SupportMessages.Routing.MatrixCellExists)]);
         }
 
         entity.UpdatedBy = Context.CurrentUserId;
@@ -101,12 +101,12 @@ internal sealed class TicketRoutingRuleRecordStore(SupportStoreContext context) 
         var errors = new List<RecordFieldError>();
         if (entity.QueueId is null && entity.OwnerId is null)
         {
-            errors.Add(new RecordFieldError("queueId", "Kuralın en az bir eylemi olmalıdır: kuyruk ya da sorumlu."));
+            errors.Add(new RecordFieldError("queueId", SupportMessages.Routing.RuleActionRequired));
         }
 
         if (entity.QueueId is { } queueId && !await Context.Data.Set<SupportQueue>().AsNoTracking().AnyAsync(q => q.Id == queueId && q.IsActive, cancellationToken))
         {
-            errors.Add(new RecordFieldError("queueId", "Kuyruk pasif; etkin bir kuyruk seçin."));
+            errors.Add(new RecordFieldError("queueId", SupportMessages.Routing.QueueInactive));
         }
 
         if (errors.Count > 0)
