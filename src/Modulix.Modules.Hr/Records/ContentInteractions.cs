@@ -99,7 +99,7 @@ internal abstract class ContentCommentRecordStore<TContent>(HrStoreContext conte
 
     protected override IReadOnlyList<RecordField<ContentComment>> Fields => fields ??=
     [
-        Field.Reference<ContentComment, TContent>("contentId", "İçerik bulunamadı.", c => c.ContentId, (c, v) => c.ContentId = v!.Value, required: true, createOnly: true),
+        Field.Reference<ContentComment, TContent>("contentId", HrMessages.NotFound.Content, c => c.ContentId, (c, v) => c.ContentId = v!.Value, required: true, createOnly: true),
         Field.Text<ContentComment>("body", ContentComment.BodyMaxLength, c => c.IsHidden && !canModerate ? null : c.Body, (c, v) => c.Body = v!, required: true, createOnly: true),
         Field.Flag<ContentComment>("isHidden", c => c.IsHidden, (c, v) => c.IsHidden = v),
         Field.Computed<ContentComment>("authorUserId", c => c.AuthorUserId.ToString()),
@@ -131,7 +131,7 @@ internal abstract class ContentCommentRecordStore<TContent>(HrStoreContext conte
     {
         if (isNew)
         {
-            entity.AuthorUserId = Context.CurrentUserId ?? throw new RecordConflictException("Aktif kullanıcı yok.");
+            entity.AuthorUserId = Context.CurrentUserId ?? throw new RecordConflictException(HrMessages.Content.NoActiveUser);
         }
 
         if (values.ContainsKey("isHidden"))
@@ -171,7 +171,7 @@ internal abstract class ContentLikeRecordStore<TContent>(HrStoreContext context,
 
     protected override IReadOnlyList<RecordField<ContentLike>> Fields => fields ??=
     [
-        Field.Reference<ContentLike, TContent>("contentId", "İçerik bulunamadı.", l => l.ContentId, (l, v) => l.ContentId = v!.Value, required: true, createOnly: true),
+        Field.Reference<ContentLike, TContent>("contentId", HrMessages.NotFound.Content, l => l.ContentId, (l, v) => l.ContentId = v!.Value, required: true, createOnly: true),
         Field.Computed<ContentLike>("userId", l => l.UserId.ToString()),
     ];
 
@@ -194,15 +194,15 @@ internal abstract class ContentLikeRecordStore<TContent>(HrStoreContext context,
 
     protected override async Task AppliedAsync(ContentLike entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
-        entity.UserId = Context.CurrentUserId ?? throw new RecordConflictException("Aktif kullanıcı yok.");
+        entity.UserId = Context.CurrentUserId ?? throw new RecordConflictException(HrMessages.Content.NoActiveUser);
         if (isNew && await Context.Data.Set<ContentLike>().AsNoTracking().AnyAsync(l => l.ContentId == entity.ContentId && l.UserId == entity.UserId, cancellationToken))
         {
-            throw new RecordConflictException("Bu içeriği zaten beğendiniz.");
+            throw new RecordConflictException(HrMessages.Content.AlreadyLiked);
         }
     }
 
     protected override Task BeforeDeleteAsync(ContentLike entity, CancellationToken cancellationToken) =>
-        Context.Gate.IsOpen ? Task.CompletedTask : throw new RecordConflictException("Beğeni, beğen eylemiyle kaldırılır.");
+        Context.Gate.IsOpen ? Task.CompletedTask : throw new RecordConflictException(HrMessages.Content.LikeRemoveViaAction);
 }
 
 internal sealed class AnnouncementLikeRecordStore(HrStoreContext context)
@@ -235,7 +235,7 @@ internal sealed class ContentInteractions(IRecordPipeline pipeline, HrStoreConte
     {
         if (ContentKind.Of(contentEntity) is not { } kind || kind.ContentEntity != contentEntity)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.NotFound, "İçerik bulunamadı.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.NotFound, HrMessages.NotFound.Content);
         }
 
         var content = await pipeline.GetAsync(new RecordRef(kind.ContentEntity, contentId), cancellationToken);
@@ -258,13 +258,13 @@ internal sealed class ContentInteractions(IRecordPipeline pipeline, HrStoreConte
     {
         if (ContentKind.Of(commentEntity) is not { } kind || kind.CommentEntity != commentEntity)
         {
-            return RecordResult<RecordData?>.Fail(RecordErrorCode.NotFound, "Yorum bulunamadı.");
+            return RecordResult<RecordData?>.Fail(RecordErrorCode.NotFound, HrMessages.NotFound.Comment);
         }
 
         if (!Actions.Contains(action))
         {
-            return RecordResult<RecordData?>.Fail(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.",
-                [new RecordFieldError("action", "Eylem hide, show ya da delete olmalıdır.")]);
+            return RecordResult<RecordData?>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.UnknownAction,
+                [new RecordFieldError("action", HrMessages.Content.ModerateAction)]);
         }
 
         var comment = await pipeline.GetAsync(new RecordRef(kind.CommentEntity, commentId), cancellationToken);
@@ -278,7 +278,7 @@ internal sealed class ContentInteractions(IRecordPipeline pipeline, HrStoreConte
         if (!moderator && !(action == "delete" && author))
         {
             return RecordResult<RecordData?>.Fail(RecordErrorCode.PermissionDenied,
-                action == "delete" ? "Yalnızca kendi yorumunuzu silebilirsiniz." : "Yorumu gizlemek için içeriği yönetme yetkisi gerekir.");
+                action == "delete" ? HrMessages.Content.DeleteOwnOnly : HrMessages.Content.HideNeedsManage);
         }
 
         using (context.Gate.Open(moderator ? kind.ManagePermission : kind.ReadPermission, action, reason: null))
@@ -303,7 +303,7 @@ internal sealed class ContentInteractions(IRecordPipeline pipeline, HrStoreConte
     {
         if (ContentKind.Of(contentEntity) is not { } kind || kind.ContentEntity != contentEntity)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.NotFound, "İçerik bulunamadı.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.NotFound, HrMessages.NotFound.Content);
         }
 
         var content = await pipeline.GetAsync(new RecordRef(kind.ContentEntity, contentId), cancellationToken);

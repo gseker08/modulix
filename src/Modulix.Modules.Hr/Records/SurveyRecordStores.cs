@@ -138,12 +138,12 @@ internal sealed class SurveyRecordStore(HrStoreContext context) : HrRecordStore<
         {
             if (!await Context.Data.Set<SurveyQuestion>().AsNoTracking().AnyAsync(q => q.SurveyId == entity.Id, cancellationToken))
             {
-                throw new RecordConflictException("Sorusu olmayan anket yanıta açılmaz.");
+                throw new RecordConflictException(HrMessages.Survey.NoQuestions);
             }
 
             if (entity.ClosesOn is { } closes && closes < SurveyAudience.Today)
             {
-                throw new RecordConflictException("Kapanış günü geçmiş; önce kapanış gününü değiştirin.");
+                throw new RecordConflictException(HrMessages.Survey.ClosingDatePassed);
             }
 
             entity.OpenedAt ??= DateTimeOffset.UtcNow;
@@ -156,7 +156,7 @@ internal sealed class SurveyRecordStore(HrStoreContext context) : HrRecordStore<
     {
         if (await Context.Data.Set<SurveyResponse>().AsNoTracking().AnyAsync(r => r.SurveyId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Yanıtı olan anket silinmez; kapatın.");
+            throw new RecordConflictException(HrMessages.Survey.HasResponses);
         }
 
         Context.Data.Set<SurveyQuestion>().RemoveRange(
@@ -179,7 +179,7 @@ internal sealed class SurveyQuestionRecordStore(HrStoreContext context) : HrReco
 
     protected override IReadOnlyList<RecordField<SurveyQuestion>> Fields { get; } =
     [
-        Field.Reference<SurveyQuestion, Survey>("surveyId", "Anket bulunamadı.", q => q.SurveyId, (q, v) => q.SurveyId = v!.Value, required: true, createOnly: true),
+        Field.Reference<SurveyQuestion, Survey>("surveyId", HrMessages.NotFound.Survey, q => q.SurveyId, (q, v) => q.SurveyId = v!.Value, required: true, createOnly: true),
         Field.Integer<SurveyQuestion>("sequence", q => q.Sequence, (q, v) => q.Sequence = v ?? 0, 1, 10_000),
         Field.Text<SurveyQuestion>("text", SurveyQuestion.TextMaxLength, q => q.Text, (q, v) => q.Text = v!, required: true),
         Field.Choice<SurveyQuestion>("questionType", SurveyQuestion.Types.All, q => q.QuestionType, (q, v) => q.QuestionType = v),
@@ -218,7 +218,7 @@ internal sealed class SurveyQuestionRecordStore(HrStoreContext context) : HrReco
                 || options.Any(o => o.Length > SurveyQuestion.OptionMaxLength))
             {
                 throw new RecordValidationException([new RecordFieldError("options",
-                    $"Seçim sorusuna satır başına bir tane olmak üzere 2–{SurveyQuestion.MaxOptions} farklı seçenek yazın (her biri en çok {SurveyQuestion.OptionMaxLength} karakter).")]);
+                    HrMessages.Survey.OptionsInvalid(SurveyQuestion.MaxOptions, SurveyQuestion.OptionMaxLength))]);
             }
 
             entity.Options = string.Join('\n', options);
@@ -243,7 +243,7 @@ internal sealed class SurveyQuestionRecordStore(HrStoreContext context) : HrReco
         var status = await Context.Data.Set<Survey>().AsNoTracking().Where(s => s.Id == surveyId).Select(s => s.Status).SingleAsync(cancellationToken);
         if (status != Survey.Statuses.Draft)
         {
-            throw new RecordConflictException("Yanıta açılmış anketin soruları değiştirilmez.");
+            throw new RecordConflictException(HrMessages.Survey.QuestionsLocked);
         }
     }
 }
@@ -268,7 +268,7 @@ internal sealed class SurveyResponseRecordStore(HrStoreContext context) : HrReco
 
     protected override IReadOnlyList<RecordField<SurveyResponse>> Fields => fields ??=
     [
-        Field.Reference<SurveyResponse, Survey>("surveyId", "Anket bulunamadı.", r => r.SurveyId, (r, v) => r.SurveyId = v!.Value, required: true, createOnly: true),
+        Field.Reference<SurveyResponse, Survey>("surveyId", HrMessages.NotFound.Survey, r => r.SurveyId, (r, v) => r.SurveyId = v!.Value, required: true, createOnly: true),
         Field.Computed<SurveyResponse>("respondentUserId", r => anonymous.Contains(r.SurveyId) ? null : r.RespondentUserId.ToString()),
         Field.Computed<SurveyResponse>("submittedAt", r => r.SubmittedAt.ToString("O")),
     ];
@@ -292,7 +292,7 @@ internal sealed class SurveyResponseRecordStore(HrStoreContext context) : HrReco
 
     protected override Task AppliedAsync(SurveyResponse entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
-        entity.RespondentUserId = Context.CurrentUserId ?? throw new RecordConflictException("Aktif kullanıcı yok.");
+        entity.RespondentUserId = Context.CurrentUserId ?? throw new RecordConflictException(HrMessages.Content.NoActiveUser);
         entity.SubmittedAt = DateTimeOffset.UtcNow;
         return Task.CompletedTask;
     }
@@ -320,10 +320,10 @@ internal sealed class SurveyAnswerRecordStore(HrStoreContext context) : HrRecord
 
     protected override IReadOnlyList<RecordField<SurveyAnswer>> Fields { get; } =
     [
-        Field.Reference<SurveyAnswer, SurveyResponse>("responseId", "Yanıt bulunamadı.", a => a.ResponseId, (a, v) => a.ResponseId = v, createOnly: true),
-        Field.Reference<SurveyAnswer, Survey>("surveyId", "Anket bulunamadı.", a => a.SurveyId, (a, v) => a.SurveyId = v ?? Guid.Empty, createOnly: true),
+        Field.Reference<SurveyAnswer, SurveyResponse>("responseId", HrMessages.NotFound.Response, a => a.ResponseId, (a, v) => a.ResponseId = v, createOnly: true),
+        Field.Reference<SurveyAnswer, Survey>("surveyId", HrMessages.NotFound.Survey, a => a.SurveyId, (a, v) => a.SurveyId = v ?? Guid.Empty, createOnly: true),
         Field.Id<SurveyAnswer>("ballotId", a => a.BallotId, (a, v) => a.BallotId = v ?? Guid.Empty),
-        Field.Reference<SurveyAnswer, SurveyQuestion>("questionId", "Soru bulunamadı.", a => a.QuestionId, (a, v) => a.QuestionId = v!.Value, required: true, createOnly: true),
+        Field.Reference<SurveyAnswer, SurveyQuestion>("questionId", HrMessages.NotFound.Question, a => a.QuestionId, (a, v) => a.QuestionId = v!.Value, required: true, createOnly: true),
         Field.Integer<SurveyAnswer>("rating", a => a.Rating, (a, v) => a.Rating = v, 1, 5, createOnly: true),
         Field.Text<SurveyAnswer>("choice", SurveyQuestion.OptionMaxLength, a => a.Choice, (a, v) => a.Choice = v, createOnly: true),
         Field.Text<SurveyAnswer>("text", SurveyAnswer.TextMaxLength, a => a.TextValue, (a, v) => a.TextValue = v, createOnly: true),
@@ -365,7 +365,7 @@ internal sealed class SurveyAnswerRecordStore(HrStoreContext context) : HrRecord
                 .SingleAsync(cancellationToken);
             if (survey.IsAnonymous)
             {
-                throw new RecordValidationException([new RecordFieldError("responseId", "Kimliği gizli anketin cevabı katılıma bağlanmaz.")]);
+                throw new RecordValidationException([new RecordFieldError("responseId", HrMessages.Survey.AnonymousNoLink)]);
             }
 
             entity.SurveyId = survey.Id;
@@ -377,7 +377,7 @@ internal sealed class SurveyAnswerRecordStore(HrStoreContext context) : HrRecord
             .Select(s => new { s.IsAnonymous, s.OpenedAt }).SingleOrDefaultAsync(cancellationToken);
         if (anonymous is not { IsAnonymous: true } || entity.BallotId == Guid.Empty)
         {
-            throw new RecordValidationException([new RecordFieldError("responseId", "Kimliği açık anketin cevabı katılıma bağlanır.")]);
+            throw new RecordValidationException([new RecordFieldError("responseId", HrMessages.Survey.OpenNeedsLink)]);
         }
 
         entity.Anonymize(anonymous.OpenedAt ?? DateTimeOffset.UtcNow);
@@ -437,8 +437,8 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
         return RecordResult<IReadOnlyList<LeaveActionState>>.Ok(
         [
             new LeaveActionState(Actions.Open, status == Survey.Statuses.Closed ? "Yeniden aç" : "Yanıta aç", status != Survey.Statuses.Open,
-                status == Survey.Statuses.Open ? "Anket zaten yanıta açık." : null, RequiresReason: false, Destructive: false),
-            new LeaveActionState(Actions.Close, "Kapat", status == Survey.Statuses.Open, status == Survey.Statuses.Open ? null : "Yalnızca yanıta açık anket kapatılır.",
+                status == Survey.Statuses.Open ? HrMessages.Survey.AlreadyOpen.Text : null, RequiresReason: false, Destructive: false),
+            new LeaveActionState(Actions.Close, "Kapat", status == Survey.Statuses.Open, status == Survey.Statuses.Open ? null : HrMessages.Survey.OnlyOpenClose.Text,
                 RequiresReason: false, Destructive: true),
         ]);
     }
@@ -464,14 +464,14 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
 
         if (!await context.Access.HasPermissionAsync(HrModule.Permissions.SurveysManage, cancellationToken))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, "Bu eylem için yetkiniz yok.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, HrMessages.Workflow.NotAllowed);
         }
 
         var status = record.Value!.Values["status"]?.GetValue<string>();
         if ((to == Survey.Statuses.Open && status == Survey.Statuses.Open) || (to == Survey.Statuses.Closed && status != Survey.Statuses.Open))
         {
             return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict,
-                to == Survey.Statuses.Open ? "Anket zaten yanıta açık." : "Yalnızca yanıta açık anket kapatılır.");
+                to == Survey.Statuses.Open ? HrMessages.Survey.AlreadyOpen : HrMessages.Survey.OnlyOpenClose);
         }
 
         using (context.Gate.Open(HrModule.Permissions.SurveysManage, to, reason: null))
@@ -484,7 +484,7 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
     {
         if (!await context.Access.HasPermissionAsync(HrModule.Permissions.SurveysRespond, cancellationToken))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, "Anket yanıtlama yetkiniz yok.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, HrMessages.Survey.RespondNotAllowed);
         }
 
         var survey = await pipeline.GetAsync(new RecordRef(HrModule.Entities.Survey, surveyId), cancellationToken);
@@ -497,12 +497,12 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
         var reader = await HrAudience.ReaderAsync(context, cancellationToken);
         if (!await SurveyAudience.Available(context, context.Data.Set<Survey>().AsNoTracking(), reader).AnyAsync(s => s.Id == surveyId, cancellationToken))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Bu anket şu an size yönelik yanıta açık değil.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, HrMessages.Survey.NotOpenForYou);
         }
 
         if (survey.Value!.Values["respondedByMe"]?.GetValue<bool>() == true)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Bu anketi daha önce yanıtladınız.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, HrMessages.Survey.AlreadyAnswered);
         }
 
         var anonymous = survey.Value.Values["isAnonymous"]?.GetValue<bool>() == true;
@@ -510,7 +510,7 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
         var (clean, errors) = Validate(questions, answers);
         if (errors.Count > 0)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Yanıtta hatalar var.", errors);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Survey.ResponseErrors, errors);
         }
 
         return await pipeline.RunAtomicAsync(async ct =>
@@ -565,14 +565,14 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
 
         if (!await context.Access.HasPermissionAsync(HrModule.Permissions.SurveysManage, cancellationToken))
         {
-            return RecordResult<SurveyResults>.Fail(RecordErrorCode.PermissionDenied, "Anket sonuçlarını görme yetkiniz yok.");
+            return RecordResult<SurveyResults>.Fail(RecordErrorCode.PermissionDenied, HrMessages.Survey.ResultsNotAllowed);
         }
 
         var responseCount = await context.Data.Set<SurveyResponse>().AsNoTracking().CountAsync(r => r.SurveyId == surveyId, cancellationToken);
         if (survey.Value!.Values["isAnonymous"]?.GetValue<bool>() == true && responseCount < Survey.MinAnonymousResponses)
         {
             return RecordResult<SurveyResults>.Ok(new SurveyResults(surveyId, responseCount,
-                $"Kimliği gizli ankette sonuçlar en az {Survey.MinAnonymousResponses} yanıttan sonra gösterilir.", []));
+                HrMessages.Survey.AnonymousMinimum(Survey.MinAnonymousResponses).Text, []));
         }
 
         var questions = await context.Data.Set<SurveyQuestion>().AsNoTracking().Where(q => q.SurveyId == surveyId)
@@ -607,13 +607,13 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
         {
             if (!byId.TryGetValue(group.Key, out var question))
             {
-                errors.Add(new RecordFieldError($"answers.{group.Key}", "Bu ankette böyle bir soru yok."));
+                errors.Add(new RecordFieldError($"answers.{group.Key}", HrMessages.Survey.UnknownQuestion));
                 continue;
             }
 
             if (group.Count() > 1)
             {
-                errors.Add(new RecordFieldError($"answers.{group.Key}", "Soru bir kez cevaplanır."));
+                errors.Add(new RecordFieldError($"answers.{group.Key}", HrMessages.Survey.AnswerOnce));
                 continue;
             }
 
@@ -623,14 +623,14 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
             SurveyAnswerInput? value = question.QuestionType switch
             {
                 SurveyQuestion.Types.Rating when answer.Rating is null => null,
-                SurveyQuestion.Types.Rating when answer.Rating is < 1 or > 5 => Fail("Puan 1 ile 5 arasında olmalıdır."),
+                SurveyQuestion.Types.Rating when answer.Rating is < 1 or > 5 => Fail(HrMessages.Survey.RatingRange),
                 SurveyQuestion.Types.Rating => new SurveyAnswerInput(question.Id, answer.Rating, null, null),
                 SurveyQuestion.Types.Choice when choice is null => null,
-                SurveyQuestion.Types.Choice when !question.OptionList().Contains(choice) => Fail("Seçeneklerden birini seçin."),
+                SurveyQuestion.Types.Choice when !question.OptionList().Contains(choice) => Fail(HrMessages.Survey.ChooseOne),
                 SurveyQuestion.Types.Choice => new SurveyAnswerInput(question.Id, null, choice, null),
                 SurveyQuestion.Types.MultiChoice => MultiChoice(question, answer, choice),
                 _ when text is null => null,
-                _ when text.Length > SurveyAnswer.TextMaxLength => Fail($"En çok {SurveyAnswer.TextMaxLength} karakter yazın."),
+                _ when text.Length > SurveyAnswer.TextMaxLength => Fail(HrMessages.Survey.TextMax(SurveyAnswer.TextMaxLength)),
                 _ => new SurveyAnswerInput(question.Id, null, null, text),
             };
             if (value is not null && value.QuestionId != Guid.Empty)
@@ -649,15 +649,15 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
 
                 if (chosen.Distinct(StringComparer.Ordinal).Count() != chosen.Count)
                 {
-                    return Fail("Bir seçenek bir kez seçilir.");
+                    return Fail(HrMessages.Survey.ChoiceOnce);
                 }
 
                 return chosen.All(question.OptionList().Contains)
                     ? new SurveyAnswerInput(question.Id, null, null, null, chosen)
-                    : Fail("Seçeneklerden seçin.");
+                    : Fail(HrMessages.Survey.ChooseFrom);
             }
 
-            SurveyAnswerInput Fail(string message)
+            SurveyAnswerInput Fail(ServerMessage message)
             {
                 errors.Add(new RecordFieldError($"answers.{question.Id}", message));
                 return new SurveyAnswerInput(Guid.Empty, null, null, null);

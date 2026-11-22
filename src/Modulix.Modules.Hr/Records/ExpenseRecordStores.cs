@@ -202,10 +202,10 @@ internal sealed partial class ExpenseClaimRecordStore(HrStoreContext context) : 
 /// <summary>Masraf kayıtlarında düzenleme yetkisi: beyanın sahibi ya da "masraf yönetimi" izni.</summary>
 internal static class ExpenseAccess
 {
-    public static async Task<string?> CannotEditAsync(HrStoreContext context, Guid? owner, CancellationToken cancellationToken) =>
+    public static async Task<ServerMessage?> CannotEditAsync(HrStoreContext context, Guid? owner, CancellationToken cancellationToken) =>
         owner is not null && owner == context.CurrentUserId || await context.Access.HasPermissionAsync(HrModule.Permissions.ExpensesManage, cancellationToken)
             ? null
-            : "Yalnızca kendi masraf beyanınızı düzenleyebilirsiniz.";
+            : HrMessages.Expense.NotOwnerEdit;
 
     /// <summary>
     /// Fiş ve fatura (dosya) kuralı satırın kuralıyla aynıdır (ADR-0042 bölüm 25): yalnızca taslak beyanda ve beyanın sahibi ya da İK. Gönderilmiş,
@@ -216,8 +216,8 @@ internal static class ExpenseAccess
         var claim = await context.Data.Set<ExpenseClaim>().AsNoTracking().Where(c => c.Id == claimId)
             .Select(c => new { c.Status, c.OwnerId }).SingleOrDefaultAsync(cancellationToken);
         return claim is null ? null
-            : claim.Status != ExpenseClaim.Statuses.Draft ? "Fiş ve fatura yalnızca taslak beyanda eklenir ya da silinir."
-            : await CannotEditAsync(context, claim.OwnerId, cancellationToken);
+            : claim.Status != ExpenseClaim.Statuses.Draft ? HrMessages.Expense.FilesDraftOnly.Text
+            : (await CannotEditAsync(context, claim.OwnerId, cancellationToken))?.Text;
     }
 }
 

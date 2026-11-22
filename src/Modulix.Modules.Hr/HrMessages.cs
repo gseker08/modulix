@@ -51,6 +51,30 @@ internal static class HrMessages
 
         public static ServerMessage Asset =>
             ServerMessage.Of("hr.server.notfound.asset", "Demirbaş bulunamadı.");
+
+        public static ServerMessage Announcement =>
+            ServerMessage.Of("hr.server.notfound.announcement", "Duyuru bulunamadı.");
+
+        public static ServerMessage Survey =>
+            ServerMessage.Of("hr.server.notfound.survey", "Anket bulunamadı.");
+
+        public static ServerMessage Question =>
+            ServerMessage.Of("hr.server.notfound.question", "Soru bulunamadı.");
+
+        public static ServerMessage Response =>
+            ServerMessage.Of("hr.server.notfound.response", "Yanıt bulunamadı.");
+
+        public static ServerMessage Template =>
+            ServerMessage.Of("hr.server.notfound.template", "Şablon bulunamadı.");
+
+        public static ServerMessage Checklist =>
+            ServerMessage.Of("hr.server.notfound.checklist", "Süreç bulunamadı.");
+
+        public static ServerMessage Content =>
+            ServerMessage.Of("hr.server.notfound.content", "İçerik bulunamadı.");
+
+        public static ServerMessage Comment =>
+            ServerMessage.Of("hr.server.notfound.comment", "Yorum bulunamadı.");
     }
 
     /// <summary>Çalışan kartı kayıtları.</summary>
@@ -335,6 +359,12 @@ internal static class HrMessages
 
         public static ServerMessage CancelOnlyDraftOrPending =>
             ServerMessage.Of("hr.server.expense.cancel-only-draft-or-pending", "Yalnızca taslak ya da onay bekleyen beyan iptal edilir.");
+
+        public static ServerMessage NotOwnerEdit =>
+            ServerMessage.Of("hr.server.expense.not-owner-edit", "Yalnızca kendi masraf beyanınızı düzenleyebilirsiniz.");
+
+        public static ServerMessage FilesDraftOnly =>
+            ServerMessage.Of("hr.server.expense.files-draft-only", "Fiş ve fatura yalnızca taslak beyanda eklenir ya da silinir.");
     }
 
 
@@ -385,5 +415,183 @@ internal static class HrMessages
 
         public static ServerMessage AlreadyClosed =>
             ServerMessage.Of("hr.server.asset.already-closed", "Zimmet zaten kapanmış.");
+    }
+
+    /// <summary>İşe giriş/çıkış süreci ve şablonları.</summary>
+    public static class Checklist
+    {
+        public static ServerMessage StartNotAllowed =>
+            ServerMessage.Of("hr.server.checklist.start-not-allowed", "Süreç başlatma yetkiniz yok.");
+
+        public static ServerMessage CancelledLocked =>
+            ServerMessage.Of("hr.server.checklist.cancelled-locked", "İptal edilmiş sürecin görevi değişmez.");
+
+        public static ServerMessage TaskAlreadyClosed =>
+            ServerMessage.Of("hr.server.checklist.task-already-closed", "Görev zaten kapanmış.");
+
+        public static ServerMessage TaskAlreadyOpen =>
+            ServerMessage.Of("hr.server.checklist.task-already-open", "Görev zaten açık.");
+
+        public static ServerMessage OpenAssets(int count) =>
+            ServerMessage.Of("hr.server.checklist.open-assets", "Çalışanın {0} açık zimmeti var; önce demirbaşları iade alın.", count);
+
+        public static ServerMessage OnlyOpenCancel =>
+            ServerMessage.Of("hr.server.checklist.only-open-cancel", "Yalnızca açık süreç iptal edilir.");
+
+        public static ServerMessage TemplateNameTaken =>
+            ServerMessage.Of("hr.server.checklist.template-name-taken", "Bu adla aynı türde başka bir şablon var.");
+
+        public static ServerMessage TemplateInUse =>
+            ServerMessage.Of("hr.server.checklist.template-in-use", "Bu şablonla süreç başlatılmış; şablon silinmez, pasife alın.");
+
+        public static ServerMessage AssetReturnOffboardingOnly =>
+            ServerMessage.Of("hr.server.checklist.asset-return-offboarding-only", "\"Zimmet iadesi\" görevi yalnızca işten çıkış şablonunda olur.");
+
+        public static ServerMessage NoDelete =>
+            ServerMessage.Of("hr.server.checklist.no-delete", "Süreçler silinmez; süreci iptal edin.");
+
+        public static ServerMessage TaskNoDelete =>
+            ServerMessage.Of("hr.server.checklist.task-no-delete", "Görevler silinmez; atlayın.");
+
+        public static ServerMessage TemplateInactive =>
+            ServerMessage.Of("hr.server.checklist.template-inactive", "Pasif şablonla süreç başlatılamaz.");
+
+        public static ServerMessage TemplateEmpty =>
+            ServerMessage.Of("hr.server.checklist.template-empty", "Şablonun hiç adımı yok.");
+
+        public static ServerMessage EmployeeTerminated =>
+            ServerMessage.Of("hr.server.checklist.employee-terminated", "Ayrılmış çalışana işe giriş süreci başlatılamaz.");
+
+        public static ServerMessage OpenOnboarding =>
+            ServerMessage.Of("hr.server.checklist.open-onboarding", "Bu çalışanın açık bir işe giriş süreci var.");
+
+        public static ServerMessage OpenOffboarding =>
+            ServerMessage.Of("hr.server.checklist.open-offboarding", "Bu çalışanın açık bir işten çıkış süreci var.");
+    }
+
+    /// <summary>Duyuru, blog ve içerik etkileşimleri (yorum, beğeni).</summary>
+    public static class Content
+    {
+        public static ServerMessage InvalidExpiry =>
+            ServerMessage.Of("hr.server.content.invalid-expiry", "Bitiş günü başlangıç gününden önce olamaz.");
+
+        public static ServerMessage NoActiveUser =>
+            ServerMessage.Of("hr.server.content.no-active-user", "Aktif kullanıcı yok.");
+
+        public static ServerMessage AlreadyLiked =>
+            ServerMessage.Of("hr.server.content.already-liked", "Bu içeriği zaten beğendiniz.");
+
+        public static ServerMessage LikeRemoveViaAction =>
+            ServerMessage.Of("hr.server.content.like-remove-via-action", "Beğeni, beğen eylemiyle kaldırılır.");
+
+        public static ServerMessage ModerateAction =>
+            ServerMessage.Of("hr.server.content.moderate-action", "Eylem hide, show ya da delete olmalıdır.");
+
+        public static ServerMessage DeleteOwnOnly =>
+            ServerMessage.Of("hr.server.content.delete-own-only", "Yalnızca kendi yorumunuzu silebilirsiniz.");
+
+        public static ServerMessage HideNeedsManage =>
+            ServerMessage.Of("hr.server.content.hide-needs-manage", "Yorumu gizlemek için içeriği yönetme yetkisi gerekir.");
+    }
+
+    /// <summary>Blog yazıları ve onay akışı.</summary>
+    public static class Blog
+    {
+        public static ServerMessage Locked =>
+            ServerMessage.Of("hr.server.blog.locked", "Onay bekleyen ya da yayındaki yazı değiştirilemez; yazı geri çevrilirse düzeltilir.");
+
+        public static ServerMessage OwnFilesOnly =>
+            ServerMessage.Of("hr.server.blog.own-files-only", "Yalnızca kendi yazınızın eklerini değiştirebilirsiniz.");
+
+        public static ServerMessage PublishNotAllowed =>
+            ServerMessage.Of("hr.server.blog.publish-not-allowed", "Yazıyı yayınlama yetkiniz yok; yazıyı onaya gönderin.");
+
+        public static ServerMessage OwnPostOnly =>
+            ServerMessage.Of("hr.server.blog.own-post-only", "Yalnızca kendi yazınızı değiştirebilir ve silebilirsiniz.");
+
+        public static ServerMessage SubmitOwnOnly =>
+            ServerMessage.Of("hr.server.blog.submit-own-only", "Yalnızca kendi yazınızı onaya gönderebilirsiniz.");
+
+        public static ServerMessage SubmitState =>
+            ServerMessage.Of("hr.server.blog.submit-state", "Yalnızca taslak ya da geri çevrilen yazı onaya gönderilir.");
+
+        public static ServerMessage DecideState =>
+            ServerMessage.Of("hr.server.blog.decide-state", "Yalnızca onay bekleyen yazı için karar verilir.");
+
+        public static ServerMessage ReturnReasonRequired =>
+            ServerMessage.Of("hr.server.blog.return-reason-required", "Geri çevirme gerekçesi zorunludur.");
+
+        public static ServerMessage ReviewNoteMax(int max) =>
+            ServerMessage.Of("hr.server.blog.review-note-max", "Gerekçe en çok {0} karakter olabilir.", max);
+    }
+
+    /// <summary>Anketler, sorular ve yanıtlar.</summary>
+    public static class Survey
+    {
+        public static ServerMessage NoQuestions =>
+            ServerMessage.Of("hr.server.survey.no-questions", "Sorusu olmayan anket yanıta açılmaz.");
+
+        public static ServerMessage ClosingDatePassed =>
+            ServerMessage.Of("hr.server.survey.closing-date-passed", "Kapanış günü geçmiş; önce kapanış gününü değiştirin.");
+
+        public static ServerMessage HasResponses =>
+            ServerMessage.Of("hr.server.survey.has-responses", "Yanıtı olan anket silinmez; kapatın.");
+
+        public static ServerMessage QuestionsLocked =>
+            ServerMessage.Of("hr.server.survey.questions-locked", "Yanıta açılmış anketin soruları değiştirilmez.");
+
+        public static ServerMessage OptionsInvalid(int max, int length) =>
+            ServerMessage.Of("hr.server.survey.options-invalid", "Seçim sorusuna satır başına bir tane olmak üzere 2–{0} farklı seçenek yazın (her biri en çok {1} karakter).", max, length);
+
+        public static ServerMessage AnonymousNoLink =>
+            ServerMessage.Of("hr.server.survey.anonymous-no-link", "Kimliği gizli anketin cevabı katılıma bağlanmaz.");
+
+        public static ServerMessage OpenNeedsLink =>
+            ServerMessage.Of("hr.server.survey.open-needs-link", "Kimliği açık anketin cevabı katılıma bağlanır.");
+
+        public static ServerMessage AlreadyOpen =>
+            ServerMessage.Of("hr.server.survey.already-open", "Anket zaten yanıta açık.");
+
+        public static ServerMessage OnlyOpenClose =>
+            ServerMessage.Of("hr.server.survey.only-open-close", "Yalnızca yanıta açık anket kapatılır.");
+
+        public static ServerMessage RespondNotAllowed =>
+            ServerMessage.Of("hr.server.survey.respond-not-allowed", "Anket yanıtlama yetkiniz yok.");
+
+        public static ServerMessage ResultsNotAllowed =>
+            ServerMessage.Of("hr.server.survey.results-not-allowed", "Anket sonuçlarını görme yetkiniz yok.");
+
+        public static ServerMessage NotOpenForYou =>
+            ServerMessage.Of("hr.server.survey.not-open-for-you", "Bu anket şu an size yönelik yanıta açık değil.");
+
+        public static ServerMessage AlreadyAnswered =>
+            ServerMessage.Of("hr.server.survey.already-answered", "Bu anketi daha önce yanıtladınız.");
+
+        public static ServerMessage ResponseErrors =>
+            ServerMessage.Of("hr.server.survey.response-errors", "Yanıtta hatalar var.");
+
+        public static ServerMessage AnonymousMinimum(int min) =>
+            ServerMessage.Of("hr.server.survey.anonymous-minimum", "Kimliği gizli ankette sonuçlar en az {0} yanıttan sonra gösterilir.", min);
+
+        public static ServerMessage UnknownQuestion =>
+            ServerMessage.Of("hr.server.survey.unknown-question", "Bu ankette böyle bir soru yok.");
+
+        public static ServerMessage AnswerOnce =>
+            ServerMessage.Of("hr.server.survey.answer-once", "Soru bir kez cevaplanır.");
+
+        public static ServerMessage RatingRange =>
+            ServerMessage.Of("hr.server.survey.rating-range", "Puan 1 ile 5 arasında olmalıdır.");
+
+        public static ServerMessage ChooseOne =>
+            ServerMessage.Of("hr.server.survey.choose-one", "Seçeneklerden birini seçin.");
+
+        public static ServerMessage TextMax(int max) =>
+            ServerMessage.Of("hr.server.survey.text-max", "En çok {0} karakter yazın.", max);
+
+        public static ServerMessage ChoiceOnce =>
+            ServerMessage.Of("hr.server.survey.choice-once", "Bir seçenek bir kez seçilir.");
+
+        public static ServerMessage ChooseFrom =>
+            ServerMessage.Of("hr.server.survey.choose-from", "Seçeneklerden seçin.");
     }
 }
