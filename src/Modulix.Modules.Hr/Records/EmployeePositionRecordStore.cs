@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -16,9 +17,9 @@ internal sealed class EmployeePositionRecordStore(HrStoreContext context) : HrRe
 
     protected override string WritePermission => HrModule.Permissions.EmployeesWrite;
 
-    protected override string? CreateBlockedMessage => "Görev geçmişi çalışan kartı güncellenince yazılır.";
+    protected override ServerMessage? CreateBlockedMessage => HrMessages.Position.CreateBlocked;
 
-    protected override string? ImmutableMessage => "Görev geçmişi değiştirilmez; çalışan kartını güncelleyin.";
+    protected override ServerMessage? ImmutableMessage => HrMessages.Position.Immutable;
 
     private Dictionary<Guid, string> unitNames = [];
 
@@ -85,12 +86,12 @@ internal static class EmployeePositions
             if (day <= latest.StartDate)
             {
                 throw new RecordValidationException([new RecordFieldError("positionEffectiveDate",
-                    $"Geçerlilik günü önceki görevin başlangıcından ({latest.StartDate:dd.MM.yyyy}) sonra olmalıdır.")]);
+                    HrMessages.Position.EffectiveAfterStart($"{latest.StartDate:dd.MM.yyyy}"))]);
             }
 
             if (entity.TerminationDate is { } left && day > left)
             {
-                throw new RecordValidationException([new RecordFieldError("positionEffectiveDate", "Geçerlilik günü ayrılış tarihinden sonra olamaz.")]);
+                throw new RecordValidationException([new RecordFieldError("positionEffectiveDate", HrMessages.Position.EffectiveBeforeTermination)]);
             }
 
             Close(latest, day.AddDays(-1));

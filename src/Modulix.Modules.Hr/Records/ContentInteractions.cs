@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -92,9 +93,9 @@ internal abstract class ContentCommentRecordStore<TContent>(HrStoreContext conte
 
     protected override string WritePermission => kind.ManagePermission;
 
-    protected override string? CreateBlockedMessage => Context.Gate.IsOpen ? null : "Yorum, yorum yazma eylemiyle eklenir.";
+    protected override ServerMessage? CreateBlockedMessage => Context.Gate.IsOpen ? null : HrMessages.Blocked.CommentCreate;
 
-    protected override string? UpdateBlockedMessage => Context.Gate.IsOpen ? null : "Yorumun metni değiştirilmez; içeriği yöneten gizleyebilir.";
+    protected override ServerMessage? UpdateBlockedMessage => Context.Gate.IsOpen ? null : HrMessages.Blocked.CommentUpdate;
 
     protected override IReadOnlyList<RecordField<ContentComment>> Fields => fields ??=
     [
@@ -164,9 +165,9 @@ internal abstract class ContentLikeRecordStore<TContent>(HrStoreContext context,
 
     protected override string WritePermission => kind.ManagePermission;
 
-    protected override string? CreateBlockedMessage => Context.Gate.IsOpen ? null : "Beğeni, beğen eylemiyle eklenir.";
+    protected override ServerMessage? CreateBlockedMessage => Context.Gate.IsOpen ? null : HrMessages.Blocked.LikeCreate;
 
-    protected override string? UpdateBlockedMessage => "Beğeni değiştirilmez.";
+    protected override ServerMessage? UpdateBlockedMessage => HrMessages.Blocked.LikeUpdate;
 
     protected override IReadOnlyList<RecordField<ContentLike>> Fields => fields ??=
     [

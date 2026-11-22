@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Hr.Domain;
@@ -169,8 +170,8 @@ internal sealed class LeaveRequestRecordStore(HrStoreContext context) : HrRecord
         return source.Where(r => (r.OwnerId != null && ids.Contains(r.OwnerId.Value)) || r.ApproverUserId == me);
     }
 
-    protected override string? UpdateBlockedMessage =>
-        Context.Gate.IsOpen ? null : "İzin talebi değiştirilemez; talebi iptal edip yenisini açın.";
+    protected override ServerMessage? UpdateBlockedMessage =>
+        Context.Gate.IsOpen ? null : HrMessages.Blocked.LeaveUpdate;
 
     protected override IReadOnlyList<RecordField<LeaveRequest>> Fields => fields ??=
     [

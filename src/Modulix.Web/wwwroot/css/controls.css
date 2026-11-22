@@ -884,3 +884,134 @@ code {
             flex: none;
         }
 }
+
+/* Kimlik kartı (identity-card): detay sayfasının başında büyük avatar, ad, alt satır ve sağda durum rozetleri. */
+.identity-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mx-space-4);
+    margin-bottom: var(--mx-space-5);
+    padding: var(--mx-space-4) var(--mx-space-5);
+    border: 1px solid var(--mx-border);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface);
+    box-shadow: var(--mx-shadow-card);
+}
+
+    .identity-card .avatar {
+        width: 3.5rem;
+        height: 3.5rem;
+        font-size: var(--mx-fs-card-title);
+    }
+
+    .identity-card h1 {
+        margin: 0;
+        font-size: var(--mx-fs-section-title);
+    }
+
+    .identity-card .header-meta {
+        margin: 0;
+    }
+
+.identity-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.identity-sub {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-2);
+    color: var(--mx-text-secondary);
+}
+
+/* Sol sekmeli düzen (SideTabs): sekmeler solda yapışık, içerik sağda. Dar ekranda sekmeler üste geçer ve yatay kayar. */
+.side-layout {
+    display: grid;
+    grid-template-columns: 14rem minmax(0, 1fr);
+    gap: var(--mx-space-5);
+    align-items: start;
+}
+
+.side-tabs {
+    position: sticky;
+    top: var(--mx-space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--mx-space-1);
+}
+
+.side-tab {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-2);
+    min-height: 2.75rem;
+    padding: 0 var(--mx-space-3);
+    border: 0;
+    border-radius: var(--mx-radius-button);
+    background: transparent;
+    color: var(--mx-text-secondary);
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+}
+
+    .side-tab:hover {
+        background: var(--mx-surface-hover);
+        color: var(--mx-text-primary);
+    }
+
+    .side-tab.active {
+        background: var(--mx-tone-brand-bg);
+        color: var(--mx-tone-brand-fg);
+    }
+
+    .side-tab .app-icon {
+        flex: none;
+    }
+
+    .side-tab .record-tab-count {
+        margin-left: auto;
+    }
+
+    .side-tab.active .record-tab-count {
+        background: var(--mx-gradient-brand);
+        color: var(--mx-text-on-brand);
+        font-weight: 700;
+    }
+
+    .side-tab .record-tab-count.record-tab-invalid,
+    .side-tab.active .record-tab-count.record-tab-invalid {
+        background: var(--mx-tone-danger-bg);
+        color: var(--mx-tone-danger-fg);
+    }
+
+    .side-tab .record-tab-count + .record-tab-count {
+        margin-left: 0;
+    }
+
+.side-content {
+    min-width: 0;
+}
+
+@media (max-width: 991.98px) {
+    .side-layout {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--mx-space-3);
+    }
+
+    .side-tabs {
+        position: static;
+        flex-direction: row;
+        overflow-x: auto;
+    }
+
+    .side-tab {
+        flex: none;
+    }
+
+        .side-tab .record-tab-count {
+            margin-left: 0;
+        }
+}

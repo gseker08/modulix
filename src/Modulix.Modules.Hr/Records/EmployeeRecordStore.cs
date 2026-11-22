@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Core.Contracts.Tenancy;
@@ -45,7 +46,7 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
 
     protected override IReadOnlyList<RecordField<Employee>> Fields => fields ??=
     [
-        Field.PersonRef<Employee>("personId", "Kişi bulunamadı.", e => e.PersonId, (e, v) => e.PersonId = v!.Value, required: true, createOnly: true),
+        Field.PersonRef<Employee>("personId", HrMessages.NotFound.Person, e => e.PersonId, (e, v) => e.PersonId = v!.Value, required: true, createOnly: true),
         Field.Text<Employee>("employeeNumber", Employee.EmployeeNumberMaxLength, e => e.EmployeeNumber, (e, v) => e.EmployeeNumber = v, upperCase: true),
         Field.Member<Employee>("userId", e => e.UserId, (e, v) => e.UserId = v),
         Field.Text<Employee>("jobTitle", Employee.JobTitleMaxLength, e => e.JobTitle, (e, v) => e.JobTitle = v),
@@ -57,7 +58,7 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
         Field.Text<Employee>("businessUnitName", 400,
             e => e.BusinessUnitId is { } unit && units.TryGetValue(unit, out var info) ? info.PathNames : null, (_, v) => requestedUnitName = v),
         Field.Computed<Employee>("businessUnitFromAccount", e => JsonValue.Create(e.UserId is { } user && accountUnits.ContainsKey(user))),
-        Field.Reference<Employee, Employee>("managerEmployeeId", "Yönetici bulunamadı.", e => e.ManagerEmployeeId, (e, v) => e.ManagerEmployeeId = v),
+        Field.Reference<Employee, Employee>("managerEmployeeId", HrMessages.NotFound.Manager, e => e.ManagerEmployeeId, (e, v) => e.ManagerEmployeeId = v),
         Field.Choice<Employee>("employmentType", Employee.EmploymentTypes.All, e => e.EmploymentType, (e, v) => e.EmploymentType = v),
         Field.Text<Employee>("workLocation", Employee.WorkLocationMaxLength, e => e.WorkLocation, (e, v) => e.WorkLocation = v),
         Field.Date<Employee>("hireDate", e => e.HireDate, (e, v) => e.HireDate = v!.Value, required: true),
@@ -167,28 +168,28 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
 
         if (isNew && await employees.AnyAsync(e => e.PersonId == entity.PersonId && e.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("personId", "Bu kişinin zaten bir çalışan kartı var."));
+            errors.Add(new RecordFieldError("personId", HrMessages.Employee.PersonTaken));
         }
 
         if (entity.EmployeeNumber is { } number && await employees.AnyAsync(e => e.EmployeeNumber == number && e.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("employeeNumber", "Bu sicil numarası başka bir çalışanda kayıtlı."));
+            errors.Add(new RecordFieldError("employeeNumber", HrMessages.Employee.NumberTaken));
         }
 
         if (entity.UserId is { } user && await employees.AnyAsync(e => e.UserId == user && e.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("userId", "Bu kullanıcı başka bir çalışan kartına bağlı."));
+            errors.Add(new RecordFieldError("userId", HrMessages.Employee.UserTaken));
         }
 
         if (entity.NationalId is { } nationalId)
         {
             if (!IsValidNationalId(nationalId))
             {
-                errors.Add(new RecordFieldError("nationalId", "T.C. kimlik numarası 11 haneli olmalı ve denetim haneleri tutmalıdır."));
+                errors.Add(new RecordFieldError("nationalId", HrMessages.Employee.NationalIdInvalid));
             }
             else if (await employees.AnyAsync(e => e.NationalId == nationalId && e.Id != entity.Id, cancellationToken))
             {
-                errors.Add(new RecordFieldError("nationalId", "Bu T.C. kimlik numarası başka bir çalışanda kayıtlı."));
+                errors.Add(new RecordFieldError("nationalId", HrMessages.Employee.NationalIdTaken));
             }
         }
 
@@ -197,34 +198,34 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
             entity.Iban = string.Concat(iban.Where(c => !char.IsWhiteSpace(c)));
             if (!IsValidIban(entity.Iban))
             {
-                errors.Add(new RecordFieldError("iban", "IBAN TR ile başlayan 26 karakter olmalı ve denetim haneleri tutmalıdır."));
+                errors.Add(new RecordFieldError("iban", HrMessages.Employee.IbanInvalid));
             }
         }
 
         if (entity.Status == Employee.Statuses.Terminated && entity.TerminationDate is null)
         {
-            errors.Add(new RecordFieldError("terminationDate", "\"Ayrıldı\" durumundaki çalışanda ayrılış tarihi girilmelidir."));
+            errors.Add(new RecordFieldError("terminationDate", HrMessages.Employee.TerminationDateRequired));
         }
 
         if (entity.TerminationDate is { } left && left < entity.HireDate)
         {
-            errors.Add(new RecordFieldError("terminationDate", "Ayrılış tarihi işe giriş tarihinden önce olamaz."));
+            errors.Add(new RecordFieldError("terminationDate", HrMessages.Employee.TerminationBeforeHire));
         }
 
         if (entity.BirthDate is { } born && born >= entity.HireDate)
         {
-            errors.Add(new RecordFieldError("birthDate", "Doğum tarihi işe giriş tarihinden önce olmalıdır."));
+            errors.Add(new RecordFieldError("birthDate", HrMessages.Employee.BirthAfterHire));
         }
 
         if (entity.ManagerEmployeeId is { } manager && (isNew || values.ContainsKey("managerEmployeeId")))
         {
             if (manager == entity.Id)
             {
-                errors.Add(new RecordFieldError("managerEmployeeId", "Çalışan kendi yöneticisi olamaz."));
+                errors.Add(new RecordFieldError("managerEmployeeId", HrMessages.Employee.OwnManager));
             }
             else if (await ReportsToAsync(manager, entity.Id, cancellationToken))
             {
-                errors.Add(new RecordFieldError("managerEmployeeId", "Seçilen yönetici bu çalışanın astı; organizasyon şemasında döngü oluşur."));
+                errors.Add(new RecordFieldError("managerEmployeeId", HrMessages.Employee.ManagerCycle));
             }
         }
 
@@ -258,8 +259,8 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
             if (matches.Count != 1)
             {
                 errors.Add(new RecordFieldError("businessUnitName", matches.Count == 0
-                    ? $"\"{name}\" adlı etkin bir departman yok; departmanı Yönetim › Departmanlar'dan açın."
-                    : $"\"{name}\" birden çok departmana uyuyor; ağaç yoluyla yazın (ör. \"Merkez › Satış\")."));
+                    ? HrMessages.Employee.UnitNameMissing(name)
+                    : HrMessages.Employee.UnitNameAmbiguous(name)));
                 return;
             }
 
@@ -274,7 +275,7 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
             if (sent is { } chosen && chosen != memberUnit)
             {
                 errors.Add(new RecordFieldError("businessUnitId",
-                    "Kullanıcı hesabı bağlı çalışanın departmanı kullanıcının departmanıdır; Yönetim › Kullanıcılar'dan departman değişikliğiyle değiştirilir."));
+                    HrMessages.Employee.UnitLockedByUser));
                 return;
             }
 
@@ -287,12 +288,12 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
             var info = (await Context.BusinessUnits.ListAsync(cancellationToken)).FirstOrDefault(u => u.Id == unit);
             if (info is null)
             {
-                errors.Add(new RecordFieldError("businessUnitId", "Departman bulunamadı."));
+                errors.Add(new RecordFieldError("businessUnitId", HrMessages.Unit.NotFound));
             }
             else if (!info.IsActive && (isNew || await Context.Data.Set<Employee>().AsNoTracking()
                          .Where(e => e.Id == entity.Id).Select(e => e.BusinessUnitId).SingleOrDefaultAsync(cancellationToken) != unit))
             {
-                errors.Add(new RecordFieldError("businessUnitId", "Kapalı departman seçilemez."));
+                errors.Add(new RecordFieldError("businessUnitId", HrMessages.Unit.Closed));
             }
         }
     }
@@ -307,7 +308,7 @@ internal sealed partial class EmployeeRecordStore(HrStoreContext context) : HrRe
     }
 
     protected override Task BeforeDeleteAsync(Employee entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Çalışan kartları silinmez; ayrılan çalışanın durumunu \"Ayrıldı\" yapın ve ayrılış tarihini girin.");
+        throw new RecordConflictException(HrMessages.Employee.NoDelete);
 
     /// <summary>T.C. kimlik numarası: 11 hane, ilk hane 0 değil; 10. hane = ((tek sıradakiler × 7) − çift sıradakiler) mod 10, 11. hane = ilk 10'un toplamı mod 10.</summary>
     internal static bool IsValidNationalId(string value)

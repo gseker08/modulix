@@ -3,6 +3,9 @@ using System.Text.RegularExpressions;
 
 namespace Modulix.Core.Settings;
 
+/// <summary>Vurgu renginin kontrol sonucu: geçerlilik, en düşük kontrast oranı (varsa) ve hata metni (geçmiyorsa).</summary>
+public sealed record AccentCheck(bool Valid, double? Contrast, string? Message);
+
 /// <summary>
 /// Firmanın vurgu rengi kuralları (E8; <c>docs/design-system/theme-tokens.md</c> "Firmanın değiştirebileceği tokenlar").
 /// Renk <c>#RRGGBB</c> olmalı ve açık/koyu temanın yüzeyleriyle ve marka üstü metinle en az 4.5:1 (WCAG AA) vermelidir.
@@ -22,24 +25,30 @@ public static partial class AccentColor
     private const string DarkOnBrand = "#07111F";
 
     /// <summary>Renk geçerliyse <c>null</c>, değilse kullanıcıya gösterilecek hata. Boş değer "firma rengi yok" demektir.</summary>
-    public static string? Validate(string value, bool dark)
+    public static string? Validate(string value, bool dark) => Check(value, dark).Message;
+
+    /// <summary>
+    /// Rengin sonucu: geçerli mi, hesaplanabildiyse en düşük kontrast (biçim hatalıysa ve boş değerde <c>null</c>) ve geçmiyorsa
+    /// hata metni. Kaydetme doğrulaması (<see cref="Validate"/>) ve ayarlar ekranındaki anlık önizleme aynı hesabı kullanır.
+    /// </summary>
+    public static AccentCheck Check(string value, bool dark)
     {
         if (value.Length == 0)
         {
-            return null;
+            return new AccentCheck(true, null, null);
         }
 
         if (!HexPattern().IsMatch(value))
         {
-            return "Renk #RRGGBB biçiminde olmalıdır (ör. #087DB8).";
+            return new AccentCheck(false, null, "Renk #RRGGBB biçiminde olmalıdır (ör. #087DB8).");
         }
 
         var luminance = Luminance(value);
         var against = (dark ? DarkSurfaces : LightSurfaces).Append(dark ? DarkOnBrand : LightOnBrand);
         var worst = against.Min(other => Contrast(luminance, Luminance(other)));
         return worst >= MinContrast
-            ? null
-            : $"Bu renk {(dark ? "koyu" : "açık")} temada yeterince okunmuyor (kontrast {worst:0.0}:1, en az {MinContrast:0.0}:1 gerekir).";
+            ? new AccentCheck(true, worst, null)
+            : new AccentCheck(false, worst, $"Bu renk {(dark ? "koyu" : "açık")} temada yeterince okunmuyor (kontrast {worst:0.0}:1, en az {MinContrast:0.0}:1 gerekir).");
     }
 
     /// <summary>WCAG göreli parlaklığı (0–1). <paramref name="hex"/> <c>#RRGGBB</c> olmalıdır.</summary>

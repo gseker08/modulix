@@ -58,4 +58,26 @@ public class AccentColorTests
         Assert.Null(AccentColor.Validate("#3BAEE6", dark: true));
         Assert.True(AccentColor.Contrast("#087DB8", "#FFFFFF") >= AccentColor.MinContrast);
     }
+
+    [Fact]
+    public void Check_reports_contrast_for_valid_formats_and_none_for_empty_or_malformed()
+    {
+        var ok = AccentColor.Check("#087DB8", dark: false);
+        Assert.True(ok.Valid);
+        Assert.InRange(ok.Contrast!.Value, 4.5, 4.6);
+        Assert.Null(ok.Message);
+
+        var low = AccentColor.Check("#7DD3FC", dark: false);
+        Assert.False(low.Valid);
+        Assert.True(low.Contrast < AccentColor.MinContrast);
+        Assert.Contains("açık", low.Message);
+
+        Assert.Equal(new AccentCheck(true, null, null), AccentColor.Check("", dark: true));
+        var bad = AccentColor.Check("red", dark: true);
+        Assert.False(bad.Valid);
+        Assert.Null(bad.Contrast);
+
+        // Kaydetme doğrulaması önizlemeyle aynı sonucu verir.
+        Assert.Equal(low.Message, AccentColor.Validate("#7DD3FC", dark: false));
+    }
 }

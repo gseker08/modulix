@@ -27,23 +27,36 @@
     }
     else
     {
-        <div class="page-header">
-            <div>
+        @* Kimlik kartı + sol sekmeli düzen (docs/design-system/component-catalog.md → SideTabs): bölümler sekmelere ayrılır,
+           sekmeler arasında girilen veri kaybolmaz (paneller DOM'da kalır). *@
+        <div class="identity-card">
+            <OwnerCell Name="@user.DisplayName" AvatarOnly="true" />
+            <div class="identity-main">
                 <h1>@user.DisplayName</h1>
-                <div class="header-meta">
-                    <UserStatusBadge User="user" />
-                    @if (user.IsAdministrator)
-                    {
-                        <span class="badge tag">@Texts.Get("admin.userDetail.administrator")</span>
-                    }
-                    @if (user.IsCurrentUser)
-                    {
-                        <span class="badge tag">@Texts.Get("admin.userDetail.you")</span>
-                    }
-                </div>
+                <span class="identity-sub"><AppIcon Name="landmark" Size="16" /> @(currentUnit?.PathNames ?? user.BusinessUnitName ?? "—")</span>
+            </div>
+            <div class="header-meta">
+                <UserStatusBadge User="user" />
+                @if (user.IsAdministrator)
+                {
+                    <span class="badge tag">@Texts.Get("admin.userDetail.administrator")</span>
+                }
+                @if (user.IsCurrentUser)
+                {
+                    <span class="badge tag">@Texts.Get("admin.userDetail.you")</span>
+                }
             </div>
         </div>
 
+        @if (Locked)
+        {
+            <div class="alert alert-info">@Texts.Get("admin.userDetail.locked")</div>
+        }
+
+        <div class="side-layout">
+            <SideTabs Tabs="Sections" State="tabs" Label="@Texts.Get("admin.userDetail.sections")" />
+            <div class="side-content">
+        <TabPanel State="tabs" Key="genel">
         <dl class="detail-grid">
             <div><dt>@Texts.Get("common.field.email")</dt><dd>@user.Email</dd></div>
             <div><dt>@Texts.Get("admin.unit")</dt><dd>@(currentUnit?.PathNames ?? user.BusinessUnitName ?? "—")</dd></div>
@@ -54,11 +67,6 @@
                 <div><dt>@Texts.Get("admin.userDetail.lastInvite")</dt><dd>@CrmLabels.Time(invitedAt)</dd></div>
             }
         </dl>
-
-        @if (Locked)
-        {
-            <div class="alert alert-info">@Texts.Get("admin.userDetail.locked")</div>
-        }
 
         @* Departman (ADR-0026): kullanıcı tam bir departmandadır. Departman değişince kullanıcının sorumlu olduğu kayıtlar da yeni departmanla görünür. *@
         <section class="detail-section">
@@ -154,6 +162,38 @@
             }
         </section>
 
+        <section class="detail-section">
+            <div class="section-header"><h2>@Texts.Get("admin.userDetail.account")</h2></div>
+
+            @if (confirming is { } pending)
+            {
+                <div class="alert alert-warning confirm" role="alertdialog">
+                    <p>@pending.Question</p>
+                    @if (pending.Handover)
+                    {
+                        <HandoverChoice Owned="owned" Receivers="receivers" Required="pending.Url.EndsWith(TransferPath)" @bind-Selected="receiverId" />
+                    }
+                    <button type="button" class="btn btn-danger" disabled="@(busy || (pending.Url.EndsWith(TransferPath) && receiverId is null))"
+                            @onclick="() => RunAsync(pending)">@pending.Label</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = null">@Texts.Get("common.dismiss")</button>
+                </div>
+            }
+            else
+            {
+                <div class="account-actions">
+                    @foreach (var action in Actions())
+                    {
+                        <div>
+                            <button type="button" class="btn @(action.Danger ? "btn-outline-danger" : "btn-outline-primary")"
+                                    disabled="@(busy || Locked)" @onclick="() => Start(action)">@action.Label</button>
+                            <small class="text-muted">@action.Hint</small>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+        </TabPanel>
+        <TabPanel State="tabs" Key="roller">
         @* Atamalar (roller, ekipler, şirketler) sayfada özet olarak durur; düzenleme atama penceresinde (PickDialog) yapılır. *@
         <section class="detail-section">
             <div class="section-header">
@@ -176,7 +216,8 @@
                 </div>
             }
         </section>
-
+        </TabPanel>
+        <TabPanel State="tabs" Key="ekipler">
         <section class="detail-section">
             <div class="section-header">
                 <h2>@Texts.Get("nav.app.admin.teams")</h2>
@@ -223,10 +264,11 @@
                 }
             }
         </section>
-
+        </TabPanel>
         @* İşletici şirket erişimi (ADR-0008). Yönetici zaten bütün şirketlere erişir; bu, yönetici olmayan kullanıcılar içindir. *@
         @if (Session.Can(CoreAccess.ManageCompanies))
         {
+        <TabPanel State="tabs" Key="sirketler">
             <section class="detail-section">
                 <div class="section-header">
                     <h2>@Texts.Get("nav.app.admin.companies")</h2>
@@ -263,7 +305,13 @@
                     }
                 }
             </section>
+        </TabPanel>
         }
+        <TabPanel State="tabs" Key="erisim">
+        <UserAccessPanel MembershipId="MembershipId" Disabled="user.Status == UserStatus.Disabled" Version="accessVersion" />
+        </TabPanel>
+            </div>
+        </div>
 
         <PickDialog TKey="Guid" Open="@(dialog == RolesDialog)" Title="@Texts.Get("admin.userDetail.assignRoles")" Subtitle="@user.DisplayName"
                     SearchPlaceholder="@Texts.Get("admin.userDetail.searchRoles")" Items="RoleItems" Selected="user.Roles.Select(r => r.Id)"
@@ -303,38 +351,6 @@
             </SelectedContent>
         </PickDialog>
 
-        <UserAccessPanel MembershipId="MembershipId" Disabled="user.Status == UserStatus.Disabled" Version="accessVersion" />
-
-        <section class="detail-section">
-            <div class="section-header"><h2>@Texts.Get("admin.userDetail.account")</h2></div>
-
-            @if (confirming is { } pending)
-            {
-                <div class="alert alert-warning confirm" role="alertdialog">
-                    <p>@pending.Question</p>
-                    @if (pending.Handover)
-                    {
-                        <HandoverChoice Owned="owned" Receivers="receivers" Required="pending.Url.EndsWith(TransferPath)" @bind-Selected="receiverId" />
-                    }
-                    <button type="button" class="btn btn-danger" disabled="@(busy || (pending.Url.EndsWith(TransferPath) && receiverId is null))"
-                            @onclick="() => RunAsync(pending)">@pending.Label</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = null">@Texts.Get("common.dismiss")</button>
-                </div>
-            }
-            else
-            {
-                <div class="account-actions">
-                    @foreach (var action in Actions())
-                    {
-                        <div>
-                            <button type="button" class="btn @(action.Danger ? "btn-outline-danger" : "btn-outline-primary")"
-                                    disabled="@(busy || Locked)" @onclick="() => Start(action)">@action.Label</button>
-                            <small class="text-muted">@action.Hint</small>
-                        </div>
-                    }
-                </div>
-            }
-        </section>
     }
 </AuthGate>
 
@@ -361,6 +377,30 @@
         public Guid? BranchId { get; set; }
     }
     private const string TransferPath = "/transfer-records";
+
+    private readonly TabState tabs = new("genel");
+
+    /// <summary>Sol sekmeler; şirket sekmesi yalnızca şirket yönetimi izni olana görünür (yetkisiz sekme listeye eklenmez).</summary>
+    private IReadOnlyList<SideTabItem> Sections
+    {
+        get
+        {
+            List<SideTabItem> items =
+            [
+                new("genel", Texts.Get("admin.userDetail.tab.general"), "user"),
+                new("roller", Texts.Get("nav.app.admin.roles"), "layers", user?.Roles.Count),
+                new("ekipler", Texts.Get("nav.app.admin.teams"), "users", savedTeams.Count),
+            ];
+            if (Session.Can(CoreAccess.ManageCompanies))
+            {
+                items.Add(new("sirketler", Texts.Get("nav.app.admin.companies"), "building",
+                    user?.IsAdministrator == true ? null : assignments.Values.Count(a => a.Selected)));
+            }
+
+            items.Add(new("erisim", Texts.Get("admin.userDetail.tab.access"), "shield"));
+            return items;
+        }
+    }
 
     // Açık atama penceresi (yoksa null) ve kayıt hatası; hata pencerenin içinde gösterilir, pencere açık kalır.
     private const string RolesDialog = "roles";
