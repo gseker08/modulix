@@ -76,7 +76,16 @@
                     <p class="text-muted">@Texts.Get("admin.roleDetail.ownPermissionsOnly")</p>
                 }
 
-                <PermissionMatrix Permissions="permissions" Selected="selected" CanGrant="CanGrant" />
+                @* İzinler atama penceresinde (PickDialog, modüle göre gruplu) seçilir; matris seçimin salt okunur özetidir.
+                   Pencere seçimi forma uygular, rol "Kaydet" ile yazılır. *@
+                <div class="section-header">
+                    <strong>@Texts.Get("pick.selectedCount", selected.Count - HiddenCount)</strong>
+                    <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="() => pickingPermissions = true">
+                        <AppIcon Name="plus" Size="16" /> @Texts.Get("admin.roleDetail.assignPermissions")
+                    </button>
+                </div>
+                <p class="text-muted small">@Texts.Get("admin.roleDetail.permissionsApplyHint")</p>
+                <PermissionMatrix Permissions="permissions" Selected="selected" ReadOnly="true" />
                 <FieldError Field="permissions" Errors="errors" />
 
                 @if (skippedFromTemplate > 0)
@@ -206,6 +215,11 @@
                 </div>
             </form>
 
+            <PickDialog TKey="string" Open="pickingPermissions" Title="@Texts.Get("admin.roleDetail.assignPermissions")" Subtitle="@name"
+                        SearchPlaceholder="@Texts.Get("admin.roleDetail.searchPermissions")" Icon="key" GroupLabel="@Texts.Get("admin.roleDetail.module")"
+                        Items="PermissionItems" Selected="selected" Linked="LinkedPermissions" SaveLabel="@Texts.Get("pick.apply")"
+                        OnSave="ApplyPermissions" OnClose="() => pickingPermissions = false" />
+
             @if (role is not null)
             {
                 <RoleMembers RoleId="role.Id" />
@@ -305,6 +319,41 @@
         new("form-kapsam", Texts.Get("admin.roleDetail.tab.scope"), Errors: ErrorCount("scope", "scopeOverrides", "assignLevel", "hideOutOfScopeShared")),
     ];
 
+    private bool pickingPermissions;
+
+    private const string ReadSuffix = ".read";
+    private const string WriteSuffix = ".write";
+
+    /// <summary>Pencere satırları: modüle göre gruplu (yönetim izinleri en sonda); kişinin veremeyeceği izin kilitlidir, asıl denetim sunucudadır.</summary>
+    private IReadOnlyList<PickItem<string>> PermissionItems =>
+        permissions
+            .OrderBy(p => p.ModuleKey == CoreAccess.ModuleKey)
+            .Select(p => new PickItem<string>(
+                p.Key,
+                p.DisplayName,
+                CanGrant(p.Key) ? null : Texts.Get("admin.permissions.locked"),
+                p.ModuleKey == CoreAccess.ModuleKey ? Texts.Get("nav.app.admin") : p.ModuleName,
+                Locked: !CanGrant(p.Key)))
+            .ToList();
+
+    /// <summary>Düzenleme görüntülemeyi gerektirir: düzenleme seçilince görüntüleme de seçilir, görüntüleme kalkınca düzenleme de kalkar.</summary>
+    private static IEnumerable<string> LinkedPermissions(string key, bool on)
+    {
+        if (on && key.EndsWith(WriteSuffix, StringComparison.Ordinal))
+        {
+            return [key[..^WriteSuffix.Length] + ReadSuffix];
+        }
+
+        return !on && key.EndsWith(ReadSuffix, StringComparison.Ordinal) ? [key[..^ReadSuffix.Length] + WriteSuffix] : [];
+    }
+
+    // Formda görünmeyen (modülü kapalı) izinler pencerenin sonucunda korunur.
+    private void ApplyPermissions(IReadOnlyList<string> keys)
+    {
+        selected = keys.ToHashSet();
+        pickingPermissions = false;
+    }
+
     private bool IsNew => RoleId is null;
 
     private RoleTemplateDto? Template => templates.FirstOrDefault(t => t.Key == templateKey);
@@ -326,6 +375,7 @@
 
         loaded = false;
         deleting = false;
+        pickingPermissions = false;
         moveTo = null;
         errors = null;
         tabs.Select("form-genel");

@@ -53,8 +53,17 @@
             </div>
         </form>
 
+        @* Üyeler sayfada özet olarak durur; ekleme/çıkarma atama penceresinde (PickDialog) yapılır. *@
         <section class="detail-section">
-            <div class="section-header"><h2>@Texts.Get("admin.roles.col.members")</h2></div>
+            <div class="section-header">
+                <h2>@Texts.Get("admin.roles.col.members")</h2>
+                @if (members is { Count: > 0 })
+                {
+                    <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="OpenMembers">
+                        <AppIcon Name="plus" Size="16" /> @Texts.Get("admin.teamDetail.assignMembers")
+                    </button>
+                }
+            </div>
             @if (members is null)
             {
                 <LoadingState />
@@ -63,24 +72,26 @@
             {
                 <EmptyState Compact="true" Title="@Texts.Get("admin.teamDetail.noUsers")" />
             }
+            else if (team.Members.Count == 0)
+            {
+                <EmptyState Compact="true" Title="@Texts.Get("admin.teamDetail.noMembers")" />
+            }
             else
             {
-                <p class="text-muted small">@Texts.Get("admin.teamDetail.selected", selected.Count)</p>
-                <div class="role-picker">
-                    @foreach (var member in members)
+                <p class="text-muted small">@Texts.Get("admin.teamDetail.selected", team.Members.Count)</p>
+                <div class="assigned-tags">
+                    @foreach (var member in team.Members.OrderBy(m => m.DisplayName))
                     {
-                        <label class="form-check">
-                            <input class="form-check-input" type="checkbox" checked="@selected.Contains(member.MembershipId)"
-                                   @onchange="e => Toggle(member.MembershipId, e.Value is true)" />
-                            <span class="form-check-label">@member.DisplayName <small class="text-muted">· @member.Email</small></span>
-                        </label>
+                        <span class="badge tag">@member.DisplayName · @member.Email</span>
                     }
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveMembersAsync">@Texts.Get("admin.teamDetail.saveMembers")</button>
                 </div>
             }
         </section>
+
+        <PickDialog TKey="Guid" Open="pickingMembers" Title="@Texts.Get("admin.teamDetail.assignMembers")" Subtitle="@team.Name"
+                    SearchPlaceholder="@Texts.Get("admin.teamDetail.searchMembers")" Icon="user" Items="MemberItems"
+                    Selected="team.Members.Select(m => m.MembershipId)"
+                    Busy="busy" Error="@dialogError" OnSave="SaveMembersAsync" OnClose="CloseMembers" />
 
         <section class="detail-section">
             <div class="section-header"><h2>@Texts.Get("admin.teamDetail.delete")</h2></div>
@@ -110,7 +121,8 @@
 
     private TeamDetailDto? team;
     private List<UserDto>? members;
-    private HashSet<Guid> selected = [];
+    private bool pickingMembers;
+    private string? dialogError;
     private string name = string.Empty;
     private string? description;
     private bool busy;
@@ -134,9 +146,10 @@
             Show(loaded);
 
             // Davet bekleyenler de eklenebilir; devre dışı olanlar gösterilmez (ekipteyse yine işaretli kalır).
+            var current = loaded.Members.Select(m => m.MembershipId).ToHashSet();
             var users = await Api.GetAsync<UserPageResponse>("/api/users?pageSize=100");
             members = users.Value?.Items
-                .Where(u => u.Status != UserStatus.Disabled || selected.Contains(u.MembershipId))
+                .Where(u => u.Status != UserStatus.Disabled || current.Contains(u.MembershipId))
                 .OrderBy(u => u.DisplayName)
                 .ToList() ?? [];
         }
@@ -147,20 +160,14 @@
         team = loaded;
         name = loaded.Name;
         description = loaded.Description;
-        selected = loaded.Members.Select(m => m.MembershipId).ToHashSet();
     }
 
-    private void Toggle(Guid membershipId, bool on)
-    {
-        if (on)
-        {
-            selected.Add(membershipId);
-        }
-        else
-        {
-            selected.Remove(membershipId);
-        }
-    }
+    private IReadOnlyList<PickItem<Guid>> MemberItems =>
+        members?.Select(u => new PickItem<Guid>(u.MembershipId, u.DisplayName, u.Email)).ToList() ?? [];
+
+    private void OpenMembers() => (pickingMembers, dialogError, notice) = (true, null, null);
+
+    private void CloseMembers() => (pickingMembers, dialogError) = (false, null);
 
     private async Task SaveAsync()
     {
@@ -179,20 +186,22 @@
         message = result.FieldErrors.Count > 0 ? null : result.Error;
     }
 
-    private async Task SaveMembersAsync()
+    private async Task SaveMembersAsync(IReadOnlyList<Guid> membershipIds)
     {
         busy = true;
         notice = null;
-        var result = await Api.PutAsync<TeamDetailDto>($"/api/teams/{TeamId}/members", new SetTeamMembersRequest(selected.ToList()));
+        var result = await Api.PutAsync<TeamDetailDto>($"/api/teams/{TeamId}/members", new SetTeamMembersRequest(membershipIds));
         busy = false;
         if (result.Value is { } saved)
         {
             Show(saved);
+            CloseMembers();
             (notice, message) = (Texts.Get("admin.teamDetail.membersSaved", saved.Members.Count), null);
             return;
         }
 
-        message = result.Error;
+        // Hata pencerenin içinde gösterilir; pencere açık kalır.
+        dialogError = result.Error;
     }
 
     private async Task DeleteAsync()

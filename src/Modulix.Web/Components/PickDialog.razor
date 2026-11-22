@@ -1,0 +1,189 @@
+@* Atama penceresi (docs/design-system/component-catalog.md → PickDialog): tek liste, işaret kutulu; seçilenler üstte etiket
+   olarak durur. Seçim pencerenin çalışma kopyasında tutulur, "Kaydet" ile sayfaya verilir; "İptal" hiçbir şeyi değiştirmez.
+   Satırlar gruplanabilir (izinler modüle göre) ve seçili satır ek alan taşıyabilir (şirket görevinin bitiş tarihi, şubesi). *@
+@typeparam TKey where TKey : notnull
+
+<Modal Open="Open" Title="@Title" Subtitle="@Subtitle" OnClose="OnClose" Class="@(Wide ? "pick-dialog wide" : "pick-dialog")">
+    <ChildContent>
+        @if (selection is { } current)
+        {
+            @if (Error is not null)
+            {
+                <div class="alert alert-danger" role="alert">@Error</div>
+            }
+
+            <div class="pick-summary">
+                <strong>@Texts.Get("pick.selectedCount", current.Count)</strong>
+                <button type="button" class="chip @(onlySelected ? "active" : null)" aria-pressed="@(onlySelected ? "true" : "false")"
+                        @onclick="() => onlySelected = !onlySelected">@Texts.Get("pick.onlySelected")</button>
+            </div>
+
+            @if (!Grouped && current.Count > 0)
+            {
+                <div class="pick-chips">
+                    @foreach (var item in current.SelectedItems)
+                    {
+                        <button type="button" class="badge tag pick-chip" disabled="@item.Locked"
+                                aria-label="@Texts.Get("pick.remove", item.Name)" @onclick="() => current.Toggle(item.Key, false)">
+                            @item.Name
+                            @if (!item.Locked)
+                            {
+                                <AppIcon Name="x" Size="12" />
+                            }
+                        </button>
+                    }
+                </div>
+            }
+
+            <div class="pick-filters">
+                <input class="form-control" type="search" aria-label="@SearchPlaceholder" placeholder="@SearchPlaceholder"
+                       @bind="search" @bind:event="oninput" />
+                @if (Groups.Count > 1)
+                {
+                    <select class="form-select" aria-label="@GroupLabel" @bind="group">
+                        <option value="">@GroupLabel: @Texts.Get("support.all")</option>
+                        @foreach (var name in Groups)
+                        {
+                            <option value="@name">@name</option>
+                        }
+                    </select>
+                }
+            </div>
+
+            var visible = current.Visible(search, group, onlySelected);
+            @if (visible.Count == 0)
+            {
+                <EmptyState Compact="true" Title="@Texts.Get("pick.noMatch")" />
+            }
+            else if (Grouped)
+            {
+                @foreach (var bucket in visible.GroupBy(i => i.Group ?? string.Empty))
+                {
+                    var open = bucket.Where(i => !i.Locked).ToList();
+                    <section class="pick-group" aria-label="@bucket.Key">
+                        <header>
+                            <h3>@bucket.Key <span class="badge tag">@bucket.Count(i => current.IsSelected(i.Key)) / @bucket.Count()</span></h3>
+                            @if (open.Count > 0)
+                            {
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" checked="@open.All(i => current.IsSelected(i.Key))"
+                                           @onchange="e => current.SetAll(open, e.Value is true)" />
+                                    <span class="form-check-label">@Texts.Get("support.all")</span>
+                                </label>
+                            }
+                        </header>
+                        <div class="pick-list">
+                            @foreach (var item in bucket)
+                            {
+                                @Row(current, item)
+                            }
+                        </div>
+                    </section>
+                }
+            }
+            else
+            {
+                <div class="pick-list">
+                    @foreach (var item in visible)
+                    {
+                        @Row(current, item)
+                    }
+                </div>
+            }
+        }
+    </ChildContent>
+    <Footer>
+        <button type="button" class="btn btn-outline-secondary" disabled="@Busy" @onclick="OnClose">@Texts.Get("common.cancel")</button>
+        <button type="button" class="btn btn-primary" disabled="@Busy" aria-busy="@(Busy ? "true" : "false")" @onclick="SaveAsync">
+            <AppIcon Name="check" Size="16" /> @(SaveLabel ?? Texts.Get("common.save"))
+        </button>
+    </Footer>
+</Modal>
+
+@code {
+    private PickSelection<TKey>? selection;
+    private string? search;
+    private string group = string.Empty;
+    private bool onlySelected;
+    private bool wasOpen;
+
+    [Parameter] public bool Open { get; set; }
+
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    /// <summary>Üzerinde çalışılan kaydın adı (kullanıcı, ekip, rol); başlığın yanında görünür.</summary>
+    [Parameter] public string? Subtitle { get; set; }
+
+    [Parameter, EditorRequired] public string SearchPlaceholder { get; set; } = "";
+
+    [Parameter, EditorRequired] public IReadOnlyList<PickItem<TKey>> Items { get; set; } = [];
+
+    /// <summary>Pencere açılırken seçili olanlar; pencere bunu değiştirmez.</summary>
+    [Parameter, EditorRequired] public IEnumerable<TKey> Selected { get; set; } = [];
+
+    /// <summary>Satır ikonu (<c>AppIcon</c> adı).</summary>
+    [Parameter] public string Icon { get; set; } = "layers";
+
+    /// <summary>Grup süzgecinin adı (ör. "Modül"); yalnızca gruplu listede kullanılır.</summary>
+    [Parameter] public string? GroupLabel { get; set; }
+
+    /// <summary>Bir satır değişince aynı duruma getirilecek diğer satırlar (bkz. <see cref="PickSelection{TKey}"/>).</summary>
+    [Parameter] public Func<TKey, bool, IEnumerable<TKey>>? Linked { get; set; }
+
+    /// <summary>Seçili satırın ek alanları (ör. bitiş tarihi); değerleri sayfa tutar.</summary>
+    [Parameter] public RenderFragment<TKey>? SelectedContent { get; set; }
+
+    /// <summary>Birincil düğmenin metni; verilmezse "Kaydet". Seçim formun parçasıysa (form ayrıca kaydediliyorsa) "Uygula" verilir.</summary>
+    [Parameter] public string? SaveLabel { get; set; }
+
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Kayıt hatası; pencere açık kalır ve hata içinde gösterilir.</summary>
+    [Parameter] public string? Error { get; set; }
+
+    [Parameter] public EventCallback<IReadOnlyList<TKey>> OnSave { get; set; }
+
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private bool Grouped => Items.Any(i => !string.IsNullOrEmpty(i.Group));
+
+    private bool Wide => Grouped || SelectedContent is not null;
+
+    private IReadOnlyList<string> Groups => Items.Select(i => i.Group).OfType<string>().Where(g => g.Length > 0).Distinct().ToList();
+
+    protected override void OnParametersSet()
+    {
+        if (Open && !wasOpen)
+        {
+            selection = new PickSelection<TKey>(Items, Selected, Linked);
+            (search, group, onlySelected) = (null, string.Empty, false);
+        }
+
+        wasOpen = Open;
+    }
+
+    private Task SaveAsync() => selection is { } current ? OnSave.InvokeAsync(current.Result) : Task.CompletedTask;
+
+    private RenderFragment Row(PickSelection<TKey> current, PickItem<TKey> item) => __builder =>
+    {
+        var on = current.IsSelected(item.Key);
+        <div class="pick-item @(on ? "selected" : null)">
+            <label class="form-check">
+                <input class="form-check-input" type="checkbox" checked="@on" disabled="@item.Locked"
+                       @onchange="e => current.Toggle(item.Key, e.Value is true)" />
+                <AppIcon Name="@Icon" Size="18" />
+                <span class="form-check-label">
+                    @item.Name
+                    @if (!string.IsNullOrEmpty(item.Note))
+                    {
+                        <small class="text-muted"> · @item.Note</small>
+                    }
+                </span>
+            </label>
+            @if (on && SelectedContent is not null)
+            {
+                <div class="pick-item-extra">@SelectedContent(item.Key)</div>
+            }
+        </div>
+    };
+}
