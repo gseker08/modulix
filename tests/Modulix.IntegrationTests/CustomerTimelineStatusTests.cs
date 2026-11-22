@@ -26,8 +26,8 @@ public class CustomerTimelineStatusTests(ModulixApiFactory factory) : IClassFixt
         var won = await CreateOpportunityAsync(client, company.Id, "Kazanılan fırsat");
         var lost = await CreateOpportunityAsync(client, company.Id, "Kaybedilen fırsat");
         var open = await CreateOpportunityAsync(client, company.Id, "Açık fırsat");
-        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/crm/opportunities/{won.Id}/win", new WinOpportunityRequestDto(won.Version))).StatusCode);
-        var loseResponse = await client.PostAsJsonAsync($"/api/crm/opportunities/{lost.Id}/lose", new LoseOpportunityRequestDto(lost.Version, "Fiyat"));
+        await WinAsync(client, won);
+        var loseResponse = await client.PostAsJsonAsync($"/api/crm/opportunities/{lost.Id}/lose", new LoseOpportunityRequestDto(lost.Version, "Price"));
         Assert.True(loseResponse.StatusCode == HttpStatusCode.OK, await loseResponse.Content.ReadAsStringAsync());
         var quote = await AcceptedQuoteAsync(client, company.Id);
         var lead = await ConvertedLeadAsync(client, company.Id);
@@ -84,7 +84,7 @@ public class CustomerTimelineStatusTests(ModulixApiFactory factory) : IClassFixt
         using var clientB = await LoginAsync(adminB);
         var companyA = await CreateCompanyAsync(clientA, "A Tenant A.Ş.");
         var opp = await CreateOpportunityAsync(clientA, companyA.Id, "A'nın fırsatı");
-        Assert.Equal(HttpStatusCode.OK, (await clientA.PostAsJsonAsync($"/api/crm/opportunities/{opp.Id}/win", new WinOpportunityRequestDto(opp.Version))).StatusCode);
+        await WinAsync(clientA, opp);
         await ConvertedLeadAsync(clientA, companyA.Id);
         var companyB = await CreateCompanyAsync(clientB, "B Tenant A.Ş.");
 
@@ -100,7 +100,7 @@ public class CustomerTimelineStatusTests(ModulixApiFactory factory) : IClassFixt
         using var adminClient = await LoginAsync(admin);
         var company = await CreateCompanyAsync(adminClient, "Yetki A.Ş.");
         var opp = await CreateOpportunityAsync(adminClient, company.Id, "Yöneticinin fırsatı");
-        Assert.Equal(HttpStatusCode.OK, (await adminClient.PostAsJsonAsync($"/api/crm/opportunities/{opp.Id}/win", new WinOpportunityRequestDto(opp.Version))).StatusCode);
+        await WinAsync(adminClient, opp);
         await AcceptedQuoteAsync(adminClient, company.Id);
         await ConvertedLeadAsync(adminClient, company.Id);
 
@@ -119,7 +119,7 @@ public class CustomerTimelineStatusTests(ModulixApiFactory factory) : IClassFixt
         using var ownClient = await LoginAsync(own);
         var ownCompany = await CreateCompanyAsync(ownClient, "Temsilcinin firması");
         var foreign = await CreateOpportunityAsync(adminClient, ownCompany.Id, "Başkasının fırsatı");
-        Assert.Equal(HttpStatusCode.OK, (await adminClient.PostAsJsonAsync($"/api/crm/opportunities/{foreign.Id}/win", new WinOpportunityRequestDto(foreign.Version))).StatusCode);
+        await WinAsync(adminClient, foreign);
         var scoped = (await ownClient.GetFromJsonAsync<CustomerTimelineDto>($"/api/crm/companies/{ownCompany.Id}/timeline?take=50"))!;
         Assert.Contains("crm.opportunities", scoped.Sources);
         Assert.Empty(scoped.Items);
@@ -151,9 +151,15 @@ public class CustomerTimelineStatusTests(ModulixApiFactory factory) : IClassFixt
 
     private static async Task<OpportunityDto> CreateOpportunityAsync(HttpClient client, Guid companyId, string title)
     {
-        var response = await client.PostAsJsonAsync("/api/crm/opportunities", new SaveOpportunityRequest(title, companyId));
+        var response = await client.PostAsJsonAsync("/api/crm/opportunities", new SaveOpportunityRequest(title, companyId, Amount: 1_000m, Currency: "TRY"));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<OpportunityDto>())!;
+    }
+
+    private static async Task WinAsync(HttpClient client, OpportunityDto opportunity)
+    {
+        var response = await client.PostAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}/win", new WinOpportunityRequestDto(opportunity.Version));
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
     }
 
     /// <summary>Satırlı, sunulmuş ve kabul edilmiş teklif.</summary>
@@ -179,7 +185,7 @@ public class CustomerTimelineStatusTests(ModulixApiFactory factory) : IClassFixt
     private static async Task<LeadDto> ConvertedLeadAsync(HttpClient client, Guid companyId)
     {
         var created = await client.PostAsJsonAsync("/api/crm/leads",
-            new SaveLeadRequest($"Talep {Guid.NewGuid():N}"[..16], FirstName: "Mehmet", LastName: "Kaya", CompanyName: "Kapsam Lojistik", Email: "kaya@kapsam.test"));
+            new SaveLeadRequest($"Talep {Guid.NewGuid():N}"[..16], FirstName: "Mehmet", LastName: "Kaya", CompanyName: "Kapsam Lojistik", Email: "kaya@kapsam.test", NeedDescription: "Yıllık bakım ihtiyacı"));
         Assert.True(created.StatusCode == HttpStatusCode.Created, await created.Content.ReadAsStringAsync());
         var lead = (await created.Content.ReadFromJsonAsync<LeadDto>())!;
         var qualified = await client.PostAsJsonAsync($"/api/crm/leads/{lead.Id}/qualify", new QualifyLeadRequest(lead.Version));
