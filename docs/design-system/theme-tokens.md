@@ -91,14 +91,14 @@ Yazı tipi **Manrope** (OFL lisanslı, değişken ağırlık 400–800). Dosyala
 
 ## Firmanın değiştirebileceği tokenlar (E8, 22.11.2026)
 
-Çalışma alanı rengi (CRM epik E8, R4) için firma yöneticisi tasarım sistemini değil, aşağıdaki **kapalı listeyi** değiştirir. Liste dışındaki her token (yüzey, metin, durum, ton, tipografi, boşluk, köşe, gölge, CTA degradesi) bütün firmalarda aynıdır; firma bileşene ya da ekrana özel renk veremez. Firma ayarı yoksa `tokens.css` varsayılanları geçerlidir.
+Çalışma alanı rengi (CRM epik E8, R4) için firma yöneticisi tasarım sistemini değil, aşağıdaki **kapalı listeyi** değiştirir. Liste dışındaki her token (yüzey, metin, durum, ton, tipografi, boşluk, köşe, gölge; CTA degradesi ve ışıması vurgudan türer) bütün firmalarda aynıdır; firma bileşene ya da ekrana özel renk veremez. Firma ayarı yoksa `tokens.css` varsayılanları geçerlidir.
 
 | Firma ayarı | Etkilediği token | Açık / koyu | Kullanım |
 |---|---|---|---|
 | Vurgu rengi (açık tema) | `--mx-brand-primary` | firma değeri | Bağlantı, odak, aktif sekme çizgisi, aktif menü çizgisi, `--bs-primary`, `--bs-link-color` |
 | Vurgu rengi (koyu tema) | `--mx-brand-primary` | firma değeri | Aynı; koyu zeminde açık ton gerekir |
 
-Firmadan yalnızca bu iki değer (açık/koyu, `#RRGGBB`) alınır; Web (`shell.js`) şunları **türetir**, firma ayrıca girmez: `--mx-brand-primary-rgb` (rgb üçlüsü), `--mx-brand-primary-hover` (açık temada %12 koyulaştırılmış, koyu temada %12 açılmış ton) ve odak halkası (`--mx-focus-ring` zaten `-rgb`'den üretilir). `--mx-brand-teal*` ile CTA degradesi (`--mx-gradient-cta*`) ve marka degradesi (`--mx-gradient-brand*`) ilk sürümde sabit kalır; sabit onaltılık değerle yazıldıkları için vurgu rengine bağlanmaları ayrı bir kararla ve önce `tokens.css`'te türetmeye çevrilerek yapılır.
+Firmadan yalnızca bu iki değer (açık/koyu, `#RRGGBB`) alınır; Web (`shell.js`) şunları **türetir**, firma ayrıca girmez: `--mx-brand-primary-rgb` (rgb üçlüsü), `--mx-brand-primary-hover` (açık temada %12 koyulaştırılmış, koyu temada %12 açılmış ton) ve odak halkası (`--mx-focus-ring` zaten `-rgb`'den üretilir). Birincil düğmenin (CTA) degradesi de vurgudan türetilir: `--mx-gradient-cta` vurgudan başlayıp açık temada %20 koyulaşan, koyu temada %20 açılan uca gider; `--mx-gradient-cta-hover` %12 → %30, ışıma `--mx-shadow-cta*` vurgunun rgb'siyle (açık 0.28, koyu 0.18 alfa; hover'da +0.08). Uçlar vurgudan yalnızca beyaz metne (açık) ya da koyu metne (koyu) doğru uzaklaştığı için yukarıdaki kontrast kuralı CTA için de yeterlidir. Firma ayarı yoksa `tokens.css`'teki turkuaz→mavi degrade aynen geçerlidir. `--mx-brand-teal*` ile marka degradesi (`--mx-gradient-brand*`) sabit kalır.
 
 **Kontrast kuralı (sunucuda doğrulanır, geçmeyen renk reddedilir; arayüz yalnızca önizler):**
 
@@ -107,7 +107,7 @@ Firmadan yalnızca bu iki değer (açık/koyu, `#RRGGBB`) alınır; Web (`shell.
 - Kontrast WCAG göreli parlaklığı ile hesaplanır; hesap tek yerde (sunucu) yazılır, Web önizlemesi aynı sonucu API'den alır.
 - Firma yalnızca `#RRGGBB` verebilir (ad, `rgb()`, `var()`, alfa kabul edilmez); değer CSS'e yazılmadan önce bu desenle doğrulanır, bu yüzden CSS enjeksiyonu yoktur.
 
-**Uygulama biçimi:** Ayarlar `core.appearance.accent-light` ve `core.appearance.accent-dark` anahtarlarıyla Yönetim > Ayarlar'da tutulur (migration gerekmez, firma ayarı deposu). Web, oturum yüklenince bunları okur ve `<style id="mx-accent-style">` ile yalnızca yukarıdaki üç tokeni (`--mx-brand-primary`, `-hover`, `-rgb`) açık/koyu temaya göre yazar; bileşen CSS'i değişmez. Ayar yoksa hiçbir şey yazılmaz. Yönetim > Ayarlar'daki renk seçici (`AccentColorField`) rengi `POST /api/settings/accent/preview` ile (sunucudaki aynı kural) kaydetmeden önce denetler ve rengi, seçilen temanın yüzeyini taşıyan (`data-theme`) bir önizleme kutusunda yalnızca `--mx-brand-primary` geçersiz kılınarak gösterir. Marka renginin açık ve koyu temada ekran görüntüsü kontrolü (görsel QA) yeni değer için de yapılır.
+**Uygulama biçimi:** Ayarlar `core.appearance.accent-light` ve `core.appearance.accent-dark` anahtarlarıyla Yönetim > Ayarlar'da tutulur (migration gerekmez, firma ayarı deposu). Web, oturum yüklenince bunları okur ve `<style id="mx-accent-style">` ile yalnızca yukarıdaki tokenleri (`--mx-brand-primary`, `-hover`, `-rgb` ve CTA degrade/ışıma tokenleri) açık/koyu temaya göre yazar; bileşen CSS'i değişmez. Ayar yoksa hiçbir şey yazılmaz. Yönetim > Ayarlar'daki renk seçici (`AccentColorField`) rengi `POST /api/settings/accent/preview` ile (sunucudaki aynı kural) kaydetmeden önce denetler ve rengi, seçilen temanın yüzeyini taşıyan (`data-theme`) bir önizleme kutusunda yalnızca `--mx-brand-primary` geçersiz kılınarak gösterir. Marka renginin açık ve koyu temada ekran görüntüsü kontrolü (görsel QA) yeni değer için de yapılır.
 
 Karar kaydı ve rol bazlı menü düzeni: [ADR-0055](../adr/0055-calisma-alani-rengi-ve-rol-menusu.md). Hover tonu sunucuda ayrıca doğrulanmaz: türetme temel renkten daha okunaklı bir ton verir (ADR'de gerekçe).
 
