@@ -42,6 +42,15 @@ internal static class HrMessages
 
         public static ServerMessage Manager =>
             ServerMessage.Of("hr.server.notfound.manager", "Yönetici bulunamadı.");
+
+        public static ServerMessage Employee =>
+            ServerMessage.Of("hr.server.notfound.employee", "Çalışan bulunamadı.");
+
+        public static ServerMessage ExpenseClaim =>
+            ServerMessage.Of("hr.server.notfound.expense-claim", "Masraf beyanı bulunamadı.");
+
+        public static ServerMessage Asset =>
+            ServerMessage.Of("hr.server.notfound.asset", "Demirbaş bulunamadı.");
     }
 
     /// <summary>Çalışan kartı kayıtları.</summary>
@@ -186,5 +195,195 @@ internal static class HrMessages
 
         public static ServerMessage LeaveUpdate =>
             ServerMessage.Of("hr.server.blocked.leave-update", "İzin talebi değiştirilemez; talebi iptal edip yenisini açın.");
+    }
+
+    /// <summary>Eylem uçları için ortak iletiler.</summary>
+    public static class Workflow
+    {
+        public static ServerMessage UnknownAction =>
+            ServerMessage.Of("hr.server.workflow.unknown-action", "Bilinmeyen eylem.");
+
+        public static ServerMessage NotAllowed =>
+            ServerMessage.Of("hr.server.workflow.not-allowed", "Bu eylem için yetkiniz yok.");
+
+        public static ServerMessage NotNow =>
+            ServerMessage.Of("hr.server.workflow.not-now", "Bu eylem şu an yapılamaz.");
+
+        public static ServerMessage ReasonRequired =>
+            ServerMessage.Of("hr.server.workflow.reason-required", "Gerekçe zorunludur.");
+
+        public static ServerMessage ReasonTooLong =>
+            ServerMessage.Of("hr.server.workflow.reason-too-long", "Gerekçe çok uzun.");
+
+        public static ServerMessage ExplanationRequired =>
+            ServerMessage.Of("hr.server.workflow.explanation-required", "Açıklama zorunludur.");
+
+        public static ServerMessage TextTooLong =>
+            ServerMessage.Of("hr.server.workflow.text-too-long", "Metin çok uzun.");
+    }
+
+
+    /// <summary>İzin hakkı ve talebi.</summary>
+    public static class Leave
+    {
+        public static ServerMessage EntitlementTaken =>
+            ServerMessage.Of("hr.server.leave.entitlement-taken", "Bu çalışanın bu yıl için izin hakkı zaten tanımlı.");
+
+        public static ServerMessage EntitledBelowUsed(string used) =>
+            ServerMessage.Of("hr.server.leave.entitled-below-used", "Hak ve devreden gün toplamı kullanılan günden ({0}) az olamaz.", used);
+
+        public static ServerMessage EntitlementDeleteUsed =>
+            ServerMessage.Of("hr.server.leave.entitlement-delete-used", "İzin kullanılmış hak silinemez; hak gününü düzeltin.");
+
+        public static ServerMessage NoDelete =>
+            ServerMessage.Of("hr.server.leave.no-delete", "İzin talepleri silinmez; talebi iptal edin.");
+
+        public static ServerMessage EmployeeTerminated =>
+            ServerMessage.Of("hr.server.leave.employee-terminated", "Ayrılmış çalışana izin talebi açılamaz.");
+
+        public static ServerMessage OwnOnly =>
+            ServerMessage.Of("hr.server.leave.own-only", "Yalnızca kendiniz için izin talebi açabilirsiniz.");
+
+        public static ServerMessage EndBeforeStart =>
+            ServerMessage.Of("hr.server.leave.end-before-start", "Bitiş tarihi başlangıçtan önce olamaz.");
+
+        public static ServerMessage SingleYear =>
+            ServerMessage.Of("hr.server.leave.single-year", "Talep tek takvim yılı içinde kalmalıdır; yıl sonunu aşan izni iki talebe bölün.");
+
+        public static ServerMessage HalfDaySingle =>
+            ServerMessage.Of("hr.server.leave.half-day-single", "Yarım gün yalnızca tek günlük talepte seçilebilir.");
+
+        public static ServerMessage NoWorkDays =>
+            ServerMessage.Of("hr.server.leave.no-work-days", "Seçilen aralıkta iş günü yok (hafta sonu ya da resmî tatil).");
+
+        public static ServerMessage Overlap =>
+            ServerMessage.Of("hr.server.leave.overlap", "Bu tarihlerde bekleyen ya da onaylanmış başka bir izin talebi var.");
+
+        public static ServerMessage NoEntitlement(int year) =>
+            ServerMessage.Of("hr.server.leave.no-entitlement", "{0} yılı için yıllık izin hakkı tanımlanmamış; önce hakkı girin.", year);
+
+        public static ServerMessage InsufficientBalance(string remaining, string requested) =>
+            ServerMessage.Of("hr.server.leave.insufficient-balance", "Yetersiz izin bakiyesi: kalan {0} gün, istenen {1} gün.", remaining, requested);
+
+        public static ServerMessage PreviewRangeTitle =>
+            ServerMessage.Of("hr.server.leave.preview-range-title", "Tarih aralığı geçersiz.");
+
+        public static ServerMessage PreviewRange =>
+            ServerMessage.Of("hr.server.leave.preview-range", "Bitiş başlangıçtan önce olamaz, talep tek yıl içinde kalır; yarım gün yalnızca tek günlük talepte.");
+
+        public static ServerMessage OwnDecision =>
+            ServerMessage.Of("hr.server.leave.own-decision", "Kendi izin talebinizi onaylayamaz ya da reddedemezsiniz.");
+
+        public static ServerMessage DecideOnlyPending =>
+            ServerMessage.Of("hr.server.leave.decide-only-pending", "Yalnızca onay bekleyen talep onaylanır ya da reddedilir.");
+
+        public static ServerMessage CancelByHrOnly =>
+            ServerMessage.Of("hr.server.leave.cancel-by-hr-only", "Onaylanmış izni yalnızca İK iptal edebilir; İK'ya başvurun.");
+
+        public static ServerMessage CancelNotPossible =>
+            ServerMessage.Of("hr.server.leave.cancel-not-possible", "Reddedilmiş ya da iptal edilmiş talep iptal edilemez.");
+    }
+
+
+    /// <summary>Masraf beyanı ve satırı.</summary>
+    public static class Expense
+    {
+        public static ServerMessage NoDelete =>
+            ServerMessage.Of("hr.server.expense.no-delete", "Masraf beyanları silinmez; beyanı iptal edin.");
+
+        public static ServerMessage CurrencyFormat =>
+            ServerMessage.Of("hr.server.expense.currency-format", "Para birimi üç harfli kod olmalıdır (ör. TRY, EUR).");
+
+        public static ServerMessage EmployeeTerminated =>
+            ServerMessage.Of("hr.server.expense.employee-terminated", "Ayrılmış çalışana masraf beyanı açılamaz.");
+
+        public static ServerMessage OwnOnly =>
+            ServerMessage.Of("hr.server.expense.own-only", "Yalnızca kendiniz için masraf beyanı açabilirsiniz.");
+
+        public static ServerMessage DraftOnlyEdit =>
+            ServerMessage.Of("hr.server.expense.draft-only-edit", "Yalnızca taslak beyan düzenlenebilir; onaylayan beyanı düzeltme için iade edebilir.");
+
+        public static ServerMessage LineCurrencyLocked =>
+            ServerMessage.Of("hr.server.expense.line-currency-locked", "Satırı olan beyanın para birimi değiştirilemez.");
+
+        public static ServerMessage DateFuture =>
+            ServerMessage.Of("hr.server.expense.date-future", "Masraf tarihi ileri bir gün olamaz.");
+
+        public static ServerMessage VatOverGross =>
+            ServerMessage.Of("hr.server.expense.vat-over-gross", "KDV tutarı, KDV dahil tutardan büyük olamaz.");
+
+        public static ServerMessage LinesDraftOnly =>
+            ServerMessage.Of("hr.server.expense.lines-draft-only", "Satırlar yalnızca taslak beyanda eklenir, değiştirilir ya da silinir.");
+
+        public static ServerMessage OwnDecision =>
+            ServerMessage.Of("hr.server.expense.own-decision", "Kendi masraf beyanınıza karar veremezsiniz.");
+
+        public static ServerMessage DecideOnlySubmitted =>
+            ServerMessage.Of("hr.server.expense.decide-only-submitted", "Yalnızca onaya gönderilmiş beyana karar verilir.");
+
+        public static ServerMessage OwnPay =>
+            ServerMessage.Of("hr.server.expense.own-pay", "Kendi beyanınızın ödemesini işaretleyemezsiniz.");
+
+        public static ServerMessage PayOnlyApproved =>
+            ServerMessage.Of("hr.server.expense.pay-only-approved", "Yalnızca onaylanmış beyan ödendi olarak işaretlenir.");
+
+        public static ServerMessage SubmitOnlyDraft =>
+            ServerMessage.Of("hr.server.expense.submit-only-draft", "Yalnızca taslak beyan onaya gönderilir.");
+
+        public static ServerMessage SubmitNeedsLine =>
+            ServerMessage.Of("hr.server.expense.submit-needs-line", "Onaya göndermeden önce en az bir masraf satırı ekleyin.");
+
+        public static ServerMessage CancelOnlyDraftOrPending =>
+            ServerMessage.Of("hr.server.expense.cancel-only-draft-or-pending", "Yalnızca taslak ya da onay bekleyen beyan iptal edilir.");
+    }
+
+
+    /// <summary>Demirbaş ve zimmet.</summary>
+    public static class Asset
+    {
+        public static ServerMessage TagTaken =>
+            ServerMessage.Of("hr.server.asset.tag-taken", "Bu envanter numarası başka bir demirbaşta kayıtlı.");
+
+        public static ServerMessage StatusViaAssignment =>
+            ServerMessage.Of("hr.server.asset.status-via-assignment", "\"Zimmetli\" durumu yalnızca zimmetle gelir; demirbaşı çalışana zimmetleyin.");
+
+        public static ServerMessage StatusAssignedLocked =>
+            ServerMessage.Of("hr.server.asset.status-assigned-locked", "Zimmetteki demirbaşın durumu iade ya da kayıp kaydıyla değişir.");
+
+        public static ServerMessage CurrencyFormat =>
+            ServerMessage.Of("hr.server.asset.currency-format", "Para birimi üç harfli kod olmalıdır (ör. TRY).");
+
+        public static ServerMessage CurrencyWithPrice =>
+            ServerMessage.Of("hr.server.asset.currency-with-price", "Alış tutarıyla birlikte para birimi girilmelidir.");
+
+        public static ServerMessage HasHistory =>
+            ServerMessage.Of("hr.server.asset.has-history", "Zimmet geçmişi olan demirbaş silinmez; durumunu \"Hurda\" yapın.");
+
+        public static ServerMessage AssignmentNoDelete =>
+            ServerMessage.Of("hr.server.asset.assignment-no-delete", "Zimmet kayıtları silinmez; demirbaşı iade alın.");
+
+        public static ServerMessage AlreadyAssigned =>
+            ServerMessage.Of("hr.server.asset.already-assigned", "Demirbaş başka bir çalışana zimmetli; önce iade alın.");
+
+        public static ServerMessage NotInStock =>
+            ServerMessage.Of("hr.server.asset.not-in-stock", "Yalnızca depodaki demirbaş zimmetlenir (bakımda, hurda ya da kayıp değil).");
+
+        public static ServerMessage AssignTerminated =>
+            ServerMessage.Of("hr.server.asset.assign-terminated", "Ayrılmış çalışana zimmet verilmez.");
+
+        public static ServerMessage AssignedFuture =>
+            ServerMessage.Of("hr.server.asset.assigned-future", "Teslim tarihi ileri bir gün olamaz.");
+
+        public static ServerMessage ExpectedBeforeAssigned =>
+            ServerMessage.Of("hr.server.asset.expected-before-assigned", "Beklenen iade tarihi teslimden önce olamaz.");
+
+        public static ServerMessage AckClosed =>
+            ServerMessage.Of("hr.server.asset.ack-closed", "Kapanmış zimmet onaylanmaz.");
+
+        public static ServerMessage AckAlready =>
+            ServerMessage.Of("hr.server.asset.ack-already", "Teslim zaten onaylandı.");
+
+        public static ServerMessage AlreadyClosed =>
+            ServerMessage.Of("hr.server.asset.already-closed", "Zimmet zaten kapanmış.");
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -61,7 +62,7 @@ internal sealed class ExpenseWorkflow(IRecordPipeline pipeline, HrStoreContext c
             var decision = await DecideAsync(record.Value!, d.Action, cancellationToken);
             if (decision.Permission is not null || decision.Denied is not null)
             {
-                actions.Add(new LeaveActionState(d.Action, d.Label, decision.Permission is not null, decision.Denied, d.RequiresReason, d.Destructive));
+                actions.Add(new LeaveActionState(d.Action, d.Label, decision.Permission is not null, decision.Denied?.Text, d.RequiresReason, d.Destructive));
             }
         }
 
@@ -72,7 +73,7 @@ internal sealed class ExpenseWorkflow(IRecordPipeline pipeline, HrStoreContext c
     {
         if (Definitions.FirstOrDefault(d => d.Action == action) is not { Action: not null } definition)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.", [new RecordFieldError("action", "Bilinmeyen eylem.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.UnknownAction, [new RecordFieldError("action", HrMessages.Workflow.UnknownAction)]);
         }
 
         // Önce kayıt okunur: göremeyen için kayıt yoktur (404); yetki denetimi varlığı sızdırmaz.
@@ -86,20 +87,20 @@ internal sealed class ExpenseWorkflow(IRecordPipeline pipeline, HrStoreContext c
         if (decision.Permission is not { } permission)
         {
             return decision.Forbidden
-                ? RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, decision.Denied ?? "Bu eylem için yetkiniz yok.")
-                : RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, decision.Denied ?? "Bu eylem şu an yapılamaz.");
+                ? RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, decision.Denied ?? HrMessages.Workflow.NotAllowed)
+                : RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, decision.Denied ?? HrMessages.Workflow.NotNow);
         }
 
         var trimmed = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         if (definition.RequiresReason && trimmed is null)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", [new RecordFieldError("reason", "Gerekçe zorunludur.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.ReasonRequired, [new RecordFieldError("reason", HrMessages.Workflow.ReasonRequired)]);
         }
 
         if (trimmed is { Length: > ExpenseClaim.ReasonMaxLength })
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Metin çok uzun.",
-                [new RecordFieldError("reason", $"En fazla {ExpenseClaim.ReasonMaxLength} karakter olabilir.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.TextTooLong,
+                [new RecordFieldError("reason", ServerMessages.Validation.MaxLength(ExpenseClaim.ReasonMaxLength))]);
         }
 
         var approver = action == ExpenseActions.Submit ? await ApproverAsync(record.Value!, cancellationToken) : null;
@@ -145,12 +146,12 @@ internal sealed class ExpenseWorkflow(IRecordPipeline pipeline, HrStoreContext c
 
                 if (mine)
                 {
-                    return Decision.Refused("Kendi masraf beyanınıza karar veremezsiniz.", forbidden: true);
+                    return Decision.Refused(HrMessages.Expense.OwnDecision, forbidden: true);
                 }
 
                 return status == ExpenseClaim.Statuses.Submitted
                     ? Decision.Allowed(HrModule.Permissions.ExpensesApprove)
-                    : Decision.Refused("Yalnızca onaya gönderilmiş beyana karar verilir.");
+                    : Decision.Refused(HrMessages.Expense.DecideOnlySubmitted);
 
             case ExpenseActions.Pay:
                 if (!await context.Access.HasPermissionAsync(HrModule.Permissions.ExpensesPay, cancellationToken))
@@ -160,12 +161,12 @@ internal sealed class ExpenseWorkflow(IRecordPipeline pipeline, HrStoreContext c
 
                 if (mine)
                 {
-                    return Decision.Refused("Kendi beyanınızın ödemesini işaretleyemezsiniz.", forbidden: true);
+                    return Decision.Refused(HrMessages.Expense.OwnPay, forbidden: true);
                 }
 
                 return status == ExpenseClaim.Statuses.Approved
                     ? Decision.Allowed(HrModule.Permissions.ExpensesPay)
-                    : Decision.Refused("Yalnızca onaylanmış beyan ödendi olarak işaretlenir.");
+                    : Decision.Refused(HrMessages.Expense.PayOnlyApproved);
 
             default:
                 var ownClaim = mine && await context.Access.HasPermissionAsync(HrModule.Permissions.ExpensesRequest, cancellationToken);
@@ -179,25 +180,25 @@ internal sealed class ExpenseWorkflow(IRecordPipeline pipeline, HrStoreContext c
                 {
                     if (status != ExpenseClaim.Statuses.Draft)
                     {
-                        return Decision.Refused("Yalnızca taslak beyan onaya gönderilir.");
+                        return Decision.Refused(HrMessages.Expense.SubmitOnlyDraft);
                     }
 
                     return claim.Values["lineCount"]?.GetValue<int>() > 0
                         ? Decision.Allowed(permission)
-                        : Decision.Refused("Onaya göndermeden önce en az bir masraf satırı ekleyin.");
+                        : Decision.Refused(HrMessages.Expense.SubmitNeedsLine);
                 }
 
                 return status is ExpenseClaim.Statuses.Draft or ExpenseClaim.Statuses.Submitted
                     ? Decision.Allowed(permission)
-                    : Decision.Refused("Yalnızca taslak ya da onay bekleyen beyan iptal edilir.");
+                    : Decision.Refused(HrMessages.Expense.CancelOnlyDraftOrPending);
         }
     }
 
-    private sealed record Decision(string? Permission, string? Denied, bool Forbidden)
+    private sealed record Decision(string? Permission, ServerMessage? Denied, bool Forbidden)
     {
         public static Decision Allowed(string permission) => new(permission, null, false);
 
-        public static Decision Refused(string message, bool forbidden = false) => new(null, message, forbidden);
+        public static Decision Refused(ServerMessage message, bool forbidden = false) => new(null, message, forbidden);
 
         /// <summary>Kullanıcının bu eylemle hiç ilgisi yok: listede gösterilmez, denenirse 403.</summary>
         public static Decision Hidden() => new(null, null, true);

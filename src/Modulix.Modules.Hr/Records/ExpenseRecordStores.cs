@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Hr.Domain;
@@ -37,7 +38,7 @@ internal sealed partial class ExpenseClaimRecordStore(HrStoreContext context) : 
 
     protected override IReadOnlyList<RecordField<ExpenseClaim>> Fields => fields ??=
     [
-        Field.Reference<ExpenseClaim, Employee>("employeeId", "Çalışan bulunamadı.", c => c.EmployeeId, (c, v) => c.EmployeeId = v!.Value, required: true, createOnly: true),
+        Field.Reference<ExpenseClaim, Employee>("employeeId", HrMessages.NotFound.Employee, c => c.EmployeeId, (c, v) => c.EmployeeId = v!.Value, required: true, createOnly: true),
         Field.Text<ExpenseClaim>("title", ExpenseClaim.TitleMaxLength, c => c.Title, (c, v) => c.Title = v!, required: true),
         Field.Text<ExpenseClaim>("currency", 3, c => c.Currency, (c, v) => c.Currency = v ?? "TRY", upperCase: true),
         Field.Text<ExpenseClaim>("description", ExpenseClaim.TextMaxLength, c => c.Description, (c, v) => c.Description = v),
@@ -107,7 +108,7 @@ internal sealed partial class ExpenseClaimRecordStore(HrStoreContext context) : 
         ExpenseAccess.CannotChangeFilesAsync(Context, entity.Id, cancellationToken);
 
     protected override Task BeforeDeleteAsync(ExpenseClaim entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Masraf beyanları silinmez; beyanı iptal edin.");
+        throw new RecordConflictException(HrMessages.Expense.NoDelete);
 
     protected override async Task AppliedAsync(ExpenseClaim entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
@@ -120,7 +121,7 @@ internal sealed partial class ExpenseClaimRecordStore(HrStoreContext context) : 
         var errors = new List<RecordFieldError>();
         if (!CurrencyPattern().IsMatch(entity.Currency))
         {
-            errors.Add(new RecordFieldError("currency", "Para birimi üç harfli kod olmalıdır (ör. TRY, EUR)."));
+            errors.Add(new RecordFieldError("currency", HrMessages.Expense.CurrencyFormat));
         }
 
         if (isNew)
@@ -128,12 +129,12 @@ internal sealed partial class ExpenseClaimRecordStore(HrStoreContext context) : 
             var employee = await Employees.Where(e => e.Id == entity.EmployeeId).Select(e => new { e.UserId, e.Status }).SingleAsync(cancellationToken);
             if (employee.Status == Employee.Statuses.Terminated)
             {
-                errors.Add(new RecordFieldError("employeeId", "Ayrılmış çalışana masraf beyanı açılamaz."));
+                errors.Add(new RecordFieldError("employeeId", HrMessages.Expense.EmployeeTerminated));
             }
 
             if (employee.UserId != Context.CurrentUserId && !await Context.Access.HasPermissionAsync(HrModule.Permissions.ExpensesManage, cancellationToken))
             {
-                errors.Add(new RecordFieldError("employeeId", "Yalnızca kendiniz için masraf beyanı açabilirsiniz."));
+                errors.Add(new RecordFieldError("employeeId", HrMessages.Expense.OwnOnly));
             }
 
             entity.OwnerId = employee.UserId;
@@ -142,7 +143,7 @@ internal sealed partial class ExpenseClaimRecordStore(HrStoreContext context) : 
         {
             if (entity.Status != ExpenseClaim.Statuses.Draft)
             {
-                throw new RecordConflictException("Yalnızca taslak beyan düzenlenebilir; onaylayan beyanı düzeltme için iade edebilir.");
+                throw new RecordConflictException(HrMessages.Expense.DraftOnlyEdit);
             }
 
             if (await ExpenseAccess.CannotEditAsync(Context, entity.OwnerId, cancellationToken) is { } denied)
@@ -153,7 +154,7 @@ internal sealed partial class ExpenseClaimRecordStore(HrStoreContext context) : 
             if (values.ContainsKey("currency") && entity.LineCount > 0
                 && await Context.Data.Set<ExpenseClaim>().AsNoTracking().AnyAsync(c => c.Id == entity.Id && c.Currency != entity.Currency, cancellationToken))
             {
-                errors.Add(new RecordFieldError("currency", "Satırı olan beyanın para birimi değiştirilemez."));
+                errors.Add(new RecordFieldError("currency", HrMessages.Expense.LineCurrencyLocked));
             }
         }
 
@@ -250,7 +251,7 @@ internal sealed class ExpenseLineRecordStore(HrStoreContext context) : HrRecordS
 
     protected override IReadOnlyList<RecordField<ExpenseLine>> Fields => fields ??=
     [
-        Field.Reference<ExpenseLine, ExpenseClaim>("claimId", "Masraf beyanı bulunamadı.", l => l.ClaimId, (l, v) => l.ClaimId = v!.Value, required: true, createOnly: true),
+        Field.Reference<ExpenseLine, ExpenseClaim>("claimId", HrMessages.NotFound.ExpenseClaim, l => l.ClaimId, (l, v) => l.ClaimId = v!.Value, required: true, createOnly: true),
         Field.Date<ExpenseLine>("expenseDate", l => l.ExpenseDate, (l, v) => l.ExpenseDate = v!.Value, required: true),
         Field.ListChoice<ExpenseLine>("expenseTypeKey", HrModule.Lists.ExpenseType, l => l.ExpenseTypeKey, (l, v) => l.ExpenseTypeKey = v ?? string.Empty),
         Field.Text<ExpenseLine>("description", ExpenseLine.DescriptionMaxLength, l => l.Description, (l, v) => l.Description = v),
@@ -308,12 +309,12 @@ internal sealed class ExpenseLineRecordStore(HrStoreContext context) : HrRecordS
         var errors = new List<RecordFieldError>();
         if (entity.ExpenseDate > DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1))
         {
-            errors.Add(new RecordFieldError("expenseDate", "Masraf tarihi ileri bir gün olamaz."));
+            errors.Add(new RecordFieldError("expenseDate", HrMessages.Expense.DateFuture));
         }
 
         if (entity.VatAmount is { } vat && vat > entity.Amount)
         {
-            errors.Add(new RecordFieldError("vatAmount", "KDV tutarı, KDV dahil tutardan büyük olamaz."));
+            errors.Add(new RecordFieldError("vatAmount", HrMessages.Expense.VatOverGross));
         }
 
         if (errors.Count > 0)
@@ -344,7 +345,7 @@ internal sealed class ExpenseLineRecordStore(HrStoreContext context) : HrRecordS
         var claim = await Context.Data.Set<ExpenseClaim>().SingleAsync(c => c.Id == claimId, cancellationToken);
         if (claim.Status != ExpenseClaim.Statuses.Draft)
         {
-            throw new RecordConflictException("Satırlar yalnızca taslak beyanda eklenir, değiştirilir ya da silinir.");
+            throw new RecordConflictException(HrMessages.Expense.LinesDraftOnly);
         }
 
         return await ExpenseAccess.CannotEditAsync(Context, claim.OwnerId, cancellationToken) is { } denied

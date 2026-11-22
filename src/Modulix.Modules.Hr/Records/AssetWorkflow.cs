@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -51,7 +52,7 @@ internal sealed class AssetWorkflow(IRecordPipeline pipeline, HrStoreContext con
             var (permission, denied) = await DecideAsync(record.Value!, d.Action, cancellationToken);
             if (permission is not null || denied is not null)
             {
-                actions.Add(new LeaveActionState(d.Action, d.Label, permission is not null, denied, d.RequiresReason, d.Destructive));
+                actions.Add(new LeaveActionState(d.Action, d.Label, permission is not null, denied?.Text, d.RequiresReason, d.Destructive));
             }
         }
 
@@ -62,7 +63,7 @@ internal sealed class AssetWorkflow(IRecordPipeline pipeline, HrStoreContext con
     {
         if (Definitions.FirstOrDefault(d => d.Action == action) is not { Action: not null } definition)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.", [new RecordFieldError("action", "Bilinmeyen eylem.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.UnknownAction, [new RecordFieldError("action", HrMessages.Workflow.UnknownAction)]);
         }
 
         var record = await pipeline.GetAsync(new RecordRef(HrModule.Entities.AssetAssignment, id), cancellationToken);
@@ -75,20 +76,20 @@ internal sealed class AssetWorkflow(IRecordPipeline pipeline, HrStoreContext con
         if (permission is null)
         {
             return denied is null
-                ? RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, "Bu eylem için yetkiniz yok.")
+                ? RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, HrMessages.Workflow.NotAllowed)
                 : RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, denied);
         }
 
         var trimmed = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         if (definition.RequiresReason && trimmed is null)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Açıklama zorunludur.", [new RecordFieldError("reason", "Açıklama zorunludur.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.ExplanationRequired, [new RecordFieldError("reason", HrMessages.Workflow.ExplanationRequired)]);
         }
 
         if (trimmed is { Length: > AssetAssignment.TextMaxLength })
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Metin çok uzun.",
-                [new RecordFieldError("reason", $"En fazla {AssetAssignment.TextMaxLength} karakter olabilir.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.TextTooLong,
+                [new RecordFieldError("reason", ServerMessages.Validation.MaxLength(AssetAssignment.TextMaxLength))]);
         }
 
         using (context.Gate.Open(permission, definition.To, trimmed))
@@ -99,7 +100,7 @@ internal sealed class AssetWorkflow(IRecordPipeline pipeline, HrStoreContext con
     }
 
     /// <summary>Kullanıcı için karar: yapılabiliyorsa boru hattının isteyeceği izin; değilse (yalnızca ilgiliyse) nedeni. İkisi de boşsa eylem görünmez (403).</summary>
-    private async Task<(string? Permission, string? Denied)> DecideAsync(RecordData assignment, string action, CancellationToken cancellationToken)
+    private async Task<(string? Permission, ServerMessage? Denied)> DecideAsync(RecordData assignment, string action, CancellationToken cancellationToken)
     {
         var status = assignment.Values["status"]?.GetValue<string>();
         var owner = Guid.TryParse(assignment.Values["employeeUserId"]?.GetValue<string>(), out var o) ? o : (Guid?)null;
@@ -112,8 +113,8 @@ internal sealed class AssetWorkflow(IRecordPipeline pipeline, HrStoreContext con
                 return (null, null);
             }
 
-            return status != AssetAssignment.Statuses.Active ? (null, "Kapanmış zimmet onaylanmaz.")
-                : acknowledged ? (null, "Teslim zaten onaylandı.")
+            return status != AssetAssignment.Statuses.Active ? (null, HrMessages.Asset.AckClosed)
+                : acknowledged ? (null, HrMessages.Asset.AckAlready)
                 : (HrModule.Permissions.AssetsRead, null);
         }
 
@@ -124,6 +125,6 @@ internal sealed class AssetWorkflow(IRecordPipeline pipeline, HrStoreContext con
 
         return status == AssetAssignment.Statuses.Active
             ? (HrModule.Permissions.AssetsManage, null)
-            : (null, "Zimmet zaten kapanmış.");
+            : (null, HrMessages.Asset.AlreadyClosed);
     }
 }

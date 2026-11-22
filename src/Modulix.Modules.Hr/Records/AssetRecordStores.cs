@@ -103,25 +103,25 @@ internal sealed partial class AssetRecordStore(HrStoreContext context) : HrRecor
         var errors = new List<RecordFieldError>();
         if (await Context.Data.Set<Asset>().AsNoTracking().AnyAsync(a => a.AssetTag == entity.AssetTag && a.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("assetTag", "Bu envanter numarası başka bir demirbaşta kayıtlı."));
+            errors.Add(new RecordFieldError("assetTag", HrMessages.Asset.TagTaken));
         }
 
         if (entity.CurrentAssignmentId is null && entity.Status == Asset.Statuses.Assigned)
         {
-            errors.Add(new RecordFieldError("status", "\"Zimmetli\" durumu yalnızca zimmetle gelir; demirbaşı çalışana zimmetleyin."));
+            errors.Add(new RecordFieldError("status", HrMessages.Asset.StatusViaAssignment));
         }
         else if (entity.CurrentAssignmentId is not null && entity.Status != Asset.Statuses.Assigned)
         {
-            errors.Add(new RecordFieldError("status", "Zimmetteki demirbaşın durumu iade ya da kayıp kaydıyla değişir."));
+            errors.Add(new RecordFieldError("status", HrMessages.Asset.StatusAssignedLocked));
         }
 
         if (entity.Currency is { } currency && !CurrencyPattern().IsMatch(currency))
         {
-            errors.Add(new RecordFieldError("currency", "Para birimi üç harfli kod olmalıdır (ör. TRY)."));
+            errors.Add(new RecordFieldError("currency", HrMessages.Asset.CurrencyFormat));
         }
         else if (entity.PurchaseCost is not null && entity.Currency is null)
         {
-            errors.Add(new RecordFieldError("currency", "Alış tutarıyla birlikte para birimi girilmelidir."));
+            errors.Add(new RecordFieldError("currency", HrMessages.Asset.CurrencyWithPrice));
         }
 
         if (errors.Count > 0)
@@ -134,7 +134,7 @@ internal sealed partial class AssetRecordStore(HrStoreContext context) : HrRecor
     {
         if (await Context.Data.Set<AssetAssignment>().AsNoTracking().AnyAsync(a => a.AssetId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Zimmet geçmişi olan demirbaş silinmez; durumunu \"Hurda\" yapın.");
+            throw new RecordConflictException(HrMessages.Asset.HasHistory);
         }
     }
 
@@ -172,8 +172,8 @@ internal sealed class AssetAssignmentRecordStore(HrStoreContext context) : HrRec
 
     protected override IReadOnlyList<RecordField<AssetAssignment>> Fields => fields ??=
     [
-        Field.Reference<AssetAssignment, Asset>("assetId", "Demirbaş bulunamadı.", a => a.AssetId, (a, v) => a.AssetId = v!.Value, required: true, createOnly: true),
-        Field.Reference<AssetAssignment, Employee>("employeeId", "Çalışan bulunamadı.", a => a.EmployeeId, (a, v) => a.EmployeeId = v!.Value, required: true, createOnly: true),
+        Field.Reference<AssetAssignment, Asset>("assetId", HrMessages.NotFound.Asset, a => a.AssetId, (a, v) => a.AssetId = v!.Value, required: true, createOnly: true),
+        Field.Reference<AssetAssignment, Employee>("employeeId", HrMessages.NotFound.Employee, a => a.EmployeeId, (a, v) => a.EmployeeId = v!.Value, required: true, createOnly: true),
         Field.Date<AssetAssignment>("assignedOn", a => a.AssignedOn, (a, v) => a.AssignedOn = v!.Value, required: true),
         Field.Date<AssetAssignment>("expectedReturnOn", a => a.ExpectedReturnOn, (a, v) => a.ExpectedReturnOn = v),
         Field.Text<AssetAssignment>("conditionOut", AssetAssignment.TextMaxLength, a => a.ConditionOut, (a, v) => a.ConditionOut = v),
@@ -240,7 +240,7 @@ internal sealed class AssetAssignmentRecordStore(HrStoreContext context) : HrRec
     }
 
     protected override Task BeforeDeleteAsync(AssetAssignment entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Zimmet kayıtları silinmez; demirbaşı iade alın.");
+        throw new RecordConflictException(HrMessages.Asset.AssignmentNoDelete);
 
     protected override async Task AppliedAsync(AssetAssignment entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
@@ -255,25 +255,25 @@ internal sealed class AssetAssignmentRecordStore(HrStoreContext context) : HrRec
         if (asset.Status != Asset.Statuses.InStock)
         {
             errors.Add(new RecordFieldError("assetId", asset.Status == Asset.Statuses.Assigned
-                ? "Demirbaş başka bir çalışana zimmetli; önce iade alın."
-                : "Yalnızca depodaki demirbaş zimmetlenir (bakımda, hurda ya da kayıp değil)."));
+                ? HrMessages.Asset.AlreadyAssigned
+                : HrMessages.Asset.NotInStock));
         }
 
         var employee = await Context.Data.Set<Employee>().AsNoTracking().Where(e => e.Id == entity.EmployeeId)
             .Select(e => new { e.UserId, e.Status }).SingleAsync(cancellationToken);
         if (employee.Status == Employee.Statuses.Terminated)
         {
-            errors.Add(new RecordFieldError("employeeId", "Ayrılmış çalışana zimmet verilmez."));
+            errors.Add(new RecordFieldError("employeeId", HrMessages.Asset.AssignTerminated));
         }
 
         if (entity.AssignedOn > DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1))
         {
-            errors.Add(new RecordFieldError("assignedOn", "Teslim tarihi ileri bir gün olamaz."));
+            errors.Add(new RecordFieldError("assignedOn", HrMessages.Asset.AssignedFuture));
         }
 
         if (entity.ExpectedReturnOn is { } expected && expected < entity.AssignedOn)
         {
-            errors.Add(new RecordFieldError("expectedReturnOn", "Beklenen iade tarihi teslimden önce olamaz."));
+            errors.Add(new RecordFieldError("expectedReturnOn", HrMessages.Asset.ExpectedBeforeAssigned));
         }
 
         if (errors.Count > 0)

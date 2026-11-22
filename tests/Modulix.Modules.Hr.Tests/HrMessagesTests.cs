@@ -34,7 +34,7 @@ public partial class HrMessagesTests
             checkedCount++;
         }
 
-        Assert.True(checkedCount >= 48);
+        Assert.True(checkedCount >= 105);
     }
 
     [Fact]
