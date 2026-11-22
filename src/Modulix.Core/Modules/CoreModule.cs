@@ -28,6 +28,9 @@ public sealed class CoreModule : IModule
         /// <summary>Firmanın resmî tatil listesini yazar (ADR-0049 dilim 6a); okumak için izin gerekmez.</summary>
         public const string ManageHolidays = "core.holidays.manage";
 
+        /// <summary>Firmanın döviz kurlarını yazar (ADR-0049 dilim 5a); okumak için izin gerekmez.</summary>
+        public const string ManageExchangeRates = "core.exchange-rates.manage";
+
         /// <summary>Belge serilerini yapılandırır ve sayacı ileri alır (ADR-0049 dilim 2a).</summary>
         public const string ManageNumbering = "core.numbering.manage";
 
@@ -116,6 +119,7 @@ public sealed class CoreModule : IModule
         new(Permissions.ManageRoles, "Rolleri ve izinlerini yönetir", "Roller"),
         new(Permissions.ManageSettings, "Kuruluş ve modül ayarlarını değiştirir", "Kuruluş ayarları"),
         new(Permissions.ManageHolidays, "Firmanın resmî tatil listesini düzenler", "Resmî tatiller"),
+        new(Permissions.ManageExchangeRates, "Firmanın döviz kurlarını düzenler", "Döviz kurları"),
         new(Permissions.ManageNumbering, "Belge numarası serilerini yapılandırır ve sayacı ileri alır", "Belge numaraları"),
         new(Permissions.ReadAudit, "Denetim kaydını görüntüler", "Denetim kaydı"),
         new(Permissions.ManageCustomization, "Özel alanları ve listeleri düzenler", "Özelleştirme"),
@@ -504,6 +508,10 @@ public sealed class CoreModule : IModule
         {
             ["date"] = "Tarih", ["name"] = "Ad", ["halfDay"] = "Yarım gün",
         }, "name"),
+        new(Modulix.Core.Contracts.Currency.CurrencyEntities.ExchangeRate, "Döviz kuru", null, new Dictionary<string, string>
+        {
+            ["fromCurrency"] = "Kaynak para birimi", ["toCurrency"] = "Hedef para birimi", ["rate"] = "Kur", ["validOn"] = "Geçerli gün", ["source"] = "Kaynak", ["note"] = "Not",
+        }, "fromCurrency"),
         new(CredentialEntities.Credential, "Süreli belge", null, new Dictionary<string, string>
         {
             ["ownerEntityKey"] = "Sahip kayıt türü", ["ownerId"] = "Sahip kayıt", ["typeKey"] = "Belge türü", ["documentNo"] = "Belge no",

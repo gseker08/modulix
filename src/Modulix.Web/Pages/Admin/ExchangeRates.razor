@@ -1,0 +1,225 @@
+@page "/yonetim/doviz-kurlari"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>@Texts.Get("admin.exchangeRates.pageTitle") · Modulix</PageTitle>
+
+@* Firmanın döviz kurları (ADR-0049 dilim 5a: kurlar Core ana verisidir; ADR-0018'de CRM "Vergi ve kur" ekranındaydı). Ayar ekranı, sekmeli form
+   kuralının dışındadır. Kurları her üye okur, yazmak core.exchange-rates.manage ister. Kur, geçerli olduğu günden itibaren uygulanır; belgeye
+   uygulanan kur belgede saklanır, sonradan eklenen kur eski belgeyi değiştirmez. *@
+<AuthGate>
+    <PageHeader Title="@Texts.Get("admin.exchangeRates.pageTitle")" Icon="landmark" Subtitle="@Texts.Get("admin.exchangeRates.intro")" />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (Session.Can(CoreAccess.ManageExchangeRates) && form is null)
+    {
+        <div class="list-toolbar">
+            <button type="button" class="btn btn-primary" @onclick="() => form = new()"><AppIcon Name="plus" Size="16" /> @Texts.Get("admin.exchangeRates.newRate")</button>
+        </div>
+    }
+
+    @if (form is not null)
+    {
+        <FormTabs Title="@Texts.Get("admin.exchangeRates.rateForm")" Label="@Texts.Get("admin.exchangeRates.rateFormSections")">
+            <form class="form-grid" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <div>
+                    <label class="form-label" for="rateFrom">@Texts.Get("admin.exchangeRates.field.from")</label>
+                    <input id="rateFrom" class="form-control" maxlength="3" @bind="form.From" />
+                    <FieldError Field="fromCurrency" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="rateTo">@Texts.Get("admin.exchangeRates.field.to")</label>
+                    <input id="rateTo" class="form-control" maxlength="3" @bind="form.To" />
+                    <FieldError Field="toCurrency" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="rateValue">@Texts.Get("admin.exchangeRates.field.rateValue")</label>
+                    <input id="rateValue" class="form-control" type="number" step="any" min="0" @bind="form.Rate" />
+                    <FieldError Field="rate" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="rateDay">@Texts.Get("admin.exchangeRates.field.validOn")</label>
+                    <input id="rateDay" class="form-control" type="date" @bind="form.ValidOn" />
+                    <FieldError Field="validOn" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="rateSource">@Texts.Get("admin.exchangeRates.col.source")</label>
+                    <select id="rateSource" class="form-select" @bind="form.Source">
+                        @foreach (var source in PricingLabels.RateSources)
+                        {
+                            <option value="@source.Key">@source.Label</option>
+                        }
+                    </select>
+                    <FieldError Field="source" Errors="errors" />
+                </div>
+                <div>
+                    <label class="form-label" for="rateNote">@Texts.Get("admin.exchangeRates.col.note")</label>
+                    <input id="rateNote" class="form-control" maxlength="500" @bind="form.Note" />
+                    <FieldError Field="note" Errors="errors" />
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : null)">@Texts.Get("common.save")</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">@Texts.Get("common.dismiss")</button>
+                </div>
+            </form>
+        </FormTabs>
+    }
+
+    @if (page is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (page.Items.Count == 0)
+    {
+        <EmptyState Icon="landmark" Title="@Texts.Get("admin.exchangeRates.noRates")" />
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">@Texts.Get("admin.exchangeRates.pageTitle")</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><SortHeader Label="@Texts.Get("admin.exchangeRates.col.pair")" ColumnIcon="repeat" Asc="pair" Desc="-pair" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("admin.exchangeRates.col.rateValue")" ColumnIcon="hash" Asc="rate" Desc="-rate" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="@Texts.Get("admin.exchangeRates.col.day")" ColumnIcon="calendar" Asc="validOn" Desc="-validOn" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col">@Texts.Get("admin.exchangeRates.col.source")</th>
+                    <th scope="col">@Texts.Get("admin.exchangeRates.col.note")</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var rate in page.Items)
+                {
+                    <tr>
+                        <td data-label="@Texts.Get("admin.exchangeRates.col.pair")" class="primary">@WarehouseLabels.Text(rate, "fromCurrency") → @WarehouseLabels.Text(rate, "toCurrency")</td>
+                        <td data-label="@Texts.Get("admin.exchangeRates.col.rateValue")">@WarehouseLabels.Decimal(rate, "rate")</td>
+                        <td data-label="@Texts.Get("admin.exchangeRates.col.day")">@WarehouseLabels.Text(rate, "validOn")</td>
+                        <td data-label="@Texts.Get("admin.exchangeRates.col.source")">@PricingLabels.Label(PricingLabels.RateSources, WarehouseLabels.Text(rate, "source"))</td>
+                        <td data-label="@Texts.Get("admin.exchangeRates.col.note")">@WarehouseLabels.Text(rate, "note")</td>
+                        <td class="row-menu-cell">
+                            @if (Session.Can(CoreAccess.ManageExchangeRates))
+                            {
+                                <RowMenu Label="@Texts.Get("hr.content.row-actions", WarehouseLabels.Text(rate, "fromCurrency") + " → " + WarehouseLabels.Text(rate, "toCurrency"))">
+                                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Edit(rate)"><AppIcon Name="pencil" Size="16" /> <span>@Texts.Get("common.edit")</span></button>
+                                    <RowMenuDelete OnConfirm="() => DeleteAsync(rate)" />
+                                </RowMenu>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</AuthGate>
+
+@code {
+    private static readonly string Url = "/api/records/" + ExchangeRateAccess.EntityKey;
+
+    private RecordPageResponse? page;
+    private RateForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+
+    // Sıralama sunucudadır (kayıt deposunun sort anahtarları); boş değer deponun varsayılan sırasıdır.
+    private string sort = "";
+
+    private string SortQuery => sort.Length == 0 ? "" : "&sort=" + Uri.EscapeDataString(sort);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        await LoadAsync();
+    }
+
+    private async Task SortAsync(string value)
+    {
+        sort = value;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<RecordPageResponse>($"{Url}?pageSize=100{SortQuery}");
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private void Edit(RecordResponse rate)
+    {
+        form = new RateForm
+        {
+            Id = rate.Id, Version = rate.Version, From = WarehouseLabels.Text(rate, "fromCurrency"), To = WarehouseLabels.Text(rate, "toCurrency"),
+            Rate = WarehouseLabels.Decimal(rate, "rate"), ValidOn = DateTime.Parse(WarehouseLabels.Text(rate, "validOn"), System.Globalization.CultureInfo.InvariantCulture),
+            Source = WarehouseLabels.Text(rate, "source"), Note = WarehouseLabels.Text(rate, "note"),
+        };
+        errors = null;
+    }
+
+    private void Cancel()
+    {
+        form = null;
+        errors = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        var f = form!;
+        var request = new RecordWriteRequest(new JsonObject
+        {
+            ["fromCurrency"] = f.From,
+            ["toCurrency"] = f.To,
+            ["rate"] = f.Rate,
+            ["validOn"] = f.ValidOn.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+            ["source"] = f.Source,
+            ["note"] = string.IsNullOrWhiteSpace(f.Note) ? null : f.Note.Trim(),
+        }, f.Version);
+        var result = f.Id is { } id
+            ? await Api.PutAsync<RecordResponse>($"{Url}/{id}", request)
+            : await Api.PostAsync<RecordResponse>(Url, request);
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            message = result.FieldErrors is { Count: > 0 } ? null : result.Error;
+            return;
+        }
+
+        form = null;
+        errors = null;
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(RecordResponse rate)
+    {
+        var result = await Api.DeleteAsync($"{Url}/{rate.Id}?version={rate.Version}");
+        message = result.IsSuccess ? null : result.Error;
+        await LoadAsync();
+    }
+
+    private sealed class RateForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string From { get; set; } = "USD";
+
+        public string To { get; set; } = "TRY";
+
+        public decimal Rate { get; set; }
+
+        public DateTime ValidOn { get; set; } = DateTime.Today;
+
+        public string Source { get; set; } = "Manual";
+
+        public string? Note { get; set; }
+    }
+}

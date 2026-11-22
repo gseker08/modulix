@@ -17,9 +17,6 @@ internal sealed class SalesPlanningData(IModuleData data)
 {
     // ---- Okuma
 
-    public async Task<List<RateEntry>> RatesAsync(CancellationToken cancellationToken) =>
-        await data.Set<ExchangeRate>().AsNoTracking().Select(r => new RateEntry(r.FromCurrency, r.ToCurrency, r.Rate, r.ValidOn)).ToListAsync(cancellationToken);
-
     public async Task<List<SalesTarget>> TargetsOverlappingAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken) =>
         await data.Set<SalesTarget>().AsNoTracking().Where(t => t.PeriodEnd >= start && t.PeriodStart <= end).ToListAsync(cancellationToken);
 

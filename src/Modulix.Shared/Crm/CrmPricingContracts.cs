@@ -9,11 +9,6 @@ public sealed record TaxRateDto(Guid Id, long Version, string Code, string Name,
 public sealed record SaveTaxRateRequest(
     string Code, string Name, decimal RatePercent, DateOnly ValidFrom, DateOnly? ValidTo = null, bool IsActive = true, long? Version = null);
 
-public sealed record ExchangeRateDto(Guid Id, long Version, string FromCurrency, string ToCurrency, decimal Rate, DateOnly ValidOn, string Source, string? Note);
-
-public sealed record SaveExchangeRateRequest(
-    string FromCurrency, string ToCurrency, decimal Rate, DateOnly ValidOn, string Source = "Manual", string? Note = null, long? Version = null);
-
 public sealed record PriceListDto(
     Guid Id,
     long Version,

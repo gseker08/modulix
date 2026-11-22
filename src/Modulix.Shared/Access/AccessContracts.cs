@@ -207,6 +207,13 @@ public static class HolidayAccess
     public const string EntityKey = "core.holiday";
 }
 
+/// <summary>Firmanın döviz kurları (ADR-0049 dilim 5a). Yazma izni <see cref="CoreAccess.ManageExchangeRates"/>'tir.</summary>
+public static class ExchangeRateAccess
+{
+    /// <summary>Kur listesinin kayıt türü: <c>/api/records/core.exchange-rate</c>.</summary>
+    public const string EntityKey = "core.exchange-rate";
+}
+
 /// <summary>Çekirdek (yönetim) izinleri; arayüz menüsü bunlara bakar. <c>CoreModule.Permissions</c> ile aynıdır (test denetler).</summary>
 public static class CoreAccess
 {
@@ -218,6 +225,9 @@ public static class CoreAccess
 
     /// <summary>Firmanın resmî tatil listesi (ADR-0049 dilim 6a): okuma her üyeye açık, yazma bu izinle.</summary>
     public const string ManageHolidays = "core.holidays.manage";
+
+    /// <summary>Firmanın döviz kurları (ADR-0049 dilim 5a): okuma her üyeye açık, yazma bu izinle.</summary>
+    public const string ManageExchangeRates = "core.exchange-rates.manage";
 
     /// <summary>Belge numarası serileri (ADR-0049 dilim 2a): yapılandırma ve sayacı ileri alma.</summary>
     public const string ManageNumbering = "core.numbering.manage";
@@ -271,5 +281,5 @@ public static class CoreAccess
     public static IReadOnlyList<string> AdministrationPermissions { get; } =
         [ManageUsers, ManageRoles, ManageSettings, ReadAudit, ManageCustomization, ManageCompanies, ReadCommunication, ManageCommunication, SuppressCommunication,
          ReadAutomation, ManageAutomation, PublishAutomation, RunAutomation, ReadAutomationLogs, ApproveAutomation, ManageApprovals,
-         RunImports, ReadImports, RollbackImports, ImportPeople, ManageHolidays, ManageNumbering];
+         RunImports, ReadImports, RollbackImports, ImportPeople, ManageHolidays, ManageExchangeRates, ManageNumbering];
 }

@@ -686,18 +686,6 @@ internal static class CrmMessages
             ServerMessage.Of("crm.server.pricing.tax-rate-in-use",
                 "Ürünlerde kullanılan vergi kodunun oranı silinemez; bitiş tarihi verin ya da pasifleştirin.");
 
-        public static ServerMessage CurrenciesRequired =>
-            ServerMessage.Of("crm.server.pricing.currencies-required", "Kaynak ve hedef para birimi zorunludur.");
-
-        public static ServerMessage CurrenciesSame => ServerMessage.Of("crm.server.pricing.currencies-same", "Kaynak ve hedef para birimi aynı olamaz.");
-
-        public static ServerMessage RatePositive => ServerMessage.Of("crm.server.pricing.rate-positive", "Kur sıfırdan büyük olmalıdır.");
-
-        public static ServerMessage RateDayRequired => ServerMessage.Of("crm.server.pricing.rate-day-required", "Kurun geçerli olduğu gün zorunludur.");
-
-        public static ServerMessage RateExists =>
-            ServerMessage.Of("crm.server.pricing.rate-exists", "Bu para birimi çifti için o güne ait kur zaten var.");
-
         public static ServerMessage PriceListLocked =>
             ServerMessage.Of("crm.server.pricing.price-list-locked",
                 "Yayımlanmış ya da arşivlenmiş fiyat listesi değiştirilemez; yeni liste açın.");

@@ -201,6 +201,8 @@ public class ModulixDbContext(
     /// <summary>Firmanın resmî tatil listesi (ADR-0049 dilim 6a).</summary>
     public DbSet<Modulix.Core.Calendar.Holiday> Holidays => Set<Modulix.Core.Calendar.Holiday>();
 
+    public DbSet<Modulix.Core.Currency.ExchangeRate> ExchangeRates => Set<Modulix.Core.Currency.ExchangeRate>();
+
     /// <summary>Belge serisi sayaçları (ADR-0049).</summary>
     public DbSet<Modulix.Core.Numbering.NumberCounter> NumberCounters => Set<Modulix.Core.Numbering.NumberCounter>();
 

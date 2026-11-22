@@ -96,7 +96,7 @@ public interface IForecastWorkflow
 /// Tenant kapsamlı tahmin ve kilit, yalnızca tüm kayıtlara erişen (veri kapsamı Tümü) kullanıcıyla hazırlanır; böylece anlık görüntü eksik kayıtla oluşmaz.
 /// </summary>
 internal sealed class ForecastWorkflow(
-    IRecordPipeline pipeline, IRecordAccess recordAccess, ICurrentAccess access, SalesPlanningData planning, SalesOpportunityReader reader,
+    IRecordPipeline pipeline, IRecordAccess recordAccess, ICurrentAccess access, SalesPlanningData planning, Modulix.Core.Contracts.Currency.IExchangeRateReader rateReader, SalesOpportunityReader reader,
     ForecastWorkflowGate gate, ITenantContextAccessor tenant, ITenantMembers members, TimeProvider time,
     ISalesReportingPolicyProvider? policyProvider = null) : IForecastWorkflow
 {
@@ -991,7 +991,7 @@ internal sealed class ForecastWorkflow(
     }
 
     private async Task<RateBook> RatesAsync(CancellationToken cancellationToken) =>
-        new(await planning.RatesAsync(cancellationToken));
+        await RateBook.LoadAsync(rateReader, cancellationToken);
 
     private async Task<SalesReportingPolicy> PolicyAsync(CancellationToken cancellationToken) =>
         policyProvider is null ? SalesReportingPolicy.Default : await policyProvider.GetAsync(cancellationToken);

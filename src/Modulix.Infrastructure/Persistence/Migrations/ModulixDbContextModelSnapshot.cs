@@ -1552,6 +1552,68 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("Credentials", "core");
                 });
 
+            modelBuilder.Entity("Modulix.Core.Currency.ExchangeRate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FromCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .IsUnicode(false)
+                        .HasColumnType("char(3)")
+                        .IsFixedLength();
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal>("Rate")
+                        .HasPrecision(28, 10)
+                        .HasColumnType("decimal(28,10)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ToCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .IsUnicode(false)
+                        .HasColumnType("char(3)")
+                        .IsFixedLength();
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly>("ValidOn")
+                        .HasColumnType("date");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "FromCurrency", "ToCurrency", "ValidOn")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ExchangeRates_PairDay");
+
+                    b.ToTable("ExchangeRates", "core", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExchangeRates_Pair", "[FromCurrency] <> [ToCurrency]");
+
+                            t.HasCheckConstraint("CK_ExchangeRates_Rate", "[Rate] > 0");
+                        });
+                });
+
             modelBuilder.Entity("Modulix.Core.Customization.CustomField", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3862,8 +3924,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "MembershipId");
 
                     b.HasIndex("TenantId", "MembershipId")
                         .IsUnique()
@@ -6830,73 +6890,6 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("DiscountPolicies", "crm", t =>
                         {
                             t.HasCheckConstraint("CK_DiscountPolicies_Value", "([Percent] IS NOT NULL AND [Amount] IS NULL AND [Percent] > 0 AND [Percent] <= 100) OR ([Percent] IS NULL AND [Amount] IS NOT NULL AND [Amount] > 0 AND [Currency] IS NOT NULL)");
-                        });
-                });
-
-            modelBuilder.Entity("Modulix.Modules.Crm.Domain.ExchangeRate", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("CustomFields")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FromCurrency")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .IsUnicode(false)
-                        .HasColumnType("char(3)")
-                        .IsFixedLength();
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<decimal>("Rate")
-                        .HasPrecision(28, 10)
-                        .HasColumnType("decimal(28,10)");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ToCurrency")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .IsUnicode(false)
-                        .HasColumnType("char(3)")
-                        .IsFixedLength();
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<DateOnly>("ValidOn")
-                        .HasColumnType("date");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasAlternateKey("TenantId", "Id");
-
-                    b.HasIndex("TenantId", "FromCurrency", "ToCurrency", "ValidOn")
-                        .IsUnique()
-                        .HasDatabaseName("UX_ExchangeRates_PairDay");
-
-                    b.ToTable("ExchangeRates", "crm", t =>
-                        {
-                            t.HasCheckConstraint("CK_ExchangeRates_Pair", "[FromCurrency] <> [ToCurrency]");
-
-                            t.HasCheckConstraint("CK_ExchangeRates_Rate", "[Rate] > 0");
                         });
                 });
 
