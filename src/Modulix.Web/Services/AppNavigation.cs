@@ -182,7 +182,14 @@ public sealed class AppNavigation(SessionState session)
             active = parent;
         }
 
-        return new MenuContext(menuRoot, active, Sections(MenuEntries(menuRoot.Id)));
+        // Rol düzeni yalnızca görünür bağlantıların üstüne biner (gizlemek yetki değildir); etkin ekran gizli olsa da bağlam bozulmaz.
+        IReadOnlyList<MenuEntry> entries = MenuLayoutRules.Apply(
+            MenuEntries(menuRoot.Id),
+            session.Access?.RoleIds ?? [],
+            session.Access?.MenuLayout ?? [],
+            AppCatalog.Groups.Where(g => g.Footer).Select(g => g.Id).ToArray());
+
+        return new MenuContext(menuRoot, active, Sections(entries));
     }
 
     /// <summary>
