@@ -5,6 +5,10 @@
     <ProjectReference Include="..\Modulix.Modules.Fleet.Contracts\Modulix.Modules.Fleet.Contracts.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Modulix.Modules.Fleet.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

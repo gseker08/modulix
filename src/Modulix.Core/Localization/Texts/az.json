@@ -12914,5 +12914,18 @@
   "support.server.report.start-after-end": "Başlanğıc tarixi bitmə tarixindən sonra ola bilməz.",
   "support.server.report.end-in-future": "Bitmə tarixi bu gündən sonra ola bilməz.",
   "support.server.report.period-too-long": "Dövr ən çoxu {0} gün ola bilər.",
-  "support.server.report.min-occurrences-range": "Təkrar həddi 2-100 arasında olmalıdır."
+  "support.server.report.min-occurrences-range": "Təkrar həddi 2-100 arasında olmalıdır.",
+  "fleet.server.field.max-decimals": "Ən çoxu {0} onluq rəqəm daxil edilə bilər.",
+  "fleet.server.notfound.vehicle": "Nəqliyyat vasitəsi tapılmadı.",
+  "fleet.server.maintenance.performed-in-future": "Texniki xidmət tarixi gələcək tarix ola bilməz; planlaşdırılan xidməti \"Növbəti xidmət tarixi\" sahəsinə yazın.",
+  "fleet.server.maintenance.next-due-date-order": "Növbəti xidmət tarixi xidmət tarixindən sonra olmalıdır.",
+  "fleet.server.maintenance.next-due-km-order": "Növbəti xidmət kilometrajı xidmət kilometrajından böyük olmalıdır.",
+  "fleet.server.maintenance.currency-required": "Məbləğ daxil edilibsə, valyuta məcburidir.",
+  "fleet.server.vehicle.plate-format": "Nömrə nişanı yalnız hərf və rəqəm ehtiva edə bilər (boşluqlar silinir).",
+  "fleet.server.vehicle.plate-taken": "Bu nömrə nişanı başqa nəqliyyat vasitəsində qeydiyyatdadır.",
+  "fleet.server.vehicle.vin-format": "Şassi nömrəsi 17 simvol olmalıdır; I, O və Q hərflərini ehtiva etmir.",
+  "fleet.server.vehicle.vin-taken": "Bu şassi nömrəsi başqa nəqliyyat vasitəsində qeydiyyatdadır.",
+  "fleet.server.vehicle.carrier-required": "Subpodratçı nəqliyyat vasitəsində daşıyıcı firma seçilməlidir.",
+  "fleet.server.vehicle.carrier-only-subcontract": "Daşıyıcı firma yalnız subpodratçı nəqliyyat vasitəsində seçilir.",
+  "fleet.server.vehicle.no-delete": "Nəqliyyat vasitələri silinmir; istismardan çıxmış vasitənin vəziyyətini \"Passiv\" edin."
 }

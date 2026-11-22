@@ -12914,5 +12914,18 @@
   "support.server.report.start-after-end": "Başlangıç tarihi bitişten sonra olamaz.",
   "support.server.report.end-in-future": "Bitiş tarihi bugünden sonra olamaz.",
   "support.server.report.period-too-long": "Dönem en çok {0} gün olabilir.",
-  "support.server.report.min-occurrences-range": "Tekrar eşiği 2-100 arasında olmalıdır."
+  "support.server.report.min-occurrences-range": "Tekrar eşiği 2-100 arasında olmalıdır.",
+  "fleet.server.field.max-decimals": "En fazla {0} ondalık basamak girilebilir.",
+  "fleet.server.notfound.vehicle": "Araç bulunamadı.",
+  "fleet.server.maintenance.performed-in-future": "Bakım tarihi ileri bir gün olamaz; planlanan bakımı \"Sonraki bakım tarihi\" alanına yazın.",
+  "fleet.server.maintenance.next-due-date-order": "Sonraki bakım tarihi bakım tarihinden sonra olmalı.",
+  "fleet.server.maintenance.next-due-km-order": "Sonraki bakım kilometresi bakım kilometresinden büyük olmalı.",
+  "fleet.server.maintenance.currency-required": "Tutar girildiyse para birimi zorunludur.",
+  "fleet.server.vehicle.plate-format": "Plaka yalnızca harf ve rakam içerebilir (boşluklar kaldırılır).",
+  "fleet.server.vehicle.plate-taken": "Bu plaka başka bir araçta kayıtlı.",
+  "fleet.server.vehicle.vin-format": "Şasi numarası 17 karakter olmalı; I, O ve Q harflerini içermez.",
+  "fleet.server.vehicle.vin-taken": "Bu şasi numarası başka bir araçta kayıtlı.",
+  "fleet.server.vehicle.carrier-required": "Taşeron araçta taşıyıcı firma seçilmelidir.",
+  "fleet.server.vehicle.carrier-only-subcontract": "Taşıyıcı firma yalnızca taşeron araçta seçilir.",
+  "fleet.server.vehicle.no-delete": "Araçlar silinmez; kullanım dışı aracın durumunu \"Pasif\" yapın."
 }

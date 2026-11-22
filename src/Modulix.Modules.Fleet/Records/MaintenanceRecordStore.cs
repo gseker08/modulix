@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Fleet.Domain;
 
@@ -22,7 +23,7 @@ internal sealed partial class MaintenanceRecordStore(FleetStoreContext context) 
 
     protected override IReadOnlyList<RecordField<MaintenanceRecord>> Fields { get; } =
     [
-        Field.Reference<MaintenanceRecord, Vehicle>("vehicleId", "Araç bulunamadı.", m => m.VehicleId, (m, v) => m.VehicleId = v!.Value, required: true, createOnly: true),
+        Field.Reference<MaintenanceRecord, Vehicle>("vehicleId", FleetMessages.NotFound.Vehicle, m => m.VehicleId, (m, v) => m.VehicleId = v!.Value, required: true, createOnly: true),
         Field.ListChoice<MaintenanceRecord>("kindKey", FleetModule.Lists.MaintenanceKind, m => m.KindKey, (m, v) => m.KindKey = v ?? string.Empty),
         Field.Date<MaintenanceRecord>("performedOn", m => m.PerformedOn, (m, v) => m.PerformedOn = v!.Value, required: true),
         Field.Integer<MaintenanceRecord>("odometerKm", m => m.OdometerKm, (m, v) => m.OdometerKm = v, 0, MaintenanceRecord.MaxKm),
@@ -79,26 +80,26 @@ internal sealed partial class MaintenanceRecordStore(FleetStoreContext context) 
         // Tenant saat dilimi farkı için bir gün pay bırakılır; ileri tarihli plan "sonraki bakım" alanına yazılır.
         if (entity.PerformedOn > DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1))
         {
-            errors.Add(new RecordFieldError("performedOn", "Bakım tarihi ileri bir gün olamaz; planlanan bakımı \"Sonraki bakım tarihi\" alanına yazın."));
+            errors.Add(new RecordFieldError("performedOn", FleetMessages.Maintenance.PerformedInFuture));
         }
 
         if (entity.NextDueDate is { } nextDate && nextDate <= entity.PerformedOn)
         {
-            errors.Add(new RecordFieldError("nextDueDate", "Sonraki bakım tarihi bakım tarihinden sonra olmalı."));
+            errors.Add(new RecordFieldError("nextDueDate", FleetMessages.Maintenance.NextDueDateOrder));
         }
 
         if (entity.NextDueKm is { } nextKm && entity.OdometerKm is { } km && nextKm <= km)
         {
-            errors.Add(new RecordFieldError("nextDueKm", "Sonraki bakım kilometresi bakım kilometresinden büyük olmalı."));
+            errors.Add(new RecordFieldError("nextDueKm", FleetMessages.Maintenance.NextDueKmOrder));
         }
 
         if (entity.Currency is { } currency && !CurrencyPattern().IsMatch(currency))
         {
-            errors.Add(new RecordFieldError("currency", "Üç harfli para birimi girin (ör. TRY)."));
+            errors.Add(new RecordFieldError("currency", ServerMessages.Validation.Currency));
         }
         else if (entity.Cost is not null && entity.Currency is null)
         {
-            errors.Add(new RecordFieldError("currency", "Tutar girildiyse para birimi zorunludur."));
+            errors.Add(new RecordFieldError("currency", FleetMessages.Maintenance.CurrencyRequired));
         }
 
         if (errors.Count > 0)
