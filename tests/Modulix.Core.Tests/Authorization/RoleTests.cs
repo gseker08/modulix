@@ -29,7 +29,22 @@ public class RoleTests
     [InlineData("   ")]
     public void Empty_name_is_rejected(string name)
     {
-        Assert.ThrowsAny<ArgumentException>(() => new Role(name, []));
+        // İleti alanın altında gösterilir; çerçevenin İngilizce varsayılan iletisi olmamalıdır.
+        var ex = Assert.Throws<ArgumentException>(() => new Role(name, []));
+
+        Assert.Equal("name", ex.ParamName);
+        Assert.StartsWith("Rol adı zorunludur.", ex.Message);
+    }
+
+    [Fact]
+    public void Renaming_to_an_empty_name_is_rejected_and_keeps_the_name()
+    {
+        var role = new Role("Satış", []);
+
+        var ex = Assert.Throws<ArgumentException>(() => role.Rename(" "));
+
+        Assert.StartsWith("Rol adı zorunludur.", ex.Message);
+        Assert.Equal("Satış", role.Name);
     }
 
     [Fact]

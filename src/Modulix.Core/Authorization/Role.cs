@@ -118,7 +118,11 @@ public sealed class Role : ITenantEntity, ICompanyShared
     public void Rename(string name)
     {
         EnsureEditable();
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Rol adı zorunludur.", nameof(name));
+        }
+
         var trimmed = name.Trim();
         if (trimmed.Length > NameMaxLength)
         {
