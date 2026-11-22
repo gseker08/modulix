@@ -1,4 +1,5 @@
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Support.Lifecycle;
 
@@ -26,18 +27,18 @@ internal sealed class TicketBulk(IRecordPipeline pipeline, ITicketWorkflow workf
     {
         if (!ITicketBulk.Actions.Contains(action))
         {
-            return Invalid("action", $"Toplu işlem şunlardan biri olmalıdır: {string.Join(", ", ITicketBulk.Actions)}.");
+            return Invalid("action", SupportMessages.Bulk.ActionOneOf(string.Join(", ", ITicketBulk.Actions)));
         }
 
         var distinct = ids.Distinct().ToList();
         if (distinct.Count == 0)
         {
-            return Invalid("ids", "En az bir talep seçin.");
+            return Invalid("ids", SupportMessages.Bulk.SelectOne);
         }
 
         if (distinct.Count > ITicketBulk.MaxItems)
         {
-            return Invalid("ids", $"Bir seferde en fazla {ITicketBulk.MaxItems} talep işlenebilir.");
+            return Invalid("ids", SupportMessages.Bulk.MaxItems(ITicketBulk.MaxItems));
         }
 
         var results = new List<BulkTicketResult>(distinct.Count);
@@ -61,6 +62,6 @@ internal sealed class TicketBulk(IRecordPipeline pipeline, ITicketWorkflow workf
         return RecordResult<IReadOnlyList<BulkTicketResult>>.Ok(results);
     }
 
-    private static RecordResult<IReadOnlyList<BulkTicketResult>> Invalid(string field, string message) =>
+    private static RecordResult<IReadOnlyList<BulkTicketResult>> Invalid(string field, ServerMessage message) =>
         RecordResult<IReadOnlyList<BulkTicketResult>>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

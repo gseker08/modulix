@@ -76,7 +76,7 @@ internal sealed class TicketMessages(
     {
         if (!MessageKind.All.Contains(input.Kind))
         {
-            return Invalid("kind", $"Şunlardan biri olmalıdır: {string.Join(", ", MessageKind.All)}.");
+            return Invalid("kind", ServerMessages.Validation.OneOf(string.Join(", ", MessageKind.All)));
         }
 
         var (visibility, direction, permission, eventKind) = input.Kind switch
@@ -96,26 +96,26 @@ internal sealed class TicketMessages(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(permission))
         {
-            return RecordResult<TicketMessageItem>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir.");
+            return RecordResult<TicketMessageItem>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission));
         }
 
         var body = input.Body?.Trim();
         if (string.IsNullOrEmpty(body))
         {
-            return Invalid("body", "Mesaj metni zorunludur.");
+            return Invalid("body", SupportMessages.Message.BodyRequired);
         }
 
         if (body.Length > TicketMessage.BodyMaxLength)
         {
-            return Invalid("body", $"En fazla {TicketMessage.BodyMaxLength} karakter olabilir.");
+            return Invalid("body", ServerMessages.Validation.MaxLength(TicketMessage.BodyMaxLength));
         }
 
         var status = TicketWorkflow.Text(loaded.Value!, "status") ?? TicketStatus.New;
         if (TicketStatus.IsFinal(status))
         {
             return RecordResult<TicketMessageItem>.Fail(RecordErrorCode.Conflict,
-                "Kapanmış ya da iptal edilmiş talebe mesaj eklenemez; yeniden açın (pencere içindeyse) ya da ilişkili yeni talep açın.",
-                [new RecordFieldError("status", "Talep kapalı.")]);
+                SupportMessages.Message.TicketClosed,
+                [new RecordFieldError("status", SupportMessages.Ticket.Closed)]);
         }
 
         var values = new JsonObject { ["lastActivityAt"] = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture) };
@@ -140,7 +140,7 @@ internal sealed class TicketMessages(
         {
             if (status != TicketStatus.Resolved)
             {
-                return RecordResult<TicketMessageItem>.Fail(RecordErrorCode.Conflict, "Müşteri teyidi yalnızca çözülmüş talepte kaydedilir.", [new RecordFieldError("status", "Talep çözülmüş değil.")]);
+                return RecordResult<TicketMessageItem>.Fail(RecordErrorCode.Conflict, SupportMessages.Message.ConfirmationOnlyResolved, [new RecordFieldError("status", SupportMessages.Message.NotResolved)]);
             }
 
             // Teyit çözülmüş talebi kapatır; çözüm kaydı ve geçmiş korunur.
@@ -232,6 +232,6 @@ internal sealed class TicketMessages(
     private static TicketMessageItem ToItem(TicketMessage m) =>
         new(m.Id, m.Visibility, m.Direction, m.Body, m.AuthorId, m.DeliveryStatus, m.IsAutomatic, m.CreatedAt, m.SourceTicketId, m.Channel);
 
-    private static RecordResult<TicketMessageItem> Invalid(string field, string message) =>
+    private static RecordResult<TicketMessageItem> Invalid(string field, ServerMessage message) =>
         RecordResult<TicketMessageItem>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }
