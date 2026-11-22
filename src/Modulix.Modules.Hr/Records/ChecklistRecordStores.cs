@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -139,9 +140,9 @@ internal sealed class EmployeeChecklistRecordStore(HrStoreContext context) : HrR
 
     protected override string? OwnerFieldName => "employeeUserId";
 
-    protected override string? CreateBlockedMessage => Context.Gate.IsOpen ? null : "Süreç /api/hr/employee-checklists/start ile başlatılır.";
+    protected override ServerMessage? CreateBlockedMessage => Context.Gate.IsOpen ? null : HrMessages.Blocked.ChecklistCreate;
 
-    protected override string? UpdateBlockedMessage => Context.Gate.IsOpen ? null : "Süreç değiştirilmez; görevleri tamamlayın ya da süreci iptal edin.";
+    protected override ServerMessage? UpdateBlockedMessage => Context.Gate.IsOpen ? null : HrMessages.Blocked.ChecklistUpdate;
 
     protected override bool IsInScope(RecordData record, IReadOnlySet<Guid> owners)
     {
@@ -286,9 +287,9 @@ internal sealed class ChecklistTaskRecordStore(HrStoreContext context) : HrRecor
 
     protected override string? OwnerFieldName => "employeeUserId";
 
-    protected override string? CreateBlockedMessage => Context.Gate.IsOpen ? null : "Görevler süreç başlatılırken şablondan oluşur.";
+    protected override ServerMessage? CreateBlockedMessage => Context.Gate.IsOpen ? null : HrMessages.Blocked.ChecklistTaskCreate;
 
-    protected override string? UpdateBlockedMessage => Context.Gate.IsOpen ? null : "Görev değiştirilmez; tamamlayın, atlayın ya da yeniden açın.";
+    protected override ServerMessage? UpdateBlockedMessage => Context.Gate.IsOpen ? null : HrMessages.Blocked.ChecklistTaskUpdate;
 
     protected override bool IsInScope(RecordData record, IReadOnlySet<Guid> owners) =>
         base.IsInScope(record, owners) || (Context.CurrentUserId is { } me && UserIn(record, "assigneeUserId", new HashSet<Guid> { me }));

@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -166,8 +167,8 @@ internal sealed class AssetAssignmentRecordStore(HrStoreContext context) : HrRec
         return source.Where(a => a.OwnerId != null && ids.Contains(a.OwnerId.Value));
     }
 
-    protected override string? UpdateBlockedMessage =>
-        Context.Gate.IsOpen ? null : "Zimmet değiştirilemez; iade edip yeniden zimmetleyin.";
+    protected override ServerMessage? UpdateBlockedMessage =>
+        Context.Gate.IsOpen ? null : HrMessages.Blocked.AssetUpdate;
 
     protected override IReadOnlyList<RecordField<AssetAssignment>> Fields => fields ??=
     [
