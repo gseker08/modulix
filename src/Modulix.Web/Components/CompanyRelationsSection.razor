@@ -74,7 +74,7 @@
                     </div>
                     @if (CanWrite && item.IsActive)
                     {
-                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => EndAsync(item)">@Texts.Get("crm.company.people.end")</button>
+                        <IconAction Icon="unlink" Label="@Texts.Get("crm.company.people.end")" Disabled="@busy" OnClick="() => EndAsync(item)" />
                     }
                 </li>
             }

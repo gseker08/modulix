@@ -27,7 +27,7 @@
 
         .page-breadcrumb a:hover {
             color: var(--mx-text-primary);
-            text-decoration: underline;
+            text-decoration: none;
         }
 
     .page-breadcrumb [aria-current="page"] {
@@ -486,7 +486,7 @@ tr.done td.primary {
         }
 
             .record-table td.primary a:hover {
-                text-decoration: underline;
+                text-decoration: none;
             }
 
     .record-table td.actions {

@@ -20,8 +20,29 @@ h1:focus {
     outline: none;
 }
 
+/* Bağlantı ve metin düğmesi (22.11.2026 kararı): hiçbir durumda altı çizilmez; tıklanabilirlik marka rengi + kalınlıkla
+   anlatılır, üstüne gelince bir ton koyulaşır. Satır eylemleri metin bağlantısı değil ikon düğmesidir (IconAction). */
 a, .btn-link {
     color: var(--mx-brand-primary);
+    text-decoration: none;
+}
+
+    a:hover, .btn-link:hover, .btn-link:focus-visible {
+        color: var(--mx-brand-primary-hover);
+        text-decoration: none;
+    }
+
+.btn-link {
+    --bs-btn-color: var(--mx-brand-primary);
+    --bs-btn-hover-color: var(--mx-brand-primary-hover);
+    --bs-btn-active-color: var(--mx-brand-primary-hover);
+    --bs-btn-disabled-color: var(--mx-text-secondary);
+    font-weight: 600;
+}
+
+/* Kayıt adı bağlantısı (liste satırı, tablo birincil hücresi): marka renginde ve kalın. */
+.item-main strong a {
+    font-weight: 700;
 }
 
 /* ---- Button ---- */

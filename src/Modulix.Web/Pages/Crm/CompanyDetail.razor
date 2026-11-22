@@ -220,10 +220,10 @@
                                                 </div>
                                                 @if (Session.Can(CrmAccess.ContactsWrite))
                                                 {
-                                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => OpenLink(link)">@Texts.Get("common.edit")</button>
+                                                    <IconAction Icon="square-pen" Label="@Texts.Get("common.edit")" OnClick="() => OpenLink(link)" />
                                                     @if (link.IsActive)
                                                     {
-                                                        <button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="() => EndLinkAsync(link)">@Texts.Get("crm.company.people.end")</button>
+                                                        <IconAction Icon="unlink" Label="@Texts.Get("crm.company.people.end")" Disabled="@busy" OnClick="() => EndLinkAsync(link)" />
                                                     }
                                                 }
                                             </li>
@@ -277,7 +277,7 @@
                                                 </div>
                                                 @if (Session.Can(CrmAccess.OpportunitiesWrite))
                                                 {
-                                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => OpenOpportunity(opportunity)">@Texts.Get("common.edit")</button>
+                                                    <IconAction Icon="square-pen" Label="@Texts.Get("common.edit")" OnClick="() => OpenOpportunity(opportunity)" />
                                                 }
                                             </li>
                                         }
@@ -334,7 +334,7 @@
                                                 </div>
                                                 @if (Session.Can(CrmAccess.ActivitiesWrite))
                                                 {
-                                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => OpenActivity(activity)">@Texts.Get("common.edit")</button>
+                                                    <IconAction Icon="square-pen" Label="@Texts.Get("common.edit")" OnClick="() => OpenActivity(activity)" />
                                                 }
                                             </li>
                                         }

@@ -76,12 +76,12 @@
                                 <span class="form-check-label">@Texts.Get("admin.customFields.active")</span>
                             </label>
                             <span class="order">
-                                <button type="button" class="btn btn-link btn-sm" aria-label="@Texts.Get("admin.automationEditor.moveUp")" disabled="@(index == 0)" @onclick="() => Move(index, -1)">↑</button>
-                                <button type="button" class="btn btn-link btn-sm" aria-label="@Texts.Get("admin.automationEditor.moveDown")" disabled="@(index == rows.Count - 1)" @onclick="() => Move(index, 1)">↓</button>
+                                <IconAction Icon="arrow-up" Label="@Texts.Get("admin.automationEditor.moveUp")" Disabled="@(index == 0)" OnClick="() => Move(index, -1)" />
+                                <IconAction Icon="arrow-down" Label="@Texts.Get("admin.automationEditor.moveDown")" Disabled="@(index == rows.Count - 1)" OnClick="() => Move(index, 1)" />
                             </span>
                             @if (row.Key is null)
                             {
-                                <button type="button" class="btn btn-link btn-sm" @onclick="() => rows.RemoveAt(index)">@Texts.Get("admin.subProfiles.remove")</button>
+                                <IconAction Icon="trash" Label="@Texts.Get("admin.subProfiles.remove")" OnClick="() => rows.RemoveAt(index)" />
                             }
                         </div>
                     }

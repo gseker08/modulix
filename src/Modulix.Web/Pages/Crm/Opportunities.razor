@@ -125,7 +125,7 @@
                                                 <option value="@stage.Key">@stage.Label</option>
                                             }
                                         </select>
-                                        <button type="button" class="btn btn-link btn-sm" @onclick="() => Open(opportunity)">@Texts.Get("common.edit")</button>
+                                        <IconAction Icon="square-pen" Label="@Texts.Get("common.edit")" OnClick="() => Open(opportunity)" />
                                     </div>
                                 }
                             </article>
