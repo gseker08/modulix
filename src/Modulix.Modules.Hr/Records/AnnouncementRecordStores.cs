@@ -139,7 +139,7 @@ internal sealed class AnnouncementRecordStore(HrStoreContext context) : HrRecord
 
         if (entity.ExpiresOn is { } expires && expires < entity.PublishOn)
         {
-            throw new RecordValidationException([new RecordFieldError("expiresOn", "Bitiş günü başlangıç gününden önce olamaz.")]);
+            throw new RecordValidationException([new RecordFieldError("expiresOn", HrMessages.Content.InvalidExpiry)]);
         }
     }
 
@@ -170,7 +170,7 @@ internal sealed class AnnouncementReadRecordStore(HrStoreContext context) : HrRe
 
     protected override IReadOnlyList<RecordField<AnnouncementRead>> Fields { get; } =
     [
-        Field.Reference<AnnouncementRead, Announcement>("announcementId", "Duyuru bulunamadı.", r => r.AnnouncementId, (r, v) => r.AnnouncementId = v!.Value, required: true, createOnly: true),
+        Field.Reference<AnnouncementRead, Announcement>("announcementId", HrMessages.NotFound.Announcement, r => r.AnnouncementId, (r, v) => r.AnnouncementId = v!.Value, required: true, createOnly: true),
         Field.Computed<AnnouncementRead>("userId", r => r.UserId.ToString()),
         Field.Computed<AnnouncementRead>("readAt", r => r.ReadAt.ToString("O")),
     ];
@@ -186,7 +186,7 @@ internal sealed class AnnouncementReadRecordStore(HrStoreContext context) : HrRe
 
     protected override Task AppliedAsync(AnnouncementRead entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
-        entity.UserId = Context.CurrentUserId ?? throw new RecordConflictException("Aktif kullanıcı yok.");
+        entity.UserId = Context.CurrentUserId ?? throw new RecordConflictException(HrMessages.Content.NoActiveUser);
         entity.ReadAt = DateTimeOffset.UtcNow;
         return Task.CompletedTask;
     }

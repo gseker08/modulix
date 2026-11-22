@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -14,8 +15,6 @@ namespace Modulix.Modules.Hr.Records;
 /// </summary>
 internal sealed class BlogPostRecordStore(HrStoreContext context) : HrRecordStore<BlogPost>(context)
 {
-    private const string LockedMessage = "Onay bekleyen ya da yayındaki yazı değiştirilemez; yazı geri çevrilirse düzeltilir.";
-
     private readonly ContentStats stats = new(context);
 
     public override string EntityKey => HrModule.Entities.BlogPost;
@@ -109,10 +108,10 @@ internal sealed class BlogPostRecordStore(HrStoreContext context) : HrRecordStor
 
         if (entity.AuthorUserId != Context.CurrentUserId)
         {
-            return "Yalnızca kendi yazınızın eklerini değiştirebilirsiniz.";
+            return HrMessages.Blog.OwnFilesOnly.Text;
         }
 
-        return entity.IsPublished || entity.ReviewStatus == BlogPost.Statuses.Submitted ? LockedMessage : null;
+        return entity.IsPublished || entity.ReviewStatus == BlogPost.Statuses.Submitted ? HrMessages.Blog.Locked.Text : null;
     }
 
     protected override async Task AppliedAsync(BlogPost entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
@@ -137,7 +136,7 @@ internal sealed class BlogPostRecordStore(HrStoreContext context) : HrRecordStor
 
         if (!manages && entity.IsPublished)
         {
-            throw new RecordValidationException([new RecordFieldError("isPublished", "Yazıyı yayınlama yetkiniz yok; yazıyı onaya gönderin.")]);
+            throw new RecordValidationException([new RecordFieldError("isPublished", HrMessages.Blog.PublishNotAllowed)]);
         }
 
         if (entity.IsPublished)
@@ -177,12 +176,12 @@ internal sealed class BlogPostRecordStore(HrStoreContext context) : HrRecordStor
     {
         if (authorUserId != Context.CurrentUserId)
         {
-            throw new RecordAccessDeniedException("Yalnızca kendi yazınızı değiştirebilir ve silebilirsiniz.");
+            throw new RecordAccessDeniedException(HrMessages.Blog.OwnPostOnly);
         }
 
         if (isPublished || reviewStatus == BlogPost.Statuses.Submitted)
         {
-            throw new RecordConflictException(LockedMessage);
+            throw new RecordConflictException(HrMessages.Blog.Locked);
         }
     }
 }

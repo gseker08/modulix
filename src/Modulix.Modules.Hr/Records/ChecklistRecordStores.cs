@@ -56,7 +56,7 @@ internal sealed class ChecklistTemplateRecordStore(HrStoreContext context) : HrR
     {
         if (await Context.Data.Set<ChecklistTemplate>().AsNoTracking().AnyAsync(t => t.Kind == entity.Kind && t.Name == entity.Name && t.Id != entity.Id, cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError("name", "Bu adla aynı türde başka bir şablon var.")]);
+            throw new RecordValidationException([new RecordFieldError("name", HrMessages.Checklist.TemplateNameTaken)]);
         }
     }
 
@@ -64,7 +64,7 @@ internal sealed class ChecklistTemplateRecordStore(HrStoreContext context) : HrR
     {
         if (await Context.Data.Set<EmployeeChecklist>().AsNoTracking().AnyAsync(c => c.TemplateId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Bu şablonla süreç başlatılmış; şablon silinmez, pasife alın.");
+            throw new RecordConflictException(HrMessages.Checklist.TemplateInUse);
         }
 
         Context.Data.Set<ChecklistTemplateItem>().RemoveRange(
@@ -86,7 +86,7 @@ internal sealed class ChecklistTemplateItemRecordStore(HrStoreContext context) :
 
     protected override IReadOnlyList<RecordField<ChecklistTemplateItem>> Fields { get; } =
     [
-        Field.Reference<ChecklistTemplateItem, ChecklistTemplate>("templateId", "Şablon bulunamadı.", i => i.TemplateId, (i, v) => i.TemplateId = v!.Value, required: true, createOnly: true),
+        Field.Reference<ChecklistTemplateItem, ChecklistTemplate>("templateId", HrMessages.NotFound.Template, i => i.TemplateId, (i, v) => i.TemplateId = v!.Value, required: true, createOnly: true),
         Field.Integer<ChecklistTemplateItem>("sequence", i => i.Sequence, (i, v) => i.Sequence = v ?? 0, 1, 10_000),
         Field.Text<ChecklistTemplateItem>("title", ChecklistTemplateItem.TitleMaxLength, i => i.Title, (i, v) => i.Title = v!, required: true),
         Field.Text<ChecklistTemplateItem>("description", ChecklistTemplateItem.TextMaxLength, i => i.Description, (i, v) => i.Description = v),
@@ -110,7 +110,7 @@ internal sealed class ChecklistTemplateItemRecordStore(HrStoreContext context) :
         var kind = await Context.Data.Set<ChecklistTemplate>().AsNoTracking().Where(t => t.Id == entity.TemplateId).Select(t => t.Kind).SingleAsync(cancellationToken);
         if (entity.TaskType == Checklists.TaskTypes.AssetReturn && kind != Checklists.Kinds.Offboarding)
         {
-            throw new RecordValidationException([new RecordFieldError("taskType", "\"Zimmet iadesi\" görevi yalnızca işten çıkış şablonunda olur.")]);
+            throw new RecordValidationException([new RecordFieldError("taskType", HrMessages.Checklist.AssetReturnOffboardingOnly)]);
         }
 
         if (entity.Sequence == 0)
@@ -165,8 +165,8 @@ internal sealed class EmployeeChecklistRecordStore(HrStoreContext context) : HrR
 
     protected override IReadOnlyList<RecordField<EmployeeChecklist>> Fields => fields ??=
     [
-        Field.Reference<EmployeeChecklist, Employee>("employeeId", "Çalışan bulunamadı.", c => c.EmployeeId, (c, v) => c.EmployeeId = v!.Value, required: true, createOnly: true),
-        Field.Reference<EmployeeChecklist, ChecklistTemplate>("templateId", "Şablon bulunamadı.", c => c.TemplateId, (c, v) => c.TemplateId = v!.Value, required: true, createOnly: true),
+        Field.Reference<EmployeeChecklist, Employee>("employeeId", HrMessages.NotFound.Employee, c => c.EmployeeId, (c, v) => c.EmployeeId = v!.Value, required: true, createOnly: true),
+        Field.Reference<EmployeeChecklist, ChecklistTemplate>("templateId", HrMessages.NotFound.Template, c => c.TemplateId, (c, v) => c.TemplateId = v!.Value, required: true, createOnly: true),
         Field.Date<EmployeeChecklist>("startDate", c => c.StartDate, (c, v) => c.StartDate = v!.Value, required: true),
         Field.Computed<EmployeeChecklist>("kind", c => c.Kind),
         Field.Computed<EmployeeChecklist>("name", c => c.Name),
@@ -215,7 +215,7 @@ internal sealed class EmployeeChecklistRecordStore(HrStoreContext context) : HrR
         EmployeeNames.LoadAsync(Context, entities.Select(c => c.EmployeeId), names, cancellationToken);
 
     protected override Task BeforeDeleteAsync(EmployeeChecklist entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Süreçler silinmez; süreci iptal edin.");
+        throw new RecordConflictException(HrMessages.Checklist.NoDelete);
 
     protected override async Task AppliedAsync(EmployeeChecklist entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
@@ -235,26 +235,26 @@ internal sealed class EmployeeChecklistRecordStore(HrStoreContext context) : HrR
         var template = await Context.Data.Set<ChecklistTemplate>().AsNoTracking().SingleAsync(t => t.Id == entity.TemplateId, cancellationToken);
         if (!template.IsActive)
         {
-            errors.Add(new RecordFieldError("templateId", "Pasif şablonla süreç başlatılamaz."));
+            errors.Add(new RecordFieldError("templateId", HrMessages.Checklist.TemplateInactive));
         }
         else if (!await Context.Data.Set<ChecklistTemplateItem>().AsNoTracking().AnyAsync(i => i.TemplateId == template.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("templateId", "Şablonun hiç adımı yok."));
+            errors.Add(new RecordFieldError("templateId", HrMessages.Checklist.TemplateEmpty));
         }
 
         var employee = await Context.Data.Set<Employee>().AsNoTracking().Where(e => e.Id == entity.EmployeeId)
             .Select(e => new { e.UserId, e.Status }).SingleAsync(cancellationToken);
         if (template.Kind == Checklists.Kinds.Onboarding && employee.Status == Employee.Statuses.Terminated)
         {
-            errors.Add(new RecordFieldError("employeeId", "Ayrılmış çalışana işe giriş süreci başlatılamaz."));
+            errors.Add(new RecordFieldError("employeeId", HrMessages.Checklist.EmployeeTerminated));
         }
 
         if (await Context.Data.Set<EmployeeChecklist>().AsNoTracking().AnyAsync(
                 c => c.EmployeeId == entity.EmployeeId && c.Kind == template.Kind && c.Status == EmployeeChecklist.Statuses.Open && c.Id != entity.Id, cancellationToken))
         {
             errors.Add(new RecordFieldError("employeeId", template.Kind == Checklists.Kinds.Onboarding
-                ? "Bu çalışanın açık bir işe giriş süreci var."
-                : "Bu çalışanın açık bir işten çıkış süreci var."));
+                ? HrMessages.Checklist.OpenOnboarding
+                : HrMessages.Checklist.OpenOffboarding));
         }
 
         if (errors.Count > 0)
@@ -303,7 +303,7 @@ internal sealed class ChecklistTaskRecordStore(HrStoreContext context) : HrRecor
 
     protected override IReadOnlyList<RecordField<ChecklistTask>> Fields => fields ??=
     [
-        Field.Reference<ChecklistTask, EmployeeChecklist>("checklistId", "Süreç bulunamadı.", t => t.ChecklistId, (t, v) => t.ChecklistId = v!.Value, required: true, createOnly: true),
+        Field.Reference<ChecklistTask, EmployeeChecklist>("checklistId", HrMessages.NotFound.Checklist, t => t.ChecklistId, (t, v) => t.ChecklistId = v!.Value, required: true, createOnly: true),
         Field.Integer<ChecklistTask>("sequence", t => t.Sequence, (t, v) => t.Sequence = v ?? 0, 0, 10_000, createOnly: true),
         Field.Text<ChecklistTask>("title", ChecklistTemplateItem.TitleMaxLength, t => t.Title, (t, v) => t.Title = v!, required: true, createOnly: true),
         Field.Text<ChecklistTask>("description", ChecklistTemplateItem.TextMaxLength, t => t.Description, (t, v) => t.Description = v, createOnly: true),
@@ -363,7 +363,7 @@ internal sealed class ChecklistTaskRecordStore(HrStoreContext context) : HrRecor
     }
 
     protected override Task BeforeDeleteAsync(ChecklistTask entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Görevler silinmez; atlayın.");
+        throw new RecordConflictException(HrMessages.Checklist.TaskNoDelete);
 
     protected override async Task AppliedAsync(ChecklistTask entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {

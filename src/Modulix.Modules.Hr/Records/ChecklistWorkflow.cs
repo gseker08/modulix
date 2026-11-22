@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -50,7 +51,7 @@ internal sealed class ChecklistWorkflow(IRecordPipeline pipeline, HrStoreContext
     {
         if (!await context.Access.HasPermissionAsync(HrModule.Permissions.ChecklistsManage, cancellationToken))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, "Süreç başlatma yetkiniz yok.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, HrMessages.Checklist.StartNotAllowed);
         }
 
         return await pipeline.RunAtomicAsync(async ct =>
@@ -114,7 +115,7 @@ internal sealed class ChecklistWorkflow(IRecordPipeline pipeline, HrStoreContext
             var (permission, denied) = await DecideTaskAsync(record.Value!, d.Action, cancellationToken);
             if (permission is not null || denied is not null)
             {
-                actions.Add(new LeaveActionState(d.Action, d.Label, permission is not null, denied, d.RequiresReason, d.Destructive));
+                actions.Add(new LeaveActionState(d.Action, d.Label, permission is not null, denied?.Text, d.RequiresReason, d.Destructive));
             }
         }
 
@@ -158,7 +159,7 @@ internal sealed class ChecklistWorkflow(IRecordPipeline pipeline, HrStoreContext
         var (permission, denied) = await DecideChecklistAsync(record.Value!, cancellationToken);
         return RecordResult<IReadOnlyList<LeaveActionState>>.Ok(permission is null && denied is null
             ? []
-            : [new LeaveActionState(ChecklistActions.Cancel, "Süreci iptal et", permission is not null, denied, RequiresReason: true, Destructive: true)]);
+            : [new LeaveActionState(ChecklistActions.Cancel, "Süreci iptal et", permission is not null, denied?.Text, RequiresReason: true, Destructive: true)]);
     }
 
     public async Task<RecordResult<RecordData>> RunChecklistAsync(Guid checklistId, string action, long version, string? reason, CancellationToken cancellationToken)
@@ -188,7 +189,7 @@ internal sealed class ChecklistWorkflow(IRecordPipeline pipeline, HrStoreContext
     }
 
     /// <summary>Görev eylemi için karar; ikisi de boşsa eylem kullanıcıyı ilgilendirmez (gösterilmez, denenirse 403).</summary>
-    private async Task<(string? Permission, string? Denied)> DecideTaskAsync(RecordData task, string action, CancellationToken cancellationToken)
+    private async Task<(string? Permission, ServerMessage? Denied)> DecideTaskAsync(RecordData task, string action, CancellationToken cancellationToken)
     {
         var status = task.Values["status"]?.GetValue<string>();
         var assignee = Guid.TryParse(task.Values["assigneeUserId"]?.GetValue<string>(), out var a) ? a : (Guid?)null;
@@ -206,12 +207,12 @@ internal sealed class ChecklistWorkflow(IRecordPipeline pipeline, HrStoreContext
 
             if (checklistStatus == EmployeeChecklist.Statuses.Cancelled)
             {
-                return (null, "İptal edilmiş sürecin görevi değişmez.");
+                return (null, HrMessages.Checklist.CancelledLocked);
             }
 
             if (status != ChecklistTask.Statuses.Open)
             {
-                return (null, "Görev zaten kapanmış.");
+                return (null, HrMessages.Checklist.TaskAlreadyClosed);
             }
 
             if (task.Values["taskType"]?.GetValue<string>() == Checklists.TaskTypes.AssetReturn)
@@ -221,7 +222,7 @@ internal sealed class ChecklistWorkflow(IRecordPipeline pipeline, HrStoreContext
                     .CountAsync(z => z.EmployeeId == employeeId && z.Status == AssetAssignment.Statuses.Active, cancellationToken);
                 if (open > 0)
                 {
-                    return (null, $"Çalışanın {open} açık zimmeti var; önce demirbaşları iade alın.");
+                    return (null, HrMessages.Checklist.OpenAssets(open));
                 }
             }
 
@@ -235,15 +236,15 @@ internal sealed class ChecklistWorkflow(IRecordPipeline pipeline, HrStoreContext
 
         if (checklistStatus == EmployeeChecklist.Statuses.Cancelled)
         {
-            return (null, "İptal edilmiş sürecin görevi değişmez.");
+            return (null, HrMessages.Checklist.CancelledLocked);
         }
 
         return action == ChecklistActions.Skip
-            ? status == ChecklistTask.Statuses.Open ? (HrModule.Permissions.ChecklistsManage, null) : (null, "Görev zaten kapanmış.")
-            : status != ChecklistTask.Statuses.Open ? (HrModule.Permissions.ChecklistsManage, null) : (null, "Görev zaten açık.");
+            ? status == ChecklistTask.Statuses.Open ? (HrModule.Permissions.ChecklistsManage, null) : (null, HrMessages.Checklist.TaskAlreadyClosed)
+            : status != ChecklistTask.Statuses.Open ? (HrModule.Permissions.ChecklistsManage, null) : (null, HrMessages.Checklist.TaskAlreadyOpen);
     }
 
-    private async Task<(string? Permission, string? Denied)> DecideChecklistAsync(RecordData checklist, CancellationToken cancellationToken)
+    private async Task<(string? Permission, ServerMessage? Denied)> DecideChecklistAsync(RecordData checklist, CancellationToken cancellationToken)
     {
         if (!await context.Access.HasPermissionAsync(HrModule.Permissions.ChecklistsManage, cancellationToken))
         {
@@ -252,26 +253,26 @@ internal sealed class ChecklistWorkflow(IRecordPipeline pipeline, HrStoreContext
 
         return checklist.Values["status"]?.GetValue<string>() == EmployeeChecklist.Statuses.Open
             ? (HrModule.Permissions.ChecklistsManage, null)
-            : (null, "Yalnızca açık süreç iptal edilir.");
+            : (null, HrMessages.Checklist.OnlyOpenCancel);
     }
 
-    private static RecordResult<RecordData>? Check(string? permission, string? denied, bool requiresReason, string? reason, int maxLength)
+    private static RecordResult<RecordData>? Check(string? permission, ServerMessage? denied, bool requiresReason, string? reason, int maxLength)
     {
         if (permission is null)
         {
             return denied is null
-                ? RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, "Bu eylem için yetkiniz yok.")
+                ? RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, HrMessages.Workflow.NotAllowed)
                 : RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, denied);
         }
 
         var trimmed = Trim(reason);
         if (requiresReason && trimmed is null)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", [new RecordFieldError("reason", "Gerekçe zorunludur.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.ReasonRequired, [new RecordFieldError("reason", HrMessages.Workflow.ReasonRequired)]);
         }
 
         return trimmed is { } text && text.Length > maxLength
-            ? RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Metin çok uzun.", [new RecordFieldError("reason", $"En fazla {maxLength} karakter olabilir.")])
+            ? RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.TextTooLong, [new RecordFieldError("reason", ServerMessages.Validation.MaxLength(maxLength))])
             : null;
     }
 

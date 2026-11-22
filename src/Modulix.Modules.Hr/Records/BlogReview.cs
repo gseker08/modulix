@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -38,14 +39,14 @@ internal sealed class BlogReview(IRecordPipeline pipeline, HrStoreContext contex
         if (state.MaySubmit)
         {
             actions.Add(new LeaveActionState(Actions.Submit, "Onaya gönder", state.Status is BlogPost.Statuses.Draft or BlogPost.Statuses.Returned,
-                state.Status is BlogPost.Statuses.Draft or BlogPost.Statuses.Returned ? null : "Yalnızca taslak ya da geri çevrilen yazı onaya gönderilir.",
+                state.Status is BlogPost.Statuses.Draft or BlogPost.Statuses.Returned ? null : HrMessages.Blog.SubmitState.Text,
                 RequiresReason: false, Destructive: false));
         }
 
         if (state.Manages)
         {
             bool submitted = state.Status == BlogPost.Statuses.Submitted;
-            string? message = submitted ? null : "Yalnızca onay bekleyen yazı için karar verilir.";
+            string? message = submitted ? null : HrMessages.Blog.DecideState.Text;
             actions.Add(new LeaveActionState(Actions.Publish, "Onayla ve yayınla", submitted, message, RequiresReason: false, Destructive: false));
             actions.Add(new LeaveActionState(Actions.Return, "Geri çevir", submitted, message, RequiresReason: true, Destructive: true));
         }
@@ -74,12 +75,12 @@ internal sealed class BlogReview(IRecordPipeline pipeline, HrStoreContext contex
         {
             if (!state.MaySubmit)
             {
-                return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, "Yalnızca kendi yazınızı onaya gönderebilirsiniz.");
+                return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, HrMessages.Blog.SubmitOwnOnly);
             }
 
             if (state.Status is not (BlogPost.Statuses.Draft or BlogPost.Statuses.Returned))
             {
-                return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Yalnızca taslak ya da geri çevrilen yazı onaya gönderilir.");
+                return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, HrMessages.Blog.SubmitState);
             }
 
             (permission, to) = (HrModule.Permissions.BlogWrite, BlogPost.Statuses.Submitted);
@@ -88,17 +89,17 @@ internal sealed class BlogReview(IRecordPipeline pipeline, HrStoreContext contex
         {
             if (!state.Manages)
             {
-                return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, "Bu eylem için yetkiniz yok.");
+                return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, HrMessages.Workflow.NotAllowed);
             }
 
             if (state.Status != BlogPost.Statuses.Submitted)
             {
-                return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Yalnızca onay bekleyen yazı için karar verilir.");
+                return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, HrMessages.Blog.DecideState);
             }
 
             if (action == Actions.Return && (reason is null || reason.Length > BlogPost.ReviewNoteMaxLength))
             {
-                var message = reason is null ? "Geri çevirme gerekçesi zorunludur." : $"Gerekçe en çok {BlogPost.ReviewNoteMaxLength} karakter olabilir.";
+                var message = reason is null ? HrMessages.Blog.ReturnReasonRequired : HrMessages.Blog.ReviewNoteMax(BlogPost.ReviewNoteMaxLength);
                 return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError("reason", message)]);
             }
 
