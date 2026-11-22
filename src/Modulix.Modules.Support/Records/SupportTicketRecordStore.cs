@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Support.Domain;
@@ -33,13 +34,13 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         Field.Text<SupportTicket>("description", SupportTicket.TextMaxLength, t => t.Description, (t, v) => t.Description = v),
         Field.ListChoice<SupportTicket>("typeKey", SupportModule.Lists.TicketType, t => t.TypeKey, (t, v) => t.TypeKey = v ?? string.Empty),
         Field.Choice<SupportTicket>("channel", TicketChannels.All, t => t.Channel, (t, v) => t.Channel = v),
-        Field.Shared<SupportTicket, Party>("partyId", "Müşteri bulunamadı.", t => t.PartyId, (t, v) => t.PartyId = v),
-        Field.Shared<SupportTicket, Person>("personId", "Kişi bulunamadı.", t => t.PersonId, (t, v) => t.PersonId = v),
+        Field.Shared<SupportTicket, Party>("partyId", SupportMessages.NotFound.Party, t => t.PartyId, (t, v) => t.PartyId = v),
+        Field.Shared<SupportTicket, Person>("personId", SupportMessages.NotFound.Person, t => t.PersonId, (t, v) => t.PersonId = v),
         Field.Text<SupportTicket>("customerName", SupportTicket.NameMaxLength, t => t.CustomerName, (t, v) => t.CustomerName = v).AsSystem(),
         Field.Text<SupportTicket>("reporterName", SupportTicket.NameMaxLength, t => t.ReporterName, (t, v) => t.ReporterName = v),
         Field.Text<SupportTicket>("reporterEmail", SupportTicket.EmailMaxLength, t => t.ReporterEmail, (t, v) => t.ReporterEmail = v),
         Field.Text<SupportTicket>("reporterPhone", SupportTicket.PhoneMaxLength, t => t.ReporterPhone, (t, v) => t.ReporterPhone = v),
-        Field.Reference<SupportTicket, TicketCategory>("categoryId", "Kategori bulunamadı.", t => t.CategoryId, (t, v) => t.CategoryId = v),
+        Field.Reference<SupportTicket, TicketCategory>("categoryId", SupportMessages.NotFound.Category, t => t.CategoryId, (t, v) => t.CategoryId = v),
         Field.Choice<SupportTicket>("impact", TicketLevel.All, t => t.Impact, (t, v) => t.Impact = v),
         Field.Choice<SupportTicket>("urgency", TicketLevel.All, t => t.Urgency, (t, v) => t.Urgency = v),
         Field.Text<SupportTicket>("priority", SupportTicket.StatusMaxLength, t => t.Priority, (t, v) => t.Priority = v!).AsSystem(),
@@ -49,7 +50,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
         Field.Text<SupportTicket>("statusReason", SupportTicket.ReasonMaxLength, t => t.StatusReason, (t, v) => t.StatusReason = v).AsSystem(),
         Field.Id<SupportTicket>("queueId", t => t.QueueId, (t, v) => t.QueueId = v).AsSystem(),
         Field.Owner<SupportTicket>(OwnerField, t => t.OwnerId, (t, v) => t.OwnerId = v).AsSystem(),
-        Field.Reference<SupportTicket, SupportTicket>("parentTicketId", "İlişkili talep bulunamadı.", t => t.ParentTicketId, (t, v) => t.ParentTicketId = v, createOnly: true),
+        Field.Reference<SupportTicket, SupportTicket>("parentTicketId", SupportMessages.NotFound.RelatedTicket, t => t.ParentTicketId, (t, v) => t.ParentTicketId = v, createOnly: true),
         Field.Text<SupportTicket>("clientKey", SupportTicket.ClientKeyMaxLength, t => t.ClientKey, (t, v) => t.ClientKey = v).AsSystem(),
         Field.Id<SupportTicket>("mergedIntoId", t => t.MergedIntoId, (t, v) => t.MergedIntoId = v).AsSystem(),
         Field.Date<SupportTicket>("eventDate", t => t.EventDate, (t, v) => t.EventDate = v),

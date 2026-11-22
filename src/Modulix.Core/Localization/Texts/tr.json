@@ -12729,5 +12729,13 @@
   "contracts.server.from-quote.lines-taken": "Seçilen teklif kalemleri zaten bir sözleşmede: {0}.",
   "contracts.server.from-quote.line-taken": "Kalem başka bir sözleşmede kullanılıyor.",
   "contracts.server.from-quote.source-unavailable": "Teklif kaynağı kullanılamıyor; kabul edilmiş teklif bulunamadı.",
-  "contracts.server.from-quote.accepted-not-found": "Kabul edilmiş teklif bulunamadı."
+  "contracts.server.from-quote.accepted-not-found": "Kabul edilmiş teklif bulunamadı.",
+  "support.server.field.signed-money": "En fazla iki ondalıklı bir tutar girin.",
+  "support.server.not-found.party": "Müşteri bulunamadı.",
+  "support.server.not-found.person": "Kişi bulunamadı.",
+  "support.server.not-found.category": "Kategori bulunamadı.",
+  "support.server.not-found.parent-category": "Üst kategori bulunamadı.",
+  "support.server.not-found.related-ticket": "İlişkili talep bulunamadı.",
+  "support.server.not-found.queue": "Kuyruk bulunamadı.",
+  "support.server.not-found.calendar": "Takvim bulunamadı."
 }

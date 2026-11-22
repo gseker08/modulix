@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Calendar;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Support.Domain;
@@ -90,13 +91,13 @@ internal sealed class SlaPolicyRecordStore(SupportStoreContext context) : Suppor
         Field.Flag<SlaPolicy>("isDefault", p => p.IsDefault, (p, v) => p.IsDefault = v),
         Field.Integer<SlaPolicy>("precedence", p => p.Precedence, (p, v) => p.Precedence = v ?? 100, max: 1000),
         Field.ListChoice<SlaPolicy>("typeKey", SupportModule.Lists.TicketType, p => p.TypeKey, (p, v) => p.TypeKey = v, required: false),
-        Field.Reference<SlaPolicy, TicketCategory>("categoryId", "Kategori bulunamadı.", p => p.CategoryId, (p, v) => p.CategoryId = v),
+        Field.Reference<SlaPolicy, TicketCategory>("categoryId", SupportMessages.NotFound.Category, p => p.CategoryId, (p, v) => p.CategoryId = v),
         Field.OptionalChoice<SlaPolicy>("priority", TicketPriority.All, p => p.Priority, (p, v) => p.Priority = v),
-        Field.Shared<SlaPolicy, Party>("partyId", "Müşteri bulunamadı.", p => p.PartyId, (p, v) => p.PartyId = v),
+        Field.Shared<SlaPolicy, Party>("partyId", SupportMessages.NotFound.Party, p => p.PartyId, (p, v) => p.PartyId = v),
         Field.Id<SlaPolicy>("contractId", p => p.ContractId, (p, v) => p.ContractId = v),
         Field.Integer<SlaPolicy>("firstResponseMinutes", p => p.FirstResponseMinutes, (p, v) => p.FirstResponseMinutes = v, max: SlaPolicy.MaxMinutes),
         Field.Integer<SlaPolicy>("resolutionMinutes", p => p.ResolutionMinutes, (p, v) => p.ResolutionMinutes = v, max: SlaPolicy.MaxMinutes),
-        Field.Reference<SlaPolicy, SlaCalendar>("calendarId", "Takvim bulunamadı.", p => p.CalendarId, (p, v) => p.CalendarId = v),
+        Field.Reference<SlaPolicy, SlaCalendar>("calendarId", SupportMessages.NotFound.Calendar, p => p.CalendarId, (p, v) => p.CalendarId = v),
         Field.Flag<SlaPolicy>("pauseOnWaitingCustomer", p => p.PauseOnWaitingCustomer, (p, v) => p.PauseOnWaitingCustomer = v),
         Field.Flag<SlaPolicy>("pauseOnWaitingInternal", p => p.PauseOnWaitingInternal, (p, v) => p.PauseOnWaitingInternal = v),
         Field.Text<SlaPolicy>("escalationRules", SlaPolicy.RulesMaxLength, p => p.EscalationRules, (p, v) => p.EscalationRules = v),
