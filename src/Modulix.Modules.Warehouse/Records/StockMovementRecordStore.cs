@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Warehouse.Domain;
 
@@ -23,20 +24,19 @@ internal sealed class StockMovementRecordStore(WarehouseStoreContext context) : 
 
     protected override string WritePermission => WarehouseModule.Permissions.MovementsWrite;
 
-    protected override string? ImmutableMessage =>
-        "Stok hareketi değiştirilemez ya da silinemez (defter yalnızca eklenir). Düzeltmek için düzeltme türünde bir ters kayıt oluşturun.";
+    protected override ServerMessage? ImmutableMessage => WarehouseMessages.Movement.Immutable;
 
     protected override IReadOnlyList<RecordField<StockMovement>> Fields { get; } =
     [
         Field.ListChoice<StockMovement>("typeKey", WarehouseModule.Lists.MovementType, m => m.TypeKey, (m, v) => m.TypeKey = v ?? string.Empty),
-        Field.Reference<StockMovement, Lot>("lotId", "Parti bulunamadı.", m => m.LotId == Guid.Empty ? null : m.LotId, (m, v) => m.LotId = v ?? Guid.Empty, createOnly: true),
-        Field.Reference<StockMovement, Location>("fromLocationId", "Kaynak lokasyon bulunamadı.", m => m.FromLocationId, (m, v) => m.FromLocationId = v, createOnly: true),
-        Field.Reference<StockMovement, Location>("toLocationId", "Hedef lokasyon bulunamadı.", m => m.ToLocationId, (m, v) => m.ToLocationId = v, createOnly: true),
+        Field.Reference<StockMovement, Lot>("lotId", WarehouseMessages.NotFound.Lot, m => m.LotId == Guid.Empty ? null : m.LotId, (m, v) => m.LotId = v ?? Guid.Empty, createOnly: true),
+        Field.Reference<StockMovement, Location>("fromLocationId", WarehouseMessages.NotFound.SourceLocation, m => m.FromLocationId, (m, v) => m.FromLocationId = v, createOnly: true),
+        Field.Reference<StockMovement, Location>("toLocationId", WarehouseMessages.NotFound.TargetLocation, m => m.ToLocationId, (m, v) => m.ToLocationId = v, createOnly: true),
         Field.Decimal<StockMovement>("quantity", m => m.Quantity == 0 ? null : m.Quantity, (m, v) => m.Quantity = v ?? 0m, scale: 3, min: 0.001m, max: 999_999_999_999m),
         Field.ListChoice<StockMovement>("reasonKey", WarehouseModule.Lists.MovementReason, m => m.ReasonKey, (m, v) => m.ReasonKey = v, required: false),
         Field.Text<StockMovement>("documentReference", StockMovement.DocumentMaxLength, m => m.DocumentReference, (m, v) => m.DocumentReference = v),
         Field.Text<StockMovement>("idempotencyKey", StockMovement.IdempotencyKeyMaxLength, m => m.IdempotencyKey, (m, v) => m.IdempotencyKey = v),
-        Field.Reference<StockMovement, StockMovement>("reversesMovementId", "Geri alınacak hareket bulunamadı.", m => m.ReversesMovementId, (m, v) => m.ReversesMovementId = v, createOnly: true),
+        Field.Reference<StockMovement, StockMovement>("reversesMovementId", WarehouseMessages.NotFound.ReversedMovement, m => m.ReversesMovementId, (m, v) => m.ReversesMovementId = v, createOnly: true),
         Field.Computed<StockMovement>("occurredAt", m => m.OccurredAt == default ? null : m.OccurredAt.UtcDateTime.ToString("O", CultureInfo.InvariantCulture)),
         Field.Computed<StockMovement>("userId", m => m.UserId == Guid.Empty ? null : m.UserId.ToString()),
         Field.Computed<StockMovement>("membershipId", m => m.MembershipId == Guid.Empty ? null : m.MembershipId.ToString()),

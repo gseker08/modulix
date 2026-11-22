@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Warehouse.Domain;
 
@@ -22,7 +23,7 @@ internal sealed partial class LocationLevelRecordStore(WarehouseStoreContext con
 
     protected override IReadOnlyList<RecordField<LocationLevel>> Fields { get; } =
     [
-        Field.Reference<LocationLevel, Facility>("facilityId", "Tesis bulunamadı.", l => l.FacilityId, (l, v) => l.FacilityId = v!.Value, required: true, createOnly: true),
+        Field.Reference<LocationLevel, Facility>("facilityId", WarehouseMessages.NotFound.Facility, l => l.FacilityId, (l, v) => l.FacilityId = v!.Value, required: true, createOnly: true),
         Field.Integer<LocationLevel>("position", l => l.Position, (l, v) => l.Position = v ?? l.Position, 1, LocationLevel.MaxPosition, required: true),
         Field.Text<LocationLevel>("key", LocationLevel.KeyMaxLength, l => l.Key, (l, v) => l.Key = v!, required: true),
         Field.Text<LocationLevel>("name", LocationLevel.NameMaxLength, l => l.Name, (l, v) => l.Name = v!, required: true),
@@ -70,28 +71,28 @@ internal sealed partial class LocationLevelRecordStore(WarehouseStoreContext con
         entity.Key = entity.Key.ToLowerInvariant();
         if (!KeyPattern().IsMatch(entity.Key))
         {
-            errors.Add(new RecordFieldError("key", "Anahtar küçük harfle başlamalı; yalnızca harf, rakam ve alt çizgi içerebilir."));
+            errors.Add(new RecordFieldError("key", WarehouseMessages.Level.KeyFormat));
         }
 
         if (entity.MinLength > entity.MaxLength)
         {
-            errors.Add(new RecordFieldError("minLength", "En az uzunluk, en çok uzunluktan büyük olamaz."));
+            errors.Add(new RecordFieldError("minLength", WarehouseMessages.Level.MinLengthOrder));
         }
 
         if (!entity.Separator.All(LocationLevel.SeparatorCharacters.Contains))
         {
-            errors.Add(new RecordFieldError("separator", $"Ayraç yalnızca şu karakterlerden oluşabilir: {LocationLevel.SeparatorCharacters}"));
+            errors.Add(new RecordFieldError("separator", WarehouseMessages.Level.SeparatorChars(LocationLevel.SeparatorCharacters)));
         }
 
         var siblings = Context.Data.Set<LocationLevel>().AsNoTracking().Where(l => l.FacilityId == entity.FacilityId && l.Id != entity.Id);
         if (await siblings.AnyAsync(l => l.Position == entity.Position, cancellationToken))
         {
-            errors.Add(new RecordFieldError("position", "Bu sırada başka bir seviye var."));
+            errors.Add(new RecordFieldError("position", WarehouseMessages.Level.PositionTaken));
         }
 
         if (await siblings.AnyAsync(l => l.Key == entity.Key, cancellationToken))
         {
-            errors.Add(new RecordFieldError("key", "Bu anahtar tesisteki başka bir seviyede kullanılıyor."));
+            errors.Add(new RecordFieldError("key", WarehouseMessages.Level.KeyTaken));
         }
 
         // Kullanımdaki tesiste (lokasyonu olan) tanım yalnızca eklenir ve yeniden adlandırılır (K11): mevcut kodlar bozulmaz.
@@ -102,7 +103,7 @@ internal sealed partial class LocationLevelRecordStore(WarehouseStoreContext con
                 var deepest = await siblings.MaxAsync(l => (int?)l.Position, cancellationToken) ?? 0;
                 if (entity.Position <= deepest)
                 {
-                    errors.Add(new RecordFieldError("position", "Lokasyonu olan tesiste yeni seviye yalnızca mevcut seviyelerden sonra eklenebilir."));
+                    errors.Add(new RecordFieldError("position", WarehouseMessages.Level.AppendOnly));
                 }
             }
             else
@@ -118,7 +119,7 @@ internal sealed partial class LocationLevelRecordStore(WarehouseStoreContext con
                     ["separator"] = before.Separator != entity.Separator,
                 };
                 errors.AddRange(changed.Where(c => c.Value)
-                    .Select(c => new RecordFieldError(c.Key, "Lokasyonu olan tesiste seviye tanımı değiştirilemez; yalnızca ad değişir.")));
+                    .Select(c => new RecordFieldError(c.Key, WarehouseMessages.Level.NameOnly)));
             }
         }
 
@@ -135,7 +136,7 @@ internal sealed partial class LocationLevelRecordStore(WarehouseStoreContext con
             .CountAsync(l => l.FacilityId == entity.FacilityId && l.Position < entity.Position, cancellationToken) + 1;
         if (await Context.Data.Set<Location>().AsNoTracking().AnyAsync(l => l.FacilityId == entity.FacilityId && l.Depth >= rank, cancellationToken))
         {
-            throw new RecordConflictException("Bu seviyeyi kullanan lokasyonlar var; önce lokasyonları silin.");
+            throw new RecordConflictException(WarehouseMessages.Level.InUse);
         }
     }
 

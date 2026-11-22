@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Warehouse.Domain;
 
@@ -24,7 +25,7 @@ internal sealed class RegimeBindingRecordStore(WarehouseStoreContext context) : 
     protected override IReadOnlyList<RecordField<RegimeBinding>> Fields { get; } =
     [
         Field.ListChoice<RegimeBinding>("regimeKey", WarehouseModule.Lists.CustomsRegime, b => b.RegimeKey, (b, v) => b.RegimeKey = v ?? string.Empty),
-        Field.ProfileRef<RegimeBinding>("profileId", "Rejim profili bulunamadı ya da yayında değil.", b => b.ProfileId, (b, v) => b.ProfileId = v!.Value, required: true),
+        Field.ProfileRef<RegimeBinding>("profileId", WarehouseMessages.NotFound.RegimeProfile, b => b.ProfileId, (b, v) => b.ProfileId = v!.Value, required: true),
         Field.Choice<RegimeBinding>("enforcement", Levels, b => b.Enforcement, (b, v) => b.Enforcement = v),
     ];
 

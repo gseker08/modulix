@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Warehouse.Domain;
 
@@ -21,7 +22,7 @@ internal sealed partial class ZoneRecordStore(WarehouseStoreContext context) : W
 
     protected override IReadOnlyList<RecordField<Zone>> Fields { get; } =
     [
-        Field.Reference<Zone, Facility>("facilityId", "Tesis bulunamadı.", z => z.FacilityId, (z, v) => z.FacilityId = v!.Value, required: true, createOnly: true),
+        Field.Reference<Zone, Facility>("facilityId", WarehouseMessages.NotFound.Facility, z => z.FacilityId, (z, v) => z.FacilityId = v!.Value, required: true, createOnly: true),
         Field.Text<Zone>("code", Zone.CodeMaxLength, z => z.Code, (z, v) => z.Code = v!, required: true),
         Field.Text<Zone>("name", Zone.NameMaxLength, z => z.Name, (z, v) => z.Name = v!, required: true),
         Field.ListChoice<Zone>("kindKey", WarehouseModule.Lists.ZoneKind, z => z.KindKey, (z, v) => z.KindKey = v ?? string.Empty),
@@ -68,32 +69,32 @@ internal sealed partial class ZoneRecordStore(WarehouseStoreContext context) : W
         entity.Code = entity.Code.ToUpperInvariant();
         if (!CodePattern().IsMatch(entity.Code))
         {
-            errors.Add(new RecordFieldError("code", "Kod yalnızca harf, rakam ve alt çizgi içerebilir."));
+            errors.Add(new RecordFieldError("code", WarehouseMessages.Code.LettersDigitsUnderscore));
         }
         else if (await Context.Data.Set<Zone>().AsNoTracking()
             .AnyAsync(z => z.FacilityId == entity.FacilityId && z.Code == entity.Code && z.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("code", "Bu kod tesisteki başka bir alanda kullanılıyor."));
+            errors.Add(new RecordFieldError("code", WarehouseMessages.Zone.CodeTaken));
         }
 
         var facility = await Context.Data.Set<Facility>().AsNoTracking().SingleAsync(f => f.Id == entity.FacilityId, cancellationToken);
         var category = (await ZoneRules.CategoriesAsync(Context, cancellationToken)).GetValueOrDefault(entity.KindKey);
         if (category is null)
         {
-            errors.Add(new RecordFieldError("kindKey", "Alan türünün kategorisi tanımlı değil."));
+            errors.Add(new RecordFieldError("kindKey", WarehouseMessages.Zone.KindCategoryMissing));
         }
         else
         {
             if (category == WarehouseModule.ZoneKindCategories.Controlled && !facility.CustomsEnabled)
             {
-                errors.Add(new RecordFieldError("kindKey", "Gümrük denetimli alan yalnızca gümrük uzantısı açık tesiste tanımlanabilir."));
+                errors.Add(new RecordFieldError("kindKey", WarehouseMessages.Zone.CustomsRequired));
             }
 
             var others = await ZoneRules.CategoriesInUseAsync(Context, entity.FacilityId, entity.Id, cancellationToken);
             others.Add(category);
             if (ZoneRules.IsMixed(others) && !facility.AllowMixedZones)
             {
-                errors.Add(new RecordFieldError("kindKey", "Bu tesiste serbest ve gümrük denetimli alanlar birlikte bulunamaz (tesis ayarı kapalı)."));
+                errors.Add(new RecordFieldError("kindKey", WarehouseMessages.Zone.MixedNotAllowed));
             }
         }
 
@@ -107,7 +108,7 @@ internal sealed partial class ZoneRecordStore(WarehouseStoreContext context) : W
     {
         if (await Context.Data.Set<Location>().AsNoTracking().AnyAsync(l => l.ZoneId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Alana bağlı lokasyonlar var; önce lokasyonları başka alana taşıyın ya da silin.");
+            throw new RecordConflictException(WarehouseMessages.Zone.HasLocations);
         }
     }
 

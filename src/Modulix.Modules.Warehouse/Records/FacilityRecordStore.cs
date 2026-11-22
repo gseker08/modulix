@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Warehouse.Domain;
 
@@ -67,18 +68,18 @@ internal sealed partial class FacilityRecordStore(WarehouseStoreContext context)
         entity.Code = entity.Code.ToUpperInvariant();
         if (!CodePattern().IsMatch(entity.Code))
         {
-            errors.Add(new RecordFieldError("code", "Kod yalnızca harf, rakam ve alt çizgi içerebilir."));
+            errors.Add(new RecordFieldError("code", WarehouseMessages.Code.LettersDigitsUnderscore));
         }
         else if (await Context.Data.Set<Facility>().AsNoTracking().AnyAsync(f => f.Code == entity.Code && f.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("code", "Bu kod başka bir tesiste kullanılıyor."));
+            errors.Add(new RecordFieldError("code", WarehouseMessages.Facility.CodeTaken));
         }
 
         if (entity.CountryCode is { } country)
         {
             if (country.Length != Facility.CountryCodeLength || !country.All(char.IsAsciiLetter))
             {
-                errors.Add(new RecordFieldError("countryCode", "İki harfli ülke kodu girin (ör. TR)."));
+                errors.Add(new RecordFieldError("countryCode", ServerMessages.Validation.Country));
             }
             else
             {
@@ -92,12 +93,12 @@ internal sealed partial class FacilityRecordStore(WarehouseStoreContext context)
             var inUse = await ZoneRules.CategoriesInUseAsync(Context, entity.Id, null, cancellationToken);
             if (!entity.CustomsEnabled && inUse.Contains(WarehouseModule.ZoneKindCategories.Controlled))
             {
-                errors.Add(new RecordFieldError("customsEnabled", "Gümrük denetimli alanı olan tesiste gümrük uzantısı kapatılamaz."));
+                errors.Add(new RecordFieldError("customsEnabled", WarehouseMessages.Facility.CustomsInUse));
             }
 
             if (!entity.AllowMixedZones && ZoneRules.IsMixed(inUse))
             {
-                errors.Add(new RecordFieldError("allowMixedZones", "Tesiste serbest ve gümrük denetimli alanlar birlikte duruyor; önce birini kaldırın."));
+                errors.Add(new RecordFieldError("allowMixedZones", WarehouseMessages.Facility.MixedInUse));
             }
         }
 
@@ -112,7 +113,7 @@ internal sealed partial class FacilityRecordStore(WarehouseStoreContext context)
         if (await Context.Data.Set<Zone>().AsNoTracking().AnyAsync(z => z.FacilityId == entity.Id, cancellationToken)
             || await Context.Data.Set<LocationLevel>().AsNoTracking().AnyAsync(l => l.FacilityId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Tesise bağlı alanlar veya lokasyon seviyeleri var; önce onları silin.");
+            throw new RecordConflictException(WarehouseMessages.Facility.HasChildren);
         }
     }
 
