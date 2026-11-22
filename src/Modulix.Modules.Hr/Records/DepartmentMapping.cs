@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Modules.Hr.Domain;
@@ -36,13 +37,13 @@ internal sealed class DepartmentMapping(IRecordPipeline pipeline, HrStoreContext
     public async Task<RecordResult<IReadOnlyList<BusinessUnitInfo>>> UnitsAsync(CancellationToken cancellationToken) =>
         await context.Access.HasPermissionAsync(HrModule.Permissions.EmployeesRead, cancellationToken)
             ? RecordResult<IReadOnlyList<BusinessUnitInfo>>.Ok(await context.BusinessUnits.ListAsync(cancellationToken))
-            : RecordResult<IReadOnlyList<BusinessUnitInfo>>.Fail(RecordErrorCode.PermissionDenied, "Departmanları görme yetkiniz yok.");
+            : RecordResult<IReadOnlyList<BusinessUnitInfo>>.Fail(RecordErrorCode.PermissionDenied, HrMessages.Mapping.UnitsReadDenied);
 
     public async Task<RecordResult<IReadOnlyList<DepartmentMappingRow>>> PreviewAsync(CancellationToken cancellationToken)
     {
         if (!await context.Access.HasPermissionAsync(HrModule.Permissions.EmployeesWrite, cancellationToken))
         {
-            return RecordResult<IReadOnlyList<DepartmentMappingRow>>.Fail(RecordErrorCode.PermissionDenied, "Departman eşleme yetkiniz yok.");
+            return RecordResult<IReadOnlyList<DepartmentMappingRow>>.Fail(RecordErrorCode.PermissionDenied, HrMessages.Mapping.Denied);
         }
 
         return RecordResult<IReadOnlyList<DepartmentMappingRow>>.Ok(await RowsAsync(cancellationToken));
@@ -52,7 +53,7 @@ internal sealed class DepartmentMapping(IRecordPipeline pipeline, HrStoreContext
     {
         if (!await context.Access.HasPermissionAsync(HrModule.Permissions.EmployeesWrite, cancellationToken))
         {
-            return RecordResult<int>.Fail(RecordErrorCode.PermissionDenied, "Departman eşleme yetkiniz yok.");
+            return RecordResult<int>.Fail(RecordErrorCode.PermissionDenied, HrMessages.Mapping.Denied);
         }
 
         var mapped = (await RowsAsync(cancellationToken)).Where(r => r.BusinessUnitId is not null).ToDictionary(r => r.DepartmentKey, r => r.BusinessUnitId!.Value);
