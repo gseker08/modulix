@@ -55,8 +55,8 @@ public class CustomerTimelineFilterTests(ModulixApiFactory factory) : IClassFixt
         var company = await CreateCompanyAsync(client, "Doğrulama A.Ş.");
         await CreateOpportunityAsync(client, company.Id, "Fırsat");
 
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await client.GetAsync($"/api/crm/companies/{company.Id}/timeline?sources=yok.boyle")).StatusCode);
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await client.GetAsync($"/api/crm/companies/{company.Id}/timeline?sources={TicketsSource},yok.boyle")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/api/crm/companies/{company.Id}/timeline?sources=yok.boyle")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/api/crm/companies/{company.Id}/timeline?sources={TicketsSource},yok.boyle")).StatusCode);
         Assert.Single((await TimelineAsync(client, company.Id, "?sources=")).Items);
     }
 

@@ -11,7 +11,7 @@ namespace Modulix.Modules.Crm.Endpoints;
 /// (<see cref="ICustomerTimelineSource"/>) gelir; her kaynak kendi izin, veri kapsamı ve lisans kuralını uygular, bu uç yalnızca birleştirir.
 /// Firma çağıranın kapsamında değilse 404 döner. Sayfalama imleçlidir: <c>before</c> verilirse o andan önceki satırlar gelir.
 /// Süzgeç (dilim 3): <c>sources</c> virgülle ayrılmış kaynak anahtarlarıdır; verilirse yalnızca onlar okunur (yanıttaki <c>sources</c> listesi de
-/// yalnızca sorgulananlardan okunabilenleri sayar). Tanınmayan anahtar 422 döner; izni ya da lisansı olmayan kaynağın anahtarı geçerlidir ama satır getirmez.
+/// yalnızca sorgulananlardan okunabilenleri sayar). Tanınmayan anahtar 400 döner; izni ya da lisansı olmayan kaynağın anahtarı geçerlidir ama satır getirmez.
 /// </summary>
 internal static class CompanyTimelineEndpoint
 {

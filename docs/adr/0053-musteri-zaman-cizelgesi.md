@@ -80,7 +80,7 @@ token yoktur. Fırsat ve teklif satırı kendi sayfasına bağlanır; "Daha eski
      satıra girmez. Yanıt deposuna `receivedBefore` süzgeci eklendi. Teslimat satırının anı kayıt oluşturulma anıdır (gönderim anı değil).
 3. Kaynak türüne göre süzgeç ve özet şeridi (son temas, açık iş sayısı).
    - **Süzgeç (22 Kasım 2026):** `GET .../timeline?sources=a,b` kaynak anahtarlarıyla süzer; seçilmeyen kaynak hiç okunmaz, yanıttaki `sources`
-     listesi yalnızca sorgulananlardan okunabilenleri sayar. Tanınmayan anahtar 422 döner; izni ya da lisansı olmayan kaynağın anahtarı geçerlidir
+     listesi yalnızca sorgulananlardan okunabilenleri sayar. Tanınmayan anahtar 400 döner; izni ya da lisansı olmayan kaynağın anahtarı geçerlidir
      ama kaynak listede ve satırlarda yoktur (süzgeç yetkiyi genişletmez). Arayüzde çizelgenin üstünde çok seçimli `chip` süzgeci vardır ("Tümü" ya da
      seçilen türler); çipler süzgeçsiz yüklemenin `sources` listesinden kurulur, tek kaynak okunabiliyorsa gösterilmez. Süzgeç değişince çizelge
      baştan yüklenir. Özet şeridi sonraki dilimdedir.
