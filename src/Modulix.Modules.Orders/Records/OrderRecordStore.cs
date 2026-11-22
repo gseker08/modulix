@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Orders.Domain;
@@ -33,8 +34,8 @@ internal sealed class OrderRecordStore(OrdersStoreContext context) : OrdersRecor
     [
         Field.Text<SalesOrder>("number", SalesOrder.NumberMaxLength, o => o.Number, (o, v) => o.Number = v!).AsSystem(),
         Field.Text<SalesOrder>("title", SalesOrder.TitleMaxLength, o => o.Title, (o, v) => o.Title = v!, required: true),
-        Field.Shared<SalesOrder, Party>("partyId", "Müşteri bulunamadı.", o => o.PartyId, (o, v) => o.PartyId = v!.Value, required: true).AsSystem(),
-        Field.Shared<SalesOrder, Person>("personId", "Kişi bulunamadı.", o => o.PersonId, (o, v) => o.PersonId = v),
+        Field.Shared<SalesOrder, Party>("partyId", OrdersMessages.NotFound.Customer, o => o.PartyId, (o, v) => o.PartyId = v!.Value, required: true).AsSystem(),
+        Field.Shared<SalesOrder, Person>("personId", OrdersMessages.NotFound.Person, o => o.PersonId, (o, v) => o.PersonId = v),
         Field.Owner<SalesOrder>(OwnerField, o => o.OwnerId, (o, v) => o.OwnerId = v),
         Field.Id<SalesOrder>("sourceQuoteId", o => o.SourceQuoteId == Guid.Empty ? null : o.SourceQuoteId, (o, v) => o.SourceQuoteId = v ?? Guid.Empty).AsSystem(),
         Field.Text<SalesOrder>("sourceQuoteNumber", SalesOrder.NumberMaxLength, o => o.SourceQuoteNumber, (o, v) => o.SourceQuoteNumber = v ?? string.Empty).AsSystem(),
@@ -140,7 +141,7 @@ internal sealed class OrderRecordStore(OrdersStoreContext context) : OrdersRecor
         // Sipariş yalnızca kabul edilmiş tekliften (iş akışı servisi, kapı açık) oluşur; genel uçtan boş sipariş açılamaz.
         if (!Context.Gate.IsOpen)
         {
-            throw new RecordValidationException([new RecordFieldError("title", "Sipariş yalnızca kabul edilmiş tekliften oluşturulur.")]);
+            throw new RecordValidationException([new RecordFieldError("title", OrdersMessages.Order.FromQuoteOnly)]);
         }
 
         entity.CreatedBy = Context.CurrentUserId;
@@ -156,7 +157,7 @@ internal sealed class OrderRecordStore(OrdersStoreContext context) : OrdersRecor
         {
             if (OrderStatus.IsFinal(entity.Status))
             {
-                errors.Add(new RecordFieldError("title", "Sonuçlanmış sipariş değiştirilemez."));
+                errors.Add(new RecordFieldError("title", OrdersMessages.Order.FinalLocked));
             }
             else if (ContentFields.Any(values.ContainsKey) && OrderRules.CanEditContent(entity.Status) is { Allowed: false } rule)
             {
@@ -168,7 +169,7 @@ internal sealed class OrderRecordStore(OrdersStoreContext context) : OrdersRecor
         if (entity.PersonId is { } personId && (values.ContainsKey("personId") || values.ContainsKey("partyId"))
             && !await Context.Data.Set<Person>().AsNoTracking().AnyAsync(p => p.Id == personId && p.PartyId == entity.PartyId, cancellationToken))
         {
-            errors.Add(new RecordFieldError("personId", "Kişi seçilen müşteriyle ilişkili değil."));
+            errors.Add(new RecordFieldError("personId", OrdersMessages.Order.PersonMismatch));
         }
 
         if (errors.Count > 0)
@@ -199,7 +200,7 @@ internal sealed class OrderRecordStore(OrdersStoreContext context) : OrdersRecor
     }
 
     protected override Task BeforeDeleteAsync(SalesOrder entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Sipariş silinemez; geçmişi korunur. Vazgeçildiyse siparişi iptal edin.");
+        throw new RecordConflictException(OrdersMessages.Order.NoDelete);
 }
 
 /// <summary>Liste sıralama anahtarları.</summary>

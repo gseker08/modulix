@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Orders.Domain;
 using Modulix.Modules.Orders.Lifecycle;
@@ -24,7 +25,7 @@ internal sealed class OrderChangeRequestRecordStore(OrdersStoreContext context) 
 
     protected override IReadOnlyList<RecordField<OrderChangeRequest>> Fields { get; } =
     [
-        Field.Reference<OrderChangeRequest, SalesOrder>("orderId", "Sipariş bulunamadı.", c => c.OrderId, (c, v) => c.OrderId = v!.Value, required: true, createOnly: true),
+        Field.Reference<OrderChangeRequest, SalesOrder>("orderId", OrdersMessages.NotFound.Order, c => c.OrderId, (c, v) => c.OrderId = v!.Value, required: true, createOnly: true),
         Field.Integer<OrderChangeRequest>("sequence", c => c.Sequence, (c, v) => c.Sequence = v ?? 1).AsSystem(),
         Field.Choice<OrderChangeRequest>("status", ChangeRequestStatus.All, c => c.Status, (c, v) => c.Status = v).AsSystem(),
         Field.Text<OrderChangeRequest>("reason", SalesOrder.ReasonMaxLength, c => c.Reason, (c, v) => c.Reason = v ?? string.Empty, required: true).AsSystem(),
@@ -71,7 +72,7 @@ internal sealed class OrderChangeRequestRecordStore(OrdersStoreContext context) 
     {
         if (!Context.Gate.IsOpen)
         {
-            throw new RecordValidationException([new RecordFieldError("orderId", "Değişiklik talebi yalnızca sipariş ekranındaki talep işlemiyle açılır.")]);
+            throw new RecordValidationException([new RecordFieldError("orderId", OrdersMessages.Change.ViaActionOnly)]);
         }
 
         entity.RequestedBy = Context.CurrentUserId;
@@ -82,12 +83,12 @@ internal sealed class OrderChangeRequestRecordStore(OrdersStoreContext context) 
     {
         if (!isNew && !Context.Gate.IsOpen)
         {
-            throw new RecordValidationException([new RecordFieldError("status", "Değişiklik talebi yalnızca karar işlemleriyle değişir.")]);
+            throw new RecordValidationException([new RecordFieldError("status", OrdersMessages.Change.StatusViaDecision)]);
         }
 
         return Task.CompletedTask;
     }
 
     protected override Task BeforeDeleteAsync(OrderChangeRequest entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Değişiklik talebi silinemez; geçmişi korunur. Bekleyen talep geri çekilebilir.");
+        throw new RecordConflictException(OrdersMessages.Change.NoDelete);
 }

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Orders.Domain;
 using Modulix.Modules.Orders.Lifecycle;
@@ -27,7 +28,7 @@ internal sealed class OrderLineRecordStore(OrdersStoreContext context) : OrdersR
 
     protected override IReadOnlyList<RecordField<SalesOrderLine>> Fields { get; } =
     [
-        Field.Reference<SalesOrderLine, SalesOrder>("orderId", "Sipariş bulunamadı.", l => l.OrderId, (l, v) => l.OrderId = v!.Value, required: true, createOnly: true),
+        Field.Reference<SalesOrderLine, SalesOrder>("orderId", OrdersMessages.NotFound.Order, l => l.OrderId, (l, v) => l.OrderId = v!.Value, required: true, createOnly: true),
         Field.Integer<SalesOrderLine>("position", l => l.Position, (l, v) => l.Position = v ?? 0, max: 9999).AsSystem(),
         Field.Choice<SalesOrderLine>("kind", LineKinds.All, l => l.Kind, (l, v) => l.Kind = v).AsSystem(),
         Field.Id<SalesOrderLine>("parentSourceLineKey", l => l.ParentSourceLineKey, (l, v) => l.ParentSourceLineKey = v).AsSystem(),
@@ -89,7 +90,7 @@ internal sealed class OrderLineRecordStore(OrdersStoreContext context) : OrdersR
     {
         if (!Context.Gate.IsOpen)
         {
-            throw new RecordValidationException([new RecordFieldError("orderId", "Sipariş kalemi yalnızca tekliften sipariş oluşturulurken eklenir.")]);
+            throw new RecordValidationException([new RecordFieldError("orderId", OrdersMessages.Line.FromQuoteOnly)]);
         }
 
         return Task.FromResult(values);
@@ -105,10 +106,10 @@ internal sealed class OrderLineRecordStore(OrdersStoreContext context) : OrdersR
         var order = await Context.Data.Set<SalesOrder>().AsNoTracking().SingleOrDefaultAsync(o => o.Id == entity.OrderId, cancellationToken);
         if (order is null || OrderStatus.IsFinal(order.Status))
         {
-            throw new RecordValidationException([new RecordFieldError("orderId", "Sonuçlanmış siparişin kalemi değiştirilemez.")]);
+            throw new RecordValidationException([new RecordFieldError("orderId", OrdersMessages.Line.FinalLocked)]);
         }
     }
 
     protected override Task BeforeDeleteAsync(SalesOrderLine entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Sipariş kalemi silinemez; siparişi iptal edin.");
+        throw new RecordConflictException(OrdersMessages.Line.NoDelete);
 }

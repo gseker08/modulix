@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Persistence;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Orders.Domain;
 
@@ -249,7 +250,7 @@ internal abstract class OrdersRecordStore<TEntity>(OrdersStoreContext context) :
 
         if (!keys.Contains(sort, StringComparer.Ordinal))
         {
-            throw new RecordValidationException([new RecordFieldError("sort", "Geçersiz sıralama.")]);
+            throw new RecordValidationException([new RecordFieldError("sort", ServerMessages.Validation.InvalidSort)]);
         }
 
         return (filters.Where(f => f.Key != "sort").ToDictionary(f => f.Key, f => f.Value), sort);
@@ -277,7 +278,7 @@ internal abstract class OrdersRecordStore<TEntity>(OrdersStoreContext context) :
             }
             else
             {
-                errors.Add(new RecordFieldError(name, "Geçersiz filtre değeri."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.InvalidFilterValue));
             }
         }
 
@@ -325,7 +326,7 @@ internal abstract class OrdersRecordStore<TEntity>(OrdersStoreContext context) :
             {
                 if (value is not null && !JsonNode.DeepEquals(field.Read(entity), JsonValue.Create(value.ToString())))
                 {
-                    errors.Add(new RecordFieldError(name, "Oluşturulduktan sonra değiştirilemez."));
+                    errors.Add(new RecordFieldError(name, ServerMessages.Validation.CreateOnly));
                 }
 
                 continue;
@@ -334,7 +335,7 @@ internal abstract class OrdersRecordStore<TEntity>(OrdersStoreContext context) :
             if (field.Exists is { } exists && value is Guid id && !await exists(context, id, cancellationToken))
             {
                 // Başka tenant'ın kaydı da "bulunamadı" sayılır; varlığı belli edilmez.
-                errors.Add(new RecordFieldError(name, field.NotFoundMessage ?? "Kayıt bulunamadı."));
+                errors.Add(new RecordFieldError(name, field.NotFoundMessage ?? ServerMessages.Record.NotFound));
                 continue;
             }
 
@@ -344,7 +345,7 @@ internal abstract class OrdersRecordStore<TEntity>(OrdersStoreContext context) :
                 var unchanged = !isNew && choice is not null && field.Read(entity)?.GetValue<string>() == choice.Key;
                 if (choice is null || (!choice.Active && !unchanged))
                 {
-                    errors.Add(new RecordFieldError(name, choice is null ? "Listede olmayan değer." : "Bu değer artık kullanılmıyor."));
+                    errors.Add(new RecordFieldError(name, choice is null ? ServerMessages.Validation.NotInList : ServerMessages.Validation.Retired));
                     continue;
                 }
 
@@ -366,8 +367,7 @@ internal abstract class OrdersRecordStore<TEntity>(OrdersStoreContext context) :
     {
         if (expectedVersion is { } expected && expected != entity.Version)
         {
-            throw new RecordConflictException(
-                $"Kayıt siz düzenlerken değişti (beklenen sürüm {expected}, güncel sürüm {entity.Version}). Güncel halini alıp tekrar deneyin.");
+            throw new RecordConflictException(ServerMessages.Record.ConcurrencyVersion(expected, entity.Version));
         }
     }
 

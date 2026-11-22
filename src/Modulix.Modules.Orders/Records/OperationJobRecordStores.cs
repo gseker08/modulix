@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Orders.Domain;
 using Modulix.Modules.Orders.Lifecycle;
@@ -43,7 +44,7 @@ internal sealed class OperationJobRecordStore(OrdersStoreContext context) : Orde
 
     protected override IReadOnlyList<RecordField<OperationJob>> Fields { get; } =
     [
-        Field.Reference<OperationJob, SalesOrder>("orderId", "Sipariş bulunamadı.", j => j.OrderId, (j, v) => j.OrderId = v!.Value, required: true, createOnly: true),
+        Field.Reference<OperationJob, SalesOrder>("orderId", OrdersMessages.NotFound.Order, j => j.OrderId, (j, v) => j.OrderId = v!.Value, required: true, createOnly: true),
         Field.Id<OperationJob>("handoverId", j => j.HandoverId, (j, v) => j.HandoverId = v).AsSystem(),
         Field.Text<OperationJob>("number", OperationJob.NumberMaxLength, j => j.Number, (j, v) => j.Number = v!).AsSystem(),
         Field.Text<OperationJob>("title", OperationJob.TitleMaxLength, j => j.Title, (j, v) => j.Title = v!, required: true),
@@ -124,7 +125,7 @@ internal sealed class OperationJobRecordStore(OrdersStoreContext context) : Orde
     {
         if (!Context.Gate.IsOpen)
         {
-            throw new RecordValidationException([new RecordFieldError("orderId", "Operasyon işi yalnızca devir kabulünden ya da sipariş ekranındaki iş açma işleminden oluşur.")]);
+            throw new RecordValidationException([new RecordFieldError("orderId", OrdersMessages.Job.ViaHandoverOnly)]);
         }
 
         entity.CreatedBy = Context.CurrentUserId;
@@ -146,12 +147,12 @@ internal sealed class OperationJobRecordStore(OrdersStoreContext context) : Orde
         var errors = new List<RecordFieldError>();
         if (!isNew && !Context.Gate.IsOpen && JobStatus.IsFinal(entity.Status))
         {
-            errors.Add(new RecordFieldError("status", "Tamamlanmış ya da iptal edilmiş iş değiştirilemez."));
+            errors.Add(new RecordFieldError("status", OrdersMessages.Job.ClosedLocked));
         }
 
         if (entity.PlannedStartDate is { } start && entity.PlannedEndDate is { } end && end < start)
         {
-            errors.Add(new RecordFieldError("plannedEndDate", "Planlanan bitiş başlangıçtan önce olamaz."));
+            errors.Add(new RecordFieldError("plannedEndDate", OrdersMessages.Job.EndBeforeStart));
         }
 
         if (errors.Count > 0)
@@ -166,7 +167,7 @@ internal sealed class OperationJobRecordStore(OrdersStoreContext context) : Orde
     }
 
     protected override Task BeforeDeleteAsync(OperationJob entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Operasyon işi silinemez; geçmişi korunur. Vazgeçildiyse işi iptal edin.");
+        throw new RecordConflictException(OrdersMessages.Job.NoDelete);
 }
 
 /// <summary>Liste sıralama anahtarları.</summary>
@@ -195,7 +196,7 @@ internal sealed class OperationJobTaskRecordStore(OrdersStoreContext context) : 
 
     protected override IReadOnlyList<RecordField<OperationJobTask>> Fields { get; } =
     [
-        Field.Reference<OperationJobTask, OperationJob>("jobId", "İş bulunamadı.", t => t.JobId, (t, v) => t.JobId = v!.Value, required: true, createOnly: true),
+        Field.Reference<OperationJobTask, OperationJob>("jobId", OrdersMessages.NotFound.Job, t => t.JobId, (t, v) => t.JobId = v!.Value, required: true, createOnly: true),
         Field.Integer<OperationJobTask>("position", t => t.Position, (t, v) => t.Position = v ?? 0, max: 9999).AsSystem(),
         Field.Text<OperationJobTask>("title", OperationJobTask.TitleMaxLength, t => t.Title, (t, v) => t.Title = v!, required: true),
         Field.Flag<OperationJobTask>("isRequired", t => t.IsRequired, (t, v) => t.IsRequired = v).AsSystem(),
@@ -254,15 +255,15 @@ internal sealed class OperationJobTaskRecordStore(OrdersStoreContext context) : 
     protected override async Task AppliedAsync(OperationJobTask entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
         var job = await Context.Data.Set<OperationJob>().AsNoTracking().SingleOrDefaultAsync(j => j.Id == entity.JobId, cancellationToken)
-            ?? throw new RecordValidationException([new RecordFieldError("jobId", "İş bulunamadı.")]);
+            ?? throw new RecordValidationException([new RecordFieldError("jobId", OrdersMessages.NotFound.Job)]);
         if (!Context.Gate.IsOpen && JobStatus.IsFinal(job.Status))
         {
-            throw new RecordValidationException([new RecordFieldError("jobId", "Tamamlanmış ya da iptal edilmiş işin görevleri değiştirilemez.")]);
+            throw new RecordValidationException([new RecordFieldError("jobId", OrdersMessages.Job.TasksClosedLocked)]);
         }
 
         if (!isNew && entity.IsDefault && entity.Title != titleBefore)
         {
-            throw new RecordValidationException([new RecordFieldError("title", "Şablondan gelen görevin başlığı değiştirilemez.")]);
+            throw new RecordValidationException([new RecordFieldError("title", OrdersMessages.Job.TemplateTitleLocked)]);
         }
 
         if (values.ContainsKey("isDone"))
@@ -276,13 +277,13 @@ internal sealed class OperationJobTaskRecordStore(OrdersStoreContext context) : 
     {
         if (entity.IsDefault)
         {
-            throw new RecordConflictException("Şablondan gelen görev silinemez; yalnızca tamamlandı olarak işaretlenir.");
+            throw new RecordConflictException(OrdersMessages.Job.TemplateTaskNoDelete);
         }
 
         var status = await Context.Data.Set<OperationJob>().AsNoTracking().Where(j => j.Id == entity.JobId).Select(j => j.Status).SingleOrDefaultAsync(cancellationToken);
         if (status is null || JobStatus.IsFinal(status))
         {
-            throw new RecordValidationException([new RecordFieldError("jobId", "Tamamlanmış ya da iptal edilmiş işin görevleri değiştirilemez.")]);
+            throw new RecordValidationException([new RecordFieldError("jobId", OrdersMessages.Job.TasksClosedLocked)]);
         }
     }
 }

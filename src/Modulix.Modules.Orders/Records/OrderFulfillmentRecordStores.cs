@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Orders.Domain;
 using Modulix.Modules.Orders.Lifecycle;
@@ -27,7 +28,7 @@ internal sealed class OrderDeliveryRecordStore(OrdersStoreContext context) : Ord
 
     protected override IReadOnlyList<RecordField<OrderDelivery>> Fields { get; } =
     [
-        Field.Reference<OrderDelivery, SalesOrder>("orderId", "Sipariş bulunamadı.", d => d.OrderId, (d, v) => d.OrderId = v!.Value, required: true, createOnly: true),
+        Field.Reference<OrderDelivery, SalesOrder>("orderId", OrdersMessages.NotFound.Order, d => d.OrderId, (d, v) => d.OrderId = v!.Value, required: true, createOnly: true),
         Field.Id<OrderDelivery>("jobId", d => d.JobId, (d, v) => d.JobId = v).AsSystem(),
         Field.Text<OrderDelivery>("number", OrderDelivery.NumberMaxLength, d => d.Number, (d, v) => d.Number = v!).AsSystem(),
         Field.Text<OrderDelivery>("status", SalesOrder.StatusMaxLength, d => d.Status, (d, v) => d.Status = v!).AsSystem(),
@@ -85,7 +86,7 @@ internal sealed class OrderDeliveryRecordStore(OrdersStoreContext context) : Ord
     {
         if (!Context.Gate.IsOpen)
         {
-            throw new RecordValidationException([new RecordFieldError("orderId", "Teslimat yalnızca sipariş ekranındaki teslimat planlama işlemiyle oluşur.")]);
+            throw new RecordValidationException([new RecordFieldError("orderId", OrdersMessages.Delivery.ViaPlanOnly)]);
         }
 
         entity.CreatedBy = Context.CurrentUserId;
@@ -111,7 +112,7 @@ internal sealed class OrderDeliveryRecordStore(OrdersStoreContext context) : Ord
 
         if (!isNew && !Context.Gate.IsOpen && entity.Status != DeliveryStatus.Planned)
         {
-            throw new RecordValidationException([new RecordFieldError("status", "Yalnızca planlı teslimatın planı ve notu düzenlenir; teslim edilen ya da sonuçlanan teslimat değişmez.")]);
+            throw new RecordValidationException([new RecordFieldError("status", OrdersMessages.Delivery.PlannedOnly)]);
         }
 
         if (!isNew && Context.Gate.IsOpen && Context.Gate.DeliveryEffect is { } effect)
@@ -121,7 +122,7 @@ internal sealed class OrderDeliveryRecordStore(OrdersStoreContext context) : Ord
     }
 
     protected override Task BeforeDeleteAsync(OrderDelivery entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Teslimat silinemez; geçmişi korunur. Planlı teslimat iptal edilir, başarısız teslimat yeniden planlanır.");
+        throw new RecordConflictException(OrdersMessages.Delivery.NoDelete);
 }
 
 /// <summary>
@@ -144,8 +145,8 @@ internal sealed class OrderServiceStartRecordStore(OrdersStoreContext context) :
 
     protected override IReadOnlyList<RecordField<OrderServiceStart>> Fields { get; } =
     [
-        Field.Reference<OrderServiceStart, SalesOrder>("orderId", "Sipariş bulunamadı.", s => s.OrderId, (s, v) => s.OrderId = v!.Value, required: true, createOnly: true),
-        Field.Reference<OrderServiceStart, SalesOrderLine>("orderLineId", "Sipariş kalemi bulunamadı.", s => s.OrderLineId, (s, v) => s.OrderLineId = v!.Value, required: true, createOnly: true),
+        Field.Reference<OrderServiceStart, SalesOrder>("orderId", OrdersMessages.NotFound.Order, s => s.OrderId, (s, v) => s.OrderId = v!.Value, required: true, createOnly: true),
+        Field.Reference<OrderServiceStart, SalesOrderLine>("orderLineId", OrdersMessages.NotFound.OrderLine, s => s.OrderLineId, (s, v) => s.OrderLineId = v!.Value, required: true, createOnly: true),
         Field.Text<OrderServiceStart>("status", SalesOrder.StatusMaxLength, s => s.Status, (s, v) => s.Status = v!).AsSystem(),
         Field.Date<OrderServiceStart>("plannedStartDate", s => s.PlannedStartDate, (s, v) => s.PlannedStartDate = v),
         Field.Time<OrderServiceStart>("actualStartAt", s => s.ActualStartAt, (s, v) => s.ActualStartAt = v).AsSystem(),
@@ -199,7 +200,7 @@ internal sealed class OrderServiceStartRecordStore(OrdersStoreContext context) :
     {
         if (!Context.Gate.IsOpen)
         {
-            throw new RecordValidationException([new RecordFieldError("orderId", "Hizmet başlangıç kaydı yalnızca sipariş ekranındaki planlama işlemiyle oluşur.")]);
+            throw new RecordValidationException([new RecordFieldError("orderId", OrdersMessages.ServiceStart.ViaPlanOnly)]);
         }
 
         entity.CreatedBy = Context.CurrentUserId;
@@ -210,12 +211,12 @@ internal sealed class OrderServiceStartRecordStore(OrdersStoreContext context) :
     {
         if (!isNew && !Context.Gate.IsOpen && entity.Status == ServiceStatus.Completed)
         {
-            throw new RecordValidationException([new RecordFieldError("status", "Tamamlanmış hizmetin başlangıç kaydı değiştirilemez.")]);
+            throw new RecordValidationException([new RecordFieldError("status", OrdersMessages.ServiceStart.CompletedLocked)]);
         }
 
         return Task.CompletedTask;
     }
 
     protected override Task BeforeDeleteAsync(OrderServiceStart entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Hizmet başlangıç kaydı silinemez; geçmişi korunur.");
+        throw new RecordConflictException(OrdersMessages.ServiceStart.NoDelete);
 }
