@@ -1,0 +1,126 @@
+@* Firma vurgu rengi girişi (E8): renk seçici + #RRGGBB kutusu + o temada önizleme + kontrast sonucu. Kontrast sunucudaki kuralla
+   hesaplanır (POST /api/settings/accent/preview); kaydetmeyi yine sunucu doğrular. Önizleme kutusu seçilen temanın tokenlarını
+   (data-theme) ve yalnızca --mx-brand-primary'yi geçersiz kılar; bileşenler kendi sınıflarıyla çizilir. *@
+@using Modulix.Shared.Settings
+@implements IDisposable
+@inject ApiClient Api
+
+<div class="d-flex flex-wrap align-items-center gap-2">
+    <input id="@($"{Id}-picker")" class="form-control form-control-color" type="color" disabled="@Disabled"
+           value="@AccentInput.PickerValue(Value, Dark)" aria-label="@Texts.Get("admin.settings.accent.picker")"
+           @onchange="e => ChangedAsync(e.Value as string)" />
+    <input id="@Id" class="form-control w-auto" maxlength="7" placeholder="@(Dark ? AccentInput.DefaultDark : AccentInput.DefaultLight)"
+           disabled="@Disabled" value="@Value" aria-describedby="@($"{Id}-status")" @oninput="e => ChangedAsync(e.Value as string, immediate: false)" />
+    <button type="button" class="btn btn-outline-secondary" disabled="@(Disabled || Value.Length == 0)" @onclick="() => ChangedAsync(string.Empty)">
+        @Texts.Get("admin.settings.accent.reset")
+    </button>
+</div>
+
+<div id="@($"{Id}-status")" class="form-text" role="status" aria-live="polite">
+    @if (checking)
+    {
+        @Texts.Get("admin.settings.accent.checking")
+    }
+    else if (check is { Valid: true, Contrast: { } contrast })
+    {
+        @Texts.Get("admin.settings.accent.ok", contrast.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), check.MinContrast.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))
+    }
+    else if (Value.Length == 0)
+    {
+        @Texts.Get("admin.settings.accent.default")
+    }
+</div>
+@if (check is { Valid: false, Message: { } message })
+{
+    <div class="invalid-feedback d-block">@message</div>
+}
+
+@* Önizleme: seçilen temanın yüzeyinde bağlantı ve ikincil düğme, firma renginde. Renk geçersizse varsayılan renk görünür. *@
+<div class="card p-3 mt-2" data-theme="@(Dark ? "dark" : "light")" data-bs-theme="@(Dark ? "dark" : "light")"
+     style="@PreviewStyle" aria-label="@Texts.Get("admin.settings.accent.preview")">
+    <div class="d-flex flex-wrap align-items-center gap-3">
+        <a href="#" @onclick:preventDefault>@Texts.Get("admin.settings.accent.sampleLink")</a>
+        <button type="button" class="btn btn-outline-primary btn-sm" tabindex="-1">@Texts.Get("admin.settings.accent.sampleButton")</button>
+        <span class="text-muted">@(Dark ? Texts.Get("admin.settings.accent.darkTheme") : Texts.Get("admin.settings.accent.lightTheme"))</span>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
+
+    /// <summary>Boşsa firma rengi yok (Modulix rengi).</summary>
+    [Parameter] public string Value { get; set; } = string.Empty;
+
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    /// <summary>Koyu temanın rengi mi; kontrast ve önizleme o temaya göre.</summary>
+    [Parameter] public bool Dark { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    private AccentPreviewResponse? check;
+    private bool checking;
+    private CancellationTokenSource? pending;
+    private string? checkedValue;
+
+    // Önizleme yalnızca tam #RRGGBB'de rengi geçersiz kılar; değer sunucu kuralına uymasa da (düşük kontrast) kullanıcı görsün diye uygulanır.
+    private string? PreviewStyle => AccentInput.IsHex(Value) ? $"--mx-brand-primary: {Value}" : null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Yüklenen ya da dışarıdan sıfırlanan değer için kontrast bir kez sorulur.
+        if (Value != checkedValue)
+        {
+            await CheckAsync(Value, delay: false);
+        }
+    }
+
+    private async Task ChangedAsync(string? raw, bool immediate = true)
+    {
+        string value = AccentInput.Normalize(raw);
+        await ValueChanged.InvokeAsync(value);
+
+        // Yazarken (oninput) her tuşta sunucuya gidilmez; renk seçici ve düğme hemen sorar.
+        await CheckAsync(value, delay: !immediate);
+    }
+
+    private async Task CheckAsync(string value, bool delay)
+    {
+        checkedValue = value;
+        pending?.Cancel();
+        pending?.Dispose();
+        if (value.Length == 0)
+        {
+            (check, checking) = (null, false);
+            return;
+        }
+
+        pending = new CancellationTokenSource();
+        CancellationToken token = pending.Token;
+        checking = true;
+        try
+        {
+            if (delay)
+            {
+                await Task.Delay(350, token);
+            }
+
+            var result = await Api.PostAsync<AccentPreviewResponse>("/api/settings/accent/preview", new AccentPreviewRequest(value, Dark));
+            if (!token.IsCancellationRequested)
+            {
+                check = result.Value;
+                checking = false;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Daha yeni bir değer geldi; onun sonucu gösterilir.
+        }
+    }
+
+    public void Dispose()
+    {
+        pending?.Cancel();
+        pending?.Dispose();
+    }
+}

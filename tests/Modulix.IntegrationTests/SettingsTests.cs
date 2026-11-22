@@ -125,6 +125,54 @@ public class SettingsTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
     }
 
     [Fact]
+    public async Task Accent_preview_reports_contrast_writes_nothing_and_needs_the_manage_permission()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        var member = await factory.CreateUserAsync(tenant);
+        var manager = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [ManageSettings], manager);
+        using var memberClient = await LoginAsync(member);
+        using var managerClient = await LoginAsync(manager);
+
+        // Yetki: izinsiz üye önizleme de isteyemez.
+        Assert.Equal(HttpStatusCode.Forbidden, (await memberClient.PostAsJsonAsync("/api/settings/accent/preview", new AccentPreviewRequest("#0B5C87", false))).StatusCode);
+
+        // Mutlu yol: geçen renk kontrastıyla döner.
+        var ok = await Preview(managerClient, "#0B5C87", dark: false);
+        Assert.True(ok.Valid);
+        Assert.True(ok.Contrast >= ok.MinContrast);
+        Assert.Equal(4.5, ok.MinContrast);
+
+        // Doğrulama: açık temada okunmayan ve koyu temada okunmayan renk, biçimsiz girdi (CSS enjeksiyonu denemesi dahil).
+        var lowLight = await Preview(managerClient, "#7DD3FC", dark: false);
+        Assert.False(lowLight.Valid);
+        Assert.NotNull(lowLight.Message);
+        Assert.True(lowLight.Contrast < lowLight.MinContrast);
+        Assert.False((await Preview(managerClient, "#1E3A5F", dark: true)).Valid);
+        var malformed = await Preview(managerClient, "red; } body { display:none", dark: false);
+        Assert.False(malformed.Valid);
+        Assert.Null(malformed.Contrast);
+
+        // Boş değer "firma rengi yok": geçerli.
+        Assert.True((await Preview(managerClient, "", dark: true)).Valid);
+
+        // Hiçbir şey yazılmaz; başka firma etkilenmez.
+        Assert.Equal("", (await GetAsync(managerClient))[SettingKeys.AccentLight].Value);
+        using var scope = factory.OpenScope(tenant.Id);
+        Assert.False(await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().TenantSettings.AnyAsync());
+        var other = await factory.CreateTenantAsync();
+        using var otherClient = await LoginAsync(await factory.CreateUserAsync(other));
+        Assert.Equal("", (await GetAsync(otherClient))[SettingKeys.AccentLight].Value);
+    }
+
+    private static async Task<AccentPreviewResponse> Preview(HttpClient client, string color, bool dark)
+    {
+        var response = await client.PostAsJsonAsync("/api/settings/accent/preview", new AccentPreviewRequest(color, dark));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<AccentPreviewResponse>())!;
+    }
+
+    [Fact]
     public async Task Changes_are_audited_with_setting_names_and_unchanged_values_are_not()
     {
         var (client, _) = await ManagerAsync();

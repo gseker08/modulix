@@ -26,6 +26,13 @@ public static class SettingsEndpoints
             ToResponse(await tenantSettings.GetAsync(ct), await logo.GetInfoAsync(ct), await BundleAsync(language, texts, ct)));
         settings.MapPut("/", SaveAsync).RequirePermission(CoreModule.Permissions.ManageSettings);
 
+        // Vurgu rengi önizlemesi (E8): kaydetmeden önce kontrast sonucu. Hiçbir şey yazmaz; yolu /preview ile biter.
+        settings.MapPost("/accent/preview", (AccentPreviewRequest request) =>
+        {
+            var check = AccentColor.Check((request.Color ?? string.Empty).Trim(), request.Dark);
+            return Results.Ok(new AccentPreviewResponse(check.Valid, check.Contrast, AccentColor.MinContrast, check.Message));
+        }).RequirePermission(CoreModule.Permissions.ManageSettings);
+
         // Logo (Y6b): gövde dosyanın kendisidir (PNG veya JPEG, en fazla 256 KB); tür dosyanın içeriğinden belirlenir.
         settings.MapGet("/logo", GetLogoAsync);
         settings.MapPut("/logo", SaveLogoAsync).RequirePermission(CoreModule.Permissions.ManageSettings);
