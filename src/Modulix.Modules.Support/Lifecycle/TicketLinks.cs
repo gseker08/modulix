@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Support.Domain;
 using Modulix.Modules.Support.Records;
@@ -68,39 +69,39 @@ internal sealed class TicketLinks(IRecordPipeline pipeline, TicketWorkflowGate g
 
         if (entityKey is null || !TicketLinkKinds.All.Contains(entityKey))
         {
-            return Invalid("entityKey", $"Şunlardan biri olmalıdır: {string.Join(", ", TicketLinkKinds.All)}.");
+            return Invalid("entityKey", ServerMessages.Validation.OneOf(string.Join(", ", TicketLinkKinds.All)));
         }
 
         if (recordId == Guid.Empty)
         {
-            return Invalid("recordId", "Kayıt seçin.");
+            return Invalid("recordId", SupportMessages.Link.SelectRecord);
         }
 
         if (guard.PartyId is not { } ticketParty)
         {
-            return Invalid("partyId", "İlişkili kayıt bağlamak için önce talebe müşteri bağlayın.");
+            return Invalid("partyId", SupportMessages.Link.PartyRequired);
         }
 
         if (await context.Data.Set<TicketLink>().AnyAsync(l => l.TicketId == ticketId && l.EntityKey == entityKey && l.RecordId == recordId, cancellationToken))
         {
-            return RecordResult<IReadOnlyList<TicketLinkItem>>.Fail(RecordErrorCode.Conflict, "Bu kayıt talebe zaten bağlı.", [new RecordFieldError("recordId", "Zaten bağlı.")]);
+            return RecordResult<IReadOnlyList<TicketLinkItem>>.Fail(RecordErrorCode.Conflict, SupportMessages.Link.AlreadyLinked, [new RecordFieldError("recordId", SupportMessages.Link.AlreadyLinkedField)]);
         }
 
         if (await context.Data.Set<TicketLink>().CountAsync(l => l.TicketId == ticketId, cancellationToken) >= ITicketLinks.MaxPerTicket)
         {
-            return Invalid("recordId", $"Bir talebe en fazla {ITicketLinks.MaxPerTicket} kayıt bağlanabilir.");
+            return Invalid("recordId", SupportMessages.Link.MaxPerTicket(ITicketLinks.MaxPerTicket));
         }
 
         var resolved = await ResolveAsync(entityKey, recordId, cancellationToken);
         if (resolved is null)
         {
-            return Invalid("recordId", "Kayıt bulunamadı, erişim yetkiniz yok ya da ilgili modül kapalı.");
+            return Invalid("recordId", SupportMessages.Link.RecordUnavailable);
         }
 
         if (resolved.PartyId != ticketParty)
         {
             return RecordResult<IReadOnlyList<TicketLinkItem>>.Fail(
-                RecordErrorCode.Conflict, "Farklı müşteriye ait kayıt talebe bağlanamaz.", [new RecordFieldError("recordId", "Kayıt talebin müşterisine ait değil.")]);
+                RecordErrorCode.Conflict, SupportMessages.Link.OtherParty, [new RecordFieldError("recordId", SupportMessages.Link.NotOfTicketParty)]);
         }
 
         var isContract = entityKey == TicketLinkKinds.Contract;
@@ -126,7 +127,7 @@ internal sealed class TicketLinks(IRecordPipeline pipeline, TicketWorkflowGate g
         var link = await context.Data.Set<TicketLink>().AsNoTracking().FirstOrDefaultAsync(l => l.Id == linkId && l.TicketId == ticketId, cancellationToken);
         if (link is null)
         {
-            return RecordResult<IReadOnlyList<TicketLinkItem>>.Fail(RecordErrorCode.NotFound, "Bağlantı bulunamadı.");
+            return RecordResult<IReadOnlyList<TicketLinkItem>>.Fail(RecordErrorCode.NotFound, SupportMessages.Link.NotFound);
         }
 
         var isContract = link.EntityKey == TicketLinkKinds.Contract;
@@ -190,13 +191,13 @@ internal sealed class TicketLinks(IRecordPipeline pipeline, TicketWorkflowGate g
 
         if (!await access.HasPermissionAsync(SupportModule.Permissions.TicketsWrite, cancellationToken))
         {
-            return (RecordResult<IReadOnlyList<TicketLinkItem>>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{SupportModule.Permissions.TicketsWrite}' izni gerekir."), null);
+            return (RecordResult<IReadOnlyList<TicketLinkItem>>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(SupportModule.Permissions.TicketsWrite)), null);
         }
 
         var status = TicketWorkflow.Text(ticket.Value!, "status") ?? TicketStatus.New;
         if (TicketStatus.IsFinal(status))
         {
-            return (RecordResult<IReadOnlyList<TicketLinkItem>>.Fail(RecordErrorCode.Conflict, "Kapanmış, iptal edilmiş ya da birleştirilmiş talebin bağlantıları değiştirilemez.", [new RecordFieldError("status", "Talep kapalı.")]), null);
+            return (RecordResult<IReadOnlyList<TicketLinkItem>>.Fail(RecordErrorCode.Conflict, SupportMessages.Link.TicketClosed, [new RecordFieldError("status", SupportMessages.Ticket.Closed)]), null);
         }
 
         return (null, TicketWorkflow.Text(ticket.Value!, "partyId") is { } party && System.Guid.TryParse(party, out var partyId) ? partyId : null);
@@ -222,6 +223,6 @@ internal sealed class TicketLinks(IRecordPipeline pipeline, TicketWorkflowGate g
         [.. (await context.Data.Set<TicketLink>().AsNoTracking().Where(l => l.TicketId == ticketId).OrderBy(l => l.CreatedAt).ToListAsync(cancellationToken))
             .Select(l => new TicketLinkItem(l.Id, l.EntityKey, l.RecordId, l.Label, l.CreatedBy, l.CreatedAt))];
 
-    private static RecordResult<IReadOnlyList<TicketLinkItem>> Invalid(string field, string message) =>
+    private static RecordResult<IReadOnlyList<TicketLinkItem>> Invalid(string field, ServerMessage message) =>
         RecordResult<IReadOnlyList<TicketLinkItem>>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

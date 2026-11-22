@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Files;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Support.Domain;
@@ -61,18 +62,18 @@ internal sealed class TicketAttachments(
         var permission = isInternal ? SupportModule.Permissions.NotesWrite : SupportModule.Permissions.MessagesReply;
         if (message is null || (isInternal && !await access.HasPermissionAsync(SupportModule.Permissions.InternalRead, cancellationToken)))
         {
-            return RecordResult<TicketAttachmentItem>.Fail(RecordErrorCode.NotFound, "Mesaj bulunamadı.");
+            return RecordResult<TicketAttachmentItem>.Fail(RecordErrorCode.NotFound, SupportMessages.Attachment.MessageNotFound);
         }
 
         if (!await access.HasPermissionAsync(permission, cancellationToken))
         {
-            return RecordResult<TicketAttachmentItem>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir.");
+            return RecordResult<TicketAttachmentItem>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission));
         }
 
         var status = TicketWorkflow.Text(ticket.Value!, "status") ?? TicketStatus.New;
         if (TicketStatus.IsFinal(status))
         {
-            return RecordResult<TicketAttachmentItem>.Fail(RecordErrorCode.Conflict, "Kapanmış, iptal edilmiş ya da birleştirilmiş talebe ek eklenemez.", [new RecordFieldError("status", "Talep kapalı.")]);
+            return RecordResult<TicketAttachmentItem>.Fail(RecordErrorCode.Conflict, SupportMessages.Attachment.TicketClosed, [new RecordFieldError("status", SupportMessages.Ticket.Closed)]);
         }
 
         var (name, contentType, error) = AttachmentRules.Validate(fileName, content);
@@ -83,24 +84,24 @@ internal sealed class TicketAttachments(
 
         if (content.Length > limits.MaxFileBytes)
         {
-            return Invalid("file", "Dosya, depolama için ayarlanan boyut sınırını aşıyor.");
+            return Invalid("file", SupportMessages.Attachment.TooLarge);
         }
 
         var perMessage = await context.Data.Set<TicketAttachment>().CountAsync(a => a.MessageId == messageId, cancellationToken);
         if (perMessage >= AttachmentRules.MaxPerMessage)
         {
-            return Invalid("file", $"Bir mesaja en fazla {AttachmentRules.MaxPerMessage} ek eklenebilir.");
+            return Invalid("file", SupportMessages.Attachment.MaxPerMessage(AttachmentRules.MaxPerMessage));
         }
 
         if (await context.Data.Set<TicketAttachment>().CountAsync(a => a.TicketId == ticketId, cancellationToken) >= AttachmentRules.MaxPerTicket)
         {
-            return Invalid("file", $"Bir talebe en fazla {AttachmentRules.MaxPerTicket} ek eklenebilir.");
+            return Invalid("file", SupportMessages.Attachment.MaxPerTicket(AttachmentRules.MaxPerTicket));
         }
 
         var hash = Convert.ToHexString(SHA256.HashData(content));
         if (await context.Data.Set<TicketAttachment>().AnyAsync(a => a.MessageId == messageId && a.Sha256 == hash, cancellationToken))
         {
-            return RecordResult<TicketAttachmentItem>.Fail(RecordErrorCode.Conflict, "Bu dosya mesaja zaten eklenmiş.", [new RecordFieldError("file", "Aynı içerik zaten ekli.")]);
+            return RecordResult<TicketAttachmentItem>.Fail(RecordErrorCode.Conflict, SupportMessages.Attachment.AlreadyOnMessage, [new RecordFieldError("file", SupportMessages.Attachment.SameContent)]);
         }
 
         TicketAttachment? created = null;
@@ -151,7 +152,7 @@ internal sealed class TicketAttachments(
                          select new { Attachment = a, m.Visibility }).FirstOrDefaultAsync(cancellationToken);
         if (row is null)
         {
-            return RecordResult<TicketAttachmentFile>.Fail(RecordErrorCode.NotFound, "Ek bulunamadı.");
+            return RecordResult<TicketAttachmentFile>.Fail(RecordErrorCode.NotFound, SupportMessages.Attachment.NotFound);
         }
 
         // Görünürlük yukarıda denetlendi (talep kapsamı + iç not izni); depo erişim denetimi yapmaz. Taşınmamış eski ekin içeriği hâlâ satırdadır.
@@ -161,7 +162,7 @@ internal sealed class TicketAttachments(
             await using var stored = await files.OpenAsync(fileId, Key, cancellationToken);
             if (stored is null)
             {
-                return RecordResult<TicketAttachmentFile>.Fail(RecordErrorCode.NotFound, "Ek içeriği bulunamadı.");
+                return RecordResult<TicketAttachmentFile>.Fail(RecordErrorCode.NotFound, SupportMessages.Attachment.ContentNotFound);
             }
 
             using var buffer = new MemoryStream();
@@ -189,6 +190,6 @@ internal sealed class TicketAttachments(
     private static TicketAttachmentItem ToItem(TicketAttachment a, bool isInternal) =>
         new(a.Id, a.MessageId, a.FileName, a.ContentType, a.SizeBytes, a.Sha256, a.ScanStatus, isInternal, a.CreatedBy, a.CreatedAt);
 
-    private static RecordResult<TicketAttachmentItem> Invalid(string field, string message) =>
+    private static RecordResult<TicketAttachmentItem> Invalid(string field, ServerMessage message) =>
         RecordResult<TicketAttachmentItem>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

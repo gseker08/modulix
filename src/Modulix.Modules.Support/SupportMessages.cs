@@ -36,6 +36,9 @@ internal static class SupportMessages
     /// <summary>Talep kaydı doğrulamaları.</summary>
     public static class Ticket
     {
+        public static ServerMessage Closed =>
+            ServerMessage.Of("support.server.ticket.closed", "Talep kapalı.");
+
         public static ServerMessage CreateOnlyViaWorkflow =>
             ServerMessage.Of("support.server.ticket.create-only-via-workflow", "Talep yalnızca talep oluşturma işlemiyle açılır.");
 
@@ -168,5 +171,127 @@ internal static class SupportMessages
 
         public static ServerMessage OneValuePerCell =>
             ServerMessage.Of("support.server.matrix.one-value-per-cell", "Her etki × aciliyet hücresi için tek değer verilebilir.");
+    }
+
+    /// <summary>Talep mesajları (ekleme doğrulamaları).</summary>
+    public static class Message
+    {
+        public static ServerMessage BodyRequired =>
+            ServerMessage.Of("support.server.message.body-required", "Mesaj metni zorunludur.");
+
+        public static ServerMessage TicketClosed =>
+            ServerMessage.Of("support.server.message.ticket-closed", "Kapanmış ya da iptal edilmiş talebe mesaj eklenemez; yeniden açın (pencere içindeyse) ya da ilişkili yeni talep açın.");
+
+        public static ServerMessage ConfirmationOnlyResolved =>
+            ServerMessage.Of("support.server.message.confirmation-only-resolved", "Müşteri teyidi yalnızca çözülmüş talepte kaydedilir.");
+
+        public static ServerMessage NotResolved =>
+            ServerMessage.Of("support.server.message.not-resolved", "Talep çözülmüş değil.");
+    }
+
+    /// <summary>Talep ekleri.</summary>
+    public static class Attachment
+    {
+        public static ServerMessage MessageNotFound =>
+            ServerMessage.Of("support.server.attachment.message-not-found", "Mesaj bulunamadı.");
+
+        public static ServerMessage TicketClosed =>
+            ServerMessage.Of("support.server.attachment.ticket-closed", "Kapanmış, iptal edilmiş ya da birleştirilmiş talebe ek eklenemez.");
+
+        public static ServerMessage TooLarge =>
+            ServerMessage.Of("support.server.attachment.too-large", "Dosya, depolama için ayarlanan boyut sınırını aşıyor.");
+
+        public static ServerMessage MaxPerMessage(int max) =>
+            ServerMessage.Of("support.server.attachment.max-per-message", "Bir mesaja en fazla {0} ek eklenebilir.", max);
+
+        public static ServerMessage MaxPerTicket(int max) =>
+            ServerMessage.Of("support.server.attachment.max-per-ticket", "Bir talebe en fazla {0} ek eklenebilir.", max);
+
+        public static ServerMessage AlreadyOnMessage =>
+            ServerMessage.Of("support.server.attachment.already-on-message", "Bu dosya mesaja zaten eklenmiş.");
+
+        public static ServerMessage SameContent =>
+            ServerMessage.Of("support.server.attachment.same-content", "Aynı içerik zaten ekli.");
+
+        public static ServerMessage NotFound =>
+            ServerMessage.Of("support.server.attachment.not-found", "Ek bulunamadı.");
+
+        public static ServerMessage ContentNotFound =>
+            ServerMessage.Of("support.server.attachment.content-not-found", "Ek içeriği bulunamadı.");
+    }
+
+    /// <summary>Talep alt işleri.</summary>
+    public static class Task
+    {
+        public static ServerMessage NotWorking =>
+            ServerMessage.Of("support.server.task.not-working", "Talep çalışılan durumda değil.");
+
+        public static ServerMessage TitleRequired =>
+            ServerMessage.Of("support.server.task.title-required", "Alt iş başlığı zorunludur.");
+
+        public static ServerMessage AddOnlyWhenWorking =>
+            ServerMessage.Of("support.server.task.add-only-when-working", "Alt iş yalnızca çalışılan talebe eklenebilir.");
+
+        public static ServerMessage NotFound =>
+            ServerMessage.Of("support.server.task.not-found", "Alt iş bulunamadı.");
+
+        public static ServerMessage AlreadyDone =>
+            ServerMessage.Of("support.server.task.already-done", "Alt iş zaten tamamlanmış.");
+
+        public static ServerMessage AlreadyOpen =>
+            ServerMessage.Of("support.server.task.already-open", "Alt iş zaten açık.");
+
+        public static ServerMessage StatusUnchanged =>
+            ServerMessage.Of("support.server.task.status-unchanged", "Durum değişmedi.");
+
+        public static ServerMessage ReopenOnlyWhenWorking =>
+            ServerMessage.Of("support.server.task.reopen-only-when-working", "Alt iş yalnızca çalışılan talepte yeniden açılabilir.");
+    }
+
+    /// <summary>Toplu talep işlemi doğrulamaları.</summary>
+    public static class Bulk
+    {
+        public static ServerMessage ActionOneOf(string allowed) =>
+            ServerMessage.Of("support.server.bulk.action-one-of", "Toplu işlem şunlardan biri olmalıdır: {0}.", allowed);
+
+        public static ServerMessage SelectOne =>
+            ServerMessage.Of("support.server.bulk.select-one", "En az bir talep seçin.");
+
+        public static ServerMessage MaxItems(int max) =>
+            ServerMessage.Of("support.server.bulk.max-items", "Bir seferde en fazla {0} talep işlenebilir.", max);
+    }
+
+    /// <summary>Talebe bağlanan ilişkili kayıtlar.</summary>
+    public static class Link
+    {
+        public static ServerMessage SelectRecord =>
+            ServerMessage.Of("support.server.link.select-record", "Kayıt seçin.");
+
+        public static ServerMessage PartyRequired =>
+            ServerMessage.Of("support.server.link.party-required", "İlişkili kayıt bağlamak için önce talebe müşteri bağlayın.");
+
+        public static ServerMessage AlreadyLinked =>
+            ServerMessage.Of("support.server.link.already-linked", "Bu kayıt talebe zaten bağlı.");
+
+        public static ServerMessage AlreadyLinkedField =>
+            ServerMessage.Of("support.server.link.already-linked-field", "Zaten bağlı.");
+
+        public static ServerMessage MaxPerTicket(int max) =>
+            ServerMessage.Of("support.server.link.max-per-ticket", "Bir talebe en fazla {0} kayıt bağlanabilir.", max);
+
+        public static ServerMessage RecordUnavailable =>
+            ServerMessage.Of("support.server.link.record-unavailable", "Kayıt bulunamadı, erişim yetkiniz yok ya da ilgili modül kapalı.");
+
+        public static ServerMessage OtherParty =>
+            ServerMessage.Of("support.server.link.other-party", "Farklı müşteriye ait kayıt talebe bağlanamaz.");
+
+        public static ServerMessage NotOfTicketParty =>
+            ServerMessage.Of("support.server.link.not-of-ticket-party", "Kayıt talebin müşterisine ait değil.");
+
+        public static ServerMessage NotFound =>
+            ServerMessage.Of("support.server.link.not-found", "Bağlantı bulunamadı.");
+
+        public static ServerMessage TicketClosed =>
+            ServerMessage.Of("support.server.link.ticket-closed", "Kapanmış, iptal edilmiş ya da birleştirilmiş talebin bağlantıları değiştirilemez.");
     }
 }

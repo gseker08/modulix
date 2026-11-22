@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Support.Domain;
 using Modulix.Modules.Support.Records;
@@ -47,22 +48,22 @@ internal sealed class TicketTasks(IRecordPipeline pipeline, TicketWorkflowGate g
         var text = title?.Trim();
         if (string.IsNullOrEmpty(text))
         {
-            return Invalid("title", "Alt iş başlığı zorunludur.");
+            return Invalid("title", SupportMessages.Task.TitleRequired);
         }
 
         if (text.Length > TicketTask.TitleMaxLength)
         {
-            return Invalid("title", $"En fazla {TicketTask.TitleMaxLength} karakter olabilir.");
+            return Invalid("title", ServerMessages.Validation.MaxLength(TicketTask.TitleMaxLength));
         }
 
         if (!TicketStatus.IsWorking(guard.Status!))
         {
-            return RecordResult<IReadOnlyList<TicketTaskItem>>.Fail(RecordErrorCode.Conflict, "Alt iş yalnızca çalışılan talebe eklenebilir.", [new RecordFieldError("status", "Talep çalışılan durumda değil.")]);
+            return RecordResult<IReadOnlyList<TicketTaskItem>>.Fail(RecordErrorCode.Conflict, SupportMessages.Task.AddOnlyWhenWorking, [new RecordFieldError("status", SupportMessages.Task.NotWorking)]);
         }
 
         if (assigneeId is { } assignee && !await context.Members.IsActiveMemberAsync(assignee, cancellationToken))
         {
-            return Invalid("assigneeId", "Kullanıcı bu kuruluşun üyesi değil.");
+            return Invalid("assigneeId", ServerMessages.Validation.NotMember);
         }
 
         return await WriteAsync(ticketId, TicketEventKinds.TaskAdded, text, (ctx, ticket, ct) =>
@@ -83,17 +84,17 @@ internal sealed class TicketTasks(IRecordPipeline pipeline, TicketWorkflowGate g
         var task = await context.Data.Set<TicketTask>().AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskId && t.TicketId == ticketId, cancellationToken);
         if (task is null)
         {
-            return RecordResult<IReadOnlyList<TicketTaskItem>>.Fail(RecordErrorCode.NotFound, "Alt iş bulunamadı.");
+            return RecordResult<IReadOnlyList<TicketTaskItem>>.Fail(RecordErrorCode.NotFound, SupportMessages.Task.NotFound);
         }
 
         if (task.IsDone == done)
         {
-            return RecordResult<IReadOnlyList<TicketTaskItem>>.Fail(RecordErrorCode.Conflict, done ? "Alt iş zaten tamamlanmış." : "Alt iş zaten açık.", [new RecordFieldError("status", "Durum değişmedi.")]);
+            return RecordResult<IReadOnlyList<TicketTaskItem>>.Fail(RecordErrorCode.Conflict, done ? SupportMessages.Task.AlreadyDone : SupportMessages.Task.AlreadyOpen, [new RecordFieldError("status", SupportMessages.Task.StatusUnchanged)]);
         }
 
         if (!done && !TicketStatus.IsWorking(guard.Status!))
         {
-            return RecordResult<IReadOnlyList<TicketTaskItem>>.Fail(RecordErrorCode.Conflict, "Alt iş yalnızca çalışılan talepte yeniden açılabilir.", [new RecordFieldError("status", "Talep çalışılan durumda değil.")]);
+            return RecordResult<IReadOnlyList<TicketTaskItem>>.Fail(RecordErrorCode.Conflict, SupportMessages.Task.ReopenOnlyWhenWorking, [new RecordFieldError("status", SupportMessages.Task.NotWorking)]);
         }
 
         return await WriteAsync(ticketId, done ? TicketEventKinds.TaskCompleted : TicketEventKinds.TaskReopened, task.Title, async (ctx, ticket, ct) =>
@@ -117,7 +118,7 @@ internal sealed class TicketTasks(IRecordPipeline pipeline, TicketWorkflowGate g
 
         if (!await access.HasPermissionAsync(SupportModule.Permissions.TicketsWrite, cancellationToken))
         {
-            return (RecordResult<IReadOnlyList<TicketTaskItem>>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{SupportModule.Permissions.TicketsWrite}' izni gerekir."), null);
+            return (RecordResult<IReadOnlyList<TicketTaskItem>>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(SupportModule.Permissions.TicketsWrite)), null);
         }
 
         return (null, TicketWorkflow.Text(ticket.Value!, "status") ?? TicketStatus.New);
@@ -143,6 +144,6 @@ internal sealed class TicketTasks(IRecordPipeline pipeline, TicketWorkflowGate g
         [.. (await context.Data.Set<TicketTask>().AsNoTracking().Where(t => t.TicketId == ticketId).OrderBy(t => t.IsDone).ThenBy(t => t.CreatedAt).ToListAsync(cancellationToken))
             .Select(t => new TicketTaskItem(t.Id, t.Title, t.AssigneeId, t.IsBlocking, t.IsDone, t.DoneAt, t.DoneBy, t.CreatedBy, t.CreatedAt))];
 
-    private static RecordResult<IReadOnlyList<TicketTaskItem>> Invalid(string field, string message) =>
+    private static RecordResult<IReadOnlyList<TicketTaskItem>> Invalid(string field, ServerMessage message) =>
         RecordResult<IReadOnlyList<TicketTaskItem>>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }
