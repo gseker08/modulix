@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Localization;
 using System.Text;
 
 namespace Modulix.Modules.Support.Lifecycle;
@@ -66,47 +67,47 @@ public static class AttachmentRules
     }
 
     /// <summary>Adı, boyutu ve içeriği doğrular; geçerliyse güvenli ad ve türü döner.</summary>
-    public static (string? FileName, string? ContentType, string? Error) Validate(string? fileName, ReadOnlySpan<byte> content)
+    public static (string? FileName, string? ContentType, ServerMessage? Error) Validate(string? fileName, ReadOnlySpan<byte> content)
     {
         var name = SafeName(fileName);
         if (name is null)
         {
-            return (null, null, "Dosya adı zorunludur.");
+            return (null, null, SupportMessages.File.NameRequired);
         }
 
         if (content.Length == 0)
         {
-            return (null, null, "Dosya boş olamaz.");
+            return (null, null, SupportMessages.File.Empty);
         }
 
         if (content.Length > MaxBytes)
         {
-            return (null, null, $"Dosya en fazla {MaxBytes / (1024 * 1024)} MB olabilir.");
+            return (null, null, SupportMessages.File.TooLarge(MaxBytes / (1024 * 1024)));
         }
 
         var extension = Path.GetExtension(name);
         if (!Allowed.TryGetValue(extension, out var rule))
         {
-            return (null, null, $"Bu dosya türüne izin verilmez. İzinli türler: {string.Join(", ", Allowed.Keys.Order())}.");
+            return (null, null, SupportMessages.File.TypeNotAllowed(string.Join(", ", Allowed.Keys.Order())));
         }
 
         var stem = Path.GetFileNameWithoutExtension(name);
         if (Dangerous.Any(d => stem.Contains(d, StringComparison.OrdinalIgnoreCase)))
         {
-            return (null, null, "Dosya adı çalıştırılabilir ya da betik uzantısı içeremez.");
+            return (null, null, SupportMessages.File.DangerousName);
         }
 
         if (rule.Signature is { } signature)
         {
             if (content.Length < signature.Length || !content[..signature.Length].SequenceEqual(signature))
             {
-                return (null, null, "Dosya içeriği uzantısıyla uyuşmuyor.");
+                return (null, null, SupportMessages.File.ContentMismatch);
             }
         }
         else if (content.Contains((byte)0))
         {
             // Metin dosyası ikili bayt içeremez.
-            return (null, null, "Metin dosyası ikili içerik barındıramaz.");
+            return (null, null, SupportMessages.File.BinaryInText);
         }
 
         return (name, rule.ContentType, null);

@@ -12900,5 +12900,19 @@
   "support.server.corrective.result-note-required": "Sonuç notu zorunludur (ne yapıldı, nasıl doğrulandı).",
   "support.server.corrective.complaint-only": "Düzeltici aksiyon yalnızca şikâyet türündeki talepte açılır.",
   "support.server.corrective.not-complaint": "Talep şikâyet türünde değil.",
-  "support.server.corrective.ticket-closed": "İptal edilmiş ya da birleştirilmiş talepte düzeltici aksiyon değiştirilemez."
+  "support.server.corrective.ticket-closed": "İptal edilmiş ya da birleştirilmiş talepte düzeltici aksiyon değiştirilemez.",
+  "support.server.inbound.message-id-required": "Mesaj kimliği zorunludur (en fazla {0} karakter).",
+  "support.server.inbound.from-address-invalid": "Gönderen adresi geçerli bir e-posta olmalıdır.",
+  "support.server.inbound.from-address-required": "E-posta kanalında gönderen adresi zorunludur.",
+  "support.server.file.name-required": "Dosya adı zorunludur.",
+  "support.server.file.empty": "Dosya boş olamaz.",
+  "support.server.file.too-large": "Dosya en fazla {0} MB olabilir.",
+  "support.server.file.type-not-allowed": "Bu dosya türüne izin verilmez. İzinli türler: {0}.",
+  "support.server.file.dangerous-name": "Dosya adı çalıştırılabilir ya da betik uzantısı içeremez.",
+  "support.server.file.content-mismatch": "Dosya içeriği uzantısıyla uyuşmuyor.",
+  "support.server.file.binary-in-text": "Metin dosyası ikili içerik barındıramaz.",
+  "support.server.report.start-after-end": "Başlangıç tarihi bitişten sonra olamaz.",
+  "support.server.report.end-in-future": "Bitiş tarihi bugünden sonra olamaz.",
+  "support.server.report.period-too-long": "Dönem en çok {0} gün olabilir.",
+  "support.server.report.min-occurrences-range": "Tekrar eşiği 2-100 arasında olmalıdır."
 }

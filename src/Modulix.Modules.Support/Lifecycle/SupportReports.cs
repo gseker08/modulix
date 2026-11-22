@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Support.Domain;
 using Modulix.Modules.Support.Records;
 using Modulix.Modules.Support.Sla;
@@ -124,7 +125,7 @@ internal sealed class SupportReports(IRecordPipeline pipeline, SupportStoreConte
         var min = minOccurrences ?? 2;
         if (min is < 2 or > 100)
         {
-            return RecordResult<ComplaintReview>.Fail(RecordErrorCode.ValidationFailed, "Tekrar eşiği 2-100 arasında olmalıdır.", [new RecordFieldError("minOccurrences", "Tekrar eşiği 2-100 arasında olmalıdır.")]);
+            return RecordResult<ComplaintReview>.Fail(RecordErrorCode.ValidationFailed, SupportMessages.Report.MinOccurrencesRange, [new RecordFieldError("minOccurrences", SupportMessages.Report.MinOccurrencesRange)]);
         }
 
         var (from, to, granularity) = validated.Value;
@@ -352,7 +353,7 @@ internal sealed class SupportReports(IRecordPipeline pipeline, SupportStoreConte
     private static (string? Granularity, RecordFieldError? Error) CheckGranularity(string? granularity) =>
         granularity is null ? ("day", null)
         : ReportPeriod.Granularities.Contains(granularity) ? (granularity, null)
-        : (null, new RecordFieldError("granularity", $"Şunlardan biri olmalıdır: {string.Join(", ", ReportPeriod.Granularities)}."));
+        : (null, new RecordFieldError("granularity", ServerMessages.Validation.OneOf(string.Join(", ", ReportPeriod.Granularities))));
 
     private ((DateOnly From, DateOnly To, string Granularity) Value, RecordFieldError? Error) Validate(ReportQuery query)
     {
@@ -361,7 +362,7 @@ internal sealed class SupportReports(IRecordPipeline pipeline, SupportStoreConte
         var error = granularityError ?? (periodError is null ? null : new RecordFieldError("from", periodError));
         if (error is null && query.Priority is not null && !TicketPriority.All.Contains(query.Priority))
         {
-            error = new RecordFieldError("priority", $"Şunlardan biri olmalıdır: {string.Join(", ", TicketPriority.All)}.");
+            error = new RecordFieldError("priority", ServerMessages.Validation.OneOf(string.Join(", ", TicketPriority.All)));
         }
 
         return ((from, to, granularity ?? "day"), error);

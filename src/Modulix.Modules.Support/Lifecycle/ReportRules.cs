@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Localization;
 using System.Globalization;
 
 namespace Modulix.Modules.Support.Lifecycle;
@@ -55,22 +56,22 @@ public static class ReportPeriod
     public static DateTimeOffset EndExclusive(DateOnly lastDay) => StartOf(lastDay.AddDays(1));
 
     /// <summary>Dönemi doğrular: sıra, üst sınır ve gelecek günler. Boşsa son 30 gün (bugün dahil). Hata varsa mesajı döner.</summary>
-    public static (DateOnly From, DateOnly To, string? Error) Resolve(DateOnly? from, DateOnly? to, DateTimeOffset now)
+    public static (DateOnly From, DateOnly To, ServerMessage? Error) Resolve(DateOnly? from, DateOnly? to, DateTimeOffset now)
     {
         var today = LocalDate(now);
         var end = to ?? today;
         var start = from ?? end.AddDays(-(DefaultDays - 1));
         if (start > end)
         {
-            return (start, end, "Başlangıç tarihi bitişten sonra olamaz.");
+            return (start, end, SupportMessages.Report.StartAfterEnd);
         }
 
         if (end > today)
         {
-            return (start, end, "Bitiş tarihi bugünden sonra olamaz.");
+            return (start, end, SupportMessages.Report.EndInFuture);
         }
 
-        return end.DayNumber - start.DayNumber + 1 > MaxDays ? (start, end, $"Dönem en çok {MaxDays} gün olabilir.") : (start, end, null);
+        return end.DayNumber - start.DayNumber + 1 > MaxDays ? (start, end, SupportMessages.Report.PeriodTooLong(MaxDays)) : (start, end, null);
     }
 
     /// <summary>Zaman serisi kovası: gün, hafta (pazartesi başlar) ya da ay başlangıcı.</summary>

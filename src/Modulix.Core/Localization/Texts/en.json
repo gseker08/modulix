@@ -12900,5 +12900,19 @@
   "support.server.corrective.result-note-required": "A result note is required (what was done, how it was verified).",
   "support.server.corrective.complaint-only": "A corrective action can only be opened on a complaint-type ticket.",
   "support.server.corrective.not-complaint": "The ticket is not a complaint.",
-  "support.server.corrective.ticket-closed": "A corrective action cannot be changed on a cancelled or merged ticket."
+  "support.server.corrective.ticket-closed": "A corrective action cannot be changed on a cancelled or merged ticket.",
+  "support.server.inbound.message-id-required": "The message ID is required (at most {0} characters).",
+  "support.server.inbound.from-address-invalid": "The sender address must be a valid email.",
+  "support.server.inbound.from-address-required": "The sender address is required for the email channel.",
+  "support.server.file.name-required": "The file name is required.",
+  "support.server.file.empty": "The file cannot be empty.",
+  "support.server.file.too-large": "The file can be at most {0} MB.",
+  "support.server.file.type-not-allowed": "This file type is not allowed. Allowed types: {0}.",
+  "support.server.file.dangerous-name": "The file name cannot contain an executable or script extension.",
+  "support.server.file.content-mismatch": "The file content does not match its extension.",
+  "support.server.file.binary-in-text": "A text file cannot contain binary content.",
+  "support.server.report.start-after-end": "The start date cannot be after the end date.",
+  "support.server.report.end-in-future": "The end date cannot be after today.",
+  "support.server.report.period-too-long": "The period can be at most {0} days.",
+  "support.server.report.min-occurrences-range": "The repeat threshold must be between 2 and 100."
 }
