@@ -1,0 +1,80 @@
+@* Ortada açılan pencere (docs/design-system/component-catalog.md → Modal). Başlık bandı, kaydırılabilir gövde ve altta
+   eylem satırı taşır; Escape'le, arka plana ya da kapatma düğmesine tıklayınca kapanır. Açılınca odak pencereye geçer,
+   telefonda tam ekran açılır. *@
+@if (Open)
+{
+    <div class="mx-modal-backdrop" @onclick="CloseAsync"></div>
+    <div class="mx-modal @Class" role="dialog" aria-modal="true" aria-label="@Title" tabindex="-1"
+         @ref="panel" @onkeydown="OnKeyDownAsync">
+        <header class="mx-modal-head">
+            <h2>@Title @if (!string.IsNullOrEmpty(Subtitle)) { <small>@Subtitle</small> }</h2>
+            <button type="button" class="btn btn-icon mx-modal-close" aria-label="@Texts.Get("common.close")" @onclick="CloseAsync">
+                <AppIcon Name="x" Size="18" />
+            </button>
+        </header>
+        <div class="mx-modal-body">@ChildContent</div>
+        @if (Footer is not null)
+        {
+            <footer class="mx-modal-foot">@Footer</footer>
+        }
+    </div>
+}
+
+@code {
+    private ElementReference panel;
+    private bool focusPending;
+    private bool wasOpen;
+
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>Pencerenin başlığı; ekran okuyucu için adı da budur.</summary>
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = "";
+
+    /// <summary>Başlığın yanındaki soluk metin (ör. üzerinde çalışılan kaydın adı).</summary>
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Alttaki eylem satırı (İptal solda, birincil düğme sağda ve en sonda).</summary>
+    [Parameter]
+    public RenderFragment? Footer { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (Open && !wasOpen)
+        {
+            focusPending = true;
+        }
+
+        wasOpen = Open;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusPending && Open)
+        {
+            focusPending = false;
+            await panel.FocusAsync();
+        }
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await CloseAsync();
+        }
+    }
+
+    private Task CloseAsync() => OnClose.InvokeAsync();
+}

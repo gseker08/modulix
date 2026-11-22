@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Localization;
+
 namespace Modulix.Modules.Warehouse.Domain;
 
 /// <summary>
@@ -106,23 +108,26 @@ public static class MovementCategories
 /// <summary>Hareketin bakiyeye etkisi: bir lokasyonda artış ya da azalış.</summary>
 public readonly record struct BalanceEffect(Guid LocationId, decimal Delta);
 
+/// <summary>Lokasyon biçimi hatası: hatanın bağlanacağı alan ve çevrilebilir ileti.</summary>
+public readonly record struct ShapeError(string Field, ServerMessage Message);
+
 /// <summary>Defter için saf kurallar (veritabanı gerekmez).</summary>
 public static class LedgerRules
 {
     /// <summary>
     /// Kategoriye göre lokasyon biçimi: giriş yalnızca hedef, çıkış yalnızca kaynak, transfer ikisi (farklı) ister. Düzeltme (ters kayıt) lokasyonu
-    /// özgün hareketten türetir, bu yüzden burada aranmaz. Hata iletisi ya da <c>null</c> döner.
+    /// özgün hareketten türetir, bu yüzden burada aranmaz. Hata (alan ve ileti) ya da <c>null</c> döner.
     /// </summary>
-    public static string? CheckShape(string category, Guid? from, Guid? to) => category switch
+    public static ShapeError? CheckShape(string category, Guid? from, Guid? to) => category switch
     {
-        MovementCategories.Inbound when from is not null => "Giriş hareketinde kaynak lokasyon verilmez.",
-        MovementCategories.Inbound when to is null => "Giriş için hedef lokasyon zorunludur.",
-        MovementCategories.Outbound when to is not null => "Çıkış hareketinde hedef lokasyon verilmez.",
-        MovementCategories.Outbound when from is null => "Çıkış için kaynak lokasyon zorunludur.",
-        MovementCategories.Transfer when from is null || to is null => "Transfer için kaynak ve hedef lokasyon zorunludur.",
-        MovementCategories.Transfer when from == to => "Transferde kaynak ve hedef lokasyon aynı olamaz.",
+        MovementCategories.Inbound when from is not null => new ShapeError("fromLocationId", WarehouseMessages.Movement.InboundNoSource),
+        MovementCategories.Inbound when to is null => new ShapeError("toLocationId", WarehouseMessages.Movement.InboundTargetRequired),
+        MovementCategories.Outbound when to is not null => new ShapeError("toLocationId", WarehouseMessages.Movement.OutboundNoTarget),
+        MovementCategories.Outbound when from is null => new ShapeError("fromLocationId", WarehouseMessages.Movement.OutboundSourceRequired),
+        MovementCategories.Transfer when from is null || to is null => new ShapeError("toLocationId", WarehouseMessages.Movement.TransferBothRequired),
+        MovementCategories.Transfer when from == to => new ShapeError("toLocationId", WarehouseMessages.Movement.TransferSame),
         MovementCategories.Inbound or MovementCategories.Outbound or MovementCategories.Transfer => null,
-        _ => "Bu hareket türü doğrudan kaydedilemez.",
+        _ => new ShapeError("fromLocationId", WarehouseMessages.Movement.NotDirect),
     };
 
     /// <summary>Hareketin bakiyeye etkileri: önce azalışlar, sonra artışlar (yetersiz stok denetimi azalıştan başlar).</summary>

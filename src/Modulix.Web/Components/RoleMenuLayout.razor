@@ -1,0 +1,213 @@
+@* Rolün menü düzeni (E8): her uygulamanın sol menü satırlarını sıralar ve gizler. Yalnızca görünümdür; gizlemek yetki değildir,
+   ekranlar izinle korunmaya devam eder. Kullanıcının birden fazla rolü varsa bir satır, düzeni tanımlı rollerinden herhangi birinde
+   görünüyorsa görünür (MenuLayoutRules). Rol detayındaki küçük eylem formudur; kendi kaydı vardır. *@
+@using Modulix.Shared.Access
+@inject ApiClient Api
+@inject SessionState Session
+@inject AppNavigation Navigation
+@inject ToastService Toasts
+
+<section class="detail-section">
+    <div class="section-header"><h2>@Texts.Get("admin.roleMenu.title")</h2></div>
+    <p class="text-muted">@Texts.Get("admin.roleMenu.help")</p>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (menus is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (menus.Count == 0)
+    {
+        <EmptyState Title="@Texts.Get("admin.roleMenu.empty")" />
+    }
+    else
+    {
+        @foreach (MenuEditor menu in menus)
+        {
+            <h3>@AppNames.Of(menu.Root)</h3>
+            @* Uygulamanın bütün bölümleri tek tabloda: sütunlar hizalı kalır; bölüm adı başlık satırıdır. *@
+            <table class="table record-table">
+                <thead>
+                    <tr>
+                        <th>@Texts.Get("admin.roleMenu.col.item")</th>
+                        <th>@Texts.Get("admin.roleMenu.col.visible")</th>
+                        <th class="actions"><span class="visually-hidden">@Texts.Get("admin.roleMenu.col.order")</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (SectionEditor section in menu.Sections)
+                    {
+                        <tr>
+                            <th colspan="3" scope="colgroup">@(section.Group is { } group ? AppNames.Of(group) : Texts.Get("admin.roleMenu.ungrouped"))</th>
+                        </tr>
+                        @for (int i = 0; i < section.Items.Count; i++)
+                        {
+                            ItemEditor item = section.Items[i];
+                            int index = i;
+                            <tr>
+                                <td data-label="@Texts.Get("admin.roleMenu.col.item")" class="primary">@item.Entry.Name</td>
+                                <td data-label="@Texts.Get("admin.roleMenu.col.visible")">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="@ItemId(item)"
+                                               checked="@(!item.Hidden)" @onchange="e => item.Hidden = !(bool)e.Value!" />
+                                        <label class="form-check-label visually-hidden" for="@ItemId(item)">@item.Entry.Name</label>
+                                    </div>
+                                </td>
+                                <td data-label="@Texts.Get("admin.roleMenu.col.order")" class="actions">
+                                    <button type="button" class="btn btn-icon btn-ghost" disabled="@(index == 0)"
+                                            aria-label="@Texts.Get("admin.roleMenu.up", item.Entry.Name)" @onclick="() => Move(section, index, -1)">
+                                        <AppIcon Name="arrow-up" Size="18" />
+                                    </button>
+                                    <button type="button" class="btn btn-icon btn-ghost" disabled="@(index == section.Items.Count - 1)"
+                                            aria-label="@Texts.Get("admin.roleMenu.down", item.Entry.Name)" @onclick="() => Move(section, index, 1)">
+                                        <AppIcon Name="arrow-down" Size="18" />
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        }
+
+        <div class="form-actions">
+            <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Reset">@Texts.Get("admin.roleMenu.reset")</button>
+            <button type="button" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : null)" @onclick="SaveAsync">@Texts.Get("common.save")</button>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid RoleId { get; set; }
+
+    private List<MenuEditor>? menus;
+    private IReadOnlyList<RoleMenuItemDto> saved = [];
+
+    /// <summary>Kayıtlı düzende olup ekranda listelenmeyen satırlar (ör. modülü kapalı); kayıtta korunur (RoleMenuSaveRules).</summary>
+    private IReadOnlyList<RoleMenuItemDto> preserved = [];
+    private string? message;
+    private bool busy;
+
+    private sealed class ItemEditor(MenuEntry entry)
+    {
+        public MenuEntry Entry { get; } = entry;
+
+        public bool Hidden { get; set; }
+    }
+
+    private sealed class SectionEditor(AppGroup? group, List<ItemEditor> items)
+    {
+        public AppGroup? Group { get; } = group;
+
+        public List<ItemEditor> Items { get; } = items;
+
+        /// <summary>Katalogdaki (varsayılan) sıra; kullanıcı sırayı değiştirdi mi anlamak için.</summary>
+        public IReadOnlyList<string> DefaultOrder { get; } = [.. items.Select(i => i.Entry.App.Id)];
+    }
+
+    private sealed record MenuEditor(AppDefinition Root, List<SectionEditor> Sections);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        message = null;
+        menus = null;
+        var result = await Api.GetAsync<RoleMenuResponse>($"/api/roles/{RoleId}/menu");
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        saved = result.Value!.Items;
+        Build(saved);
+    }
+
+    private static string ItemId(ItemEditor item) => "role-menu-" + item.Entry.App.Id.Replace('.', '-');
+
+    private void Build(IReadOnlyList<RoleMenuItemDto> layout)
+    {
+        Dictionary<string, RoleMenuItemDto> byKey = layout.ToDictionary(i => i.ItemKey);
+        menus = [];
+        foreach (EditableMenu menu in Navigation.EditableMenus())
+        {
+            List<SectionEditor> sections = [];
+            foreach (MenuSection section in menu.Sections)
+            {
+                // Kayıtlı sıra varsa o, yoksa katalog sırası; kayıtlı satırın katalogda olmayan anahtarı zaten buraya girmez.
+                List<ItemEditor> items = section.Entries
+                    .OrderBy(e => byKey.TryGetValue(e.App.Id, out RoleMenuItemDto? row) && row.Order is { } o ? o : e.Order)
+                    .Select(e => new ItemEditor(e) { Hidden = byKey.TryGetValue(e.App.Id, out RoleMenuItemDto? row) && row.Hidden })
+                    .ToList();
+                sections.Add(new SectionEditor(section.Group, items));
+            }
+
+            menus.Add(new MenuEditor(menu.Root, sections));
+        }
+
+        // "Varsayılana dön" Build([]) çağırır: düzen boşaltılınca korunan satır da kalmaz.
+        preserved = RoleMenuSaveRules.Preserved(layout, menus.SelectMany(m => m.Sections).SelectMany(s => s.Items).Select(i => i.Entry.App.Id));
+    }
+
+    private static void Move(SectionEditor section, int index, int delta)
+    {
+        int target = index + delta;
+        if (target < 0 || target >= section.Items.Count)
+        {
+            return;
+        }
+
+        (section.Items[index], section.Items[target]) = (section.Items[target], section.Items[index]);
+    }
+
+    private void Reset() => Build([]);
+
+    /// <summary>
+    /// Yalnızca varsayılandan ayrılan bölümler yazılır: sırası değişen bölümün bütün satırları sıra numarasıyla (10, 20, …),
+    /// sırası değişmeyen bölümde yalnızca gizlenenler. Hiçbir şey değişmediyse boş liste gider (düzen kalkar).
+    /// </summary>
+    private List<RoleMenuItemDto> BuildRequest()
+    {
+        List<RoleMenuItemDto> items = [];
+        foreach (SectionEditor section in menus!.SelectMany(m => m.Sections))
+        {
+            bool reordered = !section.Items.Select(i => i.Entry.App.Id).SequenceEqual(section.DefaultOrder);
+            for (int i = 0; i < section.Items.Count; i++)
+            {
+                ItemEditor item = section.Items[i];
+                if (reordered || item.Hidden)
+                {
+                    items.Add(new RoleMenuItemDto(item.Entry.App.Id, reordered ? (i + 1) * 10 : null, item.Hidden));
+                }
+            }
+        }
+
+        // PUT bütün düzeni değiştirir; ekranda olmayan kayıtlı satırlar (modülü kapalı) silinmesin.
+        items.AddRange(preserved);
+        return items;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        var result = await Api.PutAsync<RoleMenuResponse>($"/api/roles/{RoleId}/menu", new SaveRoleMenuRequest(BuildRequest()));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        saved = result.Value!.Items;
+        Build(saved);
+
+        // Kendi rolünün düzeni değiştiyse sol menü hemen güncellensin.
+        await Session.RefreshAsync();
+        Toasts.Success(Texts.Get("admin.roleMenu.saved"));
+    }
+}

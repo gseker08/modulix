@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -86,7 +87,7 @@ internal static class HrAudience
         {
             if (units.Count > AudienceTarget.MaxUnits)
             {
-                errors.Add(new RecordFieldError(unitField, $"En çok {AudienceTarget.MaxUnits} departman seçilir."));
+                errors.Add(new RecordFieldError(unitField, HrMessages.Audience.UnitsMax(AudienceTarget.MaxUnits)));
             }
 
             var tree = (await context.BusinessUnits.ListAsync(cancellationToken)).ToDictionary(u => u.Id);
@@ -94,7 +95,7 @@ internal static class HrAudience
             {
                 if (!tree.TryGetValue(unit, out var info) || !info.IsActive)
                 {
-                    errors.Add(new RecordFieldError(unitField, info is null ? "Departman bulunamadı." : "Kapalı departman seçilemez."));
+                    errors.Add(new RecordFieldError(unitField, info is null ? HrMessages.Unit.NotFound : HrMessages.Unit.Closed));
                     break;
                 }
             }
@@ -104,14 +105,14 @@ internal static class HrAudience
         {
             if (users.Count > AudienceTarget.MaxUsers)
             {
-                errors.Add(new RecordFieldError("audienceUserIds", $"En çok {AudienceTarget.MaxUsers} kişi seçilir."));
+                errors.Add(new RecordFieldError("audienceUserIds", HrMessages.Audience.UsersMax(AudienceTarget.MaxUsers)));
             }
 
             foreach (var user in users.Except(previous.Users))
             {
                 if (!await context.Members.IsActiveMemberAsync(user, cancellationToken))
                 {
-                    errors.Add(new RecordFieldError("audienceUserIds", "Seçilen kullanıcı bu kuruluşun etkin üyesi değil."));
+                    errors.Add(new RecordFieldError("audienceUserIds", HrMessages.Audience.UserNotActiveMember));
                     break;
                 }
             }

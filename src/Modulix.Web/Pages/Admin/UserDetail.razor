@@ -27,23 +27,36 @@
     }
     else
     {
-        <div class="page-header">
-            <div>
+        @* Kimlik kartı + sol sekmeli düzen (docs/design-system/component-catalog.md → SideTabs): bölümler sekmelere ayrılır,
+           sekmeler arasında girilen veri kaybolmaz (paneller DOM'da kalır). *@
+        <div class="identity-card">
+            <OwnerCell Name="@user.DisplayName" AvatarOnly="true" />
+            <div class="identity-main">
                 <h1>@user.DisplayName</h1>
-                <div class="header-meta">
-                    <UserStatusBadge User="user" />
-                    @if (user.IsAdministrator)
-                    {
-                        <span class="badge tag">@Texts.Get("admin.userDetail.administrator")</span>
-                    }
-                    @if (user.IsCurrentUser)
-                    {
-                        <span class="badge tag">@Texts.Get("admin.userDetail.you")</span>
-                    }
-                </div>
+                <span class="identity-sub"><AppIcon Name="landmark" Size="16" /> @(currentUnit?.PathNames ?? user.BusinessUnitName ?? "—")</span>
+            </div>
+            <div class="header-meta">
+                <UserStatusBadge User="user" />
+                @if (user.IsAdministrator)
+                {
+                    <span class="badge tag">@Texts.Get("admin.userDetail.administrator")</span>
+                }
+                @if (user.IsCurrentUser)
+                {
+                    <span class="badge tag">@Texts.Get("admin.userDetail.you")</span>
+                }
             </div>
         </div>
 
+        @if (Locked)
+        {
+            <div class="alert alert-info">@Texts.Get("admin.userDetail.locked")</div>
+        }
+
+        <div class="side-layout">
+            <SideTabs Tabs="Sections" State="tabs" Label="@Texts.Get("admin.userDetail.sections")" />
+            <div class="side-content">
+        <TabPanel State="tabs" Key="genel">
         <dl class="detail-grid">
             <div><dt>@Texts.Get("common.field.email")</dt><dd>@user.Email</dd></div>
             <div><dt>@Texts.Get("admin.unit")</dt><dd>@(currentUnit?.PathNames ?? user.BusinessUnitName ?? "—")</dd></div>
@@ -54,11 +67,6 @@
                 <div><dt>@Texts.Get("admin.userDetail.lastInvite")</dt><dd>@CrmLabels.Time(invitedAt)</dd></div>
             }
         </dl>
-
-        @if (Locked)
-        {
-            <div class="alert alert-info">@Texts.Get("admin.userDetail.locked")</div>
-        }
 
         @* Departman (ADR-0026): kullanıcı tam bir departmandadır. Departman değişince kullanıcının sorumlu olduğu kayıtlar da yeni departmanla görünür. *@
         <section class="detail-section">
@@ -155,112 +163,6 @@
         </section>
 
         <section class="detail-section">
-            <div class="section-header"><h2>@Texts.Get("nav.app.admin.roles")</h2></div>
-            <RolePicker Roles="roles" Selected="selectedRoles" CanGrantAdministrator="Session.IsAdministrator" />
-            <div class="form-actions">
-                <button type="button" class="btn btn-primary" disabled="@(busy || Locked)" @onclick="SaveRolesAsync">@Texts.Get("admin.userDetail.saveRoles")</button>
-            </div>
-        </section>
-
-        <section class="detail-section">
-            <div class="section-header"><h2>@Texts.Get("nav.app.admin.teams")</h2></div>
-            @if (teams.Count == 0)
-            {
-                <p class="text-muted">@((MarkupString)Texts.Get("admin.userDetail.noTeams", "<a href=\"yonetim/ekipler\">", "</a>"))</p>
-            }
-            else
-            {
-                <p class="text-muted small">@Texts.Get("admin.userDetail.teamsHelp")</p>
-                @if (savedTeams.Count > 1)
-                {
-                    <p class="text-muted small">@Texts.Get("admin.userDetail.primaryTeamHelp")</p>
-                }
-                <div class="role-picker">
-                    @foreach (var team in teams)
-                    {
-                        <label class="form-check">
-                            <input class="form-check-input" type="checkbox" checked="@selectedTeams.Contains(team.Id)"
-                                   @onchange="e => ToggleTeam(team.Id, e.Value is true)" />
-                            <span class="form-check-label">@team.Name <small class="text-muted">· @Texts.Get("admin.userDetail.memberCount", team.MemberCount)</small></span>
-                        </label>
-                        @if (savedTeams.Count > 1 && savedTeams.Contains(team.Id))
-                        {
-                            <label class="form-check">
-                                <input class="form-check-input" type="radio" name="primaryTeam" checked="@(primaryTeam == team.Id)" disabled="@busy"
-                                       @onchange="() => SetPrimaryTeamAsync(team.Id)" />
-                                <span class="form-check-label">@Texts.Get("admin.userDetail.primaryTeam", team.Name)</span>
-                            </label>
-                        }
-                    }
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveTeamsAsync">@Texts.Get("admin.userDetail.saveTeams")</button>
-                </div>
-            }
-        </section>
-
-        @* İşletici şirket erişimi (ADR-0008). Yönetici zaten bütün şirketlere erişir; bu, yönetici olmayan kullanıcılar içindir. *@
-        @if (Session.Can(CoreAccess.ManageCompanies))
-        {
-            <section class="detail-section">
-                <div class="section-header"><h2>@Texts.Get("nav.app.admin.companies")</h2></div>
-                @if (user.IsAdministrator)
-                {
-                    <p class="text-muted small">@Texts.Get("admin.userDetail.companiesAdministrator")</p>
-                }
-                else if (companies.Count == 0)
-                {
-                    <EmptyState Compact="true" Title="@Texts.Get("admin.userDetail.noCompanies")" />
-                }
-                else
-                {
-                    <p class="text-muted small">@Texts.Get("admin.userDetail.companiesHelp")</p>
-                    <div class="role-picker">
-                        @foreach (var company in companies)
-                        {
-                            var state = assignments[company.Id];
-                            <div class="company-assignment">
-                                <label class="form-check">
-                                    <input class="form-check-input" type="checkbox" checked="@state.Selected"
-                                           @onchange="e => ToggleCompany(company.Id, e.Value is true)" />
-                                    <span class="form-check-label">@company.Name @if (company.IsDefault) { <small class="text-muted">· @Texts.Get("admin.userDetail.defaultCompany")</small> }</span>
-                                </label>
-                                @if (state.Selected)
-                                {
-                                    <div class="company-assignment-detail">
-                                        <label class="small text-muted">
-                                            @Texts.Get("admin.userDetail.validUntil")
-                                            <input type="date" class="form-control form-control-sm" value="@(state.ValidUntil?.ToString("yyyy-MM-dd"))"
-                                                   @onchange="e => SetValidUntil(company.Id, e.Value?.ToString())" />
-                                        </label>
-                                        @if (branchesByCompany.TryGetValue(company.Id, out var branches) && branches.Count > 0)
-                                        {
-                                            <label class="small text-muted">
-                                                @Texts.Get("admin.userDetail.defaultBranch")
-                                                <select class="form-select form-select-sm" @onchange="e => SetBranch(company.Id, e.Value?.ToString())">
-                                                    <option value="">—</option>
-                                                    @foreach (var branch in branches)
-                                                    {
-                                                        <option value="@branch.Id" selected="@(state.BranchId == branch.Id)">@branch.Name</option>
-                                                    }
-                                                </select>
-                                            </label>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                        }
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-primary" disabled="@busy" @onclick="SaveCompaniesAsync">@Texts.Get("admin.userDetail.saveCompanies")</button>
-                    </div>
-                }
-            </section>
-        }
-
-        <UserAccessPanel MembershipId="MembershipId" Disabled="user.Status == UserStatus.Disabled" Version="accessVersion" />
-
-        <section class="detail-section">
             <div class="section-header"><h2>@Texts.Get("admin.userDetail.account")</h2></div>
 
             @if (confirming is { } pending)
@@ -290,6 +192,165 @@
                 </div>
             }
         </section>
+        </TabPanel>
+        <TabPanel State="tabs" Key="roller">
+        @* Atamalar (roller, ekipler, şirketler) sayfada özet olarak durur; düzenleme atama penceresinde (PickDialog) yapılır. *@
+        <section class="detail-section">
+            <div class="section-header">
+                <h2>@Texts.Get("nav.app.admin.roles")</h2>
+                <button type="button" class="btn btn-tonal" disabled="@(busy || Locked)" @onclick="() => OpenDialog(RolesDialog)">
+                    <AppIcon Name="plus" Size="16" /> @Texts.Get("admin.userDetail.assignRoles")
+                </button>
+            </div>
+            @if (user.Roles.Count == 0)
+            {
+                <EmptyState Compact="true" Title="@Texts.Get("admin.userDetail.noRoles")" />
+            }
+            else
+            {
+                <div class="assigned-tags">
+                    @foreach (var role in user.Roles)
+                    {
+                        <span class="badge tag">@role.Name@(role.ViaBusinessUnit is { } via ? " · " + Texts.Get("admin.access.viaUnit", via) : null)</span>
+                    }
+                </div>
+            }
+        </section>
+        </TabPanel>
+        <TabPanel State="tabs" Key="ekipler">
+        <section class="detail-section">
+            <div class="section-header">
+                <h2>@Texts.Get("nav.app.admin.teams")</h2>
+                @if (teams.Count > 0)
+                {
+                    <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="() => OpenDialog(TeamsDialog)">
+                        <AppIcon Name="plus" Size="16" /> @Texts.Get("admin.userDetail.assignTeams")
+                    </button>
+                }
+            </div>
+            @if (teams.Count == 0)
+            {
+                <p class="text-muted">@((MarkupString)Texts.Get("admin.userDetail.noTeams", "<a href=\"yonetim/ekipler\">", "</a>"))</p>
+            }
+            else
+            {
+                <p class="text-muted small">@Texts.Get("admin.userDetail.teamsHelp")</p>
+                @if (savedTeams.Count == 0)
+                {
+                    <EmptyState Compact="true" Title="@Texts.Get("admin.userDetail.noAssignedTeams")" />
+                }
+                else
+                {
+                    <div class="assigned-tags">
+                        @foreach (var team in teams.Where(t => savedTeams.Contains(t.Id)))
+                        {
+                            <span class="badge tag">@team.Name · @Texts.Get("admin.userDetail.memberCount", team.MemberCount)</span>
+                        }
+                    </div>
+                }
+                @if (savedTeams.Count > 1)
+                {
+                    <p class="text-muted small">@Texts.Get("admin.userDetail.primaryTeamHelp")</p>
+                    <div class="role-picker">
+                        @foreach (var team in teams.Where(t => savedTeams.Contains(t.Id)))
+                        {
+                            <label class="form-check">
+                                <input class="form-check-input" type="radio" name="primaryTeam" checked="@(primaryTeam == team.Id)" disabled="@busy"
+                                       @onchange="() => SetPrimaryTeamAsync(team.Id)" />
+                                <span class="form-check-label">@Texts.Get("admin.userDetail.primaryTeam", team.Name)</span>
+                            </label>
+                        }
+                    </div>
+                }
+            }
+        </section>
+        </TabPanel>
+        @* İşletici şirket erişimi (ADR-0008). Yönetici zaten bütün şirketlere erişir; bu, yönetici olmayan kullanıcılar içindir. *@
+        @if (Session.Can(CoreAccess.ManageCompanies))
+        {
+        <TabPanel State="tabs" Key="sirketler">
+            <section class="detail-section">
+                <div class="section-header">
+                    <h2>@Texts.Get("nav.app.admin.companies")</h2>
+                    @if (!user.IsAdministrator && companies.Count > 0)
+                    {
+                        <button type="button" class="btn btn-tonal" disabled="@busy" @onclick="() => OpenDialog(CompaniesDialog)">
+                            <AppIcon Name="plus" Size="16" /> @Texts.Get("admin.userDetail.assignCompanies")
+                        </button>
+                    }
+                </div>
+                @if (user.IsAdministrator)
+                {
+                    <p class="text-muted small">@Texts.Get("admin.userDetail.companiesAdministrator")</p>
+                }
+                else if (companies.Count == 0)
+                {
+                    <EmptyState Compact="true" Title="@Texts.Get("admin.userDetail.noCompanies")" />
+                }
+                else
+                {
+                    <p class="text-muted small">@Texts.Get("admin.userDetail.companiesHelp")</p>
+                    @if (!assignments.Values.Any(a => a.Selected))
+                    {
+                        <EmptyState Compact="true" Title="@Texts.Get("admin.userDetail.noAssignedCompanies")" />
+                    }
+                    else
+                    {
+                        <div class="assigned-tags">
+                            @foreach (var company in companies.Where(c => assignments[c.Id].Selected))
+                            {
+                                <span class="badge tag">@CompanySummary(company)</span>
+                            }
+                        </div>
+                    }
+                }
+            </section>
+        </TabPanel>
+        }
+        <TabPanel State="tabs" Key="erisim">
+        <UserAccessPanel MembershipId="MembershipId" Disabled="user.Status == UserStatus.Disabled" Version="accessVersion" />
+        </TabPanel>
+            </div>
+        </div>
+
+        <PickDialog TKey="Guid" Open="@(dialog == RolesDialog)" Title="@Texts.Get("admin.userDetail.assignRoles")" Subtitle="@user.DisplayName"
+                    SearchPlaceholder="@Texts.Get("admin.userDetail.searchRoles")" Items="RoleItems" Selected="user.Roles.Select(r => r.Id)"
+                    Busy="busy" Error="@dialogError" OnSave="SaveRolesAsync" OnClose="CloseDialog" />
+
+        <PickDialog TKey="Guid" Open="@(dialog == TeamsDialog)" Title="@Texts.Get("admin.userDetail.assignTeams")" Subtitle="@user.DisplayName"
+                    SearchPlaceholder="@Texts.Get("admin.userDetail.searchTeams")" Icon="users" Items="TeamItems" Selected="savedTeams"
+                    Busy="busy" Error="@dialogError" OnSave="SaveTeamsAsync" OnClose="CloseDialog" />
+
+        <PickDialog TKey="Guid" Open="@(dialog == CompaniesDialog)" Title="@Texts.Get("admin.userDetail.assignCompanies")" Subtitle="@user.DisplayName"
+                    SearchPlaceholder="@Texts.Get("admin.userDetail.searchCompanies")" Icon="building" Items="CompanyItems"
+                    Selected="assignments.Where(a => a.Value.Selected).Select(a => a.Key)"
+                    Busy="busy" Error="@dialogError" OnSave="SaveCompaniesAsync" OnClose="CloseDialog">
+            <SelectedContent Context="companyId">
+                @* Geçici vekâlet bitişi ve varsayılan şube (ADR-0008, adım 5); pencerenin taslağında tutulur, "Kaydet" ile yazılır. *@
+                @if (companyDraft.TryGetValue(companyId, out var state))
+                {
+                    <label>
+                        @Texts.Get("admin.userDetail.validUntil")
+                        <input type="date" class="form-control form-control-sm" value="@(state.ValidUntil?.ToString("yyyy-MM-dd"))"
+                               @onchange="e => state.ValidUntil = DateTime.TryParse(e.Value?.ToString(), out var date) ? date.Date : null" />
+                    </label>
+                    @if (branchesByCompany.TryGetValue(companyId, out var branches) && branches.Count > 0)
+                    {
+                        <label>
+                            @Texts.Get("admin.userDetail.defaultBranch")
+                            <select class="form-select form-select-sm" @onchange="e => state.BranchId = Guid.TryParse(e.Value?.ToString(), out var branchId) ? branchId : null">
+                                <option value="">—</option>
+                                @foreach (var branch in branches)
+                                {
+                                    <option value="@branch.Id" selected="@(state.BranchId == branch.Id)">@branch.Name</option>
+                                }
+                            </select>
+                        </label>
+                    }
+                }
+            </SelectedContent>
+        </PickDialog>
+
     }
 </AuthGate>
 
@@ -298,9 +359,7 @@
 
     private UserDto? user;
     private IReadOnlyList<RoleDto> roles = [];
-    private HashSet<Guid> selectedRoles = [];
     private IReadOnlyList<TeamDto> teams = [];
-    private HashSet<Guid> selectedTeams = [];
     private HashSet<Guid> savedTeams = [];
     private Guid? primaryTeam;
     private IReadOnlyList<BusinessUnitDto> units = [];
@@ -318,6 +377,68 @@
         public Guid? BranchId { get; set; }
     }
     private const string TransferPath = "/transfer-records";
+
+    private readonly TabState tabs = new("genel");
+
+    /// <summary>Sol sekmeler; şirket sekmesi yalnızca şirket yönetimi izni olana görünür (yetkisiz sekme listeye eklenmez).</summary>
+    private IReadOnlyList<SideTabItem> Sections
+    {
+        get
+        {
+            List<SideTabItem> items =
+            [
+                new("genel", Texts.Get("admin.userDetail.tab.general"), "user"),
+                new("roller", Texts.Get("nav.app.admin.roles"), "layers", user?.Roles.Count),
+                new("ekipler", Texts.Get("nav.app.admin.teams"), "users", savedTeams.Count),
+            ];
+            if (Session.Can(CoreAccess.ManageCompanies))
+            {
+                items.Add(new("sirketler", Texts.Get("nav.app.admin.companies"), "building",
+                    user?.IsAdministrator == true ? null : assignments.Values.Count(a => a.Selected)));
+            }
+
+            items.Add(new("erisim", Texts.Get("admin.userDetail.tab.access"), "shield"));
+            return items;
+        }
+    }
+
+    // Açık atama penceresi (yoksa null) ve kayıt hatası; hata pencerenin içinde gösterilir, pencere açık kalır.
+    private const string RolesDialog = "roles";
+    private const string TeamsDialog = "teams";
+    private const string CompaniesDialog = "companies";
+    private string? dialog;
+    private string? dialogError;
+    private Dictionary<Guid, CompanyAssignmentState> companyDraft = [];
+
+    /// <summary>Yönetici (sistem) rolünü yalnızca yönetici verebilir; diğerinde satır kilitlidir (sunucu da reddeder).</summary>
+    private IReadOnlyList<PickItem<Guid>> RoleItems =>
+        roles.Select(r =>
+        {
+            var locked = r.IsSystem && !Session.IsAdministrator;
+            var note = !r.IsSystem ? null : Texts.Get(locked ? "admin.rolePicker.allPermissionsLocked" : "admin.rolePicker.allPermissions");
+            return new PickItem<Guid>(r.Id, r.Name, note, Locked: locked);
+        }).ToList();
+
+    private IReadOnlyList<PickItem<Guid>> TeamItems =>
+        teams.Select(t => new PickItem<Guid>(t.Id, t.Name, Texts.Get("admin.userDetail.memberCount", t.MemberCount))).ToList();
+
+    private IReadOnlyList<PickItem<Guid>> CompanyItems =>
+        companies.Select(c => new PickItem<Guid>(c.Id, c.Name, c.IsDefault ? Texts.Get("admin.userDetail.defaultCompany") : null)).ToList();
+
+    private void OpenDialog(string key)
+    {
+        if (key == CompaniesDialog)
+        {
+            // Pencere taslak üzerinde çalışır; "İptal" sayfadaki görevleri değiştirmez.
+            companyDraft = assignments.ToDictionary(
+                a => a.Key,
+                a => new CompanyAssignmentState { Selected = a.Value.Selected, ValidUntil = a.Value.ValidUntil, BranchId = a.Value.BranchId });
+        }
+
+        (dialog, dialogError, notice) = (key, null, null);
+    }
+
+    private void CloseDialog() => (dialog, dialogError) = (null, null);
 
     private AccountAction? confirming;
     private IReadOnlyList<OwnedRecordsDto>? owned;
@@ -358,7 +479,6 @@
         var result = await Api.GetAsync<UserDto>($"/api/users/{MembershipId}");
         user = result.Value;
         message = result.Error;
-        selectedRoles = user?.Roles.Select(r => r.Id).ToHashSet() ?? [];
 
         // Devre dışı kişinin üzerinde kalan kayıtlar sonradan da devredilebilir.
         owned = user?.Status == UserStatus.Disabled ? await LoadOwnedAsync() : null;
@@ -563,8 +683,7 @@
     {
         teams = (await Api.GetAsync<List<TeamDto>>("/api/teams")).Value ?? [];
         var mine = (await Api.GetAsync<List<TeamDto>>($"/api/users/{MembershipId}/teams")).Value ?? [];
-        selectedTeams = mine.Select(t => t.Id).ToHashSet();
-        savedTeams = [.. selectedTeams];
+        savedTeams = mine.Select(t => t.Id).ToHashSet();
         primaryTeam = mine.FirstOrDefault(t => t.IsPrimary)?.Id;
     }
 
@@ -584,30 +703,19 @@
         notice = Texts.Get("admin.userDetail.primaryTeamSaved");
     }
 
-    private void ToggleTeam(Guid teamId, bool on)
-    {
-        if (on)
-        {
-            selectedTeams.Add(teamId);
-        }
-        else
-        {
-            selectedTeams.Remove(teamId);
-        }
-    }
-
-    private async Task SaveTeamsAsync()
+    private async Task SaveTeamsAsync(IReadOnlyList<Guid> teamIds)
     {
         busy = true;
         notice = null;
-        var result = await Api.PutAsync<bool>($"/api/users/{MembershipId}/teams", new SetMembershipTeamsRequest(selectedTeams.ToList()));
+        var result = await Api.PutAsync<bool>($"/api/users/{MembershipId}/teams", new SetMembershipTeamsRequest(teamIds));
         busy = false;
         if (!result.IsSuccess)
         {
-            message = result.Error;
+            dialogError = result.Error;
             return;
         }
 
+        CloseDialog();
         await LoadTeamsAsync();
         accessVersion++;
         notice = Texts.Get("admin.userDetail.teamsSaved");
@@ -636,35 +744,52 @@
         }
     }
 
-    private void ToggleCompany(Guid companyId, bool on) => assignments[companyId].Selected = on;
+    private string CompanySummary(OperatingCompanyDto company)
+    {
+        var state = assignments[company.Id];
+        List<string> parts = [company.Name];
+        if (company.IsDefault)
+        {
+            parts.Add(Texts.Get("admin.userDetail.defaultCompany"));
+        }
 
-    private void SetValidUntil(Guid companyId, string? value) =>
-        assignments[companyId].ValidUntil = DateTime.TryParse(value, out var date) ? date.Date : null;
+        if (state.ValidUntil is { } until)
+        {
+            parts.Add(Texts.Get("admin.userDetail.until", until.ToString(Regional.DatePattern, System.Globalization.CultureInfo.InvariantCulture)));
+        }
 
-    private void SetBranch(Guid companyId, string? value) =>
-        assignments[companyId].BranchId = Guid.TryParse(value, out var branchId) ? branchId : null;
+        if (state.BranchId is { } branchId
+            && branchesByCompany.TryGetValue(company.Id, out var branches)
+            && branches.FirstOrDefault(b => b.Id == branchId) is { } branch)
+        {
+            parts.Add(Texts.Get("admin.userDetail.branchOf", branch.Name));
+        }
 
-    private async Task SaveCompaniesAsync()
+        return string.Join(" · ", parts);
+    }
+
+    private async Task SaveCompaniesAsync(IReadOnlyList<Guid> companyIds)
     {
         busy = true;
         notice = null;
-        var payload = assignments
-            .Where(entry => entry.Value.Selected)
+        var payload = companyIds
+            .Select(id => (Id: id, State: companyDraft[id]))
             .Select(entry => new CompanyAssignment(
-                entry.Key,
+                entry.Id,
                 null,
-                entry.Value.ValidUntil is { } date ? new DateTimeOffset(date.Date, TimeZoneInfo.Local.GetUtcOffset(date.Date)) : null,
-                entry.Value.BranchId))
+                entry.State.ValidUntil is { } date ? new DateTimeOffset(date.Date, TimeZoneInfo.Local.GetUtcOffset(date.Date)) : null,
+                entry.State.BranchId))
             .ToList();
         var result = await Api.PutAsync<bool>(
             $"/api/memberships/{MembershipId}/companies", new SetMembershipCompaniesRequest(payload));
         busy = false;
         if (!result.IsSuccess)
         {
-            message = result.Error;
+            dialogError = result.Error;
             return;
         }
 
+        CloseDialog();
         await LoadCompaniesAsync();
         notice = Texts.Get("admin.userDetail.companiesSaved");
         if (user?.IsCurrentUser == true)
@@ -673,19 +798,20 @@
         }
     }
 
-    private async Task SaveRolesAsync()
+    private async Task SaveRolesAsync(IReadOnlyList<Guid> roleIds)
     {
         busy = true;
         notice = null;
-        var result = await Api.PutAsync<bool>($"/api/memberships/{MembershipId}/roles", new SetMembershipRolesRequest(selectedRoles.ToList()));
+        var result = await Api.PutAsync<bool>($"/api/memberships/{MembershipId}/roles", new SetMembershipRolesRequest(roleIds));
         busy = false;
 
         if (!result.IsSuccess)
         {
-            message = result.Error;
+            dialogError = result.Error;
             return;
         }
 
+        CloseDialog();
         await LoadAsync();
         accessVersion++;
         notice = Texts.Get("admin.userDetail.rolesSaved");

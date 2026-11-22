@@ -46,6 +46,12 @@ public sealed record SettingWriteDto(string Value, long Version);
 /// <summary>Ayar anahtarı → yeni değer ve okunduğu sürüm. Hepsi birlikte kaydedilir ya da hiçbiri.</summary>
 public sealed record SaveSettingsRequest(IReadOnlyDictionary<string, SettingWriteDto> Values);
 
+/// <summary>Vurgu rengi önizlemesi (E8): kaydetmeden önce rengin açık ya da koyu temada okunup okunmadığı. Hiçbir şey yazmaz.</summary>
+public sealed record AccentPreviewRequest(string Color, bool Dark);
+
+/// <summary>Önizleme sonucu: geçerli mi, en düşük kontrast (hesaplanabildiyse), gereken en az kontrast ve geçmiyorsa hata metni.</summary>
+public sealed record AccentPreviewResponse(bool Valid, double? Contrast, double MinContrast, string? Message);
+
 /// <summary>Çekirdeğin ayar anahtarları; arayüz bunlarla okur.</summary>
 public static class SettingKeys
 {

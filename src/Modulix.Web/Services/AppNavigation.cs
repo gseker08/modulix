@@ -13,6 +13,9 @@ public sealed record MenuEntry(AppDefinition App, string Name, string? GroupId, 
 /// <summary>Sol menüdeki bölüm: başlık (boşsa başlıksız küme) ve bağlantıları.</summary>
 public sealed record MenuSection(AppGroup? Group, IReadOnlyList<MenuEntry> Entries);
 
+/// <summary>Rol menü düzeni ekranında bir uygulamanın menüsü: katalogdaki bölümler ve satırlar (izinden bağımsız).</summary>
+public sealed record EditableMenu(AppDefinition Root, IReadOnlyList<MenuSection> Sections);
+
 /// <summary>Bir sayfanın menü bağlamı: hangi uygulamanın menüsü gösterilir, hangi ekran aktiftir.</summary>
 public sealed record MenuContext(AppDefinition Root, AppDefinition Active, IReadOnlyList<MenuSection> Sections);
 
@@ -44,9 +47,11 @@ public sealed class AppNavigation(SessionState session)
     }
 
     /// <summary>Kullanıcının görebildiği alt uygulamalar, sıralı.</summary>
-    public IReadOnlyList<AppDefinition> Children(string parentId) =>
+    public IReadOnlyList<AppDefinition> Children(string parentId) => Children(parentId, IsVisible);
+
+    private static IReadOnlyList<AppDefinition> Children(string parentId, Func<AppDefinition, bool> visible) =>
         AppCatalog.All
-            .Where(a => a.ParentId == parentId && IsVisible(a))
+            .Where(a => a.ParentId == parentId && visible(a))
             .OrderBy(a => a.Order)
             .ToList();
 
@@ -55,17 +60,25 @@ public sealed class AppNavigation(SessionState session)
     /// uygulamaların (<see cref="AppDefinition.HostId"/>) görünür ve yerleşimi tanımlı (<see cref="AppDefinition.Hosted"/>) ekranları.
     /// Ev sahipliği yalnızca menü yerleşimidir; her ekran kendi modül ve izin denetimiyle süzülür.
     /// </summary>
-    public IReadOnlyList<MenuEntry> MenuEntries(string rootId)
+    public IReadOnlyList<MenuEntry> MenuEntries(string rootId) =>
+        MenuLayoutRules.Apply(CatalogEntries(rootId, IsVisible), session.Access?.MenuLayout);
+
+    /// <summary>
+    /// Rol düzeni uygulanmamış (katalog) menü bağlantıları; <paramref name="visible"/> hangi ekranların sayıldığını belirler.
+    /// Uygulama panelinde bir uygulamanın listelenip listelenmeyeceği bunlara bakar: düzen bir uygulamanın bütün bağlantılarını
+    /// gizlese de uygulama panelden kaybolmaz.
+    /// </summary>
+    private IReadOnlyList<MenuEntry> CatalogEntries(string rootId, Func<AppDefinition, bool> visible)
     {
         // MenuParentId dolu ekranlar (ör. teklif onayları) ayrı satır olmaz; üst satırın altında sayılır.
-        List<MenuEntry> entries = Children(rootId)
+        List<MenuEntry> entries = Children(rootId, visible)
             .Where(a => a.MenuParentId is null)
             .Select(a => new MenuEntry(a, AppNames.Of(a), a.Group, a.Order))
             .ToList();
 
-        foreach (AppDefinition hosted in AppCatalog.All.Where(a => a.ParentId is null && a.HostId == rootId && IsVisible(a)))
+        foreach (AppDefinition hosted in AppCatalog.All.Where(a => a.ParentId is null && a.HostId == rootId && visible(a)))
         {
-            foreach (AppDefinition child in Children(hosted.Id).Where(c => c.Hosted is { ParentEntryId: null }))
+            foreach (AppDefinition child in Children(hosted.Id, visible).Where(c => c.Hosted is { ParentEntryId: null }))
             {
                 HostPlacement place = child.Hosted!;
                 entries.Add(new MenuEntry(child, AppNames.MenuNameOf(child), place.Group, place.Order, place.Route));
@@ -81,7 +94,7 @@ public sealed class AppNavigation(SessionState session)
     /// </summary>
     public IReadOnlyList<AppDefinition> Roots() =>
         AppCatalog.All
-            .Where(a => a.ParentId is null && IsVisible(a) && (a.Route is not null || MenuEntries(a.Id).Count > 0) && HostOf(a) is null)
+            .Where(a => a.ParentId is null && IsVisible(a) && (a.Route is not null || CatalogEntries(a.Id, IsVisible).Count > 0) && HostOf(a) is null)
             .OrderBy(a => a.Order)
             .ToList();
 
@@ -93,7 +106,7 @@ public sealed class AppNavigation(SessionState session)
             return null;
         }
 
-        return IsVisible(host) && MenuEntries(host.Id).Count > 0 ? host : null;
+        return IsVisible(host) && CatalogEntries(host.Id, IsVisible).Count > 0 ? host : null;
     }
 
     /// <summary>Panele tıklanınca açılan ilk ekran: kendi route'u, yoksa menüsündeki ilk bağlantı.</summary>
@@ -145,6 +158,31 @@ public sealed class AppNavigation(SessionState session)
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Rol menü düzeni ekranının satırları (E8): firmada modülü açık, platforma özel olmayan uygulamaların katalog menüleri. İzin
+    /// bakılmaz: düzeni düzenleyen yönetici, rolün göreceği ekranları kendi izninden bağımsız görür; gizleme yetki değildir.
+    /// Katalog sırasıyla; rol düzeni uygulanmaz.
+    /// </summary>
+    public IReadOnlyList<EditableMenu> EditableMenus()
+    {
+        bool Editable(AppDefinition app) =>
+            !app.PlatformOnly && (app.ModuleKey is null || session.IsModuleEnabled(app.ModuleKey));
+
+        List<EditableMenu> menus = [];
+        foreach (AppDefinition root in AppCatalog.All.Where(a => a.ParentId is null && Editable(a)).OrderBy(a => a.Order))
+        {
+            // Ev sahibinin menüsünde gösterilen uygulama ayrı satırlanmaz; ev sahibinin altında düzenlenir.
+            bool hosted = root.HostId is not null && Find(root.HostId) is { } host && Editable(host) && CatalogEntries(host.Id, Editable).Count > 0;
+            IReadOnlyList<MenuEntry> entries = hosted ? [] : CatalogEntries(root.Id, Editable);
+            if (entries.Count > 0)
+            {
+                menus.Add(new EditableMenu(root, Sections(entries)));
+            }
+        }
+
+        return menus;
     }
 
     public AppDefinition? Find(string id) => AppCatalog.All.FirstOrDefault(a => a.Id == id);

@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
@@ -56,10 +57,10 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
     /// Doluysa kayıt oluşturulduktan sonra <b>değiştirilemez ve silinemez</b>: güncelleme ve silme bu iletiyle çakışma (409) döner. Yalnızca eklenen kayıtlar
     /// (stok hareket defteri, ADR-0032 K13) ve türetilmiş kayıtlar (bakiye) kullanır.
     /// </summary>
-    protected virtual string? ImmutableMessage => null;
+    protected virtual ServerMessage? ImmutableMessage => null;
 
     /// <summary>Doluysa bu kayıt türü genel uçtan oluşturulamaz (yalnızca okunur; örn. bakiye defterden türetilir).</summary>
-    protected virtual string? CreateBlockedMessage => null;
+    protected virtual ServerMessage? CreateBlockedMessage => null;
 
     private IModuleData Data => context.Data;
 
@@ -103,7 +104,7 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
         && Guid.TryParse(text, out var user) && users.Contains(user);
 
     /// <summary>Doluysa genel uçtan güncelleme bu iletiyle çakışma (409) döner (ör. durumu komutla değişen kayıt; kapı açıkken null verilir).</summary>
-    protected virtual string? UpdateBlockedMessage => null;
+    protected virtual ServerMessage? UpdateBlockedMessage => null;
 
     /// <summary>Tüm İK kayıtlarına özel alan eklenebilir (Y9a).</summary>
     public bool SupportsCustomFields => true;
@@ -120,7 +121,7 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
 
             if (!FieldsByName.TryGetValue(name, out var field))
             {
-                errors.Add(new RecordFieldError(name, "Bilinmeyen alan."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownField));
             }
             else if (!field.IsOmitted(node) && field.Parse(node).Error is { } error)
             {
@@ -130,7 +131,7 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
 
         if (operation == RecordOperation.Create)
         {
-            errors.AddRange(Fields.Where(f => f.Required && !values.ContainsKey(f.Name)).Select(f => new RecordFieldError(f.Name, "Bu alan zorunludur.")));
+            errors.AddRange(Fields.Where(f => f.Required && !values.ContainsKey(f.Name)).Select(f => new RecordFieldError(f.Name, ServerMessages.Validation.Required)));
         }
 
         return errors;
@@ -292,7 +293,7 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
 
         if (!keys.Contains(sort, StringComparer.Ordinal))
         {
-            throw new RecordValidationException([new RecordFieldError("sort", "Geçersiz sıralama.")]);
+            throw new RecordValidationException([new RecordFieldError("sort", ServerMessages.Validation.InvalidSort)]);
         }
 
         return (filters.Where(f => f.Key != "sort").ToDictionary(f => f.Key, f => f.Value), sort);
@@ -312,7 +313,7 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
         {
             if (!Filters.TryGetValue(name, out var filter))
             {
-                errors.Add(new RecordFieldError(name, "Bilinmeyen filtre."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownFilter));
             }
             else if (filter(source, value) is { } filtered)
             {
@@ -320,7 +321,7 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
             }
             else
             {
-                errors.Add(new RecordFieldError(name, "Geçersiz filtre değeri."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.InvalidFilterValue));
             }
         }
 
@@ -362,7 +363,7 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
             {
                 if (value is not null && !JsonNode.DeepEquals(field.Read(entity), JsonValue.Create(value.ToString())))
                 {
-                    errors.Add(new RecordFieldError(name, "Oluşturulduktan sonra değiştirilemez."));
+                    errors.Add(new RecordFieldError(name, ServerMessages.Validation.CreateOnly));
                 }
 
                 continue;
@@ -371,7 +372,7 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
             if (field.Exists is { } exists && value is Guid id && !await exists(context, id, cancellationToken))
             {
                 // Başka tenant'ın kaydı da "bulunamadı" sayılır; varlığı belli edilmez.
-                errors.Add(new RecordFieldError(name, field.NotFoundMessage ?? "Kayıt bulunamadı."));
+                errors.Add(new RecordFieldError(name, field.NotFoundMessage ?? ServerMessages.Record.NotFound));
                 continue;
             }
 
@@ -381,7 +382,7 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
                 var unchanged = !isNew && choice is not null && field.Read(entity)?.GetValue<string>() == choice.Key;
                 if (choice is null || (!choice.Active && !unchanged))
                 {
-                    errors.Add(new RecordFieldError(name, choice is null ? "Listede olmayan değer." : "Bu değer artık kullanılmıyor."));
+                    errors.Add(new RecordFieldError(name, choice is null ? ServerMessages.Validation.NotInList : ServerMessages.Validation.Retired));
                     continue;
                 }
 
@@ -403,8 +404,7 @@ internal abstract class HrRecordStore<TEntity>(HrStoreContext context) : IRecord
     {
         if (expectedVersion is { } expected && expected != entity.Version)
         {
-            throw new RecordConflictException(
-                $"Kayıt siz düzenlerken değişti (beklenen sürüm {expected}, güncel sürüm {entity.Version}). Güncel halini alıp tekrar deneyin.");
+            throw new RecordConflictException(ServerMessages.Record.ConcurrencyVersion(expected, entity.Version));
         }
     }
 }

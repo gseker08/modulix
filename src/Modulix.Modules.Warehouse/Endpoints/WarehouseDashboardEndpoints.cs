@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Modulix.Core.Contracts.Localization;
+using Modulix.Core.Contracts.Records;
 using Modulix.Core.Hosting;
 using Modulix.Modules.Warehouse.Dashboard;
 using Modulix.Shared.Warehouse;
@@ -23,9 +25,8 @@ internal static class WarehouseDashboardEndpoints
                 var period = days ?? 14;
                 if (!WarehouseDashboardRules.AllowedDays.Contains(period))
                 {
-                    return Results.ValidationProblem(
-                        new Dictionary<string, string[]> { ["days"] = ["Dönem 7, 14 ya da 30 gün olabilir."] },
-                        statusCode: StatusCodes.Status422UnprocessableEntity);
+                    return RecordProblems.ToProblem(new RecordError(
+                        RecordErrorCode.ValidationFailed, ServerMessages.Record.ValidationFailed, [new RecordFieldError("days", WarehouseMessages.Dashboard.Period)]));
                 }
 
                 var v = await dashboard.GetAsync(facilityId, period, ct);

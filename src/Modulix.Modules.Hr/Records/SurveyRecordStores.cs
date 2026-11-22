@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -261,9 +262,9 @@ internal sealed class SurveyResponseRecordStore(HrStoreContext context) : HrReco
 
     protected override string WritePermission => HrModule.Permissions.SurveysManage;
 
-    protected override string? CreateBlockedMessage => Context.Gate.IsOpen ? null : "Yanıt /api/hr/surveys/{id}/responses ile gönderilir.";
+    protected override ServerMessage? CreateBlockedMessage => Context.Gate.IsOpen ? null : HrMessages.Blocked.SurveyResponseCreate;
 
-    protected override string? ImmutableMessage => "Gönderilmiş yanıt değiştirilmez.";
+    protected override ServerMessage? ImmutableMessage => HrMessages.Blocked.SurveyResponseImmutable;
 
     protected override IReadOnlyList<RecordField<SurveyResponse>> Fields => fields ??=
     [
@@ -310,9 +311,9 @@ internal sealed class SurveyAnswerRecordStore(HrStoreContext context) : HrRecord
 
     protected override string WritePermission => HrModule.Permissions.SurveysAnswers;
 
-    protected override string? CreateBlockedMessage => Context.Gate.IsOpen ? null : "Yanıt /api/hr/surveys/{id}/responses ile gönderilir.";
+    protected override ServerMessage? CreateBlockedMessage => Context.Gate.IsOpen ? null : HrMessages.Blocked.SurveyResponseCreate;
 
-    protected override string? ImmutableMessage => "Gönderilmiş yanıt değiştirilmez.";
+    protected override ServerMessage? ImmutableMessage => HrMessages.Blocked.SurveyResponseImmutable;
 
     /// <summary>Kimliği gizli anketin cevabı anonim yazılır (bölüm 24); kayıt kuralı aşağıda kimliği gizli ankete sınırlar.</summary>
     public override bool AllowsAnonymousWrites => true;

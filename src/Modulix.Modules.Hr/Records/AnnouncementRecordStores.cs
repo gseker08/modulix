@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -163,9 +164,9 @@ internal sealed class AnnouncementReadRecordStore(HrStoreContext context) : HrRe
 
     protected override string WritePermission => HrModule.Permissions.AnnouncementsManage;
 
-    protected override string? CreateBlockedMessage => Context.Gate.IsOpen ? null : "Okundu bilgisi duyuru açılınca yazılır.";
+    protected override ServerMessage? CreateBlockedMessage => Context.Gate.IsOpen ? null : HrMessages.Blocked.AnnouncementReadCreate;
 
-    protected override string? ImmutableMessage => "Okundu bilgisi değiştirilmez.";
+    protected override ServerMessage? ImmutableMessage => HrMessages.Blocked.AnnouncementReadImmutable;
 
     protected override IReadOnlyList<RecordField<AnnouncementRead>> Fields { get; } =
     [
