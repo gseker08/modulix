@@ -109,6 +109,8 @@ Firmadan yalnızca bu iki değer (açık/koyu, `#RRGGBB`) alınır; Web (`shell.
 
 **Uygulama biçimi:** Ayarlar `core.appearance.accent-light` ve `core.appearance.accent-dark` anahtarlarıyla Yönetim > Ayarlar'da tutulur (migration gerekmez, firma ayarı deposu). Web, oturum yüklenince bunları okur ve `<style id="mx-accent-style">` ile yalnızca yukarıdaki üç tokeni (`--mx-brand-primary`, `-hover`, `-rgb`) açık/koyu temaya göre yazar; bileşen CSS'i değişmez. Ayar yoksa hiçbir şey yazılmaz. Yönetim > Ayarlar'daki renk seçici (`AccentColorField`) rengi `POST /api/settings/accent/preview` ile (sunucudaki aynı kural) kaydetmeden önce denetler ve rengi, seçilen temanın yüzeyini taşıyan (`data-theme`) bir önizleme kutusunda yalnızca `--mx-brand-primary` geçersiz kılınarak gösterir. Marka renginin açık ve koyu temada ekran görüntüsü kontrolü (görsel QA) yeni değer için de yapılır.
 
+Karar kaydı ve rol bazlı menü düzeni: [ADR-0055](../adr/0055-calisma-alani-rengi-ve-rol-menusu.md). Hover tonu sunucuda ayrıca doğrulanmaz: türetme temel renkten daha okunaklı bir ton verir (ADR'de gerekçe).
+
 **Kapsam dışı (bu liste büyütülmeden eklenmez):** yazı tipi, durum renkleri, yüzey/metin renkleri, köşe ve gölge. Yeni bir token firmaya açılacaksa önce bu tabloya, kontrast kuralıyla birlikte yazılır.
 
 ## Geriye uyumluluk
