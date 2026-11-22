@@ -60,6 +60,8 @@ public static class SettingKeys
     public const string Currency = "core.regional.currency";
     public const string Format = "core.regional.format";
     public const string Language = "core.regional.language";
+    public const string AccentLight = "core.appearance.accent-light";
+    public const string AccentDark = "core.appearance.accent-dark";
     public const string RequireTwoFactor = "core.security.require-two-factor";
 
     /// <summary>Firmanın çalışma günleri ve mesai saatleri (ADR-0049 dilim 6c).</summary>

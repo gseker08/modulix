@@ -88,6 +88,43 @@ public class SettingsTests(ModulixApiFactory factory) : IClassFixture<ModulixApi
     }
 
     [Fact]
+    public async Task Accent_color_is_validated_for_contrast_is_per_tenant_and_needs_the_manage_permission()
+    {
+        var tenant = await factory.CreateTenantAsync();
+        var member = await factory.CreateUserAsync(tenant);
+        var manager = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [ManageSettings], manager);
+        using var memberClient = await LoginAsync(member);
+        using var managerClient = await LoginAsync(manager);
+
+        // Yetki: izinsiz üye rengi değiştiremez.
+        var request = Save((SettingKeys.AccentLight, "#0B5C87", 0), (SettingKeys.AccentDark, "#6CC6F2", 0));
+        Assert.Equal(HttpStatusCode.Forbidden, (await memberClient.PutAsJsonAsync("/api/settings", request)).StatusCode);
+
+        // Doğrulama: açık temada yeterince koyu olmayan, koyu temada yeterince açık olmayan ve biçimsiz renk reddedilir; hiçbiri yazılmaz.
+        var invalid = await managerClient.PutAsJsonAsync("/api/settings",
+            Save((SettingKeys.AccentLight, "#7DD3FC", 0), (SettingKeys.AccentDark, "#1E3A5F", 0)));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
+        var errors = (await invalid.Content.ReadFromJsonAsync<JsonObject>())!["errors"]!.AsObject();
+        Assert.True(errors.ContainsKey(SettingKeys.AccentLight));
+        Assert.True(errors.ContainsKey(SettingKeys.AccentDark));
+        var malformed = await managerClient.PutAsJsonAsync("/api/settings", Save((SettingKeys.AccentLight, "red; }", 0)));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, malformed.StatusCode);
+        Assert.Equal("", (await GetAsync(managerClient))[SettingKeys.AccentLight].Value);
+
+        // Mutlu yol: geçen renk kaydedilir ve her üye okur.
+        Assert.Equal(HttpStatusCode.OK, (await managerClient.PutAsJsonAsync("/api/settings", request)).StatusCode);
+        var read = await GetAsync(memberClient);
+        Assert.Equal("#0B5C87", read[SettingKeys.AccentLight].Value);
+        Assert.Equal("#6CC6F2", read[SettingKeys.AccentDark].Value);
+
+        // Tenant izolasyonu: başka firma varsayılanı (boş) görür.
+        var other = await factory.CreateTenantAsync();
+        using var otherClient = await LoginAsync(await factory.CreateUserAsync(other));
+        Assert.Equal("", (await GetAsync(otherClient))[SettingKeys.AccentLight].Value);
+    }
+
+    [Fact]
     public async Task Changes_are_audited_with_setting_names_and_unchanged_values_are_not()
     {
         var (client, _) = await ManagerAsync();

@@ -222,18 +222,40 @@ public sealed class SessionState
             Regional.Apply(settings.Value?.Settings);
             UiLanguage.Apply(User.PreferredLanguage, settings.Value?.Settings, fallbackLanguage);
             Logo = settings.Value?.Logo;
+            await ApplyAccentAsync(
+                settings.Value?.Settings.FirstOrDefault(s => s.Key == SettingKeys.AccentLight)?.Value,
+                settings.Value?.Settings.FirstOrDefault(s => s.Key == SettingKeys.AccentDark)?.Value);
         }
         else
         {
             Regional.Apply(null);
             UiLanguage.Apply(User?.PreferredLanguage, null, fallbackLanguage);
             Logo = null;
+            await ApplyAccentAsync(null, null);
         }
 
         await RememberLanguageAsync();
         await LoadTextsAsync();
         IsLoaded = true;
         Changed?.Invoke();
+    }
+
+    /// <summary>Firma vurgu rengini uygular (E8); renk yoksa varsayılan marka rengine döner. Tarayıcı kapalıysa sessizce atlanır.</summary>
+    private async Task ApplyAccentAsync(string? light, string? dark)
+    {
+        if (js is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await js.InvokeVoidAsync("modulixShell.setAccent", light, dark);
+        }
+        catch (JSException)
+        {
+            // Renk uygulanamazsa varsayılan marka rengi kalır.
+        }
     }
 
     /// <summary>
