@@ -1,0 +1,28 @@
+@* Sol (dikey) sekme çubuğu (docs/design-system/component-catalog.md → SideTabs): çok bölümlü yönetim detay sayfasında bölümler
+   solda ikonlu sekmeler, içerik sağda. Paneller TabBar ile aynıdır (TabPanel + TabState): etkin olmayan panel gizlenir ama DOM'da
+   kalır. Yetkisi olmayan sekme listeye hiç eklenmez. Dar ekranda çubuk üste geçer ve yatay kayar. *@
+<div class="side-tabs" role="tablist" aria-orientation="vertical" aria-label="@Label">
+    @foreach (var tab in Tabs)
+    {
+        var active = tab.Key == State.Active;
+        <button type="button" role="tab" id="tab-@tab.Key" class="side-tab @(active ? "active" : null)"
+                aria-selected="@(active ? "true" : "false")" aria-controls="tabpanel-@tab.Key"
+                @onclick="() => State.Select(tab.Key)">
+            <AppIcon Name="@tab.Icon" Size="18" />
+            <span>@tab.Label</span>
+            @if (tab.Count is { } count)
+            {
+                <span class="record-tab-count">@count</span>
+            }
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<SideTabItem> Tabs { get; set; } = [];
+
+    [Parameter, EditorRequired] public TabState State { get; set; } = default!;
+
+    /// <summary>Ekran okuyucu için sekme grubunun adı.</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+}

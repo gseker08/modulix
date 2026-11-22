@@ -3,6 +3,9 @@ namespace Modulix.Web.Components;
 /// <summary>Sekme başlığı; <see cref="Count"/> doluysa yanında sayı, <see cref="Errors"/> sıfırdan büyükse hatalı alan işareti gösterilir.</summary>
 public sealed record TabItem(string Key, string Label, int? Count = null, int Errors = 0);
 
+/// <summary>Sol sekme çubuğundaki (<c>SideTabs</c>) bir sekme: <see cref="Icon"/> <c>AppIcon</c> adıdır, <see cref="Count"/> isteğe bağlı sayaç.</summary>
+public sealed record SideTabItem(string Key, string Label, string Icon, int? Count = null);
+
 /// <summary>
 /// Kayıt sayfası sekmelerinin durumu (docs/design-system/form-standards.md → Sekmeler). Sekme ilk seçildiğinde çizilir (tembel yükleme);
 /// sonra başka sekmeye geçilince DOM'da gizli kalır, böylece içindeki kaydedilmemiş form ve bileşen durumu kaybolmaz.
