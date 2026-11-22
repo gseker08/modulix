@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Support.Domain;
 
@@ -85,8 +86,8 @@ internal sealed class TicketCategoryRecordStore(SupportStoreContext context) : S
     protected override IReadOnlyList<RecordField<TicketCategory>> Fields { get; } =
     [
         Field.Text<TicketCategory>("name", TicketCategory.NameMaxLength, c => c.Name, (c, v) => c.Name = v!, required: true),
-        Field.Reference<TicketCategory, TicketCategory>("parentId", "Üst kategori bulunamadı.", c => c.ParentId, (c, v) => c.ParentId = v),
-        Field.Reference<TicketCategory, SupportQueue>("defaultQueueId", "Kuyruk bulunamadı.", c => c.DefaultQueueId, (c, v) => c.DefaultQueueId = v),
+        Field.Reference<TicketCategory, TicketCategory>("parentId", SupportMessages.NotFound.ParentCategory, c => c.ParentId, (c, v) => c.ParentId = v),
+        Field.Reference<TicketCategory, SupportQueue>("defaultQueueId", SupportMessages.NotFound.Queue, c => c.DefaultQueueId, (c, v) => c.DefaultQueueId = v),
         Field.Flag<TicketCategory>("isActive", c => c.IsActive, (c, v) => c.IsActive = v),
         Field.Integer<TicketCategory>("position", c => c.Position, (c, v) => c.Position = v ?? 0, max: 9999),
         Field.Text<TicketCategory>("requiredFields", 200, c => c.RequiredFields, (c, v) => c.RequiredFields = v),

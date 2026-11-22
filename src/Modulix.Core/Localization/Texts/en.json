@@ -12732,5 +12732,13 @@
   "contracts.server.from-quote.lines-taken": "The selected quote lines are already in a contract: {0}.",
   "contracts.server.from-quote.line-taken": "The line is used in another contract.",
   "contracts.server.from-quote.source-unavailable": "The quote source is unavailable; no accepted quote was found.",
-  "contracts.server.from-quote.accepted-not-found": "No accepted quote was found."
+  "contracts.server.from-quote.accepted-not-found": "No accepted quote was found.",
+  "support.server.field.signed-money": "Enter an amount with at most two decimals.",
+  "support.server.not-found.party": "Customer not found.",
+  "support.server.not-found.person": "Person not found.",
+  "support.server.not-found.category": "Category not found.",
+  "support.server.not-found.parent-category": "Parent category not found.",
+  "support.server.not-found.related-ticket": "Related ticket not found.",
+  "support.server.not-found.queue": "Queue not found.",
+  "support.server.not-found.calendar": "Calendar not found."
 }

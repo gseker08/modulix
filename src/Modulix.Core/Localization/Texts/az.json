@@ -12732,5 +12732,13 @@
   "contracts.server.from-quote.lines-taken": "Seçilmiş təklif bəndləri artıq müqavilədədir: {0}.",
   "contracts.server.from-quote.line-taken": "Bənd başqa müqavilədə istifadə olunur.",
   "contracts.server.from-quote.source-unavailable": "Təklif mənbəyi əlçatan deyil; qəbul edilmiş təklif tapılmadı.",
-  "contracts.server.from-quote.accepted-not-found": "Qəbul edilmiş təklif tapılmadı."
+  "contracts.server.from-quote.accepted-not-found": "Qəbul edilmiş təklif tapılmadı.",
+  "support.server.field.signed-money": "Ən çoxu iki onluq rəqəmli məbləğ daxil edin.",
+  "support.server.not-found.party": "Müştəri tapılmadı.",
+  "support.server.not-found.person": "Şəxs tapılmadı.",
+  "support.server.not-found.category": "Kateqoriya tapılmadı.",
+  "support.server.not-found.parent-category": "Üst kateqoriya tapılmadı.",
+  "support.server.not-found.related-ticket": "Əlaqəli sorğu tapılmadı.",
+  "support.server.not-found.queue": "Növbə tapılmadı.",
+  "support.server.not-found.calendar": "Təqvim tapılmadı."
 }
