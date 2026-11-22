@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Hr.Domain;
 
@@ -61,7 +62,7 @@ internal sealed class LeaveWorkflow(IRecordPipeline pipeline, HrStoreContext con
             var decision = await DecideAsync(record.Value!, action, cancellationToken);
             if (decision.Permission is not null || decision.Denied is not null)
             {
-                actions.Add(new LeaveActionState(action, label, decision.Permission is not null, decision.Denied, requiresReason, destructive));
+                actions.Add(new LeaveActionState(action, label, decision.Permission is not null, decision.Denied?.Text, requiresReason, destructive));
             }
         }
 
@@ -72,7 +73,7 @@ internal sealed class LeaveWorkflow(IRecordPipeline pipeline, HrStoreContext con
     {
         if (action is not (Approve or Reject or Cancel))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.", [new RecordFieldError("action", "Bilinmeyen eylem.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.UnknownAction, [new RecordFieldError("action", HrMessages.Workflow.UnknownAction)]);
         }
 
         // Önce kayıt okunur: göremeyen için kayıt yoktur (404); yetki denetimi varlığı sızdırmaz.
@@ -86,20 +87,20 @@ internal sealed class LeaveWorkflow(IRecordPipeline pipeline, HrStoreContext con
         if (decision.Permission is not { } permission)
         {
             return decision.Forbidden
-                ? RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, decision.Denied ?? "Bu eylem için yetkiniz yok.")
-                : RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, decision.Denied ?? "Bu eylem şu an yapılamaz.");
+                ? RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, decision.Denied ?? HrMessages.Workflow.NotAllowed)
+                : RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, decision.Denied ?? HrMessages.Workflow.NotNow);
         }
 
         var trimmed = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         if (action == Reject && trimmed is null)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", [new RecordFieldError("reason", "Gerekçe zorunludur.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.ReasonRequired, [new RecordFieldError("reason", HrMessages.Workflow.ReasonRequired)]);
         }
 
         if (trimmed is { Length: > LeaveRequest.ReasonMaxLength })
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe çok uzun.",
-                [new RecordFieldError("reason", $"En fazla {LeaveRequest.ReasonMaxLength} karakter olabilir.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.ReasonTooLong,
+                [new RecordFieldError("reason", ServerMessages.Validation.MaxLength(LeaveRequest.ReasonMaxLength))]);
         }
 
         var to = action switch { Approve => LeaveRequest.Statuses.Approved, Reject => LeaveRequest.Statuses.Rejected, _ => LeaveRequest.Statuses.Cancelled };
@@ -121,8 +122,8 @@ internal sealed class LeaveWorkflow(IRecordPipeline pipeline, HrStoreContext con
 
         if (end < start || end.Year != start.Year || (halfDay && end != start))
         {
-            return RecordResult<LeavePreview>.Fail(RecordErrorCode.ValidationFailed, "Tarih aralığı geçersiz.",
-                [new RecordFieldError("endDate", "Bitiş başlangıçtan önce olamaz, talep tek yıl içinde kalır; yarım gün yalnızca tek günlük talepte.")]);
+            return RecordResult<LeavePreview>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Leave.PreviewRangeTitle,
+                [new RecordFieldError("endDate", HrMessages.Leave.PreviewRange)]);
         }
 
         var days = await LeaveCalendar.DaysAsync(context, start, end, halfDay, cancellationToken);
@@ -176,12 +177,12 @@ internal sealed class LeaveWorkflow(IRecordPipeline pipeline, HrStoreContext con
 
             if (me is not null && owner == me)
             {
-                return Decision.Refused("Kendi izin talebinizi onaylayamaz ya da reddedemezsiniz.", forbidden: true);
+                return Decision.Refused(HrMessages.Leave.OwnDecision, forbidden: true);
             }
 
             return status == LeaveRequest.Statuses.Pending
                 ? Decision.Allowed(HrModule.Permissions.LeavesApprove)
-                : Decision.Refused("Yalnızca onay bekleyen talep onaylanır ya da reddedilir.");
+                : Decision.Refused(HrMessages.Leave.DecideOnlyPending);
         }
 
         var ownRequest = me is not null && owner == me && await context.Access.HasPermissionAsync(HrModule.Permissions.LeavesRequest, cancellationToken);
@@ -194,16 +195,16 @@ internal sealed class LeaveWorkflow(IRecordPipeline pipeline, HrStoreContext con
         {
             LeaveRequest.Statuses.Pending => Decision.Allowed(manages ? HrModule.Permissions.LeavesManage : HrModule.Permissions.LeavesRequest),
             LeaveRequest.Statuses.Approved when manages => Decision.Allowed(HrModule.Permissions.LeavesManage),
-            LeaveRequest.Statuses.Approved => Decision.Refused("Onaylanmış izni yalnızca İK iptal edebilir; İK'ya başvurun."),
-            _ => Decision.Refused("Reddedilmiş ya da iptal edilmiş talep iptal edilemez."),
+            LeaveRequest.Statuses.Approved => Decision.Refused(HrMessages.Leave.CancelByHrOnly),
+            _ => Decision.Refused(HrMessages.Leave.CancelNotPossible),
         };
     }
 
-    private sealed record Decision(string? Permission, string? Denied, bool Forbidden)
+    private sealed record Decision(string? Permission, ServerMessage? Denied, bool Forbidden)
     {
         public static Decision Allowed(string permission) => new(permission, null, false);
 
-        public static Decision Refused(string message, bool forbidden = false) => new(null, message, forbidden);
+        public static Decision Refused(ServerMessage message, bool forbidden = false) => new(null, message, forbidden);
 
         /// <summary>Kullanıcının bu eylemle hiç ilgisi yok: listede gösterilmez, denenirse 403.</summary>
         public static Decision Hidden() => new(null, null, true);

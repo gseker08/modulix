@@ -53,7 +53,7 @@ internal sealed class LeaveBalanceRecordStore(HrStoreContext context) : HrRecord
 
     protected override IReadOnlyList<RecordField<LeaveBalance>> Fields => fields ??=
     [
-        Field.Reference<LeaveBalance, Employee>("employeeId", "Çalışan bulunamadı.", b => b.EmployeeId, (b, v) => b.EmployeeId = v!.Value, required: true, createOnly: true),
+        Field.Reference<LeaveBalance, Employee>("employeeId", HrMessages.NotFound.Employee, b => b.EmployeeId, (b, v) => b.EmployeeId = v!.Value, required: true, createOnly: true),
         Field.Integer<LeaveBalance>("year", b => b.Year, (b, v) => b.Year = v!.Value, 2000, 2100, required: true, createOnly: true),
         Field.Decimal<LeaveBalance>("entitledDays", b => b.EntitledDays, (b, v) => b.EntitledDays = v ?? 0m, 1, 0m, LeaveBalance.MaxDays, required: true),
         Field.Decimal<LeaveBalance>("carriedOverDays", b => b.CarriedOverDays, (b, v) => b.CarriedOverDays = v ?? 0m, 1, 0m, LeaveBalance.MaxDays),
@@ -114,7 +114,7 @@ internal sealed class LeaveBalanceRecordStore(HrStoreContext context) : HrRecord
         {
             if (await Context.Data.Set<LeaveBalance>().AsNoTracking().AnyAsync(b => b.EmployeeId == entity.EmployeeId && b.Year == entity.Year, cancellationToken))
             {
-                errors.Add(new RecordFieldError("year", "Bu çalışanın bu yıl için izin hakkı zaten tanımlı."));
+                errors.Add(new RecordFieldError("year", HrMessages.Leave.EntitlementTaken));
             }
 
             entity.OwnerId = await Employees.Where(e => e.Id == entity.EmployeeId).Select(e => e.UserId).SingleOrDefaultAsync(cancellationToken);
@@ -122,7 +122,7 @@ internal sealed class LeaveBalanceRecordStore(HrStoreContext context) : HrRecord
 
         if (entity.RemainingDays < 0)
         {
-            errors.Add(new RecordFieldError("entitledDays", $"Hak ve devreden gün toplamı kullanılan günden ({entity.UsedDays:0.#}) az olamaz."));
+            errors.Add(new RecordFieldError("entitledDays", HrMessages.Leave.EntitledBelowUsed($"{entity.UsedDays:0.#}")));
         }
 
         if (errors.Count > 0)
@@ -133,7 +133,7 @@ internal sealed class LeaveBalanceRecordStore(HrStoreContext context) : HrRecord
 
     protected override Task BeforeDeleteAsync(LeaveBalance entity, CancellationToken cancellationToken) =>
         entity.UsedDays > 0
-            ? throw new RecordConflictException("İzin kullanılmış hak silinemez; hak gününü düzeltin.")
+            ? throw new RecordConflictException(HrMessages.Leave.EntitlementDeleteUsed)
             : Task.CompletedTask;
 }
 
@@ -175,7 +175,7 @@ internal sealed class LeaveRequestRecordStore(HrStoreContext context) : HrRecord
 
     protected override IReadOnlyList<RecordField<LeaveRequest>> Fields => fields ??=
     [
-        Field.Reference<LeaveRequest, Employee>("employeeId", "Çalışan bulunamadı.", r => r.EmployeeId, (r, v) => r.EmployeeId = v!.Value, required: true, createOnly: true),
+        Field.Reference<LeaveRequest, Employee>("employeeId", HrMessages.NotFound.Employee, r => r.EmployeeId, (r, v) => r.EmployeeId = v!.Value, required: true, createOnly: true),
         Field.ListChoice<LeaveRequest>("leaveTypeKey", HrModule.Lists.LeaveType, r => r.LeaveTypeKey, (r, v) => r.LeaveTypeKey = v ?? string.Empty),
         Field.Date<LeaveRequest>("startDate", r => r.StartDate, (r, v) => r.StartDate = v!.Value, required: true),
         Field.Date<LeaveRequest>("endDate", r => r.EndDate, (r, v) => r.EndDate = v!.Value, required: true),
@@ -244,7 +244,7 @@ internal sealed class LeaveRequestRecordStore(HrStoreContext context) : HrRecord
         EmployeeNames.LoadAsync(Context, entities.Select(r => r.EmployeeId), names, cancellationToken);
 
     protected override Task BeforeDeleteAsync(LeaveRequest entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("İzin talepleri silinmez; talebi iptal edin.");
+        throw new RecordConflictException(HrMessages.Leave.NoDelete);
 
     protected override async Task AppliedAsync(LeaveRequest entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
@@ -260,12 +260,12 @@ internal sealed class LeaveRequestRecordStore(HrStoreContext context) : HrRecord
 
         if (employee.Status == Employee.Statuses.Terminated)
         {
-            errors.Add(new RecordFieldError("employeeId", "Ayrılmış çalışana izin talebi açılamaz."));
+            errors.Add(new RecordFieldError("employeeId", HrMessages.Leave.EmployeeTerminated));
         }
 
         if (employee.UserId != Context.CurrentUserId && !await Context.Access.HasPermissionAsync(HrModule.Permissions.LeavesManage, cancellationToken))
         {
-            errors.Add(new RecordFieldError("employeeId", "Yalnızca kendiniz için izin talebi açabilirsiniz."));
+            errors.Add(new RecordFieldError("employeeId", HrMessages.Leave.OwnOnly));
         }
 
         var choice = (await Context.ChoiceLists.GetAsync(HrModule.Lists.LeaveType, cancellationToken)).Find(entity.LeaveTypeKey);
@@ -273,28 +273,28 @@ internal sealed class LeaveRequestRecordStore(HrStoreContext context) : HrRecord
 
         if (entity.EndDate < entity.StartDate)
         {
-            errors.Add(new RecordFieldError("endDate", "Bitiş tarihi başlangıçtan önce olamaz."));
+            errors.Add(new RecordFieldError("endDate", HrMessages.Leave.EndBeforeStart));
         }
         else if (entity.EndDate.Year != entity.StartDate.Year)
         {
-            errors.Add(new RecordFieldError("endDate", "Talep tek takvim yılı içinde kalmalıdır; yıl sonunu aşan izni iki talebe bölün."));
+            errors.Add(new RecordFieldError("endDate", HrMessages.Leave.SingleYear));
         }
         else if (entity.HalfDay && entity.EndDate != entity.StartDate)
         {
-            errors.Add(new RecordFieldError("halfDay", "Yarım gün yalnızca tek günlük talepte seçilebilir."));
+            errors.Add(new RecordFieldError("halfDay", HrMessages.Leave.HalfDaySingle));
         }
         else
         {
             entity.Days = await LeaveCalendar.DaysAsync(Context, entity.StartDate, entity.EndDate, entity.HalfDay, cancellationToken);
             if (entity.Days <= 0)
             {
-                errors.Add(new RecordFieldError("startDate", "Seçilen aralıkta iş günü yok (hafta sonu ya da resmî tatil)."));
+                errors.Add(new RecordFieldError("startDate", HrMessages.Leave.NoWorkDays));
             }
             else if (await Context.Data.Set<LeaveRequest>().AsNoTracking().AnyAsync(
                          r => r.EmployeeId == entity.EmployeeId && r.Id != entity.Id && LeaveRequest.Statuses.Active.Contains(r.Status)
                              && r.StartDate <= entity.EndDate && r.EndDate >= entity.StartDate, cancellationToken))
             {
-                errors.Add(new RecordFieldError("startDate", "Bu tarihlerde bekleyen ya da onaylanmış başka bir izin talebi var."));
+                errors.Add(new RecordFieldError("startDate", HrMessages.Leave.Overlap));
             }
             else if (entity.LeaveCategory == HrModule.LeaveCategories.Annual && await BalanceErrorAsync(entity, cancellationToken) is { } balanceError)
             {
@@ -360,10 +360,10 @@ internal sealed class LeaveRequestRecordStore(HrStoreContext context) : HrRecord
 
         var balance = await Context.Data.Set<LeaveBalance>()
             .SingleOrDefaultAsync(b => b.EmployeeId == entity.EmployeeId && b.Year == entity.StartDate.Year, cancellationToken)
-            ?? throw new RecordConflictException($"{entity.StartDate.Year} yılı için yıllık izin hakkı tanımlanmamış; önce hakkı girin.");
+            ?? throw new RecordConflictException(HrMessages.Leave.NoEntitlement(entity.StartDate.Year));
         if (approving && balance.RemainingDays < entity.Days)
         {
-            throw new RecordConflictException($"Yetersiz izin bakiyesi: kalan {balance.RemainingDays:0.#} gün, istenen {entity.Days:0.#} gün.");
+            throw new RecordConflictException(HrMessages.Leave.InsufficientBalance($"{balance.RemainingDays:0.#}", $"{entity.Days:0.#}"));
         }
 
         balance.AddUsed(approving ? entity.Days : -entity.Days);
