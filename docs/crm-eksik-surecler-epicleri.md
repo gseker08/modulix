@@ -94,13 +94,16 @@ Bu belge tek başına hiçbir şeyi uygulamaz; her epic başlamadan önce kendi 
 
 ### E8. Çalışma alanı rengi ve menü düzeni
 - **Videoda:** "Size özel, logolu ve renkli çalışma alanı"; "Formlar, menü ve iş kuralları".
-- **Modulix'te:** logo var; firma vurgu rengi ve menü düzenleme yok.
+- **Modulix'te:** logo var; firma vurgu rengi (dilim 1) ve rol bazlı menü düzeni (dilim 2, öğe düzeyinde sıra ve gizleme) var; modül/bölüm sırası yok.
 - **Süreç ve kurallar:** firma yalnızca izin verilen tokenları (`--mx-brand` vb.) değiştirir; kaydetmeden önce açık ve koyu temada
   AA kontrastı (4.5:1) sunucuda doğrulanır, geçmeyen renk reddedilir. Menüde modül/öğe sırası ve gizleme rol bazında yapılır;
   gizlemek yetki değildir (uç noktalar yine izinle korunur).
 - **Dilimler:** 1) vurgu rengi + kontrast doğrulama, 2) rol bazlı menü düzeni.
 - **Not:** tasarım kurallarına (renk yalnızca tokenlardan) aykırı değil, ama tasarım sisteminde "firma tarafından değiştirilebilir
   token" listesi tanımlanmalı.
+- **Durum (22 Kasım 2026):** dilim 0 (tasarım sisteminde firmanın değiştirebileceği tokenlar, PR #509), dilim 1 (vurgu rengi, PR #513) ve dilim 2
+  (rol menüsü: sunucu PR #525, menüye uygulama ve düzenleme ekranı PR #528, kayıtta satır koruma PR #533) teslim edildi; karar kaydı
+  [ADR-0055](adr/0055-calisma-alani-rengi-ve-rol-menusu.md). Kalan: modül/bölüm sırası, çok rollü kullanıcıda sıra kuralı (ADR'de "Yapılmadı").
 
 ### E9. Birleşik 360° müşteri zaman çizelgesi
 - **Videoda:** "360° müşteri profili: bütün geçmiş tek sayfada".
@@ -121,7 +124,7 @@ geçmiyor; ADR-0014, 0015, 0037 ve `envanter.md`'de zaten açık iş olarak duru
 1. E1 skorlama (küçük, karar istemez, E4 ve E7'yi besler)
 2. E2 panolar (rapor altyapısı hazır; A-11 ile birleşir)
 3. E9 zaman çizelgesi (ADR-0044 sözleşmeleriyle doğal adım)
-4. E8 renk/menü (küçük)
+4. ~~E8 renk/menü (küçük)~~ (yapıldı, 22 Kasım 2026: [ADR-0055](adr/0055-calisma-alani-rengi-ve-rol-menusu.md))
 5. E4 yolculuk (önce `fake` sağlayıcıyla) ve E6 tasarımcı (aynı akış modeli)
 6. E5 özel tablolar (önce ADR)
 7. E3 gönderim/İYS ve E7 yapay zekâ (hukuk ve sağlayıcı kararı bekliyor)
