@@ -7749,6 +7749,7 @@
   "meta.field.core.role.scope": "Kayıt kapsamı",
   "meta.field.core.role.assignLevel": "Atanabilir düzey",
   "meta.field.core.role.hideOutOfScopeShared": "Kapsam dışı ortak kayıtları gizle",
+  "meta.field.core.role.menu": "Menü düzeni",
   "meta.field.core.role.scopeOverrides": "Kayıt türüne göre kapsam",
   "meta.option.core.role.scope.All": "Tüm kayıtlar",
   "meta.option.core.role.scope.UnitAndBelow": "Departmanın ve alt departmanların kayıtları",

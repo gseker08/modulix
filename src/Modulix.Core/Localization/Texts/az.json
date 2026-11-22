@@ -7749,6 +7749,7 @@
   "meta.field.core.role.scope": "Qeyd əhatəsi",
   "meta.field.core.role.assignLevel": "Təyin edilə bilən səviyyə",
   "meta.field.core.role.hideOutOfScopeShared": "Əhatədən kənar ortaq qeydləri gizlət",
+  "meta.field.core.role.menu": "Menyu düzəni",
   "meta.field.core.role.scopeOverrides": "Qeyd növünə görə əhatə",
   "meta.option.core.role.scope.All": "Bütün qeydlər",
   "meta.option.core.role.scope.UnitAndBelow": "Şöbənin və alt şöbələrin qeydləri",

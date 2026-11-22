@@ -557,7 +557,7 @@ public sealed class CoreModule : IModule
         {
             ["name"] = "Ad", ["permissions"] = "İzinler", ["isSystem"] = "Sistem rolü", ["scope"] = "Kayıt kapsamı",
             ["assignLevel"] = "Atanabilir düzey", ["hideOutOfScopeShared"] = "Kapsam dışı ortak kayıtları gizle",
-            ["scopeOverrides"] = "Kayıt türüne göre kapsam",
+            ["scopeOverrides"] = "Kayıt türüne göre kapsam", ["menu"] = "Menü düzeni",
         }, "name")
         {
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
