@@ -1,4 +1,4 @@
-@* Müşteri zaman çizelgesi (CRM eksik süreçler E9, dilim 1): firmanın aktivite, fırsat ve teklifleri tek akışta, en yeniden eskiye. Satırlar sunucuda
+@* Müşteri zaman çizelgesi (CRM eksik süreçler E9, dilim 1; kaynak süzgeci dilim 3): firmanın aktivite, fırsat ve teklifleri tek akışta, en yeniden eskiye. Satırlar sunucuda
    kullanıcının izni ve veri kapsamıyla süzülür; okunamayan kaynağın satırı gelmez. Sayfalama imleçlidir ("Daha eski kayıtları göster"). *@
 @inject ApiClient Api
 
@@ -6,6 +6,21 @@
     <div class="section-header">
         <h2 id="customer-timeline-title">@Texts.Get("crm.company.tab.timeline")</h2>
     </div>
+    @if (available.Count > 1)
+    {
+        <div class="filters" role="group" aria-label="@Texts.Get("crm.timeline.filter.label")">
+            <button type="button" class="chip @(selected.Count == 0 ? "active" : null)" aria-pressed="@(selected.Count == 0 ? "true" : "false")" disabled="@loading" @onclick="ClearFilterAsync">
+                @Texts.Get("crm.timeline.filter.all")
+            </button>
+            @foreach (var key in available)
+            {
+                var on = selected.Contains(key);
+                <button type="button" class="chip @(on ? "active" : null)" aria-pressed="@(on ? "true" : "false")" disabled="@loading" @onclick="() => ToggleSourceAsync(key)">
+                    @SourceLabel(key)
+                </button>
+            }
+        </div>
+    }
     @if (error is not null)
     {
         <p class="text-muted" role="status">@error</p>
@@ -16,7 +31,7 @@
     }
     else if (items.Count == 0)
     {
-        <EmptyState Compact="true" Title="@Texts.Get("crm.timeline.empty")" />
+        <EmptyState Compact="true" Title="@Texts.Get(selected.Count == 0 ? "crm.timeline.empty" : "crm.timeline.emptyFiltered")" />
     }
     else
     {
@@ -91,6 +106,8 @@
 </section>
 
 @code {
+    private readonly SortedSet<string> available = new(StringComparer.Ordinal);
+    private readonly SortedSet<string> selected = new(StringComparer.Ordinal);
     private List<CustomerTimelineItemDto>? items;
     private DateTimeOffset? nextBefore;
     private string? error;
@@ -114,16 +131,64 @@
         loadedFor = (CompanyId, Version);
         items = null;
         nextBefore = null;
+        available.Clear();
+        selected.Clear();
         await LoadAsync(null);
     }
+
+    private async Task ToggleSourceAsync(string key)
+    {
+        if (!selected.Remove(key))
+        {
+            selected.Add(key);
+        }
+
+        await ReloadAsync();
+    }
+
+    private async Task ClearFilterAsync()
+    {
+        selected.Clear();
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        items = null;
+        nextBefore = null;
+        await LoadAsync(null);
+    }
+
+    // Kaynak anahtarının görünen adı; arayüzün tanımadığı kaynak anahtarıyla yazılır (süzgeç yine çalışır).
+    private static string SourceLabel(string key) => key switch
+    {
+        "crm.activities" => Texts.Get("crm.timeline.source.activities"),
+        "crm.opportunities" => Texts.Get("crm.timeline.source.opportunities"),
+        "crm.quotes" => Texts.Get("crm.timeline.source.quotes"),
+        "orders.orders" => Texts.Get("crm.timeline.source.orders"),
+        "contracts.contracts" => Texts.Get("crm.timeline.source.contracts"),
+        "support.tickets" => Texts.Get("crm.timeline.source.tickets"),
+        "marketing.touches" => Texts.Get("crm.timeline.source.marketing"),
+        _ => key,
+    };
 
     private Task LoadMoreAsync() => LoadAsync(nextBefore);
 
     private async Task LoadAsync(DateTimeOffset? before)
     {
         loading = true;
-        var cursor = before is { } time ? $"?before={Uri.EscapeDataString(time.ToString("O", System.Globalization.CultureInfo.InvariantCulture))}" : string.Empty;
-        var result = await Api.GetAsync<CustomerTimelineDto>($"/api/crm/companies/{CompanyId}/timeline{cursor}");
+        var query = new List<string>();
+        if (before is { } time)
+        {
+            query.Add($"before={Uri.EscapeDataString(time.ToString("O", System.Globalization.CultureInfo.InvariantCulture))}");
+        }
+
+        if (selected.Count > 0)
+        {
+            query.Add($"sources={Uri.EscapeDataString(string.Join(',', selected))}");
+        }
+
+        var result = await Api.GetAsync<CustomerTimelineDto>($"/api/crm/companies/{CompanyId}/timeline{(query.Count == 0 ? string.Empty : "?" + string.Join('&', query))}");
         loading = false;
         if (result.Value is not { } page)
         {
@@ -132,6 +197,13 @@
         }
 
         error = null;
+        if (selected.Count == 0)
+        {
+            // Süzgeçsiz yanıt okunabilen bütün kaynakları sayar; çipler bunlardan kurulur ve süzgeçli yüklemelerde değişmez.
+            available.Clear();
+            available.UnionWith(page.Sources);
+        }
+
         items ??= [];
         items.AddRange(page.Items);
         nextBefore = page.NextBefore;
