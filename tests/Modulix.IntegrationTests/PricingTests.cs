@@ -188,15 +188,15 @@ public class PricingTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
         // Gösterim para birimi için kur şarttır; ters kur da kullanılır; aynı gün için ikinci kayıt reddedilir.
         var request = new PriceCalculationRequestDto(product.Id, 1m, "TRY", DisplayCurrency: "USD", At: new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero));
         Assert.Equal("exchange-rate-not-found", await ErrorCodeAsync(admin, request));
-        await PostAsync<ExchangeRateDto>(admin, "/api/crm/exchange-rates", new SaveExchangeRateRequest("USD", "TRY", 40m, new DateOnly(2026, 5, 30), Note: "Elle giriş"));
+        await ExchangeRateTestData.CreateAsync(admin, "USD", "TRY", 40m, new DateOnly(2026, 5, 30), note: "Elle giriş");
         var display = (await CalculateAsync(admin, request)).Display!;
         Assert.Equal("USD", display.Currency);
         Assert.Equal(2.75m, display.Gross);
         Assert.Equal(new DateOnly(2026, 5, 30), display.RateDate);
         Assert.Equal(HttpStatusCode.UnprocessableEntity,
-            (await admin.PostAsJsonAsync("/api/crm/exchange-rates", new SaveExchangeRateRequest("USD", "TRY", 41m, new DateOnly(2026, 5, 30)))).StatusCode);
+            (await ExchangeRateTestData.PostAsync(admin, "USD", "TRY", 41m, new DateOnly(2026, 5, 30))).StatusCode);
         Assert.Equal(HttpStatusCode.UnprocessableEntity,
-            (await admin.PostAsJsonAsync("/api/crm/exchange-rates", new SaveExchangeRateRequest("TRY", "TRY", 1m, new DateOnly(2026, 5, 30)))).StatusCode);
+            (await ExchangeRateTestData.PostAsync(admin, "TRY", "TRY", 1m, new DateOnly(2026, 5, 30))).StatusCode);
     }
 
     [Fact]

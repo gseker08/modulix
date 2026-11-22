@@ -19,6 +19,10 @@ public sealed class RateBook(IEnumerable<RateEntry> rates)
 
     public static RateBook Empty { get; } = new([]);
 
+    /// <summary>Firmanın kayıtlı bütün kurlarından kur defterini kurar (kurlar Core ana verisidir, ADR-0049 dilim 5a).</summary>
+    public static async Task<RateBook> LoadAsync(Modulix.Core.Contracts.Currency.IExchangeRateReader reader, CancellationToken cancellationToken) =>
+        new((await reader.ListAsync(cancellationToken)).Select(r => new RateEntry(r.From, r.To, r.Rate, r.ValidOn)));
+
     /// <summary>Aynı para birimi için kur 1'dir (kayıt gerekmez). Bulunamazsa null.</summary>
     public RateLookup? Find(string from, string to, DateOnly asOf)
     {

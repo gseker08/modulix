@@ -54,7 +54,7 @@ public sealed class ReportPerformanceMeasurementTests(ModulixApiFactory factory,
         var client = factory.CreateBrowserClient();
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(admin.Email!, ModulixApiFactory.Password))).StatusCode);
         var company = (await (await client.PostAsJsonAsync("/api/crm/companies", new SaveCompanyRequest("Ölçüm A.Ş."))).Content.ReadFromJsonAsync<CompanyDto>())!;
-        await client.PostAsJsonAsync("/api/crm/exchange-rates", new SaveExchangeRateRequest("USD", "TRY", 30m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-400)));
+        await ExchangeRateTestData.PostAsync(client, "USD", "TRY", 30m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-400));
 
         var seed = Stopwatch.StartNew();
         await SeedAsync(tenant.Id, company.Id, admin.Id, open, closed);

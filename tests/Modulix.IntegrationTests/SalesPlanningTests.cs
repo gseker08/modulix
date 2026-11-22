@@ -21,6 +21,7 @@ public class SalesPlanningTests(ModulixApiFactory factory) : IClassFixture<Modul
     [
         CompaniesRead, CompaniesWrite, OpportunitiesRead, OpportunitiesWrite, OpportunityAmountsRead, OpportunitiesChangeStage, OpportunitiesClose,
         SalesReportsRead, SalesTargetsRead, SalesTargetsManage, ForecastsRead, ForecastsWrite, ForecastsSubmit, ForecastsLock, ForecastsReopen, PricesRead, PricesWrite,
+        Modulix.Core.Modules.CoreModule.Permissions.ManageExchangeRates,
     ];
 
     // ---- Genel görünüm: metrikler (kabul senaryoları 1, 2)
@@ -131,7 +132,7 @@ public class SalesPlanningTests(ModulixApiFactory factory) : IClassFixture<Modul
         Assert.Single(detail.Rows, r => r.Issue == "MissingRate");
 
         // Kur tanımlanınca aynı fırsat dönüştürülüp toplama girer.
-        await PostAsync<ExchangeRateDto>(s.Admin, "/api/crm/exchange-rates", new SaveExchangeRateRequest("USD", "TRY", 30m, anchor.AddDays(-5)));
+        await ExchangeRateTestData.CreateAsync(s.Admin, "USD", "TRY", 30m, anchor.AddDays(-5));
         var after = await OverviewAsync(s.Admin, anchor);
         Assert.Equal(400m, after.ExpectedOpen.Amount);
         Assert.Equal(0, after.ExpectedOpen.MissingRateCount);
@@ -364,7 +365,7 @@ public class SalesPlanningTests(ModulixApiFactory factory) : IClassFixture<Modul
         Assert.Equal("Pending", locked.Accuracy.State);   // dönem sürüyor: doğruluk henüz hesaplanmaz
 
         // Kilitli sürüme yeni kur eklense de satır tutarı değişmez (kur satırda saklıdır).
-        await PostAsync<ExchangeRateDto>(s.Admin, "/api/crm/exchange-rates", new SaveExchangeRateRequest("USD", "TRY", 99m, anchor));
+        await ExchangeRateTestData.CreateAsync(s.Admin, "USD", "TRY", 99m, anchor);
         var frozen = await GetForecastAsync(s.Admin, draft.Header.Id);
         Assert.Equal(locked.Items.Select(i => i.FinalAmount).Order(), frozen.Items.Select(i => i.FinalAmount).Order());
 
@@ -427,7 +428,7 @@ public class SalesPlanningTests(ModulixApiFactory factory) : IClassFixture<Modul
 
         // Kur eklenip taslak yenilenince satır toplama girer; yönetici kategori düzeltmesi yenilemede korunur.
         await s.Admin.PostAsJsonAsync($"/api/crm/sales/forecasts/{detail.Header.Id}/adjust", new AdjustForecastRequestDto(detail.Items.Single(i => i.Title == "Normal").Id, "Category", "Omitted", "Hariç tutuldu"));
-        await PostAsync<ExchangeRateDto>(s.Admin, "/api/crm/exchange-rates", new SaveExchangeRateRequest("EUR", "TRY", 35m, anchor.AddDays(-3)));
+        await ExchangeRateTestData.CreateAsync(s.Admin, "EUR", "TRY", 35m, anchor.AddDays(-3));
         var refreshed = await ReadAsync<ForecastDetailDto>(await s.Admin.PostAsJsonAsync($"/api/crm/sales/forecasts/{detail.Header.Id}/refresh", new ForecastVersionRequestDto()));
         Assert.Equal(35_000m, refreshed.Items.Single(i => i.Title == "Kursuz").BaseAmount);
         Assert.Equal("Omitted", refreshed.Items.Single(i => i.Title == "Normal").Category);

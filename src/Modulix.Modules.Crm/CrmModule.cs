@@ -166,7 +166,6 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         public const string MeasureUnit = "crm.measure-unit";
         public const string Product = "crm.product";
         public const string TaxRate = "crm.tax-rate";
-        public const string ExchangeRate = "crm.exchange-rate";
         public const string PriceList = "crm.price-list";
         public const string PriceListItem = "crm.price-list-item";
         public const string ProductComponent = "crm.product-component";
@@ -907,10 +906,6 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         {
             ["code"] = "Kod", ["name"] = "Ad", ["ratePercent"] = "Oran (%)", ["validFrom"] = "Geçerlilik başı", ["validTo"] = "Geçerlilik sonu", ["isActive"] = "Aktif",
         }, "name"),
-        new(Entities.ExchangeRate, "Döviz kuru (CRM)", Permissions.PricesRead, new Dictionary<string, string>
-        {
-            ["fromCurrency"] = "Kaynak para birimi", ["toCurrency"] = "Hedef para birimi", ["rate"] = "Kur", ["validOn"] = "Geçerli gün", ["source"] = "Kaynak", ["note"] = "Not",
-        }, "fromCurrency"),
         new(Entities.PriceList, "Fiyat listesi (CRM)", Permissions.PricesRead, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["currency"] = "Para birimi", ["scope"] = "Kapsam", ["companyId"] = "Firma", ["segment"] = "Segment", ["validFrom"] = "Geçerlilik başı",
@@ -1191,7 +1186,6 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         services.AddScoped<IRecordStore, MeasureUnitRecordStore>();
         services.AddScoped<IRecordStore, ProductRecordStore>();
         services.AddScoped<IRecordStore, TaxRateRecordStore>();
-        services.AddScoped<IRecordStore, ExchangeRateRecordStore>();
         services.AddScoped<IRecordStore, PriceListRecordStore>();
         services.AddScoped<IRecordStore, PriceListItemRecordStore>();
         services.AddScoped<IRecordStore, ProductComponentRecordStore>();

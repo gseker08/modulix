@@ -7,6 +7,17 @@ namespace Modulix.Core.Contracts.Localization;
 /// </summary>
 public static class ServerMessages
 {
+    /// <summary>Döviz kuru kaydının iletileri (ADR-0049 dilim 5a).</summary>
+    public static class ExchangeRate
+    {
+        public static ServerMessage CurrenciesSame => ServerMessage.Of("server.exchange-rate.currencies-same", "Kaynak ve hedef para birimi aynı olamaz.");
+
+        public static ServerMessage RatePositive => ServerMessage.Of("server.exchange-rate.rate-positive", "Kur sıfırdan büyük olmalıdır.");
+
+        public static ServerMessage Exists =>
+            ServerMessage.Of("server.exchange-rate.exists", "Bu para birimi çifti için o güne ait kur zaten var.");
+    }
+
     /// <summary>Kayıt boru hattının iletileri.</summary>
     public static class Record
     {

@@ -28,27 +28,6 @@ public sealed class TaxRate : CrmEntity
 }
 
 /// <summary>
-/// Döviz kuru: 1 <see cref="FromCurrency"/> = <see cref="Rate"/> <see cref="ToCurrency"/>, <see cref="ValidOn"/> gününden itibaren.
-/// Kaynak ve not tutulur; kur elle girilebilir. Aynı çift ve gün için tek kayıt vardır. Belgelere uygulanan kur belgede saklanır,
-/// sonradan eklenen kur eski belgeyi değiştirmez.
-/// </summary>
-public sealed class ExchangeRate : CrmEntity
-{
-    public string FromCurrency { get; internal set; } = string.Empty;
-
-    public string ToCurrency { get; internal set; } = string.Empty;
-
-    public decimal Rate { get; internal set; }
-
-    public DateOnly ValidOn { get; internal set; }
-
-    /// <summary><see cref="PricingRules.RateSources"/>.</summary>
-    public string Source { get; internal set; } = PricingRules.RateSourceManual;
-
-    public string? Note { get; internal set; }
-}
-
-/// <summary>
 /// Fiyat listesi başlığı. Yalnızca <c>Published</c> listeler fiyat seçiminde kullanılır; yayımlanmış liste (başlık ve satırlar) değişmez,
 /// yalnızca arşivlenebilir. Değişiklik için yeni liste açılır. Kapsam: <c>Default</c> (tenant varsayılanı), <c>Customer</c> (firmaya özel),
 /// <c>Segment</c> (segment/kanal adı eşleşmesi).
@@ -158,15 +137,12 @@ public static class PricingRules
     public const string ListArchived = "Archived";
     public const string MethodVolume = "Volume";
     public const string MethodGraduated = "Graduated";
-    public const string RateSourceManual = "Manual";
-
     public static IReadOnlyList<string> Scopes { get; } = [ScopeDefault, ScopeCustomer, ScopeSegment];
 
     public static IReadOnlyList<string> ListStatuses { get; } = [ListDraft, ListPublished, ListArchived];
 
     public static IReadOnlyList<string> TierMethods { get; } = [MethodVolume, MethodGraduated];
 
-    public static IReadOnlyList<string> RateSources { get; } = [RateSourceManual, "CentralBank", "Import"];
 
     /// <summary>Taslak → Yayımlandı → Arşiv; geri dönüş yoktur. Aynı durum geçerlidir (başka alan değişirken).</summary>
     public static bool CanTransition(string from, string to) => from == to || (from, to) switch

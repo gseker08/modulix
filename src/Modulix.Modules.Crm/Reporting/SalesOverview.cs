@@ -77,7 +77,7 @@ public interface ISalesOverview
 /// kilitli tahmin sürümleri vardır.
 /// </summary>
 internal sealed class SalesOverview(
-    SalesOpportunityReader reader, SalesPlanningData planning, ICurrentAccess access, IRecordAccess recordAccess, TimeProvider time,
+    SalesOpportunityReader reader, SalesPlanningData planning, Modulix.Core.Contracts.Currency.IExchangeRateReader rateReader, ICurrentAccess access, IRecordAccess recordAccess, TimeProvider time,
     ISalesReportingPolicyProvider? policyProvider = null) : ISalesOverview
 {
     public const int DetailLimit = 500;
@@ -194,7 +194,7 @@ internal sealed class SalesOverview(
         var rates = RateBook.Empty;
         if (error is null)
         {
-            rates = new RateBook(await planning.RatesAsync(cancellationToken));
+            rates = await RateBook.LoadAsync(rateReader, cancellationToken);
         }
 
         return new Loaded(
