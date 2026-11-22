@@ -112,7 +112,7 @@ public partial class CampaignRunTests
 
         // Dar kapsam: kampanya başkasının olduğundan kaynak okunur ama satır gelmez.
         var scoped = await factory.CreateUserAsync(s.World.Tenant);
-        await factory.CreateRoleAsync(s.World.Tenant.Id, [CrmModule.Permissions.CompaniesRead, .. Reporter], RecordScope.Own, scoped);
+        await factory.CreateRoleAsync(s.World.Tenant.Id, [CrmModule.Permissions.CompaniesRead, CrmModule.Permissions.CompaniesWrite, .. Reporter], RecordScope.Own, scoped);
         var scopedClient = await LoginAsync(scoped);
         var ownCompany = await CompanyAsync(scopedClient, "Temsilcinin firması");
         var scopedTimeline = await TimelineAsync(scopedClient, ownCompany.Id);
