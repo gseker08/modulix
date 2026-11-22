@@ -63,11 +63,11 @@
                             {
                                 <span class="badge stage-@SupportLabels.StatusBadge(status)">@SupportLabels.Label(SupportLabels.Statuses, status)</span>
                             }
-                            else if (item.EntityKey == MarketingAccess.DeliveryEntityKey)
+                            else if (item.EntityKey == MarketingTimelineKeys.Delivery)
                             {
                                 <span class="timeline-meta">@MarketingLabels.DeliveryStatus(status)</span>
                             }
-                            else if (item.EntityKey == MarketingAccess.ResponseEntityKey)
+                            else if (item.EntityKey == MarketingTimelineKeys.Response)
                             {
                                 <span class="timeline-meta">@MarketingLabels.ResponseStatus(status)</span>
                             }
@@ -144,8 +144,8 @@
         OrdersAccess.OrderEntityKey => "package",
         ContractsAccess.ContractEntityKey => "clipboard-list",
         SupportAccess.TicketEntityKey => "inbox",
-        MarketingAccess.DeliveryEntityKey => "mail",
-        MarketingAccess.ResponseEntityKey => "message-square",
+        MarketingTimelineKeys.Delivery => "mail",
+        MarketingTimelineKeys.Response => "message-square",
         CrmEntityKeys.Activity => ActivityLabels.Icon(family),
         _ => "clock",
     };
@@ -157,8 +157,8 @@
         OrdersAccess.OrderEntityKey => Texts.Get("crm.timeline.kind.order"),
         ContractsAccess.ContractEntityKey => Texts.Get("crm.timeline.kind.contract"),
         SupportAccess.TicketEntityKey => Texts.Get("crm.timeline.kind.ticket"),
-        MarketingAccess.DeliveryEntityKey => Texts.Get("crm.timeline.kind.delivery"),
-        MarketingAccess.ResponseEntityKey => item.Type is { Length: > 0 } kind
+        MarketingTimelineKeys.Delivery => Texts.Get("crm.timeline.kind.delivery"),
+        MarketingTimelineKeys.Response => item.Type is { Length: > 0 } kind
             ? Texts.Get("marketing.related.response", MarketingLabels.ResponseKind(kind))
             : Texts.Get("crm.timeline.kind.campaignResponse"),
         CrmEntityKeys.Activity => Texts.Get("crm.timeline.kind.activity"),
@@ -175,7 +175,7 @@
         ContractsAccess.ContractEntityKey => $"sozlesmeler/{item.RecordId}",
         SupportAccess.TicketEntityKey => $"destek/talepler/{item.RecordId}",
         // Pazarlama satırlarının kayıt kimliği kampanyadır.
-        MarketingAccess.DeliveryEntityKey or MarketingAccess.ResponseEntityKey => $"pazarlama/kampanyalar/{item.RecordId}",
+        MarketingTimelineKeys.Delivery or MarketingTimelineKeys.Response => $"pazarlama/kampanyalar/{item.RecordId}",
         _ => null,
     };
 }

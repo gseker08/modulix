@@ -44,17 +44,17 @@ public partial class CampaignRunTests
 
         Assert.Contains(TouchesSource, timeline.Sources);
         // Yanıt, yanıtladığı iletiden sonra alındı: önce o gelir. Satırın kayıt kimliği kampanyadır, adres ya da içerik taşımaz.
-        Assert.Equal([MarketingAccess.ResponseEntityKey, MarketingAccess.DeliveryEntityKey], timeline.Items.Select(i => i.EntityKey));
+        Assert.Equal([MarketingTimelineKeys.Response, MarketingTimelineKeys.Delivery], timeline.Items.Select(i => i.EntityKey));
         var response = timeline.Items[0];
         Assert.Equal((s.World.Campaign.Id, s.World.Campaign.Name, "Question"), (response.RecordId, response.Title, response.Type));
         Assert.Equal("Accepted", timeline.Items[1].Status);
 
         // İmleç: tek satırlık sayfalarla ikisi de gezilir.
         var first = await TimelineAsync(reader, companyId, "?take=1");
-        Assert.Equal(MarketingAccess.ResponseEntityKey, Assert.Single(first.Items).EntityKey);
+        Assert.Equal(MarketingTimelineKeys.Response, Assert.Single(first.Items).EntityKey);
         var before = Uri.EscapeDataString(first.NextBefore!.Value.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
         var second = await TimelineAsync(reader, companyId, $"?take=1&before={before}");
-        Assert.Equal(MarketingAccess.DeliveryEntityKey, Assert.Single(second.Items).EntityKey);
+        Assert.Equal(MarketingTimelineKeys.Delivery, Assert.Single(second.Items).EntityKey);
         Assert.Null(second.NextBefore);
     }
 
@@ -71,7 +71,7 @@ public partial class CampaignRunTests
 
         // Okunabilir ama kayıt yok: kaynak listede, satır yok.
         Assert.Contains(TouchesSource, timeline.Sources);
-        Assert.DoesNotContain(timeline.Items, i => i.EntityKey is MarketingAccess.DeliveryEntityKey or MarketingAccess.ResponseEntityKey);
+        Assert.DoesNotContain(timeline.Items, i => i.EntityKey is MarketingTimelineKeys.Delivery or MarketingTimelineKeys.Response);
         Assert.Equal(HttpStatusCode.NotFound, (await reader.GetAsync($"/api/crm/companies/{Guid.NewGuid()}/timeline")).StatusCode);
     }
 
@@ -86,7 +86,7 @@ public partial class CampaignRunTests
         var readerB = await ReaderAsync(b.World.Tenant, Reporter);
         var companyA = await CompanyOfAsync(readerA, a.Accepted[0].TargetId);
 
-        Assert.Contains((await TimelineAsync(readerA, companyA)).Items, i => i.EntityKey == MarketingAccess.DeliveryEntityKey);
+        Assert.Contains((await TimelineAsync(readerA, companyA)).Items, i => i.EntityKey == MarketingTimelineKeys.Delivery);
 
         // B kullanıcısı A'nın firmasının çizelgesini açamaz.
         Assert.Equal(HttpStatusCode.NotFound, (await readerB.GetAsync($"/api/crm/companies/{companyA}/timeline")).StatusCode);
@@ -107,7 +107,7 @@ public partial class CampaignRunTests
             var client = await ReaderAsync(s.World.Tenant, permissions);
             var timeline = await TimelineAsync(client, companyId);
             Assert.DoesNotContain(TouchesSource, timeline.Sources);
-            Assert.DoesNotContain(timeline.Items, i => i.EntityKey is MarketingAccess.DeliveryEntityKey or MarketingAccess.ResponseEntityKey);
+            Assert.DoesNotContain(timeline.Items, i => i.EntityKey is MarketingTimelineKeys.Delivery or MarketingTimelineKeys.Response);
         }
 
         // Dar kapsam: kampanya başkasının olduğundan kaynak okunur ama satır gelmez.

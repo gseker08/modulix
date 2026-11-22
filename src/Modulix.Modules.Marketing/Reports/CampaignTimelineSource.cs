@@ -33,8 +33,8 @@ internal sealed class CampaignTimelineSource(ICampaignReports reports) : ICustom
         return new CustomerTimelineSlice(
             [
                 .. history.Value!.Items.Select(i => i.Kind == "Delivery"
-                    ? new CustomerTimelineEntry(MarketingAccess.DeliveryEntityKey, i.CampaignId, i.At, i.CampaignName, i.Status)
-                    : new CustomerTimelineEntry(MarketingAccess.ResponseEntityKey, i.CampaignId, i.At, i.CampaignName, i.Status, Type: i.Detail)),
+                    ? new CustomerTimelineEntry(MarketingTimelineKeys.Delivery, i.CampaignId, i.At, i.CampaignName, i.Status)
+                    : new CustomerTimelineEntry(MarketingTimelineKeys.Response, i.CampaignId, i.At, i.CampaignName, i.Status, Type: i.Detail)),
             ],
             history.Value.HasMore);
     }
