@@ -86,6 +86,9 @@
 
     private List<MenuEditor>? menus;
     private IReadOnlyList<RoleMenuItemDto> saved = [];
+
+    /// <summary>Kayıtlı düzende olup ekranda listelenmeyen satırlar (ör. modülü kapalı); kayıtta korunur (RoleMenuSaveRules).</summary>
+    private IReadOnlyList<RoleMenuItemDto> preserved = [];
     private string? message;
     private bool busy;
 
@@ -145,6 +148,9 @@
 
             menus.Add(new MenuEditor(menu.Root, sections));
         }
+
+        // "Varsayılana dön" Build([]) çağırır: düzen boşaltılınca korunan satır da kalmaz.
+        preserved = RoleMenuSaveRules.Preserved(layout, menus.SelectMany(m => m.Sections).SelectMany(s => s.Items).Select(i => i.Entry.App.Id));
     }
 
     private static void Move(SectionEditor section, int index, int delta)
@@ -180,6 +186,8 @@
             }
         }
 
+        // PUT bütün düzeni değiştirir; ekranda olmayan kayıtlı satırlar (modülü kapalı) silinmesin.
+        items.AddRange(preserved);
         return items;
     }
 
