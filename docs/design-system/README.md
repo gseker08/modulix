@@ -4,7 +4,7 @@ Modulix'in bütün modülleri tek bir ürün ailesi gibi görünmelidir. Bu klas
 
 | Belge | İçerik |
 |---|---|
-| [theme-tokens.md](theme-tokens.md) | Renk, tipografi, boşluk, köşe, gölge tokenları; açık/koyu tema |
+| [theme-tokens.md](theme-tokens.md) | Renk, tipografi, boşluk, köşe, gölge tokenları; açık/koyu tema; firmanın değiştirebileceği tokenlar (E8) |
 | [component-catalog.md](component-catalog.md) | Ortak bileşenler ve CSS sınıfları, hangisi var hangisi yok |
 | [form-standards.md](form-standards.md) | Form düzeni, alan durumları, kaydetme davranışı |
 | [visual-qa-checklist.md](visual-qa-checklist.md) | Her ekran için görsel kontrol listesi |
