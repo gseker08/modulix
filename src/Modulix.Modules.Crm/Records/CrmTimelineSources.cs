@@ -6,6 +6,8 @@ using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Contracts.Timeline;
 using Modulix.Modules.Crm.Domain;
+using Modulix.Modules.Crm.Quotes;
+using Modulix.Shared.Crm;
 
 namespace Modulix.Modules.Crm.Records;
 
@@ -38,9 +40,54 @@ internal abstract class CrmTimelineSource(IRecordPipeline pipeline) : ICustomerT
                 : throw new InvalidOperationException($"Zaman çizelgesi okunamadı ({Key}): {page.Error.Message}");
         }
 
-        var entries = await ToEntriesAsync(page.Value!.Items, cancellationToken);
-        return new CustomerTimelineSlice(entries, page.Value.TotalCount > page.Value.Items.Count);
+        var entries = (await ToEntriesAsync(page.Value!.Items, cancellationToken)).ToList();
+        var more = page.Value.TotalCount > page.Value.Items.Count;
+
+        // Durum değişikliği satırları (dilim 4): kayıt satırının yanında, aynı kaynağın kendi satırları olarak gelir.
+        var (statusRows, statusMore) = await StatusRowsAsync(query, take, cancellationToken);
+        entries.AddRange(statusRows);
+        more |= statusMore;
+        return new CustomerTimelineSlice([.. entries.OrderByDescending(e => e.OccurredAt).ThenBy(e => e.RecordId)], more);
     }
+
+    /// <summary>Kaynağın durum değişikliği satırları (en çok <paramref name="take"/> adet, imleçten önce); ikinci değer daha eski satır kalıp kalmadığıdır.</summary>
+    protected virtual Task<(IReadOnlyList<CustomerTimelineEntry> Entries, bool HasMore)> StatusRowsAsync(
+        CustomerTimelineQuery query, int take, CancellationToken cancellationToken) =>
+        Task.FromResult<(IReadOnlyList<CustomerTimelineEntry>, bool)>(([], false));
+
+    /// <summary>
+    /// Firmanın bu türden, çağıranın görebildiği bütün kayıtları (kayıt boru hattıyla: izin ve veri kapsamı uygulanır). Durum satırları yalnızca bu
+    /// kayıtlar için üretilir; görünmeyen kaydın geçmişi çizelgeye girmez. En çok <see cref="MaxVisible"/> kayıt okunur.
+    /// </summary>
+    protected async Task<Dictionary<Guid, RecordData>> VisibleRecordsAsync(CustomerTimelineQuery query, CancellationToken cancellationToken)
+    {
+        var visible = new Dictionary<Guid, RecordData>();
+        var filters = new Dictionary<string, string> { ["companyId"] = query.CompanyId.ToString() };
+        for (var pageNo = 1; visible.Count < MaxVisible; pageNo++)
+        {
+            var page = await pipeline.QueryAsync(new RecordQuery(EntityKey, pageNo, RecordQuery.MaxPageSize, Filters: filters), cancellationToken);
+            if (!page.IsSuccess)
+            {
+                return page.Error!.Code is RecordErrorCode.PermissionDenied or RecordErrorCode.FeatureNotLicensed
+                    ? []
+                    : throw new InvalidOperationException($"Zaman çizelgesi okunamadı ({Key}): {page.Error.Message}");
+            }
+
+            foreach (var item in page.Value!.Items)
+            {
+                visible[item.Id] = item;
+            }
+
+            if (page.Value.Items.Count == 0 || visible.Count >= page.Value.TotalCount)
+            {
+                break;
+            }
+        }
+
+        return visible;
+    }
+
+    private const int MaxVisible = 1000;
 
     /// <summary>Açık iş süzgeci (<c>open=true</c>); türün açık işi yoksa <c>null</c>.</summary>
     protected virtual bool CountsOpen => false;
@@ -122,6 +169,36 @@ internal sealed class OpportunityTimelineSource(IRecordPipeline pipeline, IModul
 
     protected override string EntityKey => CrmModule.Entities.Opportunity;
 
+    /// <summary>Kazanıldı/kaybedildi geçişleri fırsat tarihçesinden okunur (yeni alan ya da migration yok); tutar ve neden satıra girmez.</summary>
+    protected override async Task<(IReadOnlyList<CustomerTimelineEntry> Entries, bool HasMore)> StatusRowsAsync(
+        CustomerTimelineQuery query, int take, CancellationToken cancellationToken)
+    {
+        var visible = await VisibleRecordsAsync(query, cancellationToken);
+        if (visible.Count == 0)
+        {
+            return ([], false);
+        }
+
+        var ids = visible.Keys.ToList();
+        var before = query.Before;
+        var closed = await data.Set<OpportunityHistory>().AsNoTracking()
+            .Where(h => ids.Contains(h.OpportunityId) && (h.ToStatus == Domain.OpportunityStatus.Won || h.ToStatus == Domain.OpportunityStatus.Lost) && (before == null || h.At < before))
+            .OrderByDescending(h => h.At).ThenBy(h => h.OpportunityId).Take(take + 1).ToListAsync(cancellationToken);
+        return (
+            [
+                .. closed.Take(take).Select(h => new CustomerTimelineEntry(
+                    CrmTimelineKeys.OpportunityClosed,
+                    h.OpportunityId,
+                    h.At,
+                    Text(visible[h.OpportunityId].Values, "title") ?? string.Empty,
+                    h.ToStatus,
+                    h.ToStatus,
+                    Id(visible[h.OpportunityId].Values, OwnedRecordType.OwnerField),
+                    Text(visible[h.OpportunityId].Values, "opportunityNumber"))),
+            ],
+            closed.Count > take);
+    }
+
     protected override Dictionary<string, string> Filters(CustomerTimelineQuery query, string? before)
     {
         var filters = new Dictionary<string, string> { ["companyId"] = query.CompanyId.ToString(), ["sort"] = "-created" };
@@ -158,6 +235,35 @@ internal sealed class QuoteTimelineSource(IRecordPipeline pipeline, IModuleData 
 
     protected override string EntityKey => CrmModule.Entities.Quote;
 
+    /// <summary>Teklifin kabul edildiği an teklif tarihçesinden okunur; her revizyonun kabulü ayrı satırdır.</summary>
+    protected override async Task<(IReadOnlyList<CustomerTimelineEntry> Entries, bool HasMore)> StatusRowsAsync(
+        CustomerTimelineQuery query, int take, CancellationToken cancellationToken)
+    {
+        var visible = await VisibleRecordsAsync(query, cancellationToken);
+        if (visible.Count == 0)
+        {
+            return ([], false);
+        }
+
+        var ids = visible.Keys.ToList();
+        var before = query.Before;
+        var accepted = await data.Set<QuoteEvent>().AsNoTracking()
+            .Where(e => ids.Contains(e.QuoteId) && e.ToStatus == QuoteStatus.Accepted && (before == null || e.CreatedAt < before))
+            .OrderByDescending(e => e.CreatedAt).ThenBy(e => e.QuoteId).Take(take + 1).ToListAsync(cancellationToken);
+        return (
+            [
+                .. accepted.Take(take).Select(e => new CustomerTimelineEntry(
+                    CrmTimelineKeys.QuoteAccepted,
+                    e.QuoteId,
+                    e.CreatedAt,
+                    Text(visible[e.QuoteId].Values, "title") ?? string.Empty,
+                    QuoteStatus.Accepted,
+                    OwnerId: Id(visible[e.QuoteId].Values, OwnedRecordType.OwnerField),
+                    Reference: Text(visible[e.QuoteId].Values, "quoteNumber"))),
+            ],
+            accepted.Count > take);
+    }
+
     protected override Dictionary<string, string> Filters(CustomerTimelineQuery query, string? before)
     {
         // Her revizyon ayrı satırdır: revizyonun çıkarıldığı an müşteri geçmişinin parçasıdır.
@@ -187,4 +293,55 @@ internal sealed class QuoteTimelineSource(IRecordPipeline pipeline, IModuleData 
                 Reference: Text(i.Values, "quoteNumber"))),
         ];
     }
+}
+
+/// <summary>
+/// Müşteri zaman çizelgesinin müşteri adayı kaynağı (ADR-0053, dilim 4): bu firmaya dönüşen müşteri adayları, dönüşüm anıyla. Aday kayıt boru hattından
+/// okunur (izin ve veri kapsamı uygulanır); dönüşmemiş aday firmaya bağlı sayılmaz. Bir firma çok az adayın dönüşüm hedefi olduğundan hepsi okunup bellekte sıralanır.
+/// </summary>
+internal sealed class LeadTimelineSource(IRecordPipeline pipeline) : ICustomerTimelineSource
+{
+    public string Key => "crm.leads";
+
+    public async Task<CustomerTimelineSlice?> ReadAsync(CustomerTimelineQuery query, CancellationToken cancellationToken)
+    {
+        var filters = new Dictionary<string, string> { ["convertedCompanyId"] = query.CompanyId.ToString() };
+        if (query.Before is { } before)
+        {
+            filters["convertedBefore"] = before.ToString("O", CultureInfo.InvariantCulture);
+        }
+
+        var page = await pipeline.QueryAsync(new RecordQuery(CrmModule.Entities.Lead, 1, RecordQuery.MaxPageSize, Filters: filters), cancellationToken);
+        if (!page.IsSuccess)
+        {
+            return page.Error!.Code is RecordErrorCode.PermissionDenied or RecordErrorCode.FeatureNotLicensed
+                ? null
+                : throw new InvalidOperationException($"Zaman çizelgesi okunamadı ({Key}): {page.Error.Message}");
+        }
+
+        var take = Math.Clamp(query.Take, 1, RecordQuery.MaxPageSize);
+        var rows = page.Value!.Items
+            .Select(i => (Item: i, At: DateTimeOffset.TryParse(Text(i.Values, "convertedAt"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var at) ? at : (DateTimeOffset?)null))
+            .Where(r => r.At is not null)
+            .OrderByDescending(r => r.At)
+            .ThenBy(r => r.Item.Id)
+            .ToList();
+        return new CustomerTimelineSlice(
+            [
+                .. rows.Take(take).Select(r => new CustomerTimelineEntry(
+                    CrmTimelineKeys.LeadConverted,
+                    r.Item.Id,
+                    r.At!.Value,
+                    Name(r.Item.Values),
+                    OwnerId: Guid.TryParse(Text(r.Item.Values, OwnedRecordType.OwnerField), out var owner) ? owner : null)),
+            ],
+            rows.Count > take || page.Value.TotalCount > page.Value.Items.Count);
+    }
+
+    private static string Name(JsonObject values) =>
+        string.Join(' ', new[] { Text(values, "firstName"), Text(values, "lastName") }.Where(n => !string.IsNullOrWhiteSpace(n))) is { Length: > 0 } person
+            ? person
+            : Text(values, "companyName") ?? string.Empty;
+
+    private static string? Text(JsonObject values, string name) => values[name]?.GetValue<string>();
 }

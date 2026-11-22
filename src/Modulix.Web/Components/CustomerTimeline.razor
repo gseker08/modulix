@@ -75,11 +75,11 @@
                         <span class="timeline-meta">@CrmLabels.Time(item.OccurredAt)</span>
                         @if (item.Status is { } status)
                         {
-                            @if (item.EntityKey == CrmEntityKeys.Opportunity)
+                            @if (item.EntityKey is CrmEntityKeys.Opportunity or CrmTimelineKeys.OpportunityClosed)
                             {
                                 <span class="badge stage-@status.ToLowerInvariant()">@CrmText.OpportunityStatusName(status)</span>
                             }
-                            else if (item.EntityKey == CrmEntityKeys.Quote)
+                            else if (item.EntityKey is CrmEntityKeys.Quote or CrmTimelineKeys.QuoteAccepted)
                             {
                                 <span class="badge stage-@QuoteLabels.StatusBadge(status)">@QuoteLabels.Label(QuoteLabels.Statuses, status)</span>
                             }
@@ -200,6 +200,7 @@
         "crm.activities" => Texts.Get("crm.timeline.source.activities"),
         "crm.opportunities" => Texts.Get("crm.timeline.source.opportunities"),
         "crm.quotes" => Texts.Get("crm.timeline.source.quotes"),
+        "crm.leads" => Texts.Get("crm.timeline.source.leads"),
         "orders.orders" => Texts.Get("crm.timeline.source.orders"),
         "contracts.contracts" => Texts.Get("crm.timeline.source.contracts"),
         "support.tickets" => Texts.Get("crm.timeline.source.tickets"),
@@ -248,6 +249,9 @@
     {
         CrmEntityKeys.Opportunity => "target",
         CrmEntityKeys.Quote => "file-text",
+        CrmTimelineKeys.OpportunityClosed => "check-circle",
+        CrmTimelineKeys.QuoteAccepted => "check",
+        CrmTimelineKeys.LeadConverted => "user-check",
         OrdersAccess.OrderEntityKey => "package",
         ContractsAccess.ContractEntityKey => "clipboard-list",
         SupportAccess.TicketEntityKey => "inbox",
@@ -263,6 +267,9 @@
     {
         CrmEntityKeys.Opportunity => Texts.Get("crm.timeline.kind.opportunity"),
         CrmEntityKeys.Quote => Texts.Get("crm.timeline.kind.quote"),
+        CrmTimelineKeys.OpportunityClosed => Texts.Get(type == "Won" ? "crm.timeline.kind.opportunityWon" : "crm.timeline.kind.opportunityLost"),
+        CrmTimelineKeys.QuoteAccepted => Texts.Get("crm.timeline.kind.quoteAccepted"),
+        CrmTimelineKeys.LeadConverted => Texts.Get("crm.timeline.kind.leadConverted"),
         OrdersAccess.OrderEntityKey => Texts.Get("crm.timeline.kind.order"),
         ContractsAccess.ContractEntityKey => Texts.Get("crm.timeline.kind.contract"),
         SupportAccess.TicketEntityKey => Texts.Get("crm.timeline.kind.ticket"),
@@ -278,8 +285,9 @@
     // Aktivitenin kendi sayfası yoktur (firma detayındaki Aktiviteler sekmesinden açılır).
     private static string? Href(CustomerTimelineItemDto item) => item.EntityKey switch
     {
-        CrmEntityKeys.Opportunity => $"crm/firsatlar/{item.RecordId}",
-        CrmEntityKeys.Quote => $"crm/teklifler/{item.RecordId}",
+        CrmEntityKeys.Opportunity or CrmTimelineKeys.OpportunityClosed => $"crm/firsatlar/{item.RecordId}",
+        CrmEntityKeys.Quote or CrmTimelineKeys.QuoteAccepted => $"crm/teklifler/{item.RecordId}",
+        CrmTimelineKeys.LeadConverted => $"crm/leadler/{item.RecordId}",
         OrdersAccess.OrderEntityKey => $"siparisler/{item.RecordId}",
         ContractsAccess.ContractEntityKey => $"sozlesmeler/{item.RecordId}",
         SupportAccess.TicketEntityKey => $"destek/talepler/{item.RecordId}",
