@@ -23,8 +23,8 @@ internal sealed partial class LotRecordStore(WarehouseStoreContext context) : Wa
     [
         Field.Text<Lot>("lotNo", Lot.LotNoMaxLength, l => l.LotNo, (l, v) => l.LotNo = v!, required: true, upperCase: true),
         Field.Reference<Lot, StockItem>("stockItemId", WarehouseMessages.NotFound.StockItem, l => l.StockItemId, (l, v) => l.StockItemId = v!.Value, required: true, createOnly: true),
-        Field.PartyRef<Lot>("ownerPartyId", "Malik bulunamadı.", l => l.OwnerPartyId, (l, v) => l.OwnerPartyId = v!.Value, required: true, createOnly: true),
-        Field.PartyRef<Lot>("billToPartyId", "Faturalanan taraf bulunamadı.", l => l.BillToPartyId, (l, v) => l.BillToPartyId = v),
+        Field.PartyRef<Lot>("ownerPartyId", WarehouseMessages.NotFound.Owner, l => l.OwnerPartyId, (l, v) => l.OwnerPartyId = v!.Value, required: true, createOnly: true),
+        Field.PartyRef<Lot>("billToPartyId", WarehouseMessages.NotFound.BillTo, l => l.BillToPartyId, (l, v) => l.BillToPartyId = v),
         Field.Reference<Lot, CustomsDeclarationLine>("declarationLineId", WarehouseMessages.NotFound.DeclarationLine, l => l.DeclarationLineId, (l, v) => l.DeclarationLineId = v, createOnly: true),
         Field.Text<Lot>("description", Lot.DescriptionMaxLength, l => l.Description, (l, v) => l.Description = v),
         Field.Flag<Lot>("isActive", l => l.IsActive, (l, v) => l.IsActive = v),
@@ -67,11 +67,11 @@ internal sealed partial class LotRecordStore(WarehouseStoreContext context) : Wa
         var errors = new List<RecordFieldError>();
         if (!LotNoPattern().IsMatch(entity.LotNo))
         {
-            errors.Add(new RecordFieldError("lotNo", "Parti numarası yalnızca harf, rakam ve - _ . / karakterlerini içerebilir."));
+            errors.Add(new RecordFieldError("lotNo", WarehouseMessages.Lot.NoPattern));
         }
         else if (await Context.Data.Set<Lot>().AsNoTracking().AnyAsync(l => l.LotNo == entity.LotNo && l.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("lotNo", "Bu parti numarası başka bir partide kullanılıyor."));
+            errors.Add(new RecordFieldError("lotNo", WarehouseMessages.Lot.NoTaken));
         }
 
         if (errors.Count > 0)
@@ -84,7 +84,7 @@ internal sealed partial class LotRecordStore(WarehouseStoreContext context) : Wa
     {
         if (await Context.Data.Set<StockMovement>().AsNoTracking().AnyAsync(m => m.LotId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Partinin stok hareketleri var; hareket defteri silinmez. Partiyi pasife alın.");
+            throw new RecordConflictException(WarehouseMessages.Lot.HasMovements);
         }
     }
 

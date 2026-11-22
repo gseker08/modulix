@@ -34,7 +34,7 @@ public partial class WarehouseMessagesTests
             checkedCount++;
         }
 
-        Assert.True(checkedCount >= 35);
+        Assert.True(checkedCount >= 80);
     }
 
     [Fact]
@@ -69,10 +69,18 @@ public partial class WarehouseMessagesTests
 
             foreach (var method in group.GetMethods(BindingFlags.Public | BindingFlags.Static).Where(m => m.ReturnType == typeof(ServerMessage) && !m.IsSpecialName))
             {
-                var args = method.GetParameters().Select(p => p.ParameterType == typeof(string) ? "x" + p.Position : Convert.ChangeType(7, p.ParameterType, CultureInfo.InvariantCulture)).ToArray();
+                var args = method.GetParameters().Select(SampleArgument).ToArray();
                 yield return ($"{group.Name}.{method.Name}", (ServerMessage)method.Invoke(null, args)!);
             }
         }
+    }
+
+    private static object SampleArgument(ParameterInfo parameter)
+    {
+        var type = Nullable.GetUnderlyingType(parameter.ParameterType) ?? parameter.ParameterType;
+        return type == typeof(string) ? "x" + parameter.Position
+            : type == typeof(Guid) ? Guid.Empty
+            : Convert.ChangeType(7, type, CultureInfo.InvariantCulture);
     }
 
     private static Dictionary<string, IReadOnlyDictionary<string, string>> LoadDictionaries()

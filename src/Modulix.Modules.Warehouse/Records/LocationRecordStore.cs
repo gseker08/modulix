@@ -105,18 +105,18 @@ internal sealed class LocationRecordStore(WarehouseStoreContext context) : Wareh
         {
             errors.Add(new RecordFieldError(
                 entity.ParentId is null ? "facilityId" : "parentId",
-                levels.Count == 0 ? "Tesiste lokasyon seviyesi tanımlı değil." : $"Tesiste {entity.Depth}. seviye tanımlı değil."));
+                levels.Count == 0 ? WarehouseMessages.Location.NoLevel : WarehouseMessages.Location.DepthMissing(entity.Depth)));
             return;
         }
 
         var level = levels[entity.Depth - 1];
         if (entity.Value.Length < level.MinLength || entity.Value.Length > level.MaxLength)
         {
-            errors.Add(new RecordFieldError("value", $"{level.Name} değeri {level.MinLength} ile {level.MaxLength} karakter arasında olmalıdır."));
+            errors.Add(new RecordFieldError("value", WarehouseMessages.Location.ValueLength(level.Name, level.MinLength, level.MaxLength)));
         }
         else if (!entity.Value.All(c => AllowedIn(level.CharacterSet, c)))
         {
-            errors.Add(new RecordFieldError("value", $"{level.Name} değeri yalnızca {Describe(level.CharacterSet)} içerebilir."));
+            errors.Add(new RecordFieldError("value", CharacterSetMessage(level)));
         }
 
         if (errors.Count > 0)
@@ -128,7 +128,7 @@ internal sealed class LocationRecordStore(WarehouseStoreContext context) : Wareh
         entity.Path = (parent?.Path ?? "/") + entity.Id + "/";
         if (await data.Set<Location>().AsNoTracking().AnyAsync(l => l.FacilityId == entity.FacilityId && l.Code == entity.Code, cancellationToken))
         {
-            errors.Add(new RecordFieldError("value", $"{entity.Code} kodlu lokasyon zaten var."));
+            errors.Add(new RecordFieldError("value", WarehouseMessages.Location.CodeExists(entity.Code)));
         }
     }
 
@@ -181,10 +181,10 @@ internal sealed class LocationRecordStore(WarehouseStoreContext context) : Wareh
         _ => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c),
     };
 
-    private static string Describe(string characterSet) => characterSet switch
+    private static ServerMessage CharacterSetMessage(LocationLevel level) => level.CharacterSet switch
     {
-        LocationLevel.CharacterSets.Letters => "harf",
-        LocationLevel.CharacterSets.Digits => "rakam",
-        _ => "harf ve rakam",
+        LocationLevel.CharacterSets.Letters => WarehouseMessages.Location.ValueLetters(level.Name),
+        LocationLevel.CharacterSets.Digits => WarehouseMessages.Location.ValueDigits(level.Name),
+        _ => WarehouseMessages.Location.ValueAlphanumeric(level.Name),
     };
 }

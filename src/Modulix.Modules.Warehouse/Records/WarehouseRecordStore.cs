@@ -321,8 +321,7 @@ internal abstract class WarehouseRecordStore<TEntity>(WarehouseStoreContext cont
     {
         if (expectedVersion is { } expected && expected != entity.Version)
         {
-            throw new RecordConflictException(
-                $"Kayıt siz düzenlerken değişti (beklenen sürüm {expected}, güncel sürüm {entity.Version}). Güncel halini alıp tekrar deneyin.");
+            throw new RecordConflictException(ServerMessages.Record.ConcurrencyVersion(expected, entity.Version));
         }
     }
 }

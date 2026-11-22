@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Warehouse.Domain;
@@ -22,8 +23,8 @@ internal sealed class PowerOfAttorneyRecordStore(WarehouseStoreContext context) 
 
     protected override IReadOnlyList<RecordField<PowerOfAttorney>> Fields { get; } =
     [
-        Field.PartyRef<PowerOfAttorney>("importerPartyId", "İthalatçı bulunamadı.", p => p.ImporterPartyId, (p, v) => p.ImporterPartyId = v!.Value, required: true, createOnly: true),
-        Field.PartyRef<PowerOfAttorney>("brokerPartyId", "Gümrük müşaviri bulunamadı.", p => p.BrokerPartyId, (p, v) => p.BrokerPartyId = v!.Value, required: true, createOnly: true),
+        Field.PartyRef<PowerOfAttorney>("importerPartyId", WarehouseMessages.NotFound.Importer, p => p.ImporterPartyId, (p, v) => p.ImporterPartyId = v!.Value, required: true, createOnly: true),
+        Field.PartyRef<PowerOfAttorney>("brokerPartyId", WarehouseMessages.NotFound.Broker, p => p.BrokerPartyId, (p, v) => p.BrokerPartyId = v!.Value, required: true, createOnly: true),
         Field.Date<PowerOfAttorney>("validFrom", p => p.ValidFrom, (p, v) => p.ValidFrom = v!.Value, required: true),
         Field.Date<PowerOfAttorney>("validTo", p => p.ValidTo, (p, v) => p.ValidTo = v),
         Field.Text<PowerOfAttorney>("scope", PowerOfAttorney.ScopeMaxLength, p => p.Scope, (p, v) => p.Scope = v),
@@ -73,21 +74,21 @@ internal sealed class PowerOfAttorneyRecordStore(WarehouseStoreContext context) 
 
         if (entity.ImporterPartyId == entity.BrokerPartyId)
         {
-            errors.Add(new RecordFieldError("brokerPartyId", "İthalatçı ve gümrük müşaviri aynı firma olamaz."));
+            errors.Add(new RecordFieldError("brokerPartyId", WarehouseMessages.Party.SameParty));
         }
 
         if (entity.ValidTo is { } to && to < entity.ValidFrom)
         {
-            errors.Add(new RecordFieldError("validTo", "Bitiş tarihi başlangıç tarihinden önce olamaz."));
+            errors.Add(new RecordFieldError("validTo", WarehouseMessages.PowerOfAttorney.EndBeforeStart));
         }
 
         // Taraflar yalnızca oluştururken seçilir ve rolleri o anda denetlenir (sonra değişmezler; firmadan rol kalksa da geçmiş vekâlet bozulmaz).
         if (isNew && errors.Count == 0)
         {
             await CheckRoleAsync(entity.ImporterPartyId, WarehouseModule.RelationshipRoles.Importer, "importerPartyId",
-                "Seçilen firma \"İthalatçı / malik\" ilişki rolüne sahip değil; önce firma kaydından rolü ekleyin.", errors, cancellationToken);
+                WarehouseMessages.Party.ImporterRole, errors, cancellationToken);
             await CheckRoleAsync(entity.BrokerPartyId, WarehouseModule.RelationshipRoles.Broker, "brokerPartyId",
-                "Seçilen firma \"Gümrük müşaviri\" ilişki rolüne sahip değil; önce firma kaydından rolü ekleyin.", errors, cancellationToken);
+                WarehouseMessages.Party.BrokerRole, errors, cancellationToken);
         }
 
         if (errors.Count > 0)
@@ -96,7 +97,7 @@ internal sealed class PowerOfAttorneyRecordStore(WarehouseStoreContext context) 
         }
     }
 
-    private async Task CheckRoleAsync(Guid partyId, string role, string field, string message, List<RecordFieldError> errors, CancellationToken cancellationToken)
+    private async Task CheckRoleAsync(Guid partyId, string role, string field, ServerMessage message, List<RecordFieldError> errors, CancellationToken cancellationToken)
     {
         var stored = await Context.Data.Set<Party>().AsNoTracking()
             .Where(p => p.Id == partyId).Select(p => p.RelationshipRoles).SingleOrDefaultAsync(cancellationToken);

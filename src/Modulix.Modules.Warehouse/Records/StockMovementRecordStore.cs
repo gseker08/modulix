@@ -83,7 +83,7 @@ internal sealed class StockMovementRecordStore(WarehouseStoreContext context) : 
         if (!Supplied(values, "typeKey"))
         {
             // Hareket türü sessizce listenin ilk değerine düşmez: stok etkisini belirler, açıkça seçilir.
-            errors.Add(new RecordFieldError("typeKey", "Bu alan zorunludur."));
+            errors.Add(new RecordFieldError("typeKey", ServerMessages.Validation.Required));
             throw new RecordValidationException(errors);
         }
 
@@ -94,14 +94,14 @@ internal sealed class StockMovementRecordStore(WarehouseStoreContext context) : 
                 .Where(m => m.IdempotencyKey == key).Select(m => (Guid?)m.Id).FirstOrDefaultAsync(cancellationToken);
             if (existing is { } existingId)
             {
-                throw new RecordConflictException($"Bu anahtarla bir hareket zaten işlendi (hareket: {existingId}); tekrar kaydedilmedi.");
+                throw new RecordConflictException(WarehouseMessages.Movement.IdempotentDuplicate(existingId));
             }
         }
 
         var category = (await Context.ChoiceLists.GetAsync(WarehouseModule.Lists.MovementType, cancellationToken)).Find(entity.TypeKey)?.Category;
         if (category is null)
         {
-            throw new RecordValidationException([new RecordFieldError("typeKey", "Hareket türünün kategorisi tanımlı değil.")]);
+            throw new RecordValidationException([new RecordFieldError("typeKey", WarehouseMessages.Movement.CategoryMissing)]);
         }
 
         var tenant = Context.Tenant.Current ?? throw new InvalidOperationException("Hareket için doğrulanmış tenant bağlamı yok.");
@@ -135,10 +135,10 @@ internal sealed class StockMovementRecordStore(WarehouseStoreContext context) : 
     private async Task ResolveReversalAsync(StockMovement entity, JsonObject values, List<RecordFieldError> errors, CancellationToken cancellationToken)
     {
         errors.AddRange(ReversalForbidden.Where(name => Supplied(values, name))
-            .Select(name => new RecordFieldError(name, "Düzeltme hareketinde bu bilgi özgün hareketten gelir; verilmez.")));
+            .Select(name => new RecordFieldError(name, WarehouseMessages.Movement.ReversalInherited)));
         if (entity.ReversesMovementId is not { } originalId)
         {
-            errors.Add(new RecordFieldError("reversesMovementId", "Düzeltme hareketi hangi hareketi geri aldığını belirtmelidir."));
+            errors.Add(new RecordFieldError("reversesMovementId", WarehouseMessages.Movement.ReversalTargetRequired));
             return;
         }
 
@@ -151,11 +151,11 @@ internal sealed class StockMovementRecordStore(WarehouseStoreContext context) : 
         var categories = await Context.ChoiceLists.GetAsync(WarehouseModule.Lists.MovementType, cancellationToken);
         if (categories.Find(original.TypeKey)?.Category == MovementCategories.Adjustment || original.ReversesMovementId is not null)
         {
-            errors.Add(new RecordFieldError("reversesMovementId", "Bir düzeltme hareketi geri alınamaz; gerekirse yeni bir hareket kaydedin."));
+            errors.Add(new RecordFieldError("reversesMovementId", WarehouseMessages.Movement.ReversalOfReversal));
         }
         else if (await Context.Data.Set<StockMovement>().AsNoTracking().AnyAsync(m => m.ReversesMovementId == originalId, cancellationToken))
         {
-            errors.Add(new RecordFieldError("reversesMovementId", "Bu hareket zaten geri alınmış."));
+            errors.Add(new RecordFieldError("reversesMovementId", WarehouseMessages.Movement.AlreadyReversed));
         }
 
         if (errors.Count > 0)
@@ -173,22 +173,22 @@ internal sealed class StockMovementRecordStore(WarehouseStoreContext context) : 
     {
         if (entity.ReversesMovementId is not null)
         {
-            errors.Add(new RecordFieldError("reversesMovementId", "Yalnızca düzeltme türündeki hareket başka bir hareketi geri alabilir."));
+            errors.Add(new RecordFieldError("reversesMovementId", WarehouseMessages.Movement.OnlyAdjustmentReverses));
         }
 
         if (entity.LotId == Guid.Empty)
         {
-            errors.Add(new RecordFieldError("lotId", "Bu alan zorunludur."));
+            errors.Add(new RecordFieldError("lotId", ServerMessages.Validation.Required));
         }
 
         if (entity.Quantity <= 0)
         {
-            errors.Add(new RecordFieldError("quantity", "Miktar zorunludur ve sıfırdan büyük olmalıdır."));
+            errors.Add(new RecordFieldError("quantity", WarehouseMessages.Movement.QuantityPositive));
         }
 
         if (LedgerRules.CheckShape(category, entity.FromLocationId, entity.ToLocationId) is { } shape)
         {
-            errors.Add(new RecordFieldError(shape.Contains("hedef", StringComparison.Ordinal) ? "toLocationId" : "fromLocationId", shape));
+            errors.Add(new RecordFieldError(shape.Field, shape.Message));
         }
 
         if (errors.Count > 0)
@@ -198,14 +198,14 @@ internal sealed class StockMovementRecordStore(WarehouseStoreContext context) : 
 
         if (!await Context.Data.Set<Lot>().AsNoTracking().Where(l => l.Id == entity.LotId).Select(l => l.IsActive).SingleAsync(cancellationToken))
         {
-            errors.Add(new RecordFieldError("lotId", "Pasif parti yeni hareket alamaz."));
+            errors.Add(new RecordFieldError("lotId", WarehouseMessages.Movement.LotInactive));
         }
 
         // Kaynak lokasyon pasife alınmış olsa da stok oradan çıkarılabilir; hedef lokasyon etkin olmalıdır.
         if (entity.ToLocationId is { } target
             && !await Context.Data.Set<Location>().AsNoTracking().Where(l => l.Id == target).Select(l => l.IsActive).SingleAsync(cancellationToken))
         {
-            errors.Add(new RecordFieldError("toLocationId", "Pasif lokasyona stok girişi yapılamaz."));
+            errors.Add(new RecordFieldError("toLocationId", WarehouseMessages.Movement.TargetInactive));
         }
     }
 
