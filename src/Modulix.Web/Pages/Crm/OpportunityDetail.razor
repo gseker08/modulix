@@ -669,6 +669,8 @@
                 }
             </FormSection>
 
+            @* Ekli notlar (ADR-0057): her not ayrı kayıttır ve kendi dosya ekleri vardır. *@
+            <NotesPanel ParentEntityKey="@CrmEntityKeys.Opportunity" ParentId="Id" CanWrite="Session.Can(CrmAccess.OpportunitiesWrite)" />
             <RecordHistory EntityKey="@CrmEntityKeys.Opportunity" RecordId="Id" Version="opportunity.Version" />
             </div>
             }

@@ -24,7 +24,8 @@
 
 | Dilim | İçerik |
 | --- | --- |
-| 2 | `NotesPanel`'i `Notes` alanı olan diğer detay formlarına bağlamak (Kişi, Fırsat, Müşteri adayı, Teklif, Sözleşme, Sipariş, Lojistik, İK, Filo, Antrepo, Destek) |
+| 2 (teslim edildi, 23 Kasım 2026) | `NotesPanel` CRM (Kişi, Müşteri adayı, Fırsat, Teklif), Sözleşme, Sipariş ve Operasyon işi detay ekranlarına bağlandı. Kalan: Pazarlama detayları |
+| 3 (teslim edildi, 23 Kasım 2026) | `NotesPanel` düzenleyici formlarına (yalnızca kayıtlı kayıtta, form dışında): Araç, Sürücü, Sefer, Talep/Sevkiyat, Çalışan, Zimmet, Depo konumu. Destek talebinde mesaj ve iç not zaten kendi eklerini taşır (ADR-0024), panel eklenmedi |
 | 3 | Mevcut `Notes` metinlerinin ilk not olarak taşınması ve alanın kapatılması (`migration-compat` uyumlu iki adım) |
 | 4 | Not başına @anma/bildirim, sabitleme, yalnızca yazar+yönetici görünürlüğü gibi sınıflar |
 

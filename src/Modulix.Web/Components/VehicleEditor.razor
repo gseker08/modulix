@@ -3,6 +3,7 @@
    kuralı sunucudadır; ileti alanın altında gösterilir. Araç silinmez, durumu "Pasif" yapılır (ADR-0038 K12). *@
 @using System.Text.Json.Nodes
 @inject ApiClient Api
+@inject SessionState Session
 @inject FormLayouts Layouts
 @inject ToastService Toasts
 
@@ -162,6 +163,12 @@
         </div>
     </div>
 </form>
+
+@* Ekli notlar (ADR-0057): her not ayrı kayıttır ve kendi dosya ekleri vardır; yalnızca kayıtlı kayıtta. Not formu iç içe olmasın diye form dışındadır. *@
+@if (form.Id is { } noteParentId)
+{
+    <NotesPanel ParentEntityKey="@FleetAccess.VehicleEntityKey" ParentId="noteParentId" CanWrite="Session.Can(FleetAccess.VehiclesWrite)" />
+}
 
 @code {
     private bool dirty;

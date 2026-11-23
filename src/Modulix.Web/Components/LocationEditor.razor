@@ -3,6 +3,7 @@
    kalıtılır. Kayıt genel kayıt uçlarından (/api/records/warehouse.location) yapılır; kurallar sunucudadır. *@
 @using System.Text.Json.Nodes
 @inject ApiClient Api
+@inject SessionState Session
 @inject FormLayouts Layouts
 @inject ToastService Toasts
 
@@ -112,6 +113,12 @@
         </div>
     </div>
 </form>
+
+@* Ekli notlar (ADR-0057): her not ayrı kayıttır ve kendi dosya ekleri vardır; yalnızca kayıtlı kayıtta. Not formu iç içe olmasın diye form dışındadır. *@
+@if (form.Id is { } noteParentId)
+{
+    <NotesPanel ParentEntityKey="@WarehouseAccess.LocationEntityKey" ParentId="noteParentId" CanWrite="Session.Can(WarehouseAccess.LocationsWrite)" />
+}
 
 @code {
     private bool dirty;

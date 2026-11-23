@@ -195,6 +195,8 @@
             }
         </section>
 
+        @* Ekli notlar (ADR-0057): her not ayrı kayıttır ve kendi dosya ekleri vardır. *@
+        <NotesPanel ParentEntityKey="orders.operation-job" ParentId="detail.Job.Id" CanWrite="Session.Can(OperationJobAccess.JobsManage)" />
         <section aria-labelledby="job-history-title">
             <h2 id="job-history-title">@Texts.Get("orders.jobdetail.history")</h2>
             <ol class="history-list">

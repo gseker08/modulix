@@ -271,6 +271,8 @@
             </section>
         }
 
+        @* Ekli notlar (ADR-0057): her not ayrı kayıttır ve kendi dosya ekleri vardır. *@
+        <NotesPanel ParentEntityKey="orders.order" ParentId="order.Id" CanWrite="Session.Can(OrdersAccess.OrdersWrite)" />
         <RelatedTickets Title="@Texts.Get("orders.detail.tickets")" LinkedEntityKey="orders.order" LinkedRecordId="order.Id" />
 
         <section aria-labelledby="history-title">
