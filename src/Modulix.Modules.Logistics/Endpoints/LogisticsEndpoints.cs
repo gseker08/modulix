@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Hosting;
 using Modulix.Modules.Logistics;
 using Modulix.Modules.Logistics.Lifecycle;
@@ -92,7 +93,7 @@ internal static class LogisticsEndpoints
         {
             var result = await dashboard.GetAsync(ct);
             return result.IsEmpty
-                ? Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Yetkiniz yok.", detail: "Panoyu görmek için talep, sevkiyat, sefer ya da sürücü okuma izni gerekir.")
+                ? LocalizedProblems.Problem(StatusCodes.Status403Forbidden, ServerMessages.Access.ForbiddenTitle, LogisticsMessages.Dashboard.Forbidden)
                 : Results.Ok(result);
         });
 
