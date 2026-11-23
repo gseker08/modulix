@@ -345,15 +345,16 @@ public class OperationJobTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var order = await ApprovedOrderAsync(s, sales);
         await SqlAsync(s.Tenant.Id, "UPDATE orders.OrderLines SET Kind = 'Product' WHERE OrderId = {0} AND Name = 'Sunucu'", order.Id);
         var created = await sales.PostAsJsonAsync($"/api/orders/orders/{order.Id}/handover", new { });
-        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        // Gövde yazılır: Development ortamında işlenmeyen hatanın yanıtı istisnayı taşır; aralıklı 500'ün nedeni CI günlüğünde görünsün.
+        Assert.True(created.StatusCode == HttpStatusCode.Created, $"handover: {created.StatusCode} {await created.Content.ReadAsStringAsync()}");
         var detail = (await created.Content.ReadFromJsonAsync<HandoverDetailDto>())!;
         var saved = await sales.PutAsJsonAsync($"/api/orders/handovers/{detail.Handover.Id}", Full(detail.Handover.Version, s.Ops.Id));
-        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        Assert.True(saved.StatusCode == HttpStatusCode.OK, $"handover save: {saved.StatusCode} {await saved.Content.ReadAsStringAsync()}");
         detail = (await sales.GetFromJsonAsync<HandoverDetailDto>($"/api/orders/orders/{order.Id}/handover"))!;
         foreach (var item in detail.Items)
         {
             var done = await sales.PutAsJsonAsync($"/api/orders/handover-items/{item.Id}", new SaveHandoverItemRequest(detail.Handover.Id, item.Text, true, null, item.Version));
-            Assert.Equal(HttpStatusCode.OK, done.StatusCode);
+            Assert.True(done.StatusCode == HttpStatusCode.OK, $"handover item: {done.StatusCode} {await done.Content.ReadAsStringAsync()}");
         }
 
         detail = (await sales.GetFromJsonAsync<HandoverDetailDto>($"/api/orders/orders/{order.Id}/handover"))!;
