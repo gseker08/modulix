@@ -495,6 +495,8 @@
                 </section>
             }
 
+            @* Ekli notlar (ADR-0057): her not ayrı kayıttır ve kendi dosya ekleri vardır. *@
+            <NotesPanel ParentEntityKey="@CrmEntityKeys.Quote" ParentId="quote.Id" CanWrite="Session.Can(CrmAccess.QuotesWrite)" />
             <section aria-labelledby="hist-title">
                 <h2 id="hist-title">@Texts.Get("common.history.tab")</h2>
                 @if (history.Count == 0)
