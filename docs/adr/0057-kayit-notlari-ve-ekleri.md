@@ -27,8 +27,8 @@
 | 2 (teslim edildi, 23 Kasım 2026) | `NotesPanel` CRM (Kişi, Müşteri adayı, Fırsat, Teklif), Sözleşme, Sipariş ve Operasyon işi detay ekranlarına bağlandı. Kalan: yok (Destek bilerek dışarıda) |
 | 3 (teslim edildi, 23 Kasım 2026) | `NotesPanel` düzenleyici formlarına (yalnızca kayıtlı kayıtta, form dışında): Araç, Sürücü, Sefer, Talep/Sevkiyat, Çalışan, Zimmet, Depo konumu. Destek talebinde mesaj ve iç not zaten kendi eklerini taşır (ADR-0024), panel eklenmedi |
 | 4 (teslim edildi, 23 Kasım 2026) | `NotesPanel` Pazarlama (Kampanya, Segment) ayrıntı ekranları ve İzin bakiyesi düzenleyicisine bağlandı. Destek talebi bilerek dışarıdadır (mesaj ve iç not kendi eklerini taşır, ADR-0024). Eski `Notes` metinlerinin ayrı nota taşınması yapılmadı: veri migration'ı ayrı karar ister |
-| 3 | Mevcut `Notes` metinlerinin ilk not olarak taşınması ve alanın kapatılması (`migration-compat` uyumlu iki adım) |
-| 4 | Not başına @anma/bildirim, sabitleme, yalnızca yazar+yönetici görünürlüğü gibi sınıflar |
+| Sonra (A) | Mevcut `Notes` metinlerinin ilk not olarak taşınması ve alanın kapatılması (`migration-compat` uyumlu iki adım) |
+| Sonra (B) | Not başına @anma/bildirim, sabitleme, yalnızca yazar+yönetici görünürlüğü gibi sınıflar |
 
 ## Testler
 
