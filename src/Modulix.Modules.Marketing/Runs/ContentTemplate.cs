@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Marketing.Runs;
 
@@ -22,9 +23,9 @@ public static partial class ContentTemplate
     public static IReadOnlyList<string> Variables { get; } = [Name, Surname, FullName, Company];
 
     /// <summary>Şablon hatalarını döndürür (boşsa geçerli). Söz diziminin dışında kalan "{{" ya da "}}" da hatadır.</summary>
-    public static IReadOnlyList<string> Validate(string? text)
+    public static IReadOnlyList<ServerMessage> Validate(string? text)
     {
-        var errors = new List<string>();
+        var errors = new List<ServerMessage>();
         if (string.IsNullOrEmpty(text))
         {
             return errors;
@@ -35,29 +36,29 @@ public static partial class ContentTemplate
             var name = match.Groups[1].Value;
             if (!Variables.Contains(name))
             {
-                errors.Add($"Bilinmeyen değişken '{{{{{name}}}}}'. Kullanılabilir: {string.Join(", ", Variables)}.");
+                errors.Add(MarketingMessages.ContentRule.UnknownVariable("{{" + name + "}}", string.Join(", ", Variables)));
             }
             else if (!match.Groups[2].Success || string.IsNullOrWhiteSpace(match.Groups[2].Value))
             {
-                errors.Add($"'{{{{{name}}}}}' için yedek metin gerekir (ör. {{{{{name}|Değerli müşterimiz}}}}).");
+                errors.Add(MarketingMessages.ContentRule.FallbackNeeded("{{" + name + "}}", "{{" + name + "|Değerli müşterimiz}}"));
             }
             else if (match.Groups[2].Value.Any(char.IsControl))
             {
-                errors.Add($"'{{{{{name}}}}}' yedek metni tek satır olmalıdır.");
+                errors.Add(MarketingMessages.ContentRule.FallbackOneLine("{{" + name + "}}"));
             }
             else if (match.Groups[2].Value.Trim().Length > FallbackMaxLength)
             {
-                errors.Add($"'{{{{{name}}}}}' yedek metni en fazla {FallbackMaxLength} karakter olabilir.");
+                errors.Add(MarketingMessages.ContentRule.FallbackMax("{{" + name + "}}", FallbackMaxLength));
             }
         }
 
         var rest = Placeholder().Replace(text, string.Empty);
         if (rest.Contains("{{", StringComparison.Ordinal) || rest.Contains("}}", StringComparison.Ordinal))
         {
-            errors.Add("Değişken söz dizimi geçersiz; biçim {{ad|yedek metin}} olmalıdır.");
+            errors.Add(MarketingMessages.ContentRule.SyntaxInvalid);
         }
 
-        return [.. errors.Distinct()];
+        return [.. errors.DistinctBy(e => e.Text)];
     }
 
     /// <summary>Şablondaki değişkenleri doldurur; değer yoksa yedek metin kullanılır. Geçersiz şablon doldurulmaz (olduğu gibi döner).</summary>

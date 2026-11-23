@@ -32,13 +32,13 @@ public sealed class ContentTemplateTests
     [InlineData("Merhaba {{ad|x", "söz dizimi geçersiz")]
     [InlineData("Merhaba }} {{ad|x}}", "söz dizimi geçersiz")]
     public void Invalid_templates_are_reported(string text, string expected) =>
-        Assert.Contains(ContentTemplate.Validate(text), m => m.Contains(expected, StringComparison.Ordinal));
+        Assert.Contains(ContentTemplate.Validate(text), m => m.Text.Contains(expected, StringComparison.Ordinal));
 
     [Fact]
     public void A_fallback_must_be_single_line_and_short()
     {
-        Assert.Contains(ContentTemplate.Validate("{{ad|bir\niki}}"), m => m.Contains("tek satır", StringComparison.Ordinal));
-        Assert.Contains(ContentTemplate.Validate("{{ad|" + new string('a', ContentTemplate.FallbackMaxLength + 1) + "}}"), m => m.Contains("en fazla", StringComparison.Ordinal));
+        Assert.Contains(ContentTemplate.Validate("{{ad|bir\niki}}"), m => m.Text.Contains("tek satır", StringComparison.Ordinal));
+        Assert.Contains(ContentTemplate.Validate("{{ad|" + new string('a', ContentTemplate.FallbackMaxLength + 1) + "}}"), m => m.Text.Contains("en fazla", StringComparison.Ordinal));
         Assert.Empty(ContentTemplate.Validate("{{ad|" + new string('a', ContentTemplate.FallbackMaxLength) + "}}"));
     }
 
@@ -71,8 +71,8 @@ public sealed class ContentTemplateTests
     public void Content_validation_reports_template_errors_on_the_right_field()
     {
         var errors = ContentRules.Validate(Modulix.Core.Contracts.Communication.CommunicationChannel.Email, "Merhaba {{ad}}", "Selam {{kimlik|x}}");
-        Assert.Contains(errors, e => e.Field == "subject" && e.Message.Contains("yedek metin", StringComparison.Ordinal));
-        Assert.Contains(errors, e => e.Field == "body" && e.Message.Contains("Bilinmeyen", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.Field == "subject" && e.Message.Text.Contains("yedek metin", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.Field == "body" && e.Message.Text.Contains("Bilinmeyen", StringComparison.Ordinal));
         Assert.Empty(ContentRules.Validate(Modulix.Core.Contracts.Communication.CommunicationChannel.Email, "Merhaba {{ad|müşterimiz}}", "Selam {{ad_soyad|dostum}}"));
     }
 }

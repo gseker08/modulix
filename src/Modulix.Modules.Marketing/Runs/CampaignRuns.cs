@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Communication;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Marketing.Contracts;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
@@ -94,12 +95,12 @@ internal sealed class CampaignRuns(
     {
         if (!ActionPermissions.TryGetValue(action, out var needed))
         {
-            return Fail<RecordData>(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.", ("action", "Geçersiz eylem."));
+            return Fail<RecordData>(RecordErrorCode.ValidationFailed, MarketingMessages.RunService.UnknownAction, ("action", MarketingMessages.RunService.ActionInvalid));
         }
 
         if (!await HasAnyAsync(needed, cancellationToken))
         {
-            return Fail<RecordData>(RecordErrorCode.PermissionDenied, $"Bu işlem için '{string.Join("' ya da '", needed)}' izni gerekir.");
+            return Fail<RecordData>(RecordErrorCode.PermissionDenied, ServerMessages.Access.AnyPermissionRequired(string.Join(", ", needed)));
         }
 
         var loaded = await pipeline.GetAsync(new RecordRef(MarketingModule.Entities.CampaignRun, runId), cancellationToken);
@@ -111,18 +112,18 @@ internal sealed class CampaignRuns(
         var run = RunState.From(loaded.Value!);
         if (!RunTransitions.Allowed(action, run.Status))
         {
-            return Fail<RecordData>(RecordErrorCode.Conflict, $"'{StatusText(run.Status)}' durumundaki çalıştırmada bu işlem yapılamaz.");
+            return Fail<RecordData>(RecordErrorCode.Conflict, MarketingMessages.RunService.StatusBlocked(StatusText(run.Status)));
         }
 
         var text = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         if (RunTransitions.NeedsReason(action) && text is null)
         {
-            return Fail<RecordData>(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", ("reason", "Bu işlem için gerekçe zorunludur."));
+            return Fail<RecordData>(RecordErrorCode.ValidationFailed, MarketingMessages.RunService.ReasonRequired, ("reason", MarketingMessages.RunService.ReasonRequiredDetail));
         }
 
         if (text?.Length > CampaignRun.NoteMaxLength)
         {
-            return Fail<RecordData>(RecordErrorCode.ValidationFailed, "Gerekçe çok uzun.", ("reason", $"Gerekçe en fazla {CampaignRun.NoteMaxLength} karakter olabilir."));
+            return Fail<RecordData>(RecordErrorCode.ValidationFailed, MarketingMessages.RunService.ReasonTooLong, ("reason", MarketingMessages.RunService.ReasonMax(CampaignRun.NoteMaxLength)));
         }
 
         var policy = await policyProvider.GetAsync(cancellationToken);
@@ -154,7 +155,7 @@ internal sealed class CampaignRuns(
             case RunActions.Approve:
                 if (run.SubmittedBy == userId)
                 {
-                    return Fail<RecordData>(RecordErrorCode.PermissionDenied, "Hazırlayan kendi çalıştırmasını onaylayamaz (görev ayrılığı).");
+                    return Fail<RecordData>(RecordErrorCode.PermissionDenied, MarketingMessages.RunService.SelfApproval);
                 }
 
                 values["approvedBy"] = userId?.ToString();
@@ -218,37 +219,37 @@ internal sealed class CampaignRuns(
 
         if (campaign.Value!.Values["status"]?.GetValue<string>() == CampaignStatuses.Archived)
         {
-            return Fail<RecordData>(RecordErrorCode.Conflict, "Arşivlenen kampanyada çalıştırma onaya gönderilemez.");
+            return Fail<RecordData>(RecordErrorCode.Conflict, MarketingMessages.RunService.ArchivedSubmit);
         }
 
         var channel = Enum.Parse<CommunicationChannel>(campaign.Value.Values["channel"]!.GetValue<string>());
         if (run.SnapshotId is not { } snapshotId)
         {
-            errors.Add(new RecordFieldError("snapshotId", "Hedef kitle anlık görüntüsü seçilmelidir."));
+            errors.Add(new RecordFieldError("snapshotId", MarketingMessages.RunService.SnapshotRequired));
         }
         else
         {
             var snapshot = await pipeline.GetAsync(new RecordRef(MarketingModule.Entities.AudienceSnapshot, snapshotId), cancellationToken);
             if (!snapshot.IsSuccess)
             {
-                errors.Add(new RecordFieldError("snapshotId", "Hedef kitle anlık görüntüsü bulunamadı."));
+                errors.Add(new RecordFieldError("snapshotId", MarketingMessages.RunService.SnapshotNotFound));
             }
             else if ((snapshot.Value!.Values["eligibleCount"]?.GetValue<int>() ?? 0) == 0)
             {
-                errors.Add(new RecordFieldError("snapshotId", "Dondurulmuş hedef kitlede uygun alıcı yok."));
+                errors.Add(new RecordFieldError("snapshotId", MarketingMessages.RunService.SnapshotNoRecipients));
             }
         }
 
         if (run.ContentId is not { } contentId)
         {
-            errors.Add(new RecordFieldError("contentId", "İçerik sürümü seçilmelidir."));
+            errors.Add(new RecordFieldError("contentId", MarketingMessages.RunService.ContentRequired));
         }
         else
         {
             var content = await pipeline.GetAsync(new RecordRef(MarketingModule.Entities.CampaignContent, contentId), cancellationToken);
             if (!content.IsSuccess)
             {
-                errors.Add(new RecordFieldError("contentId", "İçerik sürümü bulunamadı."));
+                errors.Add(new RecordFieldError("contentId", MarketingMessages.RunService.ContentNotFound));
             }
             else
             {
@@ -259,12 +260,12 @@ internal sealed class CampaignRuns(
 
         if (run.ScheduledAt is { } at && at <= time.GetUtcNow())
         {
-            errors.Add(new RecordFieldError("scheduledAt", "Planlanan zaman geçmişte; yeni bir zaman seçin ya da boş bırakın."));
+            errors.Add(new RecordFieldError("scheduledAt", MarketingMessages.RunService.ScheduledPast));
         }
 
         return errors.Count == 0
             ? null
-            : RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Çalıştırma onaya hazır değil.", errors);
+            : RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, MarketingMessages.RunService.NotReady, errors);
     }
 
     private async Task<RecordResult<RecordData>> StartAsync(RunState run, MarketingPolicy policy, long? expectedVersion, CancellationToken cancellationToken)
@@ -283,29 +284,29 @@ internal sealed class CampaignRuns(
 
         if (info.Status == CampaignStatuses.Archived)
         {
-            return Fail<RecordData>(RecordErrorCode.Conflict, "Arşivlenen kampanya başlatılamaz.");
+            return Fail<RecordData>(RecordErrorCode.Conflict, MarketingMessages.RunService.ArchivedStart);
         }
 
         var now = time.GetUtcNow();
         if (run.ScheduledAt is { } scheduled && scheduled > now)
         {
-            return Fail<RecordData>(RecordErrorCode.Conflict, "Planlanan zaman henüz gelmedi.");
+            return Fail<RecordData>(RecordErrorCode.Conflict, MarketingMessages.RunService.NotYetTime);
         }
 
         var today = (await clock.GetAsync(cancellationToken)).Today;
         if (info.StartsOn is { } starts && today < starts)
         {
-            return Fail<RecordData>(RecordErrorCode.Conflict, "Kampanya dönemi henüz başlamadı.");
+            return Fail<RecordData>(RecordErrorCode.Conflict, MarketingMessages.RunService.PeriodNotStarted);
         }
 
         if (info.EndsOn is { } ends && today > ends)
         {
-            return Fail<RecordData>(RecordErrorCode.Conflict, "Kampanya dönemi sona erdi.");
+            return Fail<RecordData>(RecordErrorCode.Conflict, MarketingMessages.RunService.PeriodEnded);
         }
 
         if (run.SnapshotId is null || run.ContentId is null || run.ApprovedSnapshotId != run.SnapshotId || run.ApprovedContentId != run.ContentId)
         {
-            return Fail<RecordData>(RecordErrorCode.Conflict, "Onaydan sonra içerik ya da hedef kitle değişmiş; çalıştırma yeniden onaylanmalıdır.");
+            return Fail<RecordData>(RecordErrorCode.Conflict, MarketingMessages.RunService.ChangedAfterApproval);
         }
 
         return await pipeline.RunAtomicAsync(async ct =>
@@ -316,7 +317,7 @@ internal sealed class CampaignRuns(
             var current = await pipeline.GetAsync(new RecordRef(MarketingModule.Entities.CampaignRun, run.Id), ct);
             if (!current.IsSuccess || RunState.From(current.Value!).Status != RunStatuses.Approved)
             {
-                return Fail<RecordData>(RecordErrorCode.Conflict, "Çalıştırma başka bir istekle başlatılmış ya da durumu değişmiş.");
+                return Fail<RecordData>(RecordErrorCode.Conflict, MarketingMessages.RunService.AlreadyStarted);
             }
 
             await MaterializeAsync(run, info, ct);
@@ -377,7 +378,7 @@ internal sealed class CampaignRuns(
     {
         if (!await HasAnyAsync([MarketingModule.Permissions.CampaignsSend], cancellationToken))
         {
-            return Fail<ProcessResult>(RecordErrorCode.PermissionDenied, $"Bu işlem için '{MarketingModule.Permissions.CampaignsSend}' izni gerekir.");
+            return Fail<ProcessResult>(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(MarketingModule.Permissions.CampaignsSend));
         }
 
         var loaded = await pipeline.GetAsync(new RecordRef(MarketingModule.Entities.CampaignRun, runId), cancellationToken);
@@ -389,7 +390,7 @@ internal sealed class CampaignRuns(
         var run = RunState.From(loaded.Value!);
         if (run.Status != RunStatuses.Running)
         {
-            return Fail<ProcessResult>(RecordErrorCode.Conflict, $"Yalnızca çalışan çalıştırma işlenir (durum: {StatusText(run.Status)}). Duraklatılan ya da iptal edilen çalıştırmada yeni iş çıkmaz.");
+            return Fail<ProcessResult>(RecordErrorCode.Conflict, MarketingMessages.RunService.OnlyRunning(StatusText(run.Status)));
         }
 
         var campaignResult = await pipeline.GetAsync(new RecordRef(MarketingModule.Entities.Campaign, run.CampaignId), cancellationToken);
@@ -706,7 +707,7 @@ internal sealed class CampaignRuns(
 
         if (!await permissions.HasPermissionAsync(MarketingModule.Permissions.RecipientsRead, cancellationToken))
         {
-            return Fail<DeliveryPage>(RecordErrorCode.PermissionDenied, $"Bu işlem için '{MarketingModule.Permissions.RecipientsRead}' izni gerekir.");
+            return Fail<DeliveryPage>(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(MarketingModule.Permissions.RecipientsRead));
         }
 
         var size = Math.Clamp(pageSize, 1, 200);
@@ -718,23 +719,23 @@ internal sealed class CampaignRuns(
 
     // ---- Yardımcılar ----
 
-    private string? SendBlock(MarketingPolicy policy, CommunicationChannel channel)
+    private ServerMessage? SendBlock(MarketingPolicy policy, CommunicationChannel channel)
     {
         if (!policy.HasProvider)
         {
-            return "Gönderim sağlayıcısı yapılandırılmamış; gerçek gönderim bloklu. Pazarlama ayarlarında bir sağlayıcı seçilene kadar çalıştırma başlatılamaz.";
+            return MarketingMessages.RunService.NoProvider;
         }
 
         var provider = providers.FirstOrDefault(p => p.Key == policy.Provider);
         if (provider is null || !provider.Supports(channel))
         {
-            return $"Seçilen sağlayıcı ('{policy.Provider}') bu kanalı desteklemiyor ya da kayıtlı değil.";
+            return MarketingMessages.RunService.ProviderUnsupported(policy.Provider);
         }
 
         // Abonelikten çıkma bağlantısı olmayan pazarlama iletisi gönderilmez (ADR-0025, dilim 6).
         return unsubscribe.IsAvailable
             ? null
-            : "Abonelikten çıkma bağlantısı üretilemiyor (uygulamanın genel adresi, App:PublicUrl, ayarlı değil); pazarlama iletisi bağlantısız gönderilmez.";
+            : MarketingMessages.RunService.NoUnsubscribeLink;
     }
 
     private async Task<bool> HasAnyAsync(IReadOnlyList<string> needed, CancellationToken cancellationToken)
@@ -771,7 +772,7 @@ internal sealed class CampaignRuns(
         _ => "iptal edildi",
     };
 
-    private static RecordResult<T> Fail<T>(RecordErrorCode code, string message, params (string Field, string Message)[] fields) =>
+    private static RecordResult<T> Fail<T>(RecordErrorCode code, ServerMessage message, params (string Field, ServerMessage Message)[] fields) =>
         RecordResult<T>.Fail(code, message, fields.Length == 0 ? null : [.. fields.Select(f => new RecordFieldError(f.Field, f.Message))]);
 
     private sealed class Tally

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Modulix.Core.Contracts.Communication;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Marketing.Domain;
 
 namespace Modulix.Modules.Marketing.Runs;
@@ -66,31 +67,31 @@ public static partial class ContentRules
         $"{body.TrimEnd()}\n\n--\nBu iletileri almak istemiyorsanız abonelikten çıkabilirsiniz: {pageUrl}";
 
     /// <summary>İçerikteki bağlantılar yalnızca http/https olabilir; betik ve veri şemaları ve şemasız "www" olmayan başka şemalar reddedilir.</summary>
-    public static IReadOnlyList<(string Field, string Message)> Validate(CommunicationChannel channel, string? subject, string? body)
+    public static IReadOnlyList<(string Field, ServerMessage Message)> Validate(CommunicationChannel channel, string? subject, string? body)
     {
-        var errors = new List<(string, string)>();
+        var errors = new List<(string, ServerMessage)>();
         if (string.IsNullOrWhiteSpace(body))
         {
-            errors.Add(("body", "İçerik metni zorunludur."));
+            errors.Add(("body", MarketingMessages.ContentRule.BodyRequired));
         }
         else if (body.Length > CampaignContent.BodyMaxLength)
         {
-            errors.Add(("body", $"İçerik en fazla {CampaignContent.BodyMaxLength} karakter olabilir."));
+            errors.Add(("body", MarketingMessages.ContentRule.BodyMax(CampaignContent.BodyMaxLength)));
         }
 
         if (channel == CommunicationChannel.Email && string.IsNullOrWhiteSpace(subject))
         {
-            errors.Add(("subject", "E-posta için konu zorunludur."));
+            errors.Add(("subject", MarketingMessages.ContentRule.SubjectRequired));
         }
 
         if (subject?.Length > CampaignContent.SubjectMaxLength)
         {
-            errors.Add(("subject", $"Konu en fazla {CampaignContent.SubjectMaxLength} karakter olabilir."));
+            errors.Add(("subject", MarketingMessages.ContentRule.SubjectMax(CampaignContent.SubjectMaxLength)));
         }
 
         if (subject is not null && (subject.Contains('\r', StringComparison.Ordinal) || subject.Contains('\n', StringComparison.Ordinal)))
         {
-            errors.Add(("subject", "Konu tek satır olmalıdır."));
+            errors.Add(("subject", MarketingMessages.ContentRule.SubjectOneLine));
         }
 
         errors.AddRange(ContentTemplate.Validate(subject).Select(m => ("subject", m)));
@@ -108,7 +109,7 @@ public static partial class ContentRules
                 var scheme = match.Groups[1].Value.ToLowerInvariant();
                 if (scheme is not ("http" or "https"))
                 {
-                    errors.Add(("body", $"'{scheme}:' bağlantılarına izin verilmez; yalnızca http ve https."));
+                    errors.Add(("body", MarketingMessages.ContentRule.SchemeNotAllowed(scheme)));
                     break;
                 }
             }
