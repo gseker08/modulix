@@ -63,6 +63,10 @@ public sealed class AppNavigation(SessionState session)
     public IReadOnlyList<MenuEntry> MenuEntries(string rootId) =>
         MenuLayoutRules.Apply(CatalogEntries(rootId, IsVisible), session.Access?.MenuLayout);
 
+    /// <summary>Ana uygulamanın sol menü bölümleri: rol düzenindeki satır ve bölüm sırası uygulanmış (<see cref="MenuLayoutRules"/>).</summary>
+    public IReadOnlyList<MenuSection> MenuSections(string rootId) =>
+        MenuLayoutRules.OrderSections(rootId, Sections(MenuEntries(rootId)), session.Access?.MenuLayout);
+
     /// <summary>
     /// Rol düzeni uygulanmamış (katalog) menü bağlantıları; <paramref name="visible"/> hangi ekranların sayıldığını belirler.
     /// Uygulama panelinde bir uygulamanın listelenip listelenmeyeceği bunlara bakar: düzen bir uygulamanın bütün bağlantılarını
@@ -111,7 +115,7 @@ public sealed class AppNavigation(SessionState session)
 
     /// <summary>Panele tıklanınca açılan ilk ekran: kendi route'u, yoksa menüsündeki ilk bağlantı.</summary>
     public string? EntryRoute(AppDefinition root) =>
-        root.Route ?? Sections(MenuEntries(root.Id)).SelectMany(s => s.Entries).FirstOrDefault()?.Link;
+        root.Route ?? MenuSections(root.Id).SelectMany(s => s.Entries).FirstOrDefault()?.Link;
 
     /// <summary>
     /// Verilen (görünür, sıralı) uygulamaları grup sırasına göre kümeler; kümeler içinde sıra korunur. Hiç uygulaması
@@ -220,7 +224,7 @@ public sealed class AppNavigation(SessionState session)
             active = parent;
         }
 
-        return new MenuContext(menuRoot, active, Sections(MenuEntries(menuRoot.Id)));
+        return new MenuContext(menuRoot, active, MenuSections(menuRoot.Id));
     }
 
     /// <summary>
