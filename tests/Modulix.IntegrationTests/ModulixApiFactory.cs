@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -36,6 +38,10 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
 
     // Bu fabrikanın oluşturduğu tenant'lar; Dispose yalnızca bunların platform kayıtlarını temizler.
     private readonly System.Collections.Concurrent.ConcurrentBag<Guid> createdTenants = [];
+
+    // Bu fabrikanın sunucusunda oluşturulan faaliyet kataloğu düğümleri (oluşturulma sırasıyla). Katalog platform tablosudur,
+    // tenant'a bağlı değildir: temizlenmezse test düğümleri ("Test düğümü", "Geçici faaliyet") her tenant'ın faaliyet seçiminde görünür.
+    private readonly System.Collections.Concurrent.ConcurrentQueue<Guid> createdCatalogNodes = [];
 
     // Dispose sırasında Services artık kullanılamaz (ObjectDisposedException; her test sınıfı "Test Class Cleanup Failure" verip çıkış kodunu 1 yapıyordu):
     // temizlik için gereken bağlantı ayarları tenant oluşturulurken alınır.
@@ -81,9 +87,20 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
             {
                 services.RemoveAll<AccessCache>();
                 services.AddSingleton(sharedAccessCache);
+                services.AddSingleton<IStartupFilter>(new CatalogNodeTracking(this));
             });
 
     private readonly AccessCache sharedAccessCache = new(new MemoryCache(new MemoryCacheOptions()));
+
+    /// <summary>
+    /// Testin doğrudan veritabanına yazdığı faaliyet kataloğu düğümünü temizlik listesine ekler. Platform ucundan
+    /// (<c>POST /api/platform/sectors/nodes</c>) oluşturulan düğümler kendiliğinden izlenir.
+    /// </summary>
+    public void TrackCatalogNode(Guid nodeId)
+    {
+        cleanupOptions ??= Services.GetRequiredService<ModulixDatabaseOptions>();
+        createdCatalogNodes.Enqueue(nodeId);
+    }
 
     /// <summary>Çerezleri saklayan, HTTPS üzerinden konuşan istemci (oturum çerezi Secure).</summary>
     public HttpClient CreateBrowserClient() =>
@@ -113,11 +130,13 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
     /// Yalnızca bu test çalıştırmasının oluşturduğu tenant'ların platform kayıtlarını (üyelik, modül hakkı, tenant) siler;
     /// böylece firma listesi test tenant'larıyla şişmez. Tenant iş satırları tek veritabanında TenantId ile kalır
     /// (ADR-0020); RLS yüzünden rastgele tenant kimlikleriyle kimseye görünmezler. En iyi çaba: hata olursa test
-    /// başarısını etkilemez.
+    /// başarısını etkilemez. Ardından bu fabrikanın oluşturduğu faaliyet kataloğu düğümleri silinir; başka bir kayıt hâlâ
+    /// başvuruyorsa (kural paketi, başka tenant'ın seçimi) düğüm silinemez, pasife alınır ki seçim listelerinde görünmesin.
+    /// Başlangıç paketinin kurduğu düğümler ürün verisidir, izlenmez ve kalır.
     /// </summary>
     protected override void Dispose(bool disposing)
     {
-        if (disposing && !createdTenants.IsEmpty && cleanupOptions is { } options)
+        if (disposing && (!createdTenants.IsEmpty || !createdCatalogNodes.IsEmpty) && cleanupOptions is { } options)
         {
             try
             {
@@ -132,6 +151,7 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
                         using var command = platform.CreateCommand();
                         command.CommandText =
                             "EXEC sys.sp_set_session_context @key = N'TenantId', @value = @t;" +
+                            "DELETE FROM [core].[ActivitySelections] WHERE [TenantId] = @t;" +
                             "DELETE FROM [core].[TeamMembers] WHERE [TenantId] = @t;" +
                             "DELETE FROM [core].[BusinessUnitRoles] WHERE [TenantId] = @t;" +
                             "DELETE FROM [core].[BusinessUnitMembers] WHERE [TenantId] = @t;" +
@@ -148,6 +168,12 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
                     {
                     }
                 }
+
+                // Alt düğüm üst düğümden önce: oluşturulma sırasının tersi.
+                foreach (var node in createdCatalogNodes.Distinct().Reverse())
+                {
+                    RemoveCatalogNode(platform, node);
+                }
             }
             catch (SqlException)
             {
@@ -155,6 +181,55 @@ public sealed class ModulixApiFactory : WebApplicationFactory<Program>
         }
 
         base.Dispose(disposing);
+    }
+
+    private static void RemoveCatalogNode(SqlConnection platform, Guid node)
+    {
+        try
+        {
+            using var delete = platform.CreateCommand();
+            delete.CommandText =
+                "DELETE FROM [platform].[ActivityNodeCapabilities] WHERE [NodeId] = @n;" +
+                "DELETE FROM [platform].[ActivityNodes] WHERE [Id] = @n;";
+            delete.Parameters.AddWithValue("@n", node);
+            delete.ExecuteNonQuery();
+        }
+        catch (SqlException)
+        {
+            try
+            {
+                using var deactivate = platform.CreateCommand();
+                deactivate.CommandText = "UPDATE [platform].[ActivityNodes] SET [IsActive] = 0 WHERE [Id] = @n;";
+                deactivate.Parameters.AddWithValue("@n", node);
+                deactivate.ExecuteNonQuery();
+            }
+            catch (SqlException)
+            {
+            }
+        }
+    }
+
+    /// <summary>Platform ucundan oluşturulan faaliyet düğümlerini (201 + Location) fabrikanın temizlik listesine yazar.</summary>
+    private sealed class CatalogNodeTracking(ModulixApiFactory factory) : IStartupFilter
+    {
+        private const string NodesPath = "/api/platform/sectors/nodes";
+
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use(async (context, pipeline) =>
+            {
+                await pipeline(context);
+                if (HttpMethods.IsPost(context.Request.Method)
+                    && context.Request.Path.Equals(NodesPath, StringComparison.OrdinalIgnoreCase)
+                    && context.Response.StatusCode == StatusCodes.Status201Created
+                    && Guid.TryParse(context.Response.Headers.Location.ToString().Split('/')[^1], out var id))
+                {
+                    factory.cleanupOptions ??= context.RequestServices.GetRequiredService<ModulixDatabaseOptions>();
+                    factory.createdCatalogNodes.Enqueue(id);
+                }
+            });
+            next(app);
+        };
     }
 
     public async Task<ModulixUser> CreateUserAsync(params Tenant[] memberOf)
