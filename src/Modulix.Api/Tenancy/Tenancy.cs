@@ -173,6 +173,7 @@ public static class TenancySetup
         services.AddScoped<HttpCompanyContextAccessor>();
         services.AddScoped<ICompanyContextAccessor>(sp => sp.GetRequiredService<HttpCompanyContextAccessor>());
         services.AddSingleton<ITenantScopeFactory, TenantScopeFactory>();
+        services.AddScoped<Modulix.Core.Contracts.Modules.IGrantedExecution, Modulix.Api.Jobs.GrantedExecution>();
         return services;
     }
 

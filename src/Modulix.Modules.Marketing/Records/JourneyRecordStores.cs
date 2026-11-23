@@ -103,6 +103,12 @@ internal sealed partial class JourneyRecordStore(MarketingStoreContext context) 
             throw new RecordConflictException(MarketingMessages.Journey.SegmentNotActive);
         }
 
+        if (activating)
+        {
+            // Giriş işi segmenti, yolculuğu etkinleştirenin okuma izinleriyle değerlendirir (yetki yükseltme yok).
+            entity.EntryPermissions = EntryPermissionSet.Serialize(await Context.Permissions.GetPermissionsAsync(cancellationToken));
+        }
+
         if (!string.IsNullOrWhiteSpace(entity.ExitCondition) && !IsJsonObject(entity.ExitCondition))
         {
             errors.Add(new RecordFieldError("exitCondition", MarketingMessages.Journey.ExitConditionInvalid));

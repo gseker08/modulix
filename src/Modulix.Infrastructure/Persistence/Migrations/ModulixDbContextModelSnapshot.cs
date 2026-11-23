@@ -12627,6 +12627,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<string>("EntryPermissions")
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("ExitCondition")
                         .HasMaxLength(20000)
                         .HasColumnType("nvarchar(max)");

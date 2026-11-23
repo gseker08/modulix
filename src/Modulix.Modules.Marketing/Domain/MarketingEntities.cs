@@ -207,6 +207,7 @@ public sealed class Journey : MarketingEntity, IOwnedEntity
     public const int NameMaxLength = 150;
     public const int DescriptionMaxLength = 1000;
     public const int ExitConditionMaxLength = 20000;
+    public const int EntryPermissionsMaxLength = 8000;
 
     public string Code { get; internal set; } = string.Empty;
 
@@ -215,6 +216,12 @@ public sealed class Journey : MarketingEntity, IOwnedEntity
     public string? Description { get; internal set; }
 
     public string Target { get; internal set; } = SegmentTargets.Person;
+
+    /// <summary>
+    /// Yolculuğu etkinleştirenin (yayın ya da sürdürme) okuma izinleri (JSON dizi). Giriş işi segmenti bu kümeyle değerlendirir (ADR-0056 dilim 1b-2);
+    /// kayıt alanı değildir, istekle yazılmaz ve yanıtta görünmez.
+    /// </summary>
+    public string? EntryPermissions { get; internal set; }
 
     /// <summary>Giriş segmenti (yayımlanmış, etkin ve aynı hedef türünde olmalıdır).</summary>
     public Guid SegmentId { get; internal set; }
