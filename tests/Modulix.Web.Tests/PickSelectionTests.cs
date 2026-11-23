@@ -116,4 +116,25 @@ public class PickSelectionTests
         selection.SetAll(crm, false);
         Assert.Equal(0, selection.Count);
     }
+
+    [Fact]
+    public void Single_choice_replaces_every_other_selection_including_hidden_ones()
+    {
+        PickSelection<string> selection = new(Items, ["crm.companies.read", "listede.yok"]);
+
+        selection.SelectOnly("logistics.shipments.read");
+
+        Assert.Equal(["logistics.shipments.read"], selection.Result);
+    }
+
+    [Fact]
+    public void Single_choice_ignores_locked_and_unknown_rows()
+    {
+        PickSelection<string> selection = new(Items, ["crm.companies.read"]);
+
+        selection.SelectOnly("core.users.manage");
+        selection.SelectOnly("yok");
+
+        Assert.Equal(["crm.companies.read"], selection.Result);
+    }
 }
