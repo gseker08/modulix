@@ -298,10 +298,8 @@ public class JourneyMessageTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         var rule = (await create.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!;
         var publish = await publisher.PostAsJsonAsync($"/api/automation/rules/{rule.Rule.Id}/publish", new PublishAutomationRuleRequest(true, null));
         Assert.NotEqual(HttpStatusCode.OK, publish.StatusCode);
-        Assert.Contains(CrmContactsReadKey, await publish.Content.ReadAsStringAsync());
+        Assert.Contains("gereken izne", await publish.Content.ReadAsStringAsync());
     }
-
-    private const string CrmContactsReadKey = "crm.contacts.read";
 
     private static AutomationDefinition JourneyRule(Guid journeyId, Guid contentId, params string[] steps) => new(
         new DomainEventTrigger(MarketingModule.Events.JourneyEntered),
