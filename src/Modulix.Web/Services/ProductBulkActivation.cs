@@ -4,7 +4,7 @@ namespace Modulix.Web.Services;
 
 /// <summary>
 /// Ürünler listesindeki toplu aktif yapma: her ürün mevcut güncelleme ucuna (kayıt boru hattı) tam gövdeyle gönderilir; yalnızca durum
-/// değişir. Aktif ürün yeniden "Aktif" yapılamaz (yaşam döngüsü), bu yüzden zaten aktif olanlar atlanır.
+/// değişir. Zaten aktif olanlar atlanır (sunucu aynı duruma geçişi kabul eder, ancak gereksiz sürüm artışı ve denetim kaydı oluşmasın).
 /// </summary>
 public static class ProductBulkActivation
 {

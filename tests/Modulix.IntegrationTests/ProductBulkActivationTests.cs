@@ -43,7 +43,7 @@ public class ProductBulkActivationTests(ModulixApiFactory factory) : IClassFixtu
     }
 
     [Fact]
-    public async Task Already_active_withdrawn_or_stale_products_fail_individually_without_blocking_the_others()
+    public async Task Withdrawn_or_stale_products_fail_individually_and_active_ones_are_skipped_without_blocking_the_others()
     {
         var s = await SetUpAsync();
         using var admin = await LoginAsync(s.Admin);
@@ -54,15 +54,15 @@ public class ProductBulkActivationTests(ModulixApiFactory factory) : IClassFixtu
         var stale = await CreateAsync(admin, "V-4", unit.Id);
         await PutAsync(admin, stale, "Draft", name: "Başkası değiştirdi");
 
-        // Aktif ürün listede atlanır; sunucu da aktifi yeniden "Aktif" yapmayı reddeder (yaşam döngüsü).
+        // Aktif ürün listede atlanır (gereksiz sürüm artışı ve denetim kaydı olmasın); atlanan ürün değişmeden kalır.
         Assert.False(ProductBulkActivation.NeedsActivation(alreadyActive));
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await Put(admin, alreadyActive, ProductBulkActivation.ActivationRequest(alreadyActive))).StatusCode);
         // Satıştan kaldırılan geri açılamaz; eski sürümle yazım 409 döner.
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await Put(admin, withdrawn, ProductBulkActivation.ActivationRequest(withdrawn))).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await Put(admin, stale, ProductBulkActivation.ActivationRequest(stale))).StatusCode);
 
         // Hatalı kayıtlar diğerlerini engellemez ve bozmaz.
         Assert.Equal("Active", (await ActivateAsync(admin, draft)).Status);
+        Assert.Equal(alreadyActive.Version, (await admin.GetFromJsonAsync<ProductDto>($"/api/crm/products/{alreadyActive.Id}"))!.Version);
         Assert.Equal("Withdrawn", (await admin.GetFromJsonAsync<ProductDto>($"/api/crm/products/{withdrawn.Id}"))!.Status);
         Assert.Equal("Draft", (await admin.GetFromJsonAsync<ProductDto>($"/api/crm/products/{stale.Id}"))!.Status);
     }
