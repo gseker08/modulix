@@ -698,6 +698,8 @@
                         </ol>
                     }
                 </section>
+                @* Ekli notlar (ADR-0057): her not ayrı kayıttır ve kendi dosya ekleri vardır. *@
+                <NotesPanel ParentEntityKey="contracts.contract" ParentId="contract.Id" CanWrite="CanWrite" />
                 <section aria-labelledby="audit-title">
                     <h2 id="audit-title">@Texts.Get("contracts.detail.audit")</h2>
                     <RecordHistory EntityKey="contracts.contract" RecordId="contract.Id" Version="contract.Version" />

@@ -118,6 +118,12 @@
     </fieldset>
 </form>
 
+@* Ekli notlar (ADR-0057): her not ayrı kayıttır ve kendi dosya ekleri vardır; yalnızca kayıtlı kayıtta. Not formu iç içe olmasın diye form dışındadır. *@
+@if (form.Id is { } noteParentId)
+{
+    <NotesPanel ParentEntityKey="@HrAccess.AssetEntityKey" ParentId="noteParentId" CanWrite="CanWrite" />
+}
+
 @code {
     private const string EntityKey = HrAccess.AssetEntityKey;
     private static readonly string Url = "/api/records/" + EntityKey;

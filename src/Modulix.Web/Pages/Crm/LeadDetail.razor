@@ -357,6 +357,8 @@
             }
         </section>
 
+        @* Ekli notlar (ADR-0057): her not ayrı kayıttır ve kendi dosya ekleri vardır. *@
+        <NotesPanel ParentEntityKey="@CrmEntityKeys.Lead" ParentId="Id" CanWrite="Session.Can(CrmAccess.LeadsUpdate)" />
         <RecordHistory EntityKey="@CrmEntityKeys.Lead" RecordId="Id" Version="lead.Version" />
     }
 </AuthGate>
