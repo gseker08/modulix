@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Credentials;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Fleet.Contracts;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
@@ -81,7 +82,7 @@ internal sealed class TripPlanner(
 
             if (Text(shipment.Value!, "status") != Shipment.Statuses.Pending)
             {
-                return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Yalnızca planlama bekleyen sevkiyat sefere eklenir.");
+                return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, LogisticsMessages.Planner.OnlyPendingShipment);
             }
 
             foreach (var (type, city, address) in new[]
@@ -128,12 +129,12 @@ internal sealed class TripPlanner(
 
             if (Text(shipment.Value!, "tripId") != tripId.ToString())
             {
-                return RecordResult<RecordData>.Fail(RecordErrorCode.NotFound, "Sevkiyat bu seferde değil.");
+                return RecordResult<RecordData>.Fail(RecordErrorCode.NotFound, LogisticsMessages.Planner.ShipmentNotOnTrip);
             }
 
             if (Text(shipment.Value!, "status") != Shipment.Statuses.Planned)
             {
-                return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Yüklemesi başlamış ya da kapanmış sevkiyat seferden çıkarılamaz.");
+                return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, LogisticsMessages.Planner.ShipmentLoadedNoRemove);
             }
 
             var stops = await context.Data.Set<TripStop>().AsNoTracking().Where(s => s.TripId == tripId && s.ShipmentId == shipmentId)
@@ -415,7 +416,7 @@ internal sealed class TripPlanner(
 
         return Text(trip.Value!, "status") == Trip.Statuses.Planning
             ? null
-            : RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Sevkiyat yalnızca planlanan seferde eklenir ya da çıkarılır; hazır seferi önce planlamaya geri alın.");
+            : RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, LogisticsMessages.Planner.TripPlannedOnly);
     }
 
     private static string? Text(RecordData record, string field) => record.Values[field]?.GetValue<string>();

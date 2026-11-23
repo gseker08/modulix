@@ -288,4 +288,107 @@ internal static class LogisticsMessages
         public static ServerMessage CurrencyFormat =>
             ServerMessage.Of("logistics.server.money.currency-format", "Üç harfli para birimi kodu girin (ör. TRY, EUR, USD).");
     }
+
+    /// <summary>Eylem uçları ve iş akışı.</summary>
+    public static class Workflow
+    {
+        public static ServerMessage NotAllowed =>
+            ServerMessage.Of("logistics.server.workflow.not-allowed", "Bu eylem için yetkiniz yok.");
+
+        public static ServerMessage ReasonRequired =>
+            ServerMessage.Of("logistics.server.workflow.reason-required", "Gerekçe zorunludur.");
+
+        public static ServerMessage ReasonTooLong =>
+            ServerMessage.Of("logistics.server.workflow.reason-too-long", "Gerekçe çok uzun.");
+
+        public static ServerMessage ReasonMax(int max) =>
+            ServerMessage.Of("logistics.server.workflow.reason-max", "En fazla {0} karakter olabilir.", max);
+
+        public static ServerMessage RequestApprove =>
+            ServerMessage.Of("logistics.server.workflow.request-approve", "Yalnızca yeni talep onaylanabilir.");
+
+        public static ServerMessage RequestReject =>
+            ServerMessage.Of("logistics.server.workflow.request-reject", "Yalnızca yeni talep reddedilebilir.");
+
+        public static ServerMessage RequestCancel =>
+            ServerMessage.Of("logistics.server.workflow.request-cancel", "Yalnızca yeni talep iptal edilebilir; onaylanan talebin sevkiyatını iptal edin.");
+
+        public static ServerMessage ShipmentStartLoading =>
+            ServerMessage.Of("logistics.server.workflow.shipment-start-loading", "Yükleme yalnızca planlanmış sevkiyatta başlar.");
+
+        public static ServerMessage ShipmentDepart =>
+            ServerMessage.Of("logistics.server.workflow.shipment-depart", "Yalnızca yüklenen sevkiyat yola çıkabilir.");
+
+        public static ServerMessage ShipmentCancel =>
+            ServerMessage.Of("logistics.server.workflow.shipment-cancel", "Yola çıkmış ya da kapanmış sevkiyat iptal edilemez.");
+
+        public static ServerMessage TripConfirm =>
+            ServerMessage.Of("logistics.server.workflow.trip-confirm", "Yalnızca planlanan sefer onaylanır.");
+
+        public static ServerMessage TripReopen =>
+            ServerMessage.Of("logistics.server.workflow.trip-reopen", "Yalnızca hazır sefer planlamaya geri alınır.");
+
+        public static ServerMessage TripStart =>
+            ServerMessage.Of("logistics.server.workflow.trip-start", "Sefere yalnızca planı onaylanmış (hazır) sefer çıkar.");
+
+        public static ServerMessage TripComplete =>
+            ServerMessage.Of("logistics.server.workflow.trip-complete", "Yalnızca yoldaki sefer tamamlanır.");
+
+        public static ServerMessage TripCancel =>
+            ServerMessage.Of("logistics.server.workflow.trip-cancel", "Yola çıkmış ya da kapanmış sefer iptal edilemez.");
+
+        public static ServerMessage ExpenseApprove =>
+            ServerMessage.Of("logistics.server.workflow.expense-approve", "Yalnızca beklemedeki masraf onaylanabilir.");
+
+        public static ServerMessage ExpenseReject =>
+            ServerMessage.Of("logistics.server.workflow.expense-reject", "Yalnızca beklemedeki masraf reddedilebilir.");
+
+        public static ServerMessage ExpenseResubmit =>
+            ServerMessage.Of("logistics.server.workflow.expense-resubmit", "Yalnızca reddedilen masraf yeniden onaya gönderilir.");
+
+        public static ServerMessage StopsNotArrived =>
+            ServerMessage.Of("logistics.server.workflow.stops-not-arrived", "Bütün duraklara varış saati girilmeden sefer tamamlanamaz.");
+
+        public static ServerMessage LoadedShipments =>
+            ServerMessage.Of("logistics.server.workflow.loaded-shipments", "Yüklemesi başlamış sevkiyatı olan sefer iptal edilemez.");
+
+        public static ServerMessage TripNotReady(string issues) =>
+            ServerMessage.Of("logistics.server.workflow.trip-not-ready", "Sefer hazır değil: {0}", issues);
+    }
+
+    /// <summary>Sefer planlama.</summary>
+    public static class Planner
+    {
+        public static ServerMessage OnlyPendingShipment =>
+            ServerMessage.Of("logistics.server.planner.only-pending-shipment", "Yalnızca planlama bekleyen sevkiyat sefere eklenir.");
+
+        public static ServerMessage ShipmentNotOnTrip =>
+            ServerMessage.Of("logistics.server.planner.shipment-not-on-trip", "Sevkiyat bu seferde değil.");
+
+        public static ServerMessage ShipmentLoadedNoRemove =>
+            ServerMessage.Of("logistics.server.planner.shipment-loaded-no-remove", "Yüklemesi başlamış ya da kapanmış sevkiyat seferden çıkarılamaz.");
+
+        public static ServerMessage TripPlannedOnly =>
+            ServerMessage.Of("logistics.server.planner.trip-planned-only", "Sevkiyat yalnızca planlanan seferde eklenir ya da çıkarılır; hazır seferi önce planlamaya geri alın.");
+    }
+
+    /// <summary>Sevkiyat teslimi.</summary>
+    public static class Delivery
+    {
+        public static ServerMessage NotAllowed =>
+            ServerMessage.Of("logistics.server.delivery.not-allowed", "Teslim kaydetmek için yetkiniz yok.");
+
+        public static ServerMessage OutcomeUnknown =>
+            ServerMessage.Of("logistics.server.delivery.outcome-unknown", "Bilinmeyen teslim sonucu.");
+
+        public static ServerMessage OnlyInTransit =>
+            ServerMessage.Of("logistics.server.delivery.only-in-transit", "Yalnızca yoldaki sevkiyat için teslim kaydedilir.");
+    }
+
+    /// <summary>Operasyon panosu.</summary>
+    public static class Dashboard
+    {
+        public static ServerMessage Forbidden =>
+            ServerMessage.Of("logistics.server.dashboard.forbidden", "Panoyu görmek için talep, sevkiyat, sefer ya da sürücü okuma izni gerekir.");
+    }
 }

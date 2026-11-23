@@ -34,7 +34,7 @@ public partial class LogisticsMessagesTests
             checkedCount++;
         }
 
-        Assert.True(checkedCount >= 80);
+        Assert.True(checkedCount >= 109);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Logistics.Domain;
 using Modulix.Modules.Logistics.Records;
@@ -40,17 +41,17 @@ internal sealed class ShipmentDelivery(
 
         if (!await access.HasPermissionAsync(LogisticsModule.Permissions.ShipmentsWrite, cancellationToken))
         {
-            return RecordResult<DeliveryResult>.Fail(RecordErrorCode.PermissionDenied, "Teslim kaydetmek için yetkiniz yok.");
+            return RecordResult<DeliveryResult>.Fail(RecordErrorCode.PermissionDenied, LogisticsMessages.Delivery.NotAllowed);
         }
 
         if (!DeliveryProof.Outcomes.All.Contains(command.Outcome))
         {
-            return RecordResult<DeliveryResult>.Fail(RecordErrorCode.ValidationFailed, "Bilinmeyen teslim sonucu.", [new RecordFieldError("outcome", "Bilinmeyen teslim sonucu.")]);
+            return RecordResult<DeliveryResult>.Fail(RecordErrorCode.ValidationFailed, LogisticsMessages.Delivery.OutcomeUnknown, [new RecordFieldError("outcome", LogisticsMessages.Delivery.OutcomeUnknown)]);
         }
 
         if (shipment.Value!.Values["status"]?.GetValue<string>() != Shipment.Statuses.InTransit)
         {
-            return RecordResult<DeliveryResult>.Fail(RecordErrorCode.Conflict, "Yalnızca yoldaki sevkiyat için teslim kaydedilir.");
+            return RecordResult<DeliveryResult>.Fail(RecordErrorCode.Conflict, LogisticsMessages.Delivery.OnlyInTransit);
         }
 
         return await pipeline.RunAtomicAsync(ct => RecordCoreAsync(shipment.Value!, version, command, ct), cancellationToken);
