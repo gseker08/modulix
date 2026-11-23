@@ -133,4 +133,42 @@ public class MenuLayoutTests
         Assert.DoesNotContain(nav.EditableMenus(), m => m.Root.PlatformOnly);
         Assert.DoesNotContain(nav.EditableMenus(), m => m.Root.ModuleKey is not null && m.Root.ModuleKey != CrmAccess.ModuleKey);
     }
+
+    private static string[] GroupIds(AppNavigation nav) =>
+        [.. nav.Context("crm/firmalar")!.Sections.Select(s => s.Group?.Id ?? "-")];
+
+    private static string Key(string group) => MenuLayoutRules.SectionKey("crm", group);
+
+    [Fact]
+    public void Section_order_row_moves_the_section_and_leaves_footer_in_place()
+    {
+        string[] catalog = GroupIds(Nav(null));
+        int sales = Array.IndexOf(catalog, AppCatalog.CrmSalesGroup);
+        int customers = Array.IndexOf(catalog, AppCatalog.CrmCustomersGroup);
+        Assert.True(customers < sales);
+
+        // Satış bölümü Müşterilerden önce gelsin.
+        string[] moved = GroupIds(Nav([new(RoleA, Key(AppCatalog.CrmSalesGroup), 1, false), new(RoleA, Key(AppCatalog.CrmCustomersGroup), 2, false)]));
+        Assert.True(Array.IndexOf(moved, AppCatalog.CrmSalesGroup) < Array.IndexOf(moved, AppCatalog.CrmCustomersGroup));
+        Assert.Equal(catalog.Length, moved.Length);
+
+        // Alt sabitli bölüm (CRM Ayarları) taşınmaz, yeri değişmez.
+        Assert.Equal(Array.IndexOf(catalog, AppCatalog.CrmSettingsGroup), Array.IndexOf(moved, AppCatalog.CrmSettingsGroup));
+        Assert.Equal(catalog.Order().ToArray(), moved.Order().ToArray());
+    }
+
+    [Fact]
+    public void Section_order_takes_the_smallest_order_across_roles_and_ignores_other_apps_and_unknown_sections()
+    {
+        string[] catalog = GroupIds(Nav(null));
+
+        // İki rol farklı sıra verirse en küçüğü geçer: B satışı en öne alır.
+        string[] merged = GroupIds(Nav([new(RoleA, Key(AppCatalog.CrmSalesGroup), 900, false), new(RoleB, Key(AppCatalog.CrmSalesGroup), 1, false)]));
+        Assert.Equal(AppCatalog.CrmSalesGroup, merged.First(g => g != "-"));
+
+        // Başka uygulamanın ve katalogda olmayan bölümün satırı etkisizdir; bölüm satırı öğe görünürlüğünü bozmaz.
+        var other = Nav([new(RoleA, MenuLayoutRules.SectionKey("hr", AppCatalog.CrmSalesGroup), 1, false), new(RoleA, Key("yok"), 1, false)]);
+        Assert.Equal(catalog, GroupIds(other));
+        Assert.Contains("crm.leads", Ids(other));
+    }
 }
