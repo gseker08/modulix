@@ -17,7 +17,14 @@
         </h3>
         @if (CanWrite && form is null)
         {
-            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="OpenNew">@Texts.Get("crm.address.add")</button>
+            @* Yeni adres tipe göre eklenir: seçilen tür forma hazır gelir (Fatura, Sevkiyat, Ofis …). *@
+            <RowMenu ButtonText="@Texts.Get("crm.address.add")" Label="@Texts.Get("crm.address.addByType")">
+                @foreach (var (key, label) in SharedLabels.Addresses())
+                {
+                    var type = key;
+                    <button type="button" class="view-menu-item" role="menuitem" @onclick="() => OpenNew(type)"><AppIcon Name="map-pin" Size="16" /> <span>@label</span></button>
+                }
+            </RowMenu>
         }
     </div>
 
@@ -109,7 +116,7 @@
                             <strong>@item.Line1@(item.Line2 is { Length: > 0 } ? $", {item.Line2}" : null)</strong>
                             <span>
                                 @string.Join(", ", new[] { item.PostalCode, item.District, item.City, item.Country }.Where(s => !string.IsNullOrWhiteSpace(s)))
-                                · @SharedLabels.Address(item.Type)
+                                · <span class="badge">@SharedLabels.Address(item.Type)</span>
                                 @if (item.IsPrimary) { <text> · </text><span class="badge status-customer">@Texts.Get("common.primaryBadge")</span> }
                                 @if (!item.IsActive) { <text> · @Texts.Get("common.inactive")</text> }
                             </span>
@@ -176,16 +183,16 @@
     }
 
     // Kapalı bölümde "Adres ekle" bölümü açar; yoksa form görünmez kalırdı.
-    private void OpenNew()
+    private void OpenNew(string? type = null)
     {
         open = true;
-        Open(null);
+        Open(null, type);
     }
 
-    private void Open(AddressDto? a)
+    private void Open(AddressDto? a, string? type = null)
     {
         form = a is null
-            ? new AddressForm { IsPrimary = items?.Count == 0, Type = LocationId is null ? "Registered" : "Shipping" }
+            ? new AddressForm { IsPrimary = items?.Count == 0, Type = type ?? (LocationId is null ? "Registered" : "Shipping") }
             : new AddressForm
             {
                 Id = a.Id, Version = a.Version, Type = a.Type, Country = a.Country, City = a.City, District = a.District, PostalCode = a.PostalCode,

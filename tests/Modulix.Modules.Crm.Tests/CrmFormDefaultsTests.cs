@@ -20,6 +20,20 @@ public class CrmFormDefaultsTests
     }
 
     [Fact]
+    public void Company_contact_tab_holds_the_multi_record_lists_next_to_quick_entry_fields()
+    {
+        // Adres tipine göre çoklu adres, telefon/e-posta ve lokasyon listeleri İletişim sekmesindedir (ADR-0012);
+        // tekil adres/telefon/e-posta/şehir yalnızca yeni firmada hızlı giriş olarak çizilir.
+        var company = CrmForms.All.Single(f => f.EntityKey == CrmModule.Entities.Company);
+        var contactSections = company.Sections.Where(s => s.Tab == "iletisim").Select(s => s.Key).ToHashSet();
+        foreach (var key in new[] { "addresses", "contactPoints", "locations", "address", "phone", "email", "city" })
+        {
+            var field = Assert.Single(company.Fields, f => f.Key == key);
+            Assert.Contains(field.Section, contactSections);
+        }
+    }
+
+    [Fact]
     public void Required_and_fixed_identity_fields_stay_on_the_first_tab()
     {
         // Zorunlu kimlik alanları ilk sekmede olmalı: kullanıcı kayda başlarken eksik alanı gizli sekmede aramaz.

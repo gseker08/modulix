@@ -7,7 +7,8 @@
 @inject FormLayouts Layouts
 @inject ToastService Toasts
 
-<form class="record-form sectioned" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault @oninput="() => dirty = true">
+@* Kök öğe form değil div: adres/telefon/lokasyon bölümleri kendi form'larını taşır ve kendi uçlarına kaydeder (iç içe form olmaz). *@
+<div class="record-form sectioned" role="form" @oninput="() => dirty = true">
     <div class="form-toolbar">
         <div>
             @if (!Embedded)
@@ -29,7 +30,7 @@
             {
                 <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
             }
-            <button type="submit" class="btn btn-primary" aria-busy="@(busy ? "true" : null)" disabled="@(busy || layout is null)">
+            <button type="button" class="btn btn-primary" aria-busy="@(busy ? "true" : null)" disabled="@(busy || layout is null)" @onclick="SaveAsync">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -77,7 +78,7 @@
         }
 
         <div class="@(Embedded ? null : "record-main")">
-            <LayoutForm Layout="layout" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("crm.company.editor.tabs")">
+            <LayoutForm Layout="layout" Shows="ShowsField" CustomFields="CustomFields" CustomValues="form.Custom" Errors="errors" TabsLabel="@Texts.Get("crm.company.editor.tabs")">
                 <Field Context="f">
                     @switch (f.Key)
                     {
@@ -190,6 +191,24 @@
                             <small class="text-muted">@Texts.Get("crm.language.company-help")</small>
                             <FieldError Field="preferredLanguage" Errors="errors" />
                             break;
+                        case "addresses":
+                            if (Company is { } addressesOwner)
+                            {
+                                <div @oninput:stopPropagation><AddressesSection CompanyId="addressesOwner.Id" Title="@f.Label" CanWrite="true" Changed="ContactsChangedAsync" /></div>
+                            }
+                            break;
+                        case "contactPoints":
+                            if (Company is { } pointsOwner)
+                            {
+                                <div @oninput:stopPropagation><ContactPointsSection CompanyId="pointsOwner.Id" Title="@f.Label" CanWrite="true" Changed="ContactsChangedAsync" /></div>
+                            }
+                            break;
+                        case "locations":
+                            if (Company is { } locationsOwner)
+                            {
+                                <div @oninput:stopPropagation><LocationsSection CompanyId="locationsOwner.Id" CanWrite="true" Lookups="Lookups" /></div>
+                            }
+                            break;
                         case "city":
                             <label class="@f.LabelClass()" for="city">@f.Label</label>
                             <input id="city" class="form-control" maxlength="@CrmLimits.CityMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.City" />
@@ -211,7 +230,7 @@
             <div class="form-actions">
                 @if (!Embedded)
                 {
-                    <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+                    <button type="button" class="btn btn-primary" disabled="@(busy || layout is null)" @onclick="SaveAsync">@Texts.Get("common.save")</button>
                     <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
                 }
                 @if (Company is not null)
@@ -223,7 +242,7 @@
             </div>
         </div>
     </div>
-</form>
+</div>
 
 @code {
     private static IReadOnlyList<SegmentOption<string>> KindOptions => [new("Organization", Texts.Get("crm.company.editor.organization")), new("Individual", Texts.Get("crm.company.editor.individual"))];
@@ -300,6 +319,19 @@
     {
         if (!initialized || !ReferenceEquals(source, Company))
         {
+            // Adres/telefon bölümünden dönen yenileme: yazılmamış alanlar kaybolmasın; yalnızca ana kayıtların aynası ve sürüm tazelenir.
+            // (Eski değerleri geri göndermek ana kaydı ezerdi.)
+            if (initialized && dirty && Company is { } fresh && source is { } previous && fresh.Id == previous.Id)
+            {
+                source = Company;
+                form.Version = fresh.Version;
+                form.Phone = fresh.Phone;
+                form.Email = fresh.Email;
+                form.City = fresh.City;
+                form.Address = fresh.Address;
+                return;
+            }
+
             initialized = true;
             source = Company;
             form = Company is { } c
@@ -315,6 +347,19 @@
             message = null;
         }
     }
+
+    /// <summary>Adres, telefon ve e-posta listeleri kendi uçlarına kaydeder; ana kayıt değişince firma yeniden okunur (eski alanlar ayna).</summary>
+    [Parameter] public EventCallback ContactsChanged { get; set; }
+
+    private Task ContactsChangedAsync() => ContactsChanged.InvokeAsync();
+
+    /// <summary>Yeni firmada hızlı giriş alanları (ana kaydı açar); kayıtlı firmada çoklu kayıt listeleri çizilir.</summary>
+    private bool ShowsField(FormFieldDto field) => field.Key switch
+    {
+        "address" or "phone" or "email" or "city" => Company is null,
+        "addresses" or "contactPoints" or "locations" => Company is not null,
+        _ => true,
+    };
 
     private IReadOnlyDictionary<string, string?> DuplicateQuery() => new Dictionary<string, string?>
     {
@@ -372,7 +417,7 @@
 
         public Guid? Id { get; init; }
 
-        public long? Version { get; init; }
+        public long? Version { get; set; }
 
         public string Name { get; set; } = string.Empty;
 
