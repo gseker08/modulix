@@ -1,6 +1,7 @@
 @page "/crm/urunler"
 @inject ApiClient Api
 @inject SessionState Session
+@inject ToastService Toasts
 
 <PageTitle>@Texts.Get("crm.products.title") · Modulix</PageTitle>
 
@@ -316,9 +317,23 @@
     }
     else
     {
+        @if (picked.Count > 0 && Session.Can(CrmAccess.ProductsWrite))
+        {
+            <div class="filters" role="group" aria-label="@Texts.Get("crm.products.bulk.label")">
+                <strong>@Texts.Get("crm.products.bulk.picked", picked.Count)</strong>
+                <button type="button" class="btn btn-outline-primary btn-sm" disabled="@busy" aria-busy="@(busy ? "true" : null)" @onclick="BulkActivateAsync">@Texts.Get("crm.products.bulk.activate")</button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled="@busy" @onclick="picked.Clear">@Texts.Get("crm.products.bulk.clear")</button>
+            </div>
+        }
         <table class="table record-table">
             <thead>
                 <tr>
+                    @if (Session.Can(CrmAccess.ProductsWrite))
+                    {
+                        <th scope="col" class="check-cell">
+                            <input type="checkbox" aria-label="@Texts.Get("crm.products.bulk.selectAll")" checked="@AllPicked" @onchange="PickAll" />
+                        </th>
+                    }
                     @foreach (var column in grid.VisibleColumns)
                     {
                         <GridHeader Column="column" State="grid" SortChanged="SortAsync" />
@@ -330,6 +345,12 @@
                 @foreach (var product in page.Items)
                 {
                     <tr>
+                        @if (Session.Can(CrmAccess.ProductsWrite))
+                        {
+                            <td class="check-cell">
+                                <input type="checkbox" aria-label="@Texts.Get("crm.products.bulk.selectRow", product.Name)" checked="@picked.Contains(product.Id)" @onchange="e => Pick(product, e)" />
+                            </td>
+                        }
                         @foreach (var column in grid.VisibleColumns)
                         {
                             @Cell(column, product)
@@ -412,6 +433,7 @@
     private string? status;
     private string? kind;
     private bool busy;
+    private readonly HashSet<Guid> picked = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -642,6 +664,74 @@
         componentForm = new ComponentForm();
         componentErrors = null;
         await LoadComponentsAsync(p.Id);
+    }
+
+    // ---- Toplu aktif yapma: her ürün mevcut PUT ucundan (kayıt boru hattı, yetki, yaşam döngüsü denetimi) geçer; sonuç ürün başınadır.
+
+    private bool AllPicked => page is { Items.Count: > 0 } && page.Items.All(p => picked.Contains(p.Id));
+
+    private void Pick(ProductDto product, ChangeEventArgs e)
+    {
+        if (e.Value is true)
+        {
+            picked.Add(product.Id);
+        }
+        else
+        {
+            picked.Remove(product.Id);
+        }
+    }
+
+    private void PickAll(ChangeEventArgs e)
+    {
+        foreach (var product in page?.Items ?? [])
+        {
+            if (e.Value is true)
+            {
+                picked.Add(product.Id);
+            }
+            else
+            {
+                picked.Remove(product.Id);
+            }
+        }
+    }
+
+    private async Task BulkActivateAsync()
+    {
+        busy = true;
+        message = null;
+        var targets = (page?.Items ?? []).Where(p => picked.Contains(p.Id) && p.Status != "Active").ToList();
+        var failures = new List<string>();
+        var done = 0;
+        foreach (var p in targets)
+        {
+            var request = new SaveProductRequest(
+                p.Code, p.Name, p.BaseUnitId, p.Kind, "Active", p.Description, p.CategoryId, p.ExternalCode, p.Barcode, p.Brand, p.Model, p.Tags,
+                p.SaleStart, p.SaleEnd, p.TaxCategory, p.PriceIncludesTax, p.QuantityPrecision, p.Cost, p.CostCurrency ?? "TRY",
+                p.ServiceDurationMinutes, p.DeliveryMode, p.ChargeType, p.RecurringPeriod, p.Version);
+            var result = await Api.PutAsync<ProductDto>($"{Url}/{p.Id}", request);
+            if (result.IsSuccess)
+            {
+                done++;
+            }
+            else
+            {
+                failures.Add($"{p.Code} ({result.Error ?? Texts.Get("crm.products.bulk.failedGeneric")})");
+            }
+        }
+
+        busy = false;
+        picked.Clear();
+        await LoadAsync(page?.Page ?? 1);
+        if (failures.Count > 0)
+        {
+            message = Texts.Get("crm.products.bulk.resultFailed", done, failures.Count, string.Join("; ", failures));
+        }
+        else
+        {
+            Toasts.Success(Texts.Get("crm.products.bulk.result", done));
+        }
     }
 
     private void Close() => form = null;
