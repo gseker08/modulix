@@ -173,14 +173,10 @@
                                 <td data-label="@Texts.Get("common.field.name")" class="primary">@capability.Name</td>
                                 <td data-label="@Texts.Get("warehouse.code")"><code>@capability.Code</code></td>
                                 <td data-label="@Texts.Get("platform.sectors.dependsOn")">
-                                    @foreach (var other in catalog.Capabilities.Where(c => c.Code != capability.Code))
-                                    {
-                                        <label class="form-check">
-                                            <input class="form-check-input" type="checkbox" disabled="@busy" checked="@capability.DependsOn.Contains(other.Code)"
-                                                   @onchange="e => SetDependencyAsync(capability, other.Code, (bool)e.Value!)" />
-                                            <span class="form-check-label">@other.Name</span>
-                                        </label>
-                                    }
+                                    @* Seçim uygulanınca hemen kaydedilir (eskiden her kutu tek tek kaydediyordu). *@
+                                    <PickField TKey="string" Id="@($"depends-{capability.Code}")" Title="@Texts.Get("platform.sectors.dependsOn")" Disabled="busy"
+                                               Items="@([.. catalog.Capabilities.Where(c => c.Code != capability.Code).Select(c => new PickItem<string>(c.Code, c.Name, c.Code))])"
+                                               Selected="capability.DependsOn" SelectedChanged="codes => SetDependenciesAsync(capability, codes)" />
                                 </td>
                             </tr>
                         }
@@ -306,13 +302,13 @@
         busy = false;
     }
 
-    private async Task SetDependencyAsync(CapabilityDto capability, string code, bool on)
+    private async Task SetDependenciesAsync(CapabilityDto capability, IReadOnlyList<string> codes)
     {
         busy = true;
-        List<string> wanted = on ? [.. capability.DependsOn, code] : [.. capability.DependsOn.Where(c => c != code)];
+        List<string> wanted = [.. codes];
         var result = await Api.PutAsync<CapabilityDto>($"/api/platform/sectors/capabilities/{Uri.EscapeDataString(capability.Code)}/dependencies", new CodeListRequest(wanted));
         Report(result.Error, result.FieldErrors);
-        await LoadAsync(); // reddedilen değişiklikte (ör. döngü) kutu veritabanındaki duruma döner
+        await LoadAsync(); // reddedilen değişiklikte (ör. döngü) seçim veritabanındaki duruma döner
 
         busy = false;
     }
