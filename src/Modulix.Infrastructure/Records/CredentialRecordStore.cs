@@ -64,7 +64,7 @@ internal sealed class CredentialRecordStore(
         {
             if (!Writable.Contains(name, StringComparer.Ordinal))
             {
-                errors.Add(new RecordFieldError(name, "Bilinmeyen alan."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownField));
             }
             else if (Parse(name, node).Error is { } error)
             {
@@ -106,7 +106,7 @@ internal sealed class CredentialRecordStore(
                 }
                 else
                 {
-                    errors.Add(new RecordFieldError("sort", "Geçersiz sıralama."));
+                    errors.Add(new RecordFieldError("sort", ServerMessages.Validation.InvalidSort));
                 }
 
                 continue;
@@ -166,14 +166,14 @@ internal sealed class CredentialRecordStore(
         var ownerId = (Guid)Parse("ownerId", values["ownerId"]).Value!;
         if (catalog.FindCredentialOwner(ownerKey) is not { } owner || !await access.CanAsync(ownerKey, RecordOperation.Read, cancellationToken))
         {
-            throw Invalid("ownerEntityKey", "Bu kayıt türüne süreli belge eklenemez.");
+            throw Invalid("ownerEntityKey", ServerMessages.Credential.OwnerTypeNotAllowed);
         }
 
         await EnsureWritableAsync(owner.ModuleKey, ownerKey, cancellationToken);
         if (OwnerStore(ownerKey) is not { } ownerStore || await ownerStore.FindAsync(ownerId, cancellationToken) is null)
         {
             // Başka tenant'ın kaydı da "bulunamadı" sayılır; varlığı belli edilmez.
-            throw Invalid("ownerId", "Kayıt bulunamadı.");
+            throw Invalid("ownerId", ServerMessages.Record.NotFound);
         }
 
         var entity = new Credential { OwnerEntityKey = ownerKey, OwnerId = ownerId };
@@ -213,7 +213,7 @@ internal sealed class CredentialRecordStore(
         // Ekli dosya bağlı kaydı silinince erişilemez kalır (ADR-0040 K2); önce dosyalar silinir ya da belge "İptal edildi" yapılır.
         if (await db.StoredFiles.AnyAsync(f => f.EntityKey == EntityKey && f.RecordId == id, cancellationToken))
         {
-            throw new RecordConflictException("Belgenin ekli dosyaları var; önce dosyaları silin ya da belgenin durumunu \"İptal edildi\" yapın.");
+            throw new RecordConflictException(ServerMessages.Credential.HasFiles);
         }
 
         db.Credentials.Remove(found.Entity);
@@ -251,12 +251,12 @@ internal sealed class CredentialRecordStore(
     {
         if (!await access.CanAsync(ownerKey, RecordOperation.Update, cancellationToken))
         {
-            throw new RecordAccessDeniedException("Bu kaydın belgelerini değiştirmek için kayıtta güncelleme izni gerekir.");
+            throw new RecordAccessDeniedException(ServerMessages.Credential.UpdateRequired);
         }
 
         if (tenantAccessor.Current is not { } tenant || !await license.IsWritableAsync(tenant.TenantId, moduleKey, cancellationToken))
         {
-            throw new RecordAccessDeniedException("Modül lisansı salt okunur evrede; belge eklenemez, değiştirilemez ya da silinemez.");
+            throw new RecordAccessDeniedException(ServerMessages.Credential.LicenseReadOnly);
         }
     }
 
@@ -303,7 +303,7 @@ internal sealed class CredentialRecordStore(
                     var current = name == "ownerId" ? entity.OwnerId.ToString() : entity.OwnerEntityKey;
                     if (!isNew && value is not null && !string.Equals(value.ToString(), current, StringComparison.OrdinalIgnoreCase))
                     {
-                        errors.Add(new RecordFieldError(name, "Oluşturulduktan sonra değiştirilemez."));
+                        errors.Add(new RecordFieldError(name, ServerMessages.Validation.CreateOnly));
                     }
 
                     break;
@@ -322,7 +322,7 @@ internal sealed class CredentialRecordStore(
                     }
                     else if (choice.Category != owner.Category)
                     {
-                        errors.Add(new RecordFieldError(name, $"Bu belge türü {owner.DisplayName.ToLower(CultureInfo.GetCultureInfo("tr-TR"))} kaydına eklenemez."));
+                        errors.Add(new RecordFieldError(name, ServerMessages.Credential.TypeNotAllowed(owner.DisplayName.ToLower(CultureInfo.GetCultureInfo("tr-TR")))));
                     }
                     else
                     {
@@ -353,7 +353,7 @@ internal sealed class CredentialRecordStore(
 
         if (entity.ValidFrom is { } from && entity.ValidTo is { } to && to < from)
         {
-            errors.Add(new RecordFieldError("validTo", "Bitiş tarihi başlangıçtan önce olamaz."));
+            errors.Add(new RecordFieldError("validTo", ServerMessages.Validation.EndBeforeStart));
         }
 
         if (errors.Count > 0)
@@ -365,7 +365,7 @@ internal sealed class CredentialRecordStore(
                 c => c.Id != entity.Id && c.OwnerEntityKey == entity.OwnerEntityKey && c.OwnerId == entity.OwnerId && c.TypeKey == entity.TypeKey && c.DocumentNo == no,
                 cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError("documentNo", "Bu kayıtta aynı türde ve numarada bir belge zaten var.")]);
+            throw new RecordValidationException([new RecordFieldError("documentNo", ServerMessages.Credential.NumberExists)]);
         }
     }
 
@@ -456,7 +456,7 @@ internal sealed class CredentialRecordStore(
     private static DateOnly? Day(string value) =>
         DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day) ? day : null;
 
-    private static RecordValidationException Invalid(string field, string message) => new([new RecordFieldError(field, message)]);
+    private static RecordValidationException Invalid(string field, ServerMessage message) => new([new RecordFieldError(field, message)]);
 
     private RecordData ToData(Credential c) => new(EntityKey, c.Id, c.Version, new JsonObject
     {

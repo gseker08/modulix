@@ -34,7 +34,7 @@ public partial class OrdersMessagesTests
             checkedCount++;
         }
 
-        Assert.True(checkedCount >= 162);
+        Assert.True(checkedCount >= 164);
     }
 
     [Fact]

@@ -76,7 +76,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
 
             if (!FieldsByName.TryGetValue(name, out var field))
             {
-                errors.Add(new RecordFieldError(name, "Bilinmeyen alan."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownField));
             }
             else if (!field.IsOmitted(node) && field.Parse(node).Error is { } error)
             {
@@ -86,7 +86,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
 
         if (operation == RecordOperation.Create)
         {
-            errors.AddRange(Fields.Where(f => f.Required && !values.ContainsKey(f.Name)).Select(f => new RecordFieldError(f.Name, "Bu alan zorunludur.")));
+            errors.AddRange(Fields.Where(f => f.Required && !values.ContainsKey(f.Name)).Select(f => new RecordFieldError(f.Name, ServerMessages.Validation.Required)));
         }
 
         return errors;
@@ -262,7 +262,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
         {
             if (!Filters.TryGetValue(name, out var filter))
             {
-                errors.Add(new RecordFieldError(name, "Bilinmeyen filtre."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownFilter));
             }
             else if (filter(source, value) is { } filtered)
             {

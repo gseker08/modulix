@@ -58,7 +58,7 @@ internal sealed class BlogReview(IRecordPipeline pipeline, HrStoreContext contex
     {
         if (action is not (Actions.Submit or Actions.Publish or Actions.Return))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.", [new RecordFieldError("action", "Bilinmeyen eylem.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.UnknownAction, [new RecordFieldError("action", HrMessages.Workflow.UnknownAction)]);
         }
 
         var record = await pipeline.GetAsync(new RecordRef(HrModule.Entities.BlogPost, postId), cancellationToken);

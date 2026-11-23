@@ -88,7 +88,7 @@ internal sealed class OrderWorkflow(
     {
         if (!PermissionOf.TryGetValue(action, out var permission))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.", [new RecordFieldError("action", "Bilinmeyen eylem.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, OrdersMessages.Workflow.UnknownAction, [new RecordFieldError("action", OrdersMessages.Workflow.UnknownAction)]);
         }
 
         var loaded = await pipeline.GetAsync(new RecordRef(Key, id), cancellationToken);

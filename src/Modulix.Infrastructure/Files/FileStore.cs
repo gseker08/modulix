@@ -11,6 +11,7 @@ using Modulix.Core.Files;
 using Modulix.Core.Modules;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Infrastructure.Files;
 
@@ -52,7 +53,7 @@ internal sealed class FileStore(
         var tenant = tenantAccessor.Current;
         if (tenant is null)
         {
-            return RecordResult<StoredFileInfo>.Fail(RecordErrorCode.NoActiveTenant, "Aktif tenant yok.");
+            return RecordResult<StoredFileInfo>.Fail(RecordErrorCode.NoActiveTenant, ServerMessages.Record.NoActiveTenant);
         }
 
         if (await CheckWriteAsync(tenant, record, cancellationToken) is { } error)
@@ -91,7 +92,7 @@ internal sealed class FileStore(
         var hash = Convert.ToHexString(SHA256.HashData(data.AsSpan(0, (int)buffer.Length)));
         if (await perRecord.AnyAsync(f => f.Sha256 == hash, cancellationToken))
         {
-            return RecordResult<StoredFileInfo>.Fail(RecordErrorCode.Conflict, "Bu dosya kayda zaten eklenmiş.", [new RecordFieldError("file", "Aynı içerik zaten ekli.")]);
+            return RecordResult<StoredFileInfo>.Fail(RecordErrorCode.Conflict, ServerMessages.File.AlreadyAttached, [new RecordFieldError("file", ServerMessages.File.SameContent)]);
         }
 
         var file = new StoredFile(record.EntityKey, record.Id, name!, contentType!, buffer.Length, hash, tenant.UserId);
@@ -118,31 +119,31 @@ internal sealed class FileStore(
         var tenant = tenantAccessor.Current;
         if (tenant is null)
         {
-            return RecordResult<StoredFileContent>.Fail(RecordErrorCode.NoActiveTenant, "Aktif tenant yok.");
+            return RecordResult<StoredFileContent>.Fail(RecordErrorCode.NoActiveTenant, ServerMessages.Record.NoActiveTenant);
         }
 
         var file = await db.StoredFiles.AsNoTracking().FirstOrDefaultAsync(f => f.Id == fileId, cancellationToken);
         if (file is null || file.Classification == FileClassification.ModuleOwned
             || await CheckReadAsync(new RecordRef(file.EntityKey, file.RecordId), cancellationToken) is not null)
         {
-            return RecordResult<StoredFileContent>.Fail(RecordErrorCode.NotFound, "Dosya bulunamadı.");
+            return RecordResult<StoredFileContent>.Fail(RecordErrorCode.NotFound, ServerMessages.File.NotFound);
         }
 
         if (!FileClassification.IsDownloadable(file.Classification) || file.ScanStatus == FileScanStatus.Infected)
         {
-            return RecordResult<StoredFileContent>.Fail(RecordErrorCode.PermissionDenied, "Bu dosya indirilemez.");
+            return RecordResult<StoredFileContent>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.File.NotDownloadable);
         }
 
         if (!FileScanStatus.IsDownloadable(file.ScanStatus))
         {
-            return RecordResult<StoredFileContent>.Fail(RecordErrorCode.Conflict, "Dosya taranıyor; tarama bitince indirilebilir.");
+            return RecordResult<StoredFileContent>.Fail(RecordErrorCode.Conflict, ServerMessages.File.Scanning);
         }
 
         var stream = await blobs.OpenReadAsync(tenant.TenantId, file.StorageKey, cancellationToken);
         if (stream is null)
         {
             logger.LogError("Dosya {FileId} için içerik bulunamadı (tenant {TenantId}).", file.Id, tenant.TenantId);
-            return RecordResult<StoredFileContent>.Fail(RecordErrorCode.NotFound, "Dosya içeriği bulunamadı.");
+            return RecordResult<StoredFileContent>.Fail(RecordErrorCode.NotFound, ServerMessages.File.ContentNotFound);
         }
 
         return RecordResult<StoredFileContent>.Ok(new StoredFileContent(ToInfo(file), stream));
@@ -153,14 +154,14 @@ internal sealed class FileStore(
         var tenant = tenantAccessor.Current;
         if (tenant is null)
         {
-            return RecordResult<bool>.Fail(RecordErrorCode.NoActiveTenant, "Aktif tenant yok.");
+            return RecordResult<bool>.Fail(RecordErrorCode.NoActiveTenant, ServerMessages.Record.NoActiveTenant);
         }
 
         var file = await db.StoredFiles.FirstOrDefaultAsync(f => f.Id == fileId, cancellationToken);
         var record = file is null ? null : new RecordRef(file.EntityKey, file.RecordId);
         if (file is null || file.Classification == FileClassification.ModuleOwned || await CheckReadAsync(record!, cancellationToken) is not null)
         {
-            return RecordResult<bool>.Fail(RecordErrorCode.NotFound, "Dosya bulunamadı.");
+            return RecordResult<bool>.Fail(RecordErrorCode.NotFound, ServerMessages.File.NotFound);
         }
 
         if (await CheckWriteAsync(tenant, record!, cancellationToken) is { } error)
@@ -170,7 +171,7 @@ internal sealed class FileStore(
 
         if (file.Version != version)
         {
-            return RecordResult<bool>.Fail(RecordErrorCode.Conflict, "Dosya başkası tarafından değiştirilmiş.");
+            return RecordResult<bool>.Fail(RecordErrorCode.Conflict, ServerMessages.File.ChangedByOther);
         }
 
         db.StoredFiles.Remove(file);
@@ -181,7 +182,7 @@ internal sealed class FileStore(
         }
         catch (DbUpdateConcurrencyException)
         {
-            return RecordResult<bool>.Fail(RecordErrorCode.Conflict, "Dosya başkası tarafından değiştirilmiş.");
+            return RecordResult<bool>.Fail(RecordErrorCode.Conflict, ServerMessages.File.ChangedByOther);
         }
 
         // Üst veri kesinleştikten sonra içerik silinir; silinemezse yetim kalır (temizliği dilim 3) ama kullanıcıya hata gösterilmez.

@@ -6,6 +6,7 @@ using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Infrastructure.Records;
 
@@ -53,7 +54,7 @@ internal sealed class TenantSettingRecordStore(
         {
             if (ReadString(values, KeyField) is not { } key)
             {
-                errors.Add(new RecordFieldError(KeyField, "Anahtar zorunludur."));
+                errors.Add(new RecordFieldError(KeyField, ServerMessages.Setting.KeyRequired));
             }
             else if (catalog.FindSetting(key) is { } found)
             {
@@ -61,14 +62,14 @@ internal sealed class TenantSettingRecordStore(
             }
             else
             {
-                errors.Add(new RecordFieldError(KeyField, "Tanımlı bir ayar değil."));
+                errors.Add(new RecordFieldError(KeyField, ServerMessages.Setting.NotDefined));
             }
         }
 
         // Güncellemede anahtar kayıttadır; değer UpdateAsync'te tanıma göre denetlenir.
         if (ReadString(values, ValueField) is not { } value)
         {
-            errors.Add(new RecordFieldError(ValueField, "Değer zorunludur ve metin olmalıdır."));
+            errors.Add(new RecordFieldError(ValueField, ServerMessages.Setting.ValueRequired));
         }
         else if (definition is not null && SettingRules.Validate(definition, value) is { } error)
         {
@@ -118,7 +119,7 @@ internal sealed class TenantSettingRecordStore(
 
         return companyAccessor.Current?.ActiveCompanyId
             ?? throw new RecordValidationException(
-                [new RecordFieldError(KeyField, "Bu ayar şirket başına tutulur; değer yazmak için önce bir aktif şirket seçin.")]);
+                [new RecordFieldError(KeyField, ServerMessages.Setting.CompanyScoped)]);
     }
 
     public async Task<RecordData?> UpdateAsync(Guid id, JsonObject values, long? expectedVersion, CancellationToken cancellationToken)
@@ -155,7 +156,7 @@ internal sealed class TenantSettingRecordStore(
         if (catalog.FindSetting(key) is not { } found
             || !catalog.IsEnabled(found.ModuleKey, await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken)))
         {
-            throw new RecordValidationException([new RecordFieldError(KeyField, "Bu ayar bu firmada kullanılamıyor.")]);
+            throw new RecordValidationException([new RecordFieldError(KeyField, ServerMessages.Setting.NotAvailable)]);
         }
 
         if (SettingRules.Validate(found.Definition, value) is { } error)

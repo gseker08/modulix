@@ -169,7 +169,7 @@ public static class SegmentConditions
         var field = obj["field"] is JsonValue f && f.TryGetValue<string>(out var fieldText) ? fieldText.Trim() : null;
         if (string.IsNullOrEmpty(field))
         {
-            errors.Add(new ConditionError(Join(path, "field"), "Alan zorunludur."));
+            errors.Add(new ConditionError(Join(path, "field"), MarketingMessages.Condition.FieldRequired));
         }
 
         SegmentOperator? op = null;

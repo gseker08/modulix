@@ -149,7 +149,7 @@ internal sealed class TripRecordStore(LogisticsStoreContext context) : Logistics
     }
 
     protected override Task BeforeDeleteAsync(Trip entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Sefer silinmez; gerekirse iptal edin.");
+        throw new RecordConflictException(LogisticsMessages.Trip.NotDeletable);
 
     /// <summary>
     /// Seferin belgeleri (CMR, irsaliye, yol belgeleri) sefer kapanana kadar eklenir ve silinir; kayıt yalnızca planlanırken düzenlense de belge yolda da

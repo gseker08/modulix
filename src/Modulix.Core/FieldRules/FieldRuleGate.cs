@@ -6,6 +6,7 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
 using Modulix.Core.Records;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Core.FieldRules;
 
@@ -72,12 +73,12 @@ public sealed class FieldRuleGate(ModuleCatalog modules, IServiceProvider servic
             var name = fields.Find(state.Field)?.Name ?? state.Field;
             if (state.Required && facts.Get(state.Field, AutomationValueSource.New).State == AutomationFactState.Null)
             {
-                errors.Add(new RecordFieldError(name, "Bu alan, kayıt bu durumdayken zorunludur."));
+                errors.Add(new RecordFieldError(name, ServerMessages.FieldRule.RequiredInState));
             }
 
             errors.AddRange(state.Errors.Select(m => new RecordFieldError(name, m)));
             errors.AddRange(state.Blocks.Select(m => new RecordFieldError(name, m)));
-            errors.AddRange(state.Approvals.Select(m => new RecordFieldError(name, "Onay gerekir (onay akışı henüz yok): " + m)));
+            errors.AddRange(state.Approvals.Select(m => new RecordFieldError(name, ServerMessages.FieldRule.ApprovalNeeded(m))));
         }
 
         if (before is not null)
@@ -106,7 +107,7 @@ public sealed class FieldRuleGate(ModuleCatalog modules, IServiceProvider servic
             var name = fields.Find(state.Field)?.Name ?? state.Field;
             if (Changed(before, after, name))
             {
-                errors.Add(new RecordFieldError(name, "Bu alan şu an salt okunur; değiştirilemez."));
+                errors.Add(new RecordFieldError(name, ServerMessages.FieldRule.ReadOnlyNow));
             }
         }
 
