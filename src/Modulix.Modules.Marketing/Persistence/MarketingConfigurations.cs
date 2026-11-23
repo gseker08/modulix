@@ -220,6 +220,26 @@ internal sealed class CampaignTestSendConfiguration : IEntityTypeConfiguration<C
     }
 }
 
+internal sealed class JourneyMessageConfiguration : IEntityTypeConfiguration<JourneyMessage>
+{
+    public void Configure(EntityTypeBuilder<JourneyMessage> builder)
+    {
+        builder.ToTable("JourneyMessages", MarketingTables.Schema);
+        builder.HasKey(m => m.Id);
+        builder.Property(m => m.Id).ValueGeneratedNever();
+        builder.Property(m => m.TenantId).IsRequired();
+        builder.Property(m => m.StepKey).HasMaxLength(JourneyMessage.StepKeyMaxLength).IsRequired();
+        builder.Property(m => m.Channel).HasMaxLength(JourneyMessage.ChannelMaxLength).IsRequired();
+        builder.Property(m => m.Outcome).HasMaxLength(JourneyMessage.OutcomeMaxLength).IsRequired();
+        builder.Property(m => m.Code).HasMaxLength(JourneyMessage.CodeMaxLength);
+        builder.Property(m => m.ProviderMessageId).HasMaxLength(JourneyMessage.ProviderMessageIdMaxLength);
+
+        // Kayıt + adım başına tek ileti: aynı adımın yeniden çağrılması ikinci gönderim yaratmaz.
+        builder.HasIndex(m => new { m.TenantId, m.EnrollmentId, m.StepKey }).IsUnique().HasDatabaseName("UX_JourneyMessages_Step");
+        builder.HasIndex(m => new { m.TenantId, m.JourneyId, m.CreatedAt }).HasDatabaseName("IX_JourneyMessages_Journey");
+    }
+}
+
 internal sealed class JourneyConfiguration : IEntityTypeConfiguration<Journey>
 {
     public void Configure(EntityTypeBuilder<Journey> builder)

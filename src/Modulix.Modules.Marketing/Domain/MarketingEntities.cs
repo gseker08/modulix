@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Tenancy;
 
 namespace Modulix.Modules.Marketing.Domain;
@@ -238,6 +239,54 @@ public sealed class Journey : MarketingEntity, IOwnedEntity
     public Guid? CreatedBy { get; internal set; }
 
     public Guid? UpdatedBy { get; internal set; }
+}
+
+/// <summary>Yolculuk iletisi sonuçları (<see cref="JourneyMessage.Outcome"/>).</summary>
+public static class JourneyMessageOutcomes
+{
+    /// <summary>Gönderim hakkı alındı, sonuç yazılmadı (çökme durumunda kalır; kör yeniden deneme yoktur).</summary>
+    public const string Processing = "Processing";
+    public const string Accepted = "Accepted";
+    public const string Skipped = "Skipped";
+    public const string Failed = "Failed";
+    public const string Unknown = "Unknown";
+}
+
+/// <summary>
+/// Yolculuk iletisi günlüğü (ADR-0056 dilim 2a): bir yolculuk kaydının bir adımında gönderilen (ya da izin, sıklık, adres gibi nedenlerle gönderilmeyen) ileti.
+/// Kayıt + adım başına tek satır vardır (benzersiz indeks): aynı adım yeniden çağrılsa ileti ikinci kez gitmez. Adres saklanmaz; yalnızca sonuç ve neden kodu tutulur.
+/// </summary>
+public sealed class JourneyMessage : IJournalEntity, ICompanyShared
+{
+    public const int StepKeyMaxLength = 80;
+    public const int ChannelMaxLength = 20;
+    public const int OutcomeMaxLength = 20;
+    public const int CodeMaxLength = 60;
+    public const int ProviderMessageIdMaxLength = 200;
+
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+
+    public Guid TenantId { get; private set; }
+
+    public Guid JourneyId { get; set; }
+
+    public Guid EnrollmentId { get; set; }
+
+    public string StepKey { get; set; } = string.Empty;
+
+    public Guid ContentId { get; set; }
+
+    public string Channel { get; set; } = string.Empty;
+
+    public string Outcome { get; set; } = JourneyMessageOutcomes.Processing;
+
+    public string? Code { get; set; }
+
+    public string? ProviderMessageId { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 /// <summary>Bir hedefin yolculuktaki kaydı (ADR-0056). Aynı hedef aynı yolculukta aynı anda bir kez etkin olabilir (filtreli benzersiz indeks).</summary>

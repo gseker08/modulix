@@ -12745,6 +12745,64 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.ToTable("JourneyEnrollments", "marketing");
                 });
 
+            modelBuilder.Entity("Modulix.Modules.Marketing.Domain.JourneyMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<Guid>("ContentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("EnrollmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("JourneyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("StepKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "EnrollmentId", "StepKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_JourneyMessages_Step");
+
+                    b.HasIndex("TenantId", "JourneyId", "CreatedAt")
+                        .HasDatabaseName("IX_JourneyMessages_Journey");
+
+                    b.ToTable("JourneyMessages", "marketing");
+                });
+
             modelBuilder.Entity("Modulix.Modules.Marketing.Domain.Segment", b =>
                 {
                     b.Property<Guid>("Id")
