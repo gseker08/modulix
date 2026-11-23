@@ -1,4 +1,5 @@
 using Modulix.Core.Contracts.Modules;
+using Modulix.Modules.Crm.Domain;
 
 namespace Modulix.Modules.Crm;
 
@@ -155,6 +156,9 @@ public static class CrmLookupDefinitions
             SecondaryFields = ["code"],
             SearchDescription = "Ürün kodu ve adı",
             ViewPath = "crm/urunler",
+            // Pasif ya da taslak ürün teklif kalemine eklenemez (QuoteLineRecordStore); seçici yalnızca satılabilir (Aktif) ürünleri getirir.
+            FixedFilterName = "status",
+            FixedFilterValue = CatalogRules.StatusActive,
         },
     ];
 }
