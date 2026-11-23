@@ -41,25 +41,13 @@
     else
     {
         <FormSection Title="@Texts.Get("admin.sectorSetup.step1.title")" Marker="1" Class="section-card-step" Description="@Texts.Get("admin.sectorSetup.step1.description")">
-            <div class="check-list">
-                @foreach (var profile in profiles.Profiles)
-                {
-                    <button type="button" class="chip chip-soft @(profile.Key == selectedProfile ? "active" : null)" aria-pressed="@(profile.Key == selectedProfile ? "true" : "false")"
-                            disabled="@busy" @onclick="() => SelectProfileAsync(profile.Key)">
-                        @if (profile.Icon is { } profileIcon)
-                        {
-                            <AppIcon Name="@profileIcon" Size="16" />
-                        }
-                        @profile.Name
-                        @if (profile.Key == selectedProfile)
-                        {
-                            <AppIcon Name="check" Size="14" />
-                        }
-                    </button>
-                }
-            </div>
+            @* Sektör tek seçimli atama penceresinde seçilir (PickField Single); seçilen sektör etiket olarak durur. *@
+            <label class="visually-hidden" for="sector-profile">@Texts.Get("admin.sectorSetup.step1.title")</label>
+            <PickField TKey="string" Id="sector-profile" Single="true" Title="@Texts.Get("admin.sectorSetup.step1.title")" Icon="briefcase" Disabled="busy"
+                       Items="@([.. profiles.Profiles.Select(p => new PickItem<string>(p.Key, p.Name))])"
+                       Selected="@(selectedProfile is null ? [] : new[] { selectedProfile })" SelectedChanged="SelectProfileAsync" />
 
-            @* Seçim firmanın uygulanmış profilinden farklıysa hangisinin yürürlükte olduğu söylenir; aynıysa seçili çip yeterlidir. *@
+            @* Seçim firmanın uygulanmış profilinden farklıysa hangisinin yürürlükte olduğu söylenir; aynıysa seçili etiket yeterlidir. *@
             @if (selectedProfile != profiles.Current)
             {
                 <p class="form-text">
@@ -332,8 +320,14 @@
         }
     }
 
-    private async Task SelectProfileAsync(string key)
+    private async Task SelectProfileAsync(IReadOnlyList<string> keys)
     {
+        // Sektör seçimi boşaltılamaz: pencere seçimsiz uygulanırsa ya da aynı sektör seçilirse bir şey değişmez.
+        if (keys.FirstOrDefault() is not { } key || key == selectedProfile)
+        {
+            return;
+        }
+
         selectedProfile = key;
         previewing = false;
         plan = null;

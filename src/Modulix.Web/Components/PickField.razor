@@ -2,6 +2,7 @@
    seçim atama penceresinde (PickDialog) yapılır; forma işaret kutulu liste yazılmaz. "Uygula" seçimi SelectedChanged ile forma verir,
    kayıt formla birlikte yapılır. Pencere formun içinde açıldığı için içindeki girdi olayları (arama, işaret kutuları) forma taşınmaz;
    seçim gerçekten değişince alan kendi "input" olayını yayar, böylece formun "değişti" izlemesi (oninput) çalışır. Listede olmayan seçili anahtar (ör. pasife alınmış seçenek) etiket olarak kalır ki kaldırılabilsin. *@
+@* Single: tek seçimli alan. Seçilen değer kaldırılamayan etiket olarak durur; pencerede satırlar seçenek düğmesidir. *@
 @typeparam TKey where TKey : notnull
 @inject IJSRuntime Js
 
@@ -11,14 +12,21 @@
         <div class="assigned-tags">
             @foreach (var chip in Chips)
             {
-                <button type="button" class="badge tag pick-chip" title="@chip.Title" disabled="@(Disabled || chip.Locked)"
-                        aria-label="@Texts.Get("pick.remove", chip.Name)" @onclick="() => RemoveAsync(chip.Key)">
-                    @chip.Name
-                    @if (!Disabled && !chip.Locked)
-                    {
-                        <AppIcon Name="x" Size="12" />
-                    }
-                </button>
+                @if (Single)
+                {
+                    <span class="badge tag" title="@chip.Title">@chip.Name</span>
+                }
+                else
+                {
+                    <button type="button" class="badge tag pick-chip" title="@chip.Title" disabled="@(Disabled || chip.Locked)"
+                            aria-label="@Texts.Get("pick.remove", chip.Name)" @onclick="() => RemoveAsync(chip.Key)">
+                        @chip.Name
+                        @if (!Disabled && !chip.Locked)
+                        {
+                            <AppIcon Name="x" Size="12" />
+                        }
+                    </button>
+                }
             }
         </div>
     }
@@ -28,7 +36,7 @@
 
     <div @oninput:stopPropagation="true">
     <PickDialog TKey="TKey" Open="picking" Title="@Title" SearchPlaceholder="@(SearchPlaceholder ?? Texts.Get("common.search"))"
-                GroupLabel="@GroupLabel" Icon="@Icon" Items="Items" Selected="Selected" SaveLabel="@Texts.Get("pick.apply")"
+                GroupLabel="@GroupLabel" Icon="@Icon" Items="Items" Selected="Selected" Single="Single" SaveLabel="@Texts.Get("pick.apply")"
                 OnSave="ApplyAsync" OnClose="() => picking = false" />
     </div>
 </div>
@@ -67,6 +75,9 @@
     [Parameter] public Func<TKey, string?>? ChipTitle { get; set; }
 
     [Parameter] public bool Disabled { get; set; }
+
+    /// <summary>Tek seçimli alan: <see cref="SelectedChanged"/> sıfır ya da bir anahtar verir.</summary>
+    [Parameter] public bool Single { get; set; }
 
     private IReadOnlyList<Chip> Chips
     {

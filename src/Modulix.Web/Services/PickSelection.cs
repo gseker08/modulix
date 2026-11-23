@@ -77,6 +77,22 @@ public sealed class PickSelection<TKey>
             .ToList();
     }
 
+    /// <summary>
+    /// Tek seçimli pencere: verilen satır seçilir, diğer bütün seçimler (listede görünmeyenler dahil) kalkar. Kilitli satır seçilemez;
+    /// bağlı satır kuralı tek seçimde uygulanmaz.
+    /// </summary>
+    public void SelectOnly(TKey key)
+    {
+        if (!byKey.TryGetValue(key, out var item) || item.Locked)
+        {
+            return;
+        }
+
+        selected.Clear();
+        hidden.Clear();
+        selected.Add(key);
+    }
+
     private bool Set(TKey key, bool on)
     {
         if (!byKey.TryGetValue(key, out var item) || item.Locked)
