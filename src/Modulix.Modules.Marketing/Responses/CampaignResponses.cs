@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Crm.Contracts.Activities;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Communication;
@@ -51,13 +52,13 @@ internal sealed class CampaignResponses(
     {
         if (!await permissions.HasPermissionAsync(MarketingModule.Permissions.ResponsesWrite, cancellationToken))
         {
-            return Fail<RecordData>(RecordErrorCode.PermissionDenied, $"Bu işlem için '{MarketingModule.Permissions.ResponsesWrite}' izni gerekir.");
+            return Fail<RecordData>(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(MarketingModule.Permissions.ResponsesWrite));
         }
 
         var errors = new List<RecordFieldError>();
         if (!ResponseKinds.All.Contains(request.Kind))
         {
-            errors.Add(new RecordFieldError("kind", "Yanıt türü geçersiz."));
+            errors.Add(new RecordFieldError("kind", MarketingMessages.ResponseService.KindInvalid));
         }
 
         var note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim();
@@ -69,12 +70,12 @@ internal sealed class CampaignResponses(
         var now = time.GetUtcNow();
         if (request.ReceivedAt is { } received && received > now.AddMinutes(5))
         {
-            errors.Add(new RecordFieldError("receivedAt", "Yanıt zamanı gelecekte olamaz."));
+            errors.Add(new RecordFieldError("receivedAt", MarketingMessages.ResponseService.ReceivedFuture));
         }
 
         if (errors.Count > 0)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Yanıt kaydı geçersiz.", errors);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, MarketingMessages.ResponseService.Invalid, errors);
         }
 
         // Teslimat satırı ancak çağıranın görebildiği bir çalıştırma ve kampanya üzerinden okunur: erişemediği satır "bulunamadı" gibi yanıtlanır.
@@ -83,12 +84,12 @@ internal sealed class CampaignResponses(
         var campaign = run is null ? null : await ReadAsync(MarketingModule.Entities.Campaign, Guid.Parse(run.Values["campaignId"]!.GetValue<string>()), cancellationToken);
         if (delivery is null || run is null || campaign is null)
         {
-            return Fail<RecordData>(RecordErrorCode.NotFound, "İleti bulunamadı.");
+            return Fail<RecordData>(RecordErrorCode.NotFound, MarketingMessages.ResponseService.DeliveryNotFound);
         }
 
         if (delivery.Status is not (DeliveryStatuses.Accepted or DeliveryStatuses.Unknown))
         {
-            return Fail<RecordData>(RecordErrorCode.ValidationFailed, "Yanıt yalnızca gönderilmiş bir iletiye kaydedilir.", ("deliveryId", "Bu ileti sağlayıcıya verilmemiş."));
+            return Fail<RecordData>(RecordErrorCode.ValidationFailed, MarketingMessages.ResponseService.OnlySent, ("deliveryId", MarketingMessages.ResponseService.NotHandedOver));
         }
 
         var values = new JsonObject
@@ -112,29 +113,29 @@ internal sealed class CampaignResponses(
     {
         if (!ResponseActions.All.Contains(action))
         {
-            return Fail<RecordData>(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.", ("action", "Geçersiz eylem."));
+            return Fail<RecordData>(RecordErrorCode.ValidationFailed, MarketingMessages.ResponseService.UnknownAction, ("action", MarketingMessages.ResponseService.ActionInvalid));
         }
 
         if (!await permissions.HasPermissionAsync(MarketingModule.Permissions.ResponsesWrite, cancellationToken))
         {
-            return Fail<RecordData>(RecordErrorCode.PermissionDenied, $"Bu işlem için '{MarketingModule.Permissions.ResponsesWrite}' izni gerekir.");
+            return Fail<RecordData>(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(MarketingModule.Permissions.ResponsesWrite));
         }
 
         var text = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         if (ResponseTransitions.NeedsReason(action) && text is null)
         {
-            return Fail<RecordData>(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", ("reason", "Bu işlem için gerekçe zorunludur."));
+            return Fail<RecordData>(RecordErrorCode.ValidationFailed, MarketingMessages.ResponseService.ReasonRequired, ("reason", MarketingMessages.ResponseService.ReasonRequiredDetail));
         }
 
         if (text?.Length > CampaignResponse.ReasonMaxLength)
         {
-            return Fail<RecordData>(RecordErrorCode.ValidationFailed, "Gerekçe çok uzun.", ("reason", $"Gerekçe en fazla {CampaignResponse.ReasonMaxLength} karakter olabilir."));
+            return Fail<RecordData>(RecordErrorCode.ValidationFailed, MarketingMessages.ResponseService.ReasonTooLong, ("reason", MarketingMessages.ResponseService.ReasonMax(CampaignResponse.ReasonMaxLength)));
         }
 
         // Okuma çağıranın izni ve veri kapsamıyla yapılır; görmediği yanıt "bulunamadı"dır.
         if (await ReadAsync(MarketingModule.Entities.CampaignResponse, responseId, cancellationToken) is null)
         {
-            return Fail<RecordData>(RecordErrorCode.NotFound, "Yanıt bulunamadı.");
+            return Fail<RecordData>(RecordErrorCode.NotFound, MarketingMessages.ResponseService.NotFound);
         }
 
         return await pipeline.RunAtomicAsync(async ct =>
@@ -176,7 +177,7 @@ internal sealed class CampaignResponses(
                 {
                     if (response.LeadId is not null)
                     {
-                        return Fail<RecordData>(RecordErrorCode.Conflict, "Bu yanıt zaten bir müşteri adayına bağlı.");
+                        return Fail<RecordData>(RecordErrorCode.Conflict, MarketingMessages.ResponseService.AlreadyLead);
                     }
 
                     var lead = await ConvertAsync(response, ct);
@@ -193,7 +194,7 @@ internal sealed class CampaignResponses(
                 {
                     if (response.ActivityId is not null)
                     {
-                        return Fail<RecordData>(RecordErrorCode.Conflict, "Bu yanıt için zaten bir aktivite açıldı.");
+                        return Fail<RecordData>(RecordErrorCode.Conflict, MarketingMessages.ResponseService.ActivityExists);
                     }
 
                     var activity = await ActivityAsync(response, ct);
@@ -241,13 +242,13 @@ internal sealed class CampaignResponses(
         if (campaign.Target == SegmentTarget.Lead)
         {
             return await ReadAsync(MarketingModule.ExternalEntities.Lead, delivery.TargetId, cancellationToken) is null
-                ? (null, Fail<RecordData>(RecordErrorCode.NotFound, "Müşteri adayı bulunamadı ya da görme yetkiniz yok."))
+                ? (null, Fail<RecordData>(RecordErrorCode.NotFound, MarketingMessages.ResponseService.LeadNotFound))
                 : (delivery.TargetId, null);
         }
 
         if (leads.FirstOrDefault() is not { } creator)
         {
-            return (null, Fail<RecordData>(RecordErrorCode.Conflict, "Müşteri adayı kullanılamıyor: bu firmada müşteri adayı modülü kurulu değil."));
+            return (null, Fail<RecordData>(RecordErrorCode.Conflict, MarketingMessages.ResponseService.LeadModuleMissing));
         }
 
         var contact = await ContactAsync(campaign, delivery, cancellationToken);
@@ -276,7 +277,7 @@ internal sealed class CampaignResponses(
 
         return (null, Fail<RecordData>(
             result.Forbidden ? RecordErrorCode.PermissionDenied : RecordErrorCode.Conflict,
-            result.Unavailable ? "Müşteri adayı kullanılamıyor: bu firmada müşteri adayı modülü kapalı." : result.Error ?? "Müşteri adayı açılamadı."));
+            result.Unavailable ? MarketingMessages.ResponseService.LeadModuleClosed : result.Error is { } leadError ? (ServerMessage)leadError : MarketingMessages.ResponseService.LeadOpenFailed));
     }
 
     private async Task<(Guid? ActivityId, RecordResult<RecordData>? Failure)> ActivityAsync(ResponseState response, CancellationToken cancellationToken)
@@ -298,7 +299,7 @@ internal sealed class CampaignResponses(
             linkId), cancellationToken);
         return result.IsCreated
             ? (result.ActivityId, null)
-            : (null, Fail<RecordData>(RecordErrorCode.Conflict, result.Unavailable ? "Aktivite kullanılamıyor: bu firmada aktivite modülü kapalı." : result.Error ?? "Aktivite açılamadı."));
+            : (null, Fail<RecordData>(RecordErrorCode.Conflict, result.Unavailable ? MarketingMessages.ResponseService.ActivityModuleClosed : result.Error is { } activityError ? (ServerMessage)activityError : MarketingMessages.ResponseService.ActivityOpenFailed));
     }
 
     private async Task<RecordResult<RecordData>?> OptOutAsync(ResponseState response, CancellationToken cancellationToken)
@@ -313,7 +314,7 @@ internal sealed class CampaignResponses(
         var contact = await ContactAsync(context.Campaign!, context.Delivery!, cancellationToken);
         if (contact.Address is null)
         {
-            return Fail<RecordData>(RecordErrorCode.Conflict, "Adres artık çözülemiyor (iletişim noktası pasif ya da silinmiş); çıkışı iletişim tercihleri ekranından elle kaydedin.");
+            return Fail<RecordData>(RecordErrorCode.Conflict, MarketingMessages.ResponseService.AddressUnresolvable);
         }
 
         await optOuts.RecordAsync(context.Campaign!.Channel, contact.Address, "Kampanya yanıtı: iletişim istemiyorum", cancellationToken);
@@ -332,7 +333,7 @@ internal sealed class CampaignResponses(
         var delivery = await deliveries.FindAsync(response.DeliveryId, cancellationToken);
         if (data is null || delivery is null)
         {
-            return new ResponseContext(null, null, Fail<RecordData>(RecordErrorCode.NotFound, "Kampanya ya da ileti bulunamadı."));
+            return new ResponseContext(null, null, Fail<RecordData>(RecordErrorCode.NotFound, MarketingMessages.ResponseService.CampaignOrDeliveryMissing));
         }
 
         var v = data.Values;
@@ -397,7 +398,7 @@ internal sealed class CampaignResponses(
         _ => "kapalı",
     };
 
-    private static RecordResult<T> Fail<T>(RecordErrorCode code, string message, params (string Field, string Message)[] fields) =>
+    private static RecordResult<T> Fail<T>(RecordErrorCode code, ServerMessage message, params (string Field, ServerMessage Message)[] fields) =>
         RecordResult<T>.Fail(code, message, fields.Length == 0 ? null : [.. fields.Select(f => new RecordFieldError(f.Field, f.Message))]);
 
     private sealed record ResponseState(Guid Id, Guid CampaignId, Guid DeliveryId, string Kind, string Status, string? Note, Guid? OwnerId, Guid? LeadId, Guid? ActivityId)

@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Marketing.Contracts;
 
 namespace Modulix.Modules.Marketing.Segments;
@@ -20,21 +21,28 @@ public sealed record SegmentEvaluationRequest(
     SegmentTarget Target, SegmentCondition? Condition, Guid? SegmentId, bool IncludeMembers, int Page, int PageSize, bool IncludeRows);
 
 /// <summary>Koşul alan/operatör/değer denetiminden geçmedi.</summary>
-public sealed class SegmentConditionException(IReadOnlyList<ConditionError> errors) : Exception("Koşul geçersiz.")
+public sealed class SegmentConditionException(IReadOnlyList<ConditionError> errors) : Exception(MarketingMessages.SegmentService.ConditionInvalid.Text)
 {
     public IReadOnlyList<ConditionError> Errors { get; } = errors;
 }
 
 /// <summary>Sonuç, istenen sınırdan büyük (ör. anlık görüntüye sığmaz).</summary>
-public sealed class SegmentTooLargeException(int count, int limit) : Exception($"Sonuç {count:N0} hedef; en fazla {limit:N0} kabul edilir. Segmenti daraltın.")
+public sealed class SegmentTooLargeException(int count, int limit) : Exception(MarketingMessages.SegmentService.TooLarge(MarketingMessages.N(count), MarketingMessages.N(limit)).Text)
 {
+    /// <summary>Çevrilebilir ileti (HTTP sınırında isteğin diline çevrilir).</summary>
+    public ServerMessage Reason { get; } = MarketingMessages.SegmentService.TooLarge(MarketingMessages.N(count), MarketingMessages.N(limit));
+
     public int Count { get; } = count;
 
     public int Limit { get; } = limit;
 }
 
 /// <summary>Hesaplama süre sınırını aştı.</summary>
-public sealed class SegmentTimeoutException(TimeSpan limit) : Exception($"Hesaplama {limit.TotalSeconds:0} saniyelik sınırı aştı.");
+public sealed class SegmentTimeoutException(TimeSpan limit) : Exception(MarketingMessages.SegmentService.Timeout(limit.TotalSeconds.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Text)
+{
+    /// <summary>Çevrilebilir ileti (HTTP sınırında isteğin diline çevrilir).</summary>
+    public ServerMessage Reason { get; } = MarketingMessages.SegmentService.Timeout(limit.TotalSeconds.ToString("0", System.Globalization.CultureInfo.InvariantCulture));
+}
 
 /// <summary>
 /// Segment motoru (ADR-0025 K3/K4): koşul ağacını alan kaynaklarının kimlik sorgularından kümeler cebriyle kurar, çağıranın alan

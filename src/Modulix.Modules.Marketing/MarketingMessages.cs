@@ -190,4 +190,237 @@ internal static class MarketingMessages
         public static ServerMessage NoDelete =>
             ServerMessage.Of("marketing.server.response.no-delete", "Yanıt kaydı silinmez; kapatın.");
     }
+
+    /// <summary>Segment koşulu doğrulaması.</summary>
+    public static class Condition
+    {
+        public static ServerMessage Empty =>
+            ServerMessage.Of("marketing.server.condition.empty", "Koşul boş olamaz.");
+
+        public static ServerMessage NotJson =>
+            ServerMessage.Of("marketing.server.condition.not-json", "Koşul geçerli bir JSON değil.");
+
+        public static ServerMessage MaxLeaves(int max) =>
+            ServerMessage.Of("marketing.server.condition.max-leaves", "En fazla {0} koşul kullanılabilir.", max);
+
+        public static ServerMessage NotObject =>
+            ServerMessage.Of("marketing.server.condition.not-object", "Koşul bir nesne olmalıdır.");
+
+        public static ServerMessage MaxDepth(int max) =>
+            ServerMessage.Of("marketing.server.condition.max-depth", "İç içe grup derinliği en fazla {0} olabilir.", max);
+
+        public static ServerMessage NodeShape =>
+            ServerMessage.Of("marketing.server.condition.node-shape", "Düğüm ya da grup (op, items) ya da koşul (field, operator, values) olmalıdır.");
+
+        public static ServerMessage GroupOp =>
+            ServerMessage.Of("marketing.server.condition.group-op", "Grup operatörü 'and' ya da 'or' olmalıdır.");
+
+        public static ServerMessage GroupItems =>
+            ServerMessage.Of("marketing.server.condition.group-items", "Grup en az bir koşul içermelidir.");
+
+        public static ServerMessage BadOperator =>
+            ServerMessage.Of("marketing.server.condition.bad-operator", "Geçersiz operatör.");
+
+        public static ServerMessage ValueType =>
+            ServerMessage.Of("marketing.server.condition.value-type", "Değer metin, sayı ya da evet/hayır olmalıdır.");
+
+        public static ServerMessage ValuesList =>
+            ServerMessage.Of("marketing.server.condition.values-list", "Değerler bir liste olmalıdır.");
+
+        public static ServerMessage FieldUnknown =>
+            ServerMessage.Of("marketing.server.condition.field-unknown", "Alan bulunamadı ya da bu segment türünde kullanılamıyor.");
+
+        public static ServerMessage OperatorNotAllowed(string label) =>
+            ServerMessage.Of("marketing.server.condition.operator-not-allowed", "'{0}' alanında bu operatör kullanılamaz.", label);
+
+        public static ServerMessage ValueCountExact(int count) =>
+            ServerMessage.Of("marketing.server.condition.value-count-exact", "Bu operatör {0} değer ister.", count);
+
+        public static ServerMessage ValueCountRange(int min, int max) =>
+            ServerMessage.Of("marketing.server.condition.value-count-range", "Bu operatör {0}-{1} değer ister.", min, max);
+
+        public static ServerMessage RangeOrder =>
+            ServerMessage.Of("marketing.server.condition.range-order", "Başlangıç değeri bitişten büyük olamaz.");
+
+        public static ServerMessage ValueLength(int max) =>
+            ServerMessage.Of("marketing.server.condition.value-length", "Değer 1-{0} karakter olmalıdır.", max);
+
+        public static ServerMessage WindowDays(int max) =>
+            ServerMessage.Of("marketing.server.condition.window-days", "Pencere 1-{0} arası gün sayısı olmalıdır.", max);
+
+        public static ServerMessage BoolValue =>
+            ServerMessage.Of("marketing.server.condition.bool-value", "true ya da false olmalıdır.");
+
+        public static ServerMessage IdValue =>
+            ServerMessage.Of("marketing.server.condition.id-value", "Geçerli bir kimlik olmalıdır.");
+
+        public static ServerMessage DaysRange(int max) =>
+            ServerMessage.Of("marketing.server.condition.days-range", "Gün sayısı 1-{0} arası olmalıdır.", max);
+
+        public static ServerMessage UnsupportedType =>
+            ServerMessage.Of("marketing.server.condition.unsupported-type", "Desteklenmeyen alan tipi.");
+
+        public static ServerMessage Required =>
+            ServerMessage.Of("marketing.server.condition.required", "Koşul ya da segment gerekli.");
+
+        public static ServerMessage ConditionRequired =>
+            ServerMessage.Of("marketing.server.condition.condition-required", "Koşul gerekli.");
+
+        public static ServerMessage DraftRequired =>
+            ServerMessage.Of("marketing.server.condition.draft-required", "Yayımlamak için taslak koşul yazılmalıdır.");
+    }
+
+    /// <summary>Segment servisi.</summary>
+    public static class SegmentService
+    {
+        public static ServerMessage InvalidTarget =>
+            ServerMessage.Of("marketing.server.segment-service.invalid-target", "Geçersiz hedef türü.");
+
+        public static ServerMessage ArchivedPublish =>
+            ServerMessage.Of("marketing.server.segment-service.archived-publish", "Arşivlenen segment yayımlanamaz; önce geri alın.");
+
+        public static ServerMessage NoDraftChange =>
+            ServerMessage.Of("marketing.server.segment-service.no-draft-change", "Taslakta yayımlanmamış değişiklik yok.");
+
+        public static ServerMessage OnlyActiveRefresh =>
+            ServerMessage.Of("marketing.server.segment-service.only-active-refresh", "Yalnızca etkin segment yenilenir.");
+
+        public static ServerMessage NotActive =>
+            ServerMessage.Of("marketing.server.segment-service.not-active", "Segment etkin değil; yalnızca yayımlanmış (etkin) segment hedef kitlede kullanılır.");
+
+        public static ServerMessage TargetMismatch =>
+            ServerMessage.Of("marketing.server.segment-service.target-mismatch", "Segmentin hedef türü kampanyanınkiyle aynı değil.");
+
+        public static ServerMessage AlreadyArchived =>
+            ServerMessage.Of("marketing.server.segment-service.already-archived", "Segment zaten arşivde.");
+
+        public static ServerMessage OnlyArchivedRestore =>
+            ServerMessage.Of("marketing.server.segment-service.only-archived-restore", "Yalnızca arşivlenen segment geri alınır.");
+
+        public static ServerMessage ConditionInvalid =>
+            ServerMessage.Of("marketing.server.segment-service.condition-invalid", "Koşul geçersiz.");
+
+        public static ServerMessage PublishedUnreadable =>
+            ServerMessage.Of("marketing.server.segment-service.published-unreadable", "Yayımlanmış koşul okunamadı.");
+
+        public static ServerMessage TooLarge(string count, string limit) =>
+            ServerMessage.Of("marketing.server.segment-service.too-large", "Sonuç {0} hedef; en fazla {1} kabul edilir. Segmenti daraltın.", count, limit);
+
+        public static ServerMessage Timeout(string seconds) =>
+            ServerMessage.Of("marketing.server.segment-service.timeout", "Hesaplama {0} saniyelik sınırı aştı.", seconds);
+    }
+
+    /// <summary>Kampanya hedef kitle servisi.</summary>
+    public static class AudienceService
+    {
+        public static ServerMessage ArchivedFreeze =>
+            ServerMessage.Of("marketing.server.audience-service.archived-freeze", "Arşivlenen kampanyanın hedef kitlesi dondurulamaz.");
+
+        public static ServerMessage TooManyRows(string rows, string max) =>
+            ServerMessage.Of("marketing.server.audience-service.too-many-rows", "Hedef kitle {0} satır; en fazla {1} dondurulabilir. Segmenti daraltın.", rows, max);
+
+        public static ServerMessage AlreadyArchived =>
+            ServerMessage.Of("marketing.server.audience-service.already-archived", "Kampanya zaten arşivde.");
+
+        public static ServerMessage OnlyArchivedRestore =>
+            ServerMessage.Of("marketing.server.audience-service.only-archived-restore", "Yalnızca arşivlenen kampanya geri alınır.");
+
+        public static ServerMessage Empty =>
+            ServerMessage.Of("marketing.server.audience-service.empty", "Hedef kitle boş.");
+
+        public static ServerMessage EmptyDetail =>
+            ServerMessage.Of("marketing.server.audience-service.empty-detail", "Hedef kitleye en az bir dahil edilen segment ya da hedef ekleyin.");
+
+        public static ServerMessage TooManyTargets(string count, string max) =>
+            ServerMessage.Of("marketing.server.audience-service.too-many-targets", "Hedef kitle {0} hedef; en fazla {1} kabul edilir. Segmenti daraltın.", count, max);
+
+        public static ServerMessage NoResolver =>
+            ServerMessage.Of("marketing.server.audience-service.no-resolver", "Alıcıları çözecek bir modül yok (ör. CRM bu firma için kapalı).");
+
+        public static ServerMessage ResolverPermission =>
+            ServerMessage.Of("marketing.server.audience-service.resolver-permission", "Alıcıları çözmek için kişi kayıtlarını okuma yetkisi gerekir.");
+    }
+
+    /// <summary>Kampanya yanıtı servisi.</summary>
+    public static class ResponseService
+    {
+        public static ServerMessage KindInvalid =>
+            ServerMessage.Of("marketing.server.response-service.kind-invalid", "Yanıt türü geçersiz.");
+
+        public static ServerMessage ReceivedFuture =>
+            ServerMessage.Of("marketing.server.response-service.received-future", "Yanıt zamanı gelecekte olamaz.");
+
+        public static ServerMessage Invalid =>
+            ServerMessage.Of("marketing.server.response-service.invalid", "Yanıt kaydı geçersiz.");
+
+        public static ServerMessage DeliveryNotFound =>
+            ServerMessage.Of("marketing.server.response-service.delivery-not-found", "İleti bulunamadı.");
+
+        public static ServerMessage OnlySent =>
+            ServerMessage.Of("marketing.server.response-service.only-sent", "Yanıt yalnızca gönderilmiş bir iletiye kaydedilir.");
+
+        public static ServerMessage NotHandedOver =>
+            ServerMessage.Of("marketing.server.response-service.not-handed-over", "Bu ileti sağlayıcıya verilmemiş.");
+
+        public static ServerMessage UnknownAction =>
+            ServerMessage.Of("marketing.server.response-service.unknown-action", "Bilinmeyen eylem.");
+
+        public static ServerMessage ActionInvalid =>
+            ServerMessage.Of("marketing.server.response-service.action-invalid", "Geçersiz eylem.");
+
+        public static ServerMessage ReasonRequired =>
+            ServerMessage.Of("marketing.server.response-service.reason-required", "Gerekçe zorunludur.");
+
+        public static ServerMessage ReasonRequiredDetail =>
+            ServerMessage.Of("marketing.server.response-service.reason-required-detail", "Bu işlem için gerekçe zorunludur.");
+
+        public static ServerMessage ReasonTooLong =>
+            ServerMessage.Of("marketing.server.response-service.reason-too-long", "Gerekçe çok uzun.");
+
+        public static ServerMessage ReasonMax(int max) =>
+            ServerMessage.Of("marketing.server.response-service.reason-max", "Gerekçe en fazla {0} karakter olabilir.", max);
+
+        public static ServerMessage NotFound =>
+            ServerMessage.Of("marketing.server.response-service.not-found", "Yanıt bulunamadı.");
+
+        public static ServerMessage AlreadyLead =>
+            ServerMessage.Of("marketing.server.response-service.already-lead", "Bu yanıt zaten bir müşteri adayına bağlı.");
+
+        public static ServerMessage ActivityExists =>
+            ServerMessage.Of("marketing.server.response-service.activity-exists", "Bu yanıt için zaten bir aktivite açıldı.");
+
+        public static ServerMessage LeadNotFound =>
+            ServerMessage.Of("marketing.server.response-service.lead-not-found", "Müşteri adayı bulunamadı ya da görme yetkiniz yok.");
+
+        public static ServerMessage LeadModuleMissing =>
+            ServerMessage.Of("marketing.server.response-service.lead-module-missing", "Müşteri adayı kullanılamıyor: bu firmada müşteri adayı modülü kurulu değil.");
+
+        public static ServerMessage LeadModuleClosed =>
+            ServerMessage.Of("marketing.server.response-service.lead-module-closed", "Müşteri adayı kullanılamıyor: bu firmada müşteri adayı modülü kapalı.");
+
+        public static ServerMessage LeadOpenFailed =>
+            ServerMessage.Of("marketing.server.response-service.lead-open-failed", "Müşteri adayı açılamadı.");
+
+        public static ServerMessage ActivityModuleClosed =>
+            ServerMessage.Of("marketing.server.response-service.activity-module-closed", "Aktivite kullanılamıyor: bu firmada aktivite modülü kapalı.");
+
+        public static ServerMessage ActivityOpenFailed =>
+            ServerMessage.Of("marketing.server.response-service.activity-open-failed", "Aktivite açılamadı.");
+
+        public static ServerMessage AddressUnresolvable =>
+            ServerMessage.Of("marketing.server.response-service.address-unresolvable", "Adres artık çözülemiyor (iletişim noktası pasif ya da silinmiş); çıkışı iletişim tercihleri ekranından elle kaydedin.");
+
+        public static ServerMessage CampaignOrDeliveryMissing =>
+            ServerMessage.Of("marketing.server.response-service.campaign-or-delivery-missing", "Kampanya ya da ileti bulunamadı.");
+    }
+
+    /// <summary>Kampanya raporları.</summary>
+    public static class Report
+    {
+        public static ServerMessage PermissionsBoth(string first, string second) =>
+            ServerMessage.Of("marketing.server.report.permissions-both", "Bu işlem için '{0}' ve '{1}' izinleri gerekir.", first, second);
+    }
+
+    /// <summary>Sayı iletisi bağımsız değişkeni: binlik ayraçlı, kültürden bağımsız.</summary>
+    public static string N(int value) => value.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
 }

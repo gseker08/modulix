@@ -77,10 +77,10 @@ public class SegmentConditionsTests
             deep = $$"""{"op":"and","items":[{{deep}}]}""";
         }
 
-        Assert.Contains(SegmentConditions.Parse(deep).Errors, e => e.Message.Contains("derinliği", StringComparison.Ordinal));
+        Assert.Contains(SegmentConditions.Parse(deep).Errors, e => e.Message.Text.Contains("derinliği", StringComparison.Ordinal));
 
         var wide = $$"""{"op":"or","items":[{{string.Join(',', Enumerable.Repeat(leaf, SegmentConditions.MaxLeaves + 1))}}]}""";
-        Assert.Contains(SegmentConditions.Parse(wide).Errors, e => e.Message.Contains("En fazla", StringComparison.Ordinal));
+        Assert.Contains(SegmentConditions.Parse(wide).Errors, e => e.Message.Text.Contains("En fazla", StringComparison.Ordinal));
 
         var limit = $$"""{"op":"or","items":[{{string.Join(',', Enumerable.Repeat(leaf, SegmentConditions.MaxLeaves))}}]}""";
         Assert.Empty(SegmentConditions.Parse(limit).Errors);
@@ -130,7 +130,7 @@ public class SegmentConditionsTests
     public void Choice_values_must_be_in_the_option_list()
     {
         Assert.Empty(Check(Leaf("t.status", "eq", "Customer")));
-        Assert.Contains(Check(Leaf("t.status", "eq", "Bilinmeyen")), e => e.Message.Contains("Listede olmayan", StringComparison.Ordinal));
+        Assert.Contains(Check(Leaf("t.status", "eq", "Bilinmeyen")), e => e.Message.Text.Contains("Listede olmayan", StringComparison.Ordinal));
     }
 
     [Fact]

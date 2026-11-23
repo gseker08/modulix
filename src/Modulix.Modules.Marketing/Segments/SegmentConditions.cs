@@ -1,12 +1,13 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Marketing.Contracts;
 
 namespace Modulix.Modules.Marketing.Segments;
 
 /// <summary>Koşul ağacındaki hata: <see cref="Path"/> örn. "items[1].values[0]".</summary>
-public sealed record ConditionError(string Path, string Message);
+public sealed record ConditionError(string Path, ServerMessage Message);
 
 /// <summary>
 /// Segment koşul ağacı (ADR-0025 K4): ya bir grup (<c>op</c> = and/or, <c>items</c>) ya da bir koşul (<c>field</c>, <c>operator</c>,
@@ -44,7 +45,7 @@ public static class SegmentConditions
     {
         if (string.IsNullOrWhiteSpace(json))
         {
-            return (null, [new ConditionError("", "Koşul boş olamaz.")]);
+            return (null, [new ConditionError("", MarketingMessages.Condition.Empty)]);
         }
 
         JsonNode? root;
@@ -54,7 +55,7 @@ public static class SegmentConditions
         }
         catch (JsonException)
         {
-            return (null, [new ConditionError("", "Koşul geçerli bir JSON değil.")]);
+            return (null, [new ConditionError("", MarketingMessages.Condition.NotJson)]);
         }
 
         var errors = new List<ConditionError>();
@@ -62,7 +63,7 @@ public static class SegmentConditions
         var condition = ParseNode(root, "", 1, errors, ref leaves);
         if (leaves > MaxLeaves)
         {
-            errors.Add(new ConditionError("", $"En fazla {MaxLeaves} koşul kullanılabilir."));
+            errors.Add(new ConditionError("", MarketingMessages.Condition.MaxLeaves(MaxLeaves)));
         }
 
         return errors.Count == 0 ? (condition, []) : (null, errors);
@@ -109,13 +110,13 @@ public static class SegmentConditions
     {
         if (node is not JsonObject obj)
         {
-            errors.Add(new ConditionError(path, "Koşul bir nesne olmalıdır."));
+            errors.Add(new ConditionError(path, MarketingMessages.Condition.NotObject));
             return null;
         }
 
         if (depth > MaxDepth)
         {
-            errors.Add(new ConditionError(path, $"İç içe grup derinliği en fazla {MaxDepth} olabilir."));
+            errors.Add(new ConditionError(path, MarketingMessages.Condition.MaxDepth(MaxDepth)));
             return null;
         }
 
@@ -123,7 +124,7 @@ public static class SegmentConditions
         var isLeaf = obj.ContainsKey("field") || obj.ContainsKey("operator") || obj.ContainsKey("values");
         if (isGroup == isLeaf)
         {
-            errors.Add(new ConditionError(path, "Düğüm ya da grup (op, items) ya da koşul (field, operator, values) olmalıdır."));
+            errors.Add(new ConditionError(path, MarketingMessages.Condition.NodeShape));
             return null;
         }
 
@@ -141,12 +142,12 @@ public static class SegmentConditions
         var op = obj["op"] is JsonValue v && v.TryGetValue<string>(out var text) ? text.Trim().ToLowerInvariant() : null;
         if (op is not (SegmentCondition.And or SegmentCondition.Or))
         {
-            errors.Add(new ConditionError(Join(path, "op"), "Grup operatörü 'and' ya da 'or' olmalıdır."));
+            errors.Add(new ConditionError(Join(path, "op"), MarketingMessages.Condition.GroupOp));
         }
 
         if (obj["items"] is not JsonArray array || array.Count == 0)
         {
-            errors.Add(new ConditionError(Join(path, "items"), "Grup en az bir koşul içermelidir."));
+            errors.Add(new ConditionError(Join(path, "items"), MarketingMessages.Condition.GroupItems));
             return null;
         }
 
@@ -179,7 +180,7 @@ public static class SegmentConditions
         }
         else
         {
-            errors.Add(new ConditionError(Join(path, "operator"), "Geçersiz operatör."));
+            errors.Add(new ConditionError(Join(path, "operator"), MarketingMessages.Condition.BadOperator));
         }
 
         var values = new List<string>();
@@ -201,13 +202,13 @@ public static class SegmentConditions
                 }
                 else
                 {
-                    errors.Add(new ConditionError($"{Join(path, "values")}[{i}]", "Değer metin, sayı ya da evet/hayır olmalıdır."));
+                    errors.Add(new ConditionError($"{Join(path, "values")}[{i}]", MarketingMessages.Condition.ValueType));
                 }
             }
         }
         else if (obj.ContainsKey("values") && obj["values"] is not null)
         {
-            errors.Add(new ConditionError(Join(path, "values"), "Değerler bir liste olmalıdır."));
+            errors.Add(new ConditionError(Join(path, "values"), MarketingMessages.Condition.ValuesList));
         }
 
         return string.IsNullOrEmpty(field) || op is null
@@ -231,20 +232,20 @@ public static class SegmentConditions
         var leaf = node.Leaf!;
         if (!available.TryGetValue(leaf.Field, out var field) || field.Target != target)
         {
-            errors.Add(new ConditionError(Join(path, "field"), "Alan bulunamadı ya da bu segment türünde kullanılamıyor."));
+            errors.Add(new ConditionError(Join(path, "field"), MarketingMessages.Condition.FieldUnknown));
             return;
         }
 
         if (!SegmentOperators.For(field.Type).Contains(leaf.Operator))
         {
-            errors.Add(new ConditionError(Join(path, "operator"), $"'{field.Label}' alanında bu operatör kullanılamaz."));
+            errors.Add(new ConditionError(Join(path, "operator"), MarketingMessages.Condition.OperatorNotAllowed(field.Label)));
             return;
         }
 
         var (min, max) = SegmentOperators.ValueCount(leaf.Operator);
         if (leaf.Values.Count < min || leaf.Values.Count > max)
         {
-            errors.Add(new ConditionError(Join(path, "values"), min == max ? $"Bu operatör {min} değer ister." : $"Bu operatör {min}-{max} değer ister."));
+            errors.Add(new ConditionError(Join(path, "values"), min == max ? MarketingMessages.Condition.ValueCountExact(min) : MarketingMessages.Condition.ValueCountRange(min, max)));
             return;
         }
 
@@ -260,32 +261,32 @@ public static class SegmentConditions
         if (leaf.Operator == SegmentOperator.Between && errors.Count == errorsBefore && field.Type is SegmentFieldType.Date or SegmentFieldType.Number
             && Compare(field.Type, leaf.Values[0], leaf.Values[1]) > 0)
         {
-            errors.Add(new ConditionError(Join(path, "values"), "Başlangıç değeri bitişten büyük olamaz."));
+            errors.Add(new ConditionError(Join(path, "values"), MarketingMessages.Condition.RangeOrder));
         }
     }
 
-    private static string? ValueError(SegmentFieldDefinition field, SegmentOperator op, string value)
+    private static ServerMessage? ValueError(SegmentFieldDefinition field, SegmentOperator op, string value)
     {
         if (value.Length is 0 or > MaxValueLength)
         {
-            return $"Değer 1-{MaxValueLength} karakter olmalıdır.";
+            return MarketingMessages.Condition.ValueLength(MaxValueLength);
         }
 
         if (field.Type == SegmentFieldType.Relation)
         {
-            return IsDays(value) ? null : $"Pencere 1-{MaxDays} arası gün sayısı olmalıdır.";
+            return IsDays(value) ? null : MarketingMessages.Condition.WindowDays(MaxDays);
         }
 
         return field.Type switch
         {
             SegmentFieldType.Text => null,
-            SegmentFieldType.Choice => field.Options.Count == 0 || field.Options.ContainsKey(value) ? null : "Listede olmayan değer.",
-            SegmentFieldType.Number => decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out _) ? null : "Sayı olmalıdır.",
-            SegmentFieldType.Bool => value is "true" or "false" ? null : "true ya da false olmalıdır.",
-            SegmentFieldType.Id => Guid.TryParse(value, out var id) && id != Guid.Empty ? null : "Geçerli bir kimlik olmalıdır.",
-            SegmentFieldType.Date when op is SegmentOperator.LastDays or SegmentOperator.NextDays => IsDays(value) ? null : $"Gün sayısı 1-{MaxDays} arası olmalıdır.",
-            SegmentFieldType.Date => DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _) ? null : "Tarih yyyy-AA-gg biçiminde olmalıdır.",
-            _ => "Desteklenmeyen alan tipi.",
+            SegmentFieldType.Choice => field.Options.Count == 0 || field.Options.ContainsKey(value) ? null : ServerMessages.Validation.NotInList,
+            SegmentFieldType.Number => decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out _) ? null : ServerMessages.Validation.Number,
+            SegmentFieldType.Bool => value is "true" or "false" ? null : MarketingMessages.Condition.BoolValue,
+            SegmentFieldType.Id => Guid.TryParse(value, out var id) && id != Guid.Empty ? null : MarketingMessages.Condition.IdValue,
+            SegmentFieldType.Date when op is SegmentOperator.LastDays or SegmentOperator.NextDays => IsDays(value) ? null : MarketingMessages.Condition.DaysRange(MaxDays),
+            SegmentFieldType.Date => DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _) ? null : ServerMessages.Validation.DateFormat,
+            _ => MarketingMessages.Condition.UnsupportedType,
         };
     }
 

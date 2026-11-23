@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Communication;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Marketing.Contracts;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
@@ -80,13 +81,13 @@ internal sealed class CampaignAudienceService(
         var (campaign, result, sources) = computed.Value!;
         if (campaign.Status == CampaignStatuses.Archived)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Arşivlenen kampanyanın hedef kitlesi dondurulamaz.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, MarketingMessages.AudienceService.ArchivedFreeze);
         }
 
         if (result.Rows.Count > AudienceSnapshot.RecipientsMaxRows)
         {
             return RecordResult<RecordData>.Fail(
-                RecordErrorCode.Conflict, $"Hedef kitle {result.Rows.Count:N0} satır; en fazla {AudienceSnapshot.RecipientsMaxRows:N0} dondurulabilir. Segmenti daraltın.");
+                RecordErrorCode.Conflict, MarketingMessages.AudienceService.TooManyRows(MarketingMessages.N(result.Rows.Count), MarketingMessages.N(AudienceSnapshot.RecipientsMaxRows)));
         }
 
         var summary = result.Summary;
@@ -132,7 +133,7 @@ internal sealed class CampaignAudienceService(
 
         if (!await permissions.HasPermissionAsync(MarketingModule.Permissions.RecipientsRead, cancellationToken))
         {
-            return RecordResult<AudienceRecipientsPage>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{MarketingModule.Permissions.RecipientsRead}' izni gerekir.");
+            return RecordResult<AudienceRecipientsPage>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(MarketingModule.Permissions.RecipientsRead));
         }
 
         var rows = Unpack(await snapshotRecipients.ReadAsync(snapshotId, cancellationToken));
@@ -147,13 +148,13 @@ internal sealed class CampaignAudienceService(
     }
 
     public Task<RecordResult<RecordData>> ArchiveAsync(Guid campaignId, long? expectedVersion, CancellationToken cancellationToken) =>
-        ChangeStatusAsync(campaignId, expectedVersion, CampaignStatuses.Archived, CampaignStatuses.Draft, "Kampanya zaten arşivde.", cancellationToken);
+        ChangeStatusAsync(campaignId, expectedVersion, CampaignStatuses.Archived, CampaignStatuses.Draft, MarketingMessages.AudienceService.AlreadyArchived, cancellationToken);
 
     public Task<RecordResult<RecordData>> RestoreAsync(Guid campaignId, long? expectedVersion, CancellationToken cancellationToken) =>
-        ChangeStatusAsync(campaignId, expectedVersion, CampaignStatuses.Draft, CampaignStatuses.Archived, "Yalnızca arşivlenen kampanya geri alınır.", cancellationToken);
+        ChangeStatusAsync(campaignId, expectedVersion, CampaignStatuses.Draft, CampaignStatuses.Archived, MarketingMessages.AudienceService.OnlyArchivedRestore, cancellationToken);
 
     private async Task<RecordResult<RecordData>> ChangeStatusAsync(
-        Guid campaignId, long? expectedVersion, string target, string requiredCurrent, string conflictMessage, CancellationToken cancellationToken)
+        Guid campaignId, long? expectedVersion, string target, string requiredCurrent, ServerMessage conflictMessage, CancellationToken cancellationToken)
     {
         var loaded = await pipeline.GetAsync(new RecordRef(MarketingModule.Entities.Campaign, campaignId), cancellationToken);
         if (!loaded.IsSuccess)
@@ -222,7 +223,7 @@ internal sealed class CampaignAudienceService(
 
         if (!entries.Any(e => e.Values["mode"]!.GetValue<string>() == AudienceModes.Include))
         {
-            return RecordResult<Computed>.Fail(RecordErrorCode.ValidationFailed, "Hedef kitle boş.", [new RecordFieldError("audience", "Hedef kitleye en az bir dahil edilen segment ya da hedef ekleyin.")]);
+            return RecordResult<Computed>.Fail(RecordErrorCode.ValidationFailed, MarketingMessages.AudienceService.Empty, [new RecordFieldError("audience", MarketingMessages.AudienceService.EmptyDetail)]);
         }
 
         var includes = new HashSet<Guid>();
@@ -262,19 +263,19 @@ internal sealed class CampaignAudienceService(
         includes.ExceptWith(excludes);
         if (includes.Count > MaxTargets)
         {
-            return RecordResult<Computed>.Fail(RecordErrorCode.Conflict, $"Hedef kitle {includes.Count:N0} hedef; en fazla {MaxTargets:N0} kabul edilir. Segmenti daraltın.");
+            return RecordResult<Computed>.Fail(RecordErrorCode.Conflict, MarketingMessages.AudienceService.TooManyTargets(MarketingMessages.N(includes.Count), MarketingMessages.N(MaxTargets)));
         }
 
         var targets = includes.Order().ToList();
         var resolver = resolvers.FirstOrDefault(r => r.Supports(campaign.TargetType));
         if (resolver is null)
         {
-            return RecordResult<Computed>.Fail(RecordErrorCode.Conflict, "Alıcıları çözecek bir modül yok (ör. CRM bu firma için kapalı).");
+            return RecordResult<Computed>.Fail(RecordErrorCode.Conflict, MarketingMessages.AudienceService.NoResolver);
         }
 
         if (!await access.CanAsync(resolver.ReadEntityKey, RecordOperation.Read, cancellationToken))
         {
-            return RecordResult<Computed>.Fail(RecordErrorCode.PermissionDenied, "Alıcıları çözmek için kişi kayıtlarını okuma yetkisi gerekir.");
+            return RecordResult<Computed>.Fail(RecordErrorCode.PermissionDenied, MarketingMessages.AudienceService.ResolverPermission);
         }
 
         var resolution = targets.Count == 0
