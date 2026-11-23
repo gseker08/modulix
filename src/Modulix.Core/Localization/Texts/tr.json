@@ -644,6 +644,8 @@
   "crm.party.needHelp": "Firmanın sizden aldığı ya da almak istediği hizmetler (yalnızca faaliyet seçilir); ilişki rolünden bağımsızdır.",
   "crm.party.noRecord": "— (kayıt açma)",
   "crm.party.note": "Not",
+  "crm.party.chooseRoles": "Rol seç",
+  "crm.party.searchRoles": "Rol ara",
   "crm.party.partialSave": "Bazı ilişki kayıtları kaydedilemedi; hataları düzeltip yeniden kaydedin.",
   "crm.party.sectorHelp": "Firmanın faaliyet gösterdiği sektörler. Serbest metin \"Sektör\" alanı olduğu gibi kalır.",
   "crm.party.status.active": "Aktif",

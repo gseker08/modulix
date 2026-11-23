@@ -1,6 +1,7 @@
 @* Firma ilişkileri (ADR-0029 K9): ilişki rolleri, müşteri sektörü ve hizmet ihtiyacı. Üç alan ortak firma kaydındadır (core.party),
    bu yüzden CRM'e özgü değil genel kayıt uç noktasıyla okunur ve yazılır (izin, kapsam ve denetim kaydı kayıt hattından gelir).
-   Seçenekler katalogdan gelir: roller platform kataloğundan, sektör ve ihtiyaç aktif faaliyet ağacından. Sayfa içi küçük eylem formudur. *@
+   Seçenekler katalogdan gelir: roller platform kataloğundan, sektör ve ihtiyaç aktif faaliyet ağacından. Sayfa içi küçük eylem formudur.
+   Üç liste de formda etiket olarak durur; seçim atama penceresinde (PickDialog, faaliyetlerde ActivityCodePicker) yapılır. *@
 @using System.Text.Json.Nodes
 @inject ApiClient Api
 
@@ -29,14 +30,23 @@
             <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
                 <fieldset>
                     <legend class="form-label">@Texts.Get("crm.link.editor.roles")</legend>
-                    <div class="check-list">
-                        @foreach (var role in RoleChoices)
-                        {
-                            <label class="form-check">
-                                <input class="form-check-input" type="checkbox" checked="@roles.Contains(role.Code)" @onchange="e => Toggle(roles, role.Code, (bool)e.Value!)" />
-                                <span class="form-check-label">@role.Name@(role.IsActive ? null : " (pasif)")</span>
-                            </label>
-                        }
+                    @if (roles.Count > 0)
+                    {
+                        <div class="assigned-tags">
+                            @foreach (var code in roles)
+                            {
+                                var name = RoleLabel(code);
+                                <button type="button" class="badge tag pick-chip" aria-label="@Texts.Get("pick.remove", name)" @onclick="() => roles.Remove(code)">
+                                    @name
+                                    <AppIcon Name="x" Size="12" />
+                                </button>
+                            }
+                        </div>
+                    }
+                    <div>
+                        <button type="button" class="btn btn-tonal" @onclick="() => pickingRoles = true">
+                            <AppIcon Name="plus" Size="16" /> @Texts.Get("crm.party.chooseRoles")
+                        </button>
                     </div>
                     <FieldError Field="relationshipRoles" Errors="errors" />
 
@@ -86,14 +96,14 @@
                 <fieldset class="mt-3">
                     <legend class="form-label">@Texts.Get("crm.companies.filter.sector")</legend>
                     <p class="text-muted">@Texts.Get("crm.party.sectorHelp")</p>
-                    @ActivityList(sectors)
+                    <ActivityCodePicker Id="party-sectors" Title="@Texts.Get("crm.companies.filter.sector")" Selected="[.. sectors]" SelectedChanged="codes => Replace(sectors, codes)" />
                     <FieldError Field="customerSectors" Errors="errors" />
                 </fieldset>
 
                 <fieldset class="mt-3">
                     <legend class="form-label">@Texts.Get("crm.companies.filter.need")</legend>
                     <p class="text-muted">@Texts.Get("crm.party.needHelp")</p>
-                    @ActivityList(needs, activitiesOnly: true)
+                    <ActivityCodePicker Id="party-needs" Title="@Texts.Get("crm.companies.filter.need")" ActivitiesOnly="true" Selected="[.. needs]" SelectedChanged="codes => Replace(needs, codes)" />
                     <FieldError Field="serviceNeeds" Errors="errors" />
                 </fieldset>
 
@@ -102,6 +112,9 @@
                     <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Cancel">@Texts.Get("common.dismiss")</button>
                 </div>
             </form>
+
+            <PickDialog TKey="string" Open="pickingRoles" Title="@Texts.Get("crm.link.editor.roles")" SearchPlaceholder="@Texts.Get("crm.party.searchRoles")"
+                        Icon="users" Items="RoleItems" Selected="roles" SaveLabel="@Texts.Get("pick.apply")" OnSave="ApplyRoles" OnClose="() => pickingRoles = false" />
         }
         else
         {
@@ -144,6 +157,7 @@
     private string? message;
     private bool editing;
     private bool busy;
+    private bool pickingRoles;
     private Guid loadedFor;
 
     private static Dictionary<string, string> StatusLabels => new()
@@ -250,20 +264,21 @@
     private async Task Cancel()
     {
         editing = false;
+        pickingRoles = false;
         errors = null;
         await LoadAsync();
     }
 
-    private static void Toggle(SortedSet<string> set, string code, bool on)
+    private static void Replace(SortedSet<string> set, IEnumerable<string> codes)
     {
-        if (on)
-        {
-            set.Add(code);
-        }
-        else
-        {
-            set.Remove(code);
-        }
+        set.Clear();
+        set.UnionWith(codes);
+    }
+
+    private void ApplyRoles(IReadOnlyList<string> codes)
+    {
+        pickingRoles = false;
+        Replace(roles, codes);
     }
 
     private async Task SaveAsync()
@@ -354,41 +369,15 @@
             .Concat(roles.Where(c => catalogRoles.All(r => r.Code != c)).Select(c => new RelationshipRoleDto(Guid.Empty, c, c, false)))
             .OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase);
 
+    private IReadOnlyList<PickItem<string>> RoleItems => [.. RoleChoices.Select(r => new PickItem<string>(r.Code, RoleLabel(r.Code)))];
+
+    /// <summary>Rolün adı; pasif ya da katalogdan düşmüş rol "(pasif)" ile görünür.</summary>
+    private string RoleLabel(string code) =>
+        catalogRoles.FirstOrDefault(r => r.Code == code) is { IsActive: true } role ? role.Name : $"{RoleName(code)} ({Texts.Get("common.inactiveLower")})";
+
     private string RoleName(string code) => catalogRoles.FirstOrDefault(r => r.Code == code)?.Name ?? code;
 
     private string ActivityName(string code) => activities.FirstOrDefault(a => a.Code == code)?.Name ?? code;
-
-    /// <summary>Faaliyet ağacı; girinti derinliği gösterir. Kayıtta kalmış ama pasifleşmiş kodlar sonda "(pasif)" ile görünür.</summary>
-    private RenderFragment ActivityList(SortedSet<string> selected, bool activitiesOnly = false) => __builder =>
-    {
-        <div class="activity-choices">
-            @foreach (var item in ActivityChoicesFor(selected))
-            {
-                <div class="form-check">
-                    <input id="@($"opt-{selected.GetHashCode()}-{item.Code}")" class="form-check-input" type="checkbox" checked="@selected.Contains(item.Code)" disabled="@(activitiesOnly && item.Active && item.Kind != "Activity")" @onchange="e => Toggle(selected, item.Code, (bool)e.Value!)" />
-                    <label class="form-check-label" for="@($"opt-{selected.GetHashCode()}-{item.Code}")">@(item.Depth > 0 ? string.Concat(Enumerable.Repeat("– ", item.Depth)) : null)@item.Name@(item.Active ? null : $" ({Texts.Get("common.inactiveLower")})")</label>
-                </div>
-            }
-        </div>
-    };
-
-    private IReadOnlyList<ActivityChoice> ActivityChoicesFor(SortedSet<string> selected)
-    {
-        var byParent = activities.ToLookup(a => a.ParentCode);
-        var list = new List<ActivityChoice>();
-        void Walk(string? parent, int depth)
-        {
-            foreach (var node in byParent[parent])
-            {
-                list.Add(new ActivityChoice(node.Code, node.Name, depth, node.Kind, Active: true));
-                Walk(node.Code, depth + 1);
-            }
-        }
-
-        Walk(null, 0);
-        list.AddRange(selected.Where(c => list.All(i => i.Code != c)).Select(c => new ActivityChoice(c, c, 0, "", Active: false)));
-        return list;
-    }
 
     private RenderFragment Pills(IEnumerable<string> codes, Func<string, string> name) => builder =>
     {
@@ -407,6 +396,4 @@
             builder.AddContent(3, "—");
         }
     };
-
-    internal sealed record ActivityChoice(string Code, string Name, int Depth, string Kind, bool Active);
 }

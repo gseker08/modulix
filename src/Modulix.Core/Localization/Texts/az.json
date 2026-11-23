@@ -644,6 +644,8 @@
   "crm.party.needHelp": "Şirkətin sizdən aldığı və ya almaq istədiyi xidmətlər (yalnız fəaliyyət seçilir); münasibət rolundan asılı deyil.",
   "crm.party.noRecord": "— (qeyd açma)",
   "crm.party.note": "Qeyd",
+  "crm.party.chooseRoles": "Rol seç",
+  "crm.party.searchRoles": "Rol axtar",
   "crm.party.partialSave": "Bəzi münasibət qeydləri yadda saxlanılmadı; səhvləri düzəldib yenidən yadda saxlayın.",
   "crm.party.sectorHelp": "Şirkətin fəaliyyət göstərdiyi sektorlar. Sərbəst mətnli \"Sektor\" sahəsi olduğu kimi qalır.",
   "crm.party.status.active": "Aktiv",
