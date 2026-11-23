@@ -1,6 +1,6 @@
 # ADR-0056: Müşteri yolculukları ve ortak akış modeli
 
-- **Durum:** Taslak (23 Kasım 2026). Öneri ve açık kararlar aşağıdadır; kod yazılmadı. İnceleme sonrası dilim 1'e geçilir.
+- **Durum:** Kabul edildi (23 Kasım 2026; taslak #567 birleşti, öneriler geçerli). Uygulama durumu en altta.
 - **Kaynak:** `docs/crm-eksik-surecler-epicleri.md` E4 (müşteri yolculukları) ve E6 (görsel süreç tasarımcısı); `docs/oncelikli-isler.md` A3-R5.
 - **İlgili kararlar:** ADR-0027 (kural ve iş akışı altyapısı), ADR-0025 (iletişim izni, sıklık, çıkış, konu), ADR-0044 (modül sözleşme projeleri), ADR-0046 (modül zamanlanmış işi), ADR-0049 (belge numaralama).
 
@@ -85,3 +85,14 @@ Entegrasyon testlerini yerelde SQL Server olmadığı için CI koşar; bu açık
 
 Onaylanırsa dilim 1 (model + segment girişi) ayrı PR olarak açılır. Migration içeren ilk dilimdir; `migration-compat.yml` koşar. Karar gerektiren tek
 konu yukarıdaki açık karar listesidir; öneriler değişirse dilim 1'in kapsamı değişir.
+
+## Uygulama durumu
+
+### Dilim 1a: model ve kayıt (23 Kasım 2026)
+
+- **Tablolar:** `marketing.Journeys` (kod, ad, hedef türü, giriş segmenti, yeniden giriş politikası, çıkış koşulu, sorumlu, durum) ve `marketing.JourneyEnrollments` (hedef, durum, giriş/çıkış zamanı, çıkış nedeni); migration `MarketingJourneys` (yeni tablolar, geriye uyumlu; `TenantIsolationSql.AddTable` ile RLS). "Aynı anda bir kez" kuralı `UX_JourneyEnrollments_Active` filtreli benzersiz indeksindedir (`WHERE Status = 'Active'`).
+- **Kayıt depoları:** `JourneyRecordStore` (kod 2-40 küçük harf/rakam/tire ve tenant içinde tekil, kod ve hedef türü değişmez, giriş segmenti etkin ve aynı hedef türünde olmalı, taslak dışında segment değişmez, çıkış koşulu JSON nesnesi, yalnızca taslak ve kaydı olmayan yolculuk silinir), `JourneyEnrollmentRecordStore` (elle oluşturulamaz, değiştirilemez, silinemez; iş akışı kapısı açıkken yazılır; görünürlük yolculuğun sorumlusuna bağlı).
+- **Uçlar:** `/api/marketing/journeys`, `/api/marketing/journey-enrollments` (`ResourceEndpoints.MapResource`); izinler `marketing.journeys.read|write` (rol şablonlarına eklendi: uzman ve yönetici okur/yazar, izleyici okur); denetim kaydı `AuditedEntities`'te.
+- **İletiler:** `marketing.server.journey.*` ve `marketing.server.notfound.journey` (tr/en/az; en/az taslak).
+- **Testler:** `JourneyTests` (entegrasyon, 4 tür: mutlu yol, hata/doğrulama, tenant izolasyonu, yetki; SQL Server gerektirir, CI koşar), `MarketingMessagesTests` eşiği 176.
+- **Bilerek yapılmadı:** durum geçişleri (yayın, duraklatma, arşiv) ve yayın izni, segment girişi ve `marketing.journey.entered` olayı (dilim 1b), çıkış koşulunun alan doğrulaması (dilim 2), adım aksiyonları, arayüz ekranı.
