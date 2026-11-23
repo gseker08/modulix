@@ -194,7 +194,7 @@ public static class AppCatalog
 
     public static IReadOnlyList<AppDefinition> All { get; } =
     [
-        new(Crm, null, "CRM", "users", null, 10, ModuleKey: CrmAccess.ModuleKey, Group: SalesGroup, Description: "Müşteri ilişkilerini yönetin, fırsatları takip edin."),
+        new(Crm, null, "CRM", "users", null, 10, ModuleKey: CrmAccess.ModuleKey, Group: SalesGroup, Description: "Müşteri ilişkilerini yönetin, fırsatları takip edin.", Art: "crm"),
 
         // Çalışma Alanım: kullanıcının üzerinde işlem bekleyen işler. "Onay bekleyen işlerim" teklif ve sözleşme onaylarını tek listede toplar;
         // karar ekranları (teklif onayları, sözleşme onayları) menüde ayrı satır değildir, bu satırın altında sayılır.
@@ -271,7 +271,7 @@ public static class AppCatalog
         new("marketing.settings", Marketing, "Pazarlama ayarları", "wrench", ModuleSettingsRoute(MarketingAccess.ModuleKey), 90, MarketingAccess.ModuleKey, CoreAccess.ManageSettings, Hosted: new(CrmSettingsGroup, null, 96)),
 
         // Depo ve antrepo (ADR-0032): şimdilik yapı tanımı (tesis, alan, lokasyon seviyesi, lokasyon); stok ve gümrük ekranları sonraki dilimlerle gelir.
-        new(Warehouse, null, "Depo ve Antrepo", "warehouse", null, 40, ModuleKey: WarehouseAccess.ModuleKey, Group: OperationsGroup, Description: "Depo ve antrepo operasyonlarını yönetin."),
+        new(Warehouse, null, "Depo ve Antrepo", "warehouse", null, 40, ModuleKey: WarehouseAccess.ModuleKey, Group: OperationsGroup, Description: "Depo ve antrepo operasyonlarını yönetin.", Art: "warehouse"),
         new("warehouse.dashboard", Warehouse, "Pano", "dashboard", "depo", 5, WarehouseAccess.ModuleKey, WarehouseAccess.FacilitiesRead, ExactMatch: true),
         new("warehouse.facilities", Warehouse, "Tesisler", "building", "depo/tesisler", 10, WarehouseAccess.ModuleKey, WarehouseAccess.FacilitiesRead),
         new("warehouse.zones", Warehouse, "Alanlar", "layers", "depo/alanlar", 20, WarehouseAccess.ModuleKey, WarehouseAccess.ZonesRead, Tone: AppTone.Teal),

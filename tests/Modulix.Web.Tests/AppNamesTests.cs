@@ -94,7 +94,8 @@ public class AppNamesTests
         var root = Path.Combine(directory!.FullName, "src", "Modulix.Web", "wwwroot");
         var withArt = AppCatalog.All.Where(a => a.Art is not null).ToList();
 
-        Assert.NotEmpty(withArt);
+        // Her ana uygulamanın kart görseli vardır; yeni uygulama görselsiz eklenirse test hatırlatır.
+        Assert.All(AppCatalog.All.Where(a => a.ParentId is null), a => Assert.NotNull(a.Art));
         Assert.All(withArt, a => Assert.True(a.ParentId is null && File.Exists(Path.Combine(root, AppCatalog.ArtUrl(a)!)), a.Id));
     }
 
