@@ -13700,5 +13700,19 @@
   "logistics.server.delivery.not-allowed": "You are not allowed to record a delivery.",
   "logistics.server.delivery.outcome-unknown": "Unknown delivery outcome.",
   "logistics.server.delivery.only-in-transit": "A delivery is only recorded for a shipment on the road.",
-  "logistics.server.dashboard.forbidden": "Permission to read requests, shipments, trips or drivers is required to see the dashboard."
+  "logistics.server.dashboard.forbidden": "Permission to read requests, shipments, trips or drivers is required to see the dashboard.",
+  "crm.server.sharing.draft-no-document": "A customer document cannot be generated for a draft quote; present it to the customer first.",
+  "crm.server.sharing.document-race": "The document was generated in another request; refresh the page.",
+  "crm.server.sharing.link-revoked": "The link has already been revoked.",
+  "crm.server.forecast.compare-no-previous": "There is no previous version to compare; select a version.",
+  "crm.server.forecast.compare-mismatch": "Only versions with the same period, scope and currency are compared.",
+  "crm.server.forecast.lines-need-permission": "Opportunity and amount permissions are required to see the lines.",
+  "crm.server.forecast.scope-exceeds": "The scope of this forecast exceeds your data scope; the operation cannot be performed because the snapshot would be incomplete.",
+  "crm.server.endpoint.body-too-large": "The body is too large.",
+  "crm.server.endpoint.json-required": "Send JSON.",
+  "crm.server.endpoint.invalid-body": "Invalid request body.",
+  "crm.server.endpoint.form-not-found": "Form not found.",
+  "crm.server.endpoint.submission-rejected": "The submission was not accepted.",
+  "crm.server.endpoint.link-invalid": "The link is invalid.",
+  "crm.server.endpoint.quote-state-changed": "The quote state has changed."
 }

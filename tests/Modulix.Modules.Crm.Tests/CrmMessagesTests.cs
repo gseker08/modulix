@@ -33,7 +33,7 @@ public partial class CrmMessagesTests
             checkedCount++;
         }
 
-        Assert.True(checkedCount >= 90);
+        Assert.True(checkedCount >= 299);
     }
 
     [Fact]
