@@ -5,7 +5,8 @@
 @inject IJSRuntime JS
 
 @* Modulix logosu (BrandLogo): tıklanınca "Tüm Uygulamalar" diyaloğu açılır (sayfanın üzerinde, içeriği kaydırmaz).
-   Solda kategori menüsü (AppCatalog.Groups), ortada açıklamalı uygulama kartları. Liste AppCatalog'dan ve oturumdan gelir. *@
+   Solda kategori menüsü (AppCatalog.Groups), ortada sık kullanılanlar ve açıklamalı uygulama kartları, sağda kısayollar
+   (AppCatalog.Shortcuts). Liste AppCatalog'dan ve oturumdan gelir; sık kullanılanlar tarayıcıda saklanır (LauncherFavorites). *@
 <div class="app-launcher">
     @if (Session.IsSignedIn)
     {
@@ -50,7 +51,7 @@
                 }
             </div>
 
-            <div class="app-dialog-body @(groups.Count > 0 ? "has-categories" : null)">
+            <div class="app-dialog-body @(groups.Count > 0 ? "has-categories" : null) @(shortcuts.Count > 0 ? "has-rail" : null)">
                 @if (groups.Count > 0)
                 {
                     @* Kategori menüsü: ana uygulamaların alan başlıkları (AppCatalog.Groups); yalnızca görsel süzgeçtir. *@
@@ -96,6 +97,32 @@
                         <p class="app-state" role="status">@Texts.Get("common.noResultFor", Query)</p>
                     }
 
+                    @* Sık kullanılanlar: yıldızlanan uygulamalar; arama sırasında gizlenir. *@
+                    @if (Session.IsLoaded && !loadFailed && listed.Count > 0 && string.IsNullOrWhiteSpace(Query))
+                    {
+                        <section class="app-group app-favorites" aria-labelledby="app-group-favorites">
+                            <h3 id="app-group-favorites" class="app-group-title"><AppIcon Name="star" Size="18" /> @Texts.Get("shell.launcher.favorites")</h3>
+                            @if (favoriteApps.Count == 0)
+                            {
+                                <p class="app-favorites-empty">@Texts.Get("shell.launcher.favorites.empty")</p>
+                            }
+                            else
+                            {
+                                <ul class="app-favorites-list">
+                                    @foreach (AppDefinition app in favoriteApps)
+                                    {
+                                        <li>
+                                            <a href="@Apps.EntryRoute(app)" class="app-favorite tone-@ToneClass(app)" @onclick="() => Close(true)">
+                                                <span class="app-favorite-icon"><AppIcon Name="@app.Icon" Size="18" /></span>
+                                                <span>@AppNames.Of(app)</span>
+                                            </a>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </section>
+                    }
+
                     @if (Session.IsLoaded && !loadFailed && visible.Count > 0)
                     {
                         <section class="app-group" aria-labelledby="app-group-apps">
@@ -128,6 +155,27 @@
                         </section>
                     }
                 </div>
+
+                @* Kısayollar: sık yapılan işlemlere doğrudan bağlantılar; yalnızca modülü açık ve izni olanlar listelenir. *@
+                @if (shortcuts.Count > 0)
+                {
+                    <aside class="app-rail" aria-labelledby="app-rail-title">
+                        <h3 id="app-rail-title" class="app-group-title"><AppIcon Name="zap" Size="18" /> @Texts.Get("shell.launcher.shortcuts")</h3>
+                        <p class="app-rail-subtitle">@Texts.Get("shell.launcher.shortcuts.subtitle")</p>
+                        <ul class="app-shortcuts">
+                            @foreach (AppShortcut shortcut in shortcuts)
+                            {
+                                <li>
+                                    <a href="@shortcut.Route" class="app-shortcut" @onclick="() => Close(true)">
+                                        <span class="app-shortcut-icon"><AppIcon Name="@shortcut.Icon" Size="18" /></span>
+                                        <span class="app-shortcut-name">@AppNames.Of(shortcut)</span>
+                                        <AppIcon Name="chevron-right" Size="16" />
+                                    </a>
+                                </li>
+                            }
+                        </ul>
+                    </aside>
+                }
             </div>
         </div>
     }
@@ -172,6 +220,12 @@
     private IReadOnlyList<PlannedApp> plannedVisible = [];
     private bool showSearch;
 
+    // Sık kullanılanlar (yıldızlanan uygulama kimlikleri; tarayıcıdan okunur) ve kullanıcının kullanabildiği kısayollar.
+    private IReadOnlyList<string> favorites = [];
+    private IReadOnlyList<AppDefinition> favoriteApps = [];
+    private IReadOnlyList<AppShortcut> shortcuts = [];
+    private bool favoritesPending;
+
     // Kategori menüsü yalnızca birden çok grup görünürken çıkar; aksi halde kartlar tam genişlikte düz listedir.
     private IReadOnlyList<AppRootGroup> groups = [];
 
@@ -194,6 +248,8 @@
     private void Recompute()
     {
         listed = Apps.Roots();
+        favoriteApps = LauncherFavorites.Visible(favorites, listed);
+        shortcuts = Session.IsLoaded && !loadFailed ? Apps.Shortcuts() : [];
         IReadOnlyList<AppRootGroup> grouped = Apps.Grouped(listed);
         groups = grouped.Count > 1 ? grouped : [];
 
@@ -223,7 +279,7 @@
 
     // Uygulama kartı doğrudan uygulamanın ilk ekranına gider; uygulamanın ekranları sol menüde bölümler halinde gelir.
     // Kartın tamamı bağlantıdır; "Aç" görsel ipucudur (ekranda tek birincil düğme kuralı gereği tonal).
-    private RenderFragment Card(AppDefinition app) => @<li>
+    private RenderFragment Card(AppDefinition app) => @<li class="app-card-item">
         <a href="@Apps.EntryRoute(app)" class="app-card tone-@ToneClass(app) @(app.Art is null ? null : "has-art") @(IsCurrent(app) ? "is-current" : null)"
            aria-current="@(IsCurrent(app) ? "page" : null)" @onclick="() => Close(true)">
             @if (AppCatalog.ArtUrl(app) is { } art)
@@ -244,7 +300,29 @@
                 @(IsCurrent(app) ? Texts.Get("shell.launcher.current") : Texts.Get("shell.launcher.open")) <AppIcon Name="arrow-right" Size="16" />
             </span>
         </a>
+        @* Yıldız kartın (bağlantının) dışında, üstünde durur: bağlantının içine düğme konmaz. *@
+        <button type="button" class="btn btn-ghost btn-icon btn-sm app-card-star @(favorites.Contains(app.Id) ? "is-on" : null)"
+                aria-pressed="@(favorites.Contains(app.Id) ? "true" : "false")" title="@StarLabel(app)" aria-label="@StarLabel(app)"
+                disabled="@(!favorites.Contains(app.Id) && favorites.Count >= LauncherFavorites.Max)"
+                @onclick="() => ToggleFavoriteAsync(app)">
+            <AppIcon Name="star" Size="16" />
+        </button>
     </li>;
+
+    private string StarLabel(AppDefinition app) =>
+        Texts.Get(favorites.Contains(app.Id) ? "shell.launcher.favorites.remove" : "shell.launcher.favorites.add", AppNames.Of(app));
+
+    private string? FavoritesKey => Session.User is { } user ? LauncherFavorites.StorageKey(user.UserId, user.ActiveTenantId) : null;
+
+    private async Task ToggleFavoriteAsync(AppDefinition app)
+    {
+        favorites = LauncherFavorites.Toggle(favorites, app.Id);
+        Recompute();
+        if (FavoritesKey is { } key)
+        {
+            await JS.InvokeVoidAsync("modulixAppLauncher.writeFavorites", key, LauncherFavorites.Serialize(favorites));
+        }
+    }
 
     private static bool Matches(string name, string text) =>
         System.Globalization.CultureInfo.GetCultureInfo("tr-TR").CompareInfo
@@ -288,6 +366,7 @@
         isOpen = false;
         query = "";
         category = null;
+        favorites = [];
     }
 
     private void Toggle()
@@ -301,6 +380,7 @@
         isOpen = true;
         query = "";
         category = null;
+        favoritesPending = true;
         pendingFocus = FocusTarget.Search;
         Recompute();
     }
@@ -338,6 +418,18 @@
         {
             await JS.InvokeVoidAsync("modulixAppLauncher.detach");
             attached = false;
+        }
+
+        // Sık kullanılanlar panel her açıldığında tarayıcıdan okunur (kullanıcı + firma anahtarı; tenant değişince önceki liste kalmaz).
+        if (isOpen && favoritesPending)
+        {
+            favoritesPending = false;
+            if (FavoritesKey is { } key)
+            {
+                favorites = LauncherFavorites.Parse(await JS.InvokeAsync<string?>("modulixAppLauncher.readFavorites", key));
+                Recompute();
+                StateHasChanged();
+            }
         }
 
         FocusTarget target = pendingFocus;

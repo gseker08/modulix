@@ -60,6 +60,11 @@ public class AppNamesTests
             Check(AppNames.KeyOf(group), group.Name);
         }
 
+        foreach (var shortcut in AppCatalog.Shortcuts)
+        {
+            Check(AppNames.KeyOf(shortcut), shortcut.Name);
+        }
+
         foreach (var planned in AppCatalog.Planned)
         {
             Check(AppNames.KeyOf(planned), planned.Name);

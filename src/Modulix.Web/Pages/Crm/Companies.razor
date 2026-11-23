@@ -160,6 +160,29 @@
 
     private int ActiveFilters => (role.Length > 0 ? 1 : 0) + (sector.Length > 0 ? 1 : 0) + (need.Length > 0 ? 1 : 0);
 
+    // Paneldeki "Yeni firma ekle" kısayolu (crm/firmalar?yeni=1): yazma izni varsa form açık gelir.
+    [SupplyParameterFromQuery(Name = "yeni")]
+    public string? CreateNew { get; set; }
+
+    private bool initialized;
+
+    protected override void OnParametersSet()
+    {
+        // Sayfa zaten açıkken kısayola tıklanırsa yalnızca sorgu değişir; ilk açılışta form yükleme bitince açılır.
+        if (initialized)
+        {
+            OpenNewFromQuery();
+        }
+    }
+
+    private void OpenNewFromQuery()
+    {
+        if (!string.IsNullOrEmpty(CreateNew) && !editing && Session.Can(CrmAccess.CompaniesWrite))
+        {
+            New();
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         views = new PersonalGridViews(Api, "crm.companies");
@@ -175,6 +198,9 @@
             activities = (await activitiesTask).Value ?? [];
             await LoadAsync(1);
         }
+
+        initialized = true;
+        OpenNewFromQuery();
     }
 
     private GridViewDto? Active => views.Find(view);

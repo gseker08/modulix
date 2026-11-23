@@ -143,7 +143,7 @@ html.app-launcher-open {
     z-index: 1061;
     display: flex;
     flex-direction: column;
-    width: min(64rem, calc(100vw - 2rem));
+    width: min(78rem, calc(100vw - 2rem));
     max-height: calc(100vh - 2rem);
     max-height: calc(100dvh - 2rem);
     transform: translateX(-50%);
@@ -220,6 +220,15 @@ html.app-launcher-open {
     .app-dialog-body.has-categories {
         grid-template-columns: 16.5rem minmax(0, 1fr);
         align-items: start;
+    }
+
+    .app-dialog-body.has-rail {
+        grid-template-columns: minmax(0, 1fr) 17rem;
+        align-items: start;
+    }
+
+    .app-dialog-body.has-categories.has-rail {
+        grid-template-columns: 15rem minmax(0, 1fr) 17rem;
     }
 
 .app-categories {
@@ -330,10 +339,165 @@ html.app-launcher-open {
 }
 
 .app-group-title {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-2);
     margin: 0 0 var(--mx-space-3);
     font-size: var(--mx-fs-section-title);
     font-weight: 700;
 }
+
+    .app-group-title .app-icon {
+        color: var(--mx-brand-primary);
+    }
+
+/* Sık kullanılanlar: yıldızlanan uygulamalar hap biçimli bağlantılardır. */
+.app-favorites-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mx-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.app-favorite {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-2);
+    min-height: 2.75rem;
+    padding: var(--mx-space-1) var(--mx-space-4) var(--mx-space-1) var(--mx-space-2);
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-panel-border);
+    border-radius: var(--mx-radius-button);
+    box-shadow: var(--mx-shadow-control);
+    color: var(--mx-text-primary);
+    font-size: var(--mx-fs-body);
+    font-weight: 700;
+    text-decoration: none;
+    transition: border-color 0.15s;
+}
+
+    .app-favorite:hover {
+        border-color: var(--mx-brand-primary);
+        color: var(--mx-text-primary);
+    }
+
+.app-favorite-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.6rem;
+}
+
+.tone-indigo .app-favorite-icon {
+    background: var(--mx-tone-brand-bg);
+    color: var(--mx-tone-brand-fg);
+}
+
+.tone-teal .app-favorite-icon {
+    background: var(--mx-tone-teal-bg);
+    color: var(--mx-tone-teal-fg);
+}
+
+.app-favorites-empty {
+    margin: 0;
+    color: var(--mx-text-secondary);
+    font-size: var(--mx-fs-helper);
+}
+
+/* Kısayollar sütunu: sık yapılan işlemlere doğrudan bağlantılar. */
+.app-rail {
+    position: sticky;
+    top: 0;
+    padding: var(--mx-space-4);
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-panel-border);
+    border-radius: var(--mx-radius-card);
+}
+
+    .app-rail .app-group-title {
+        margin-bottom: var(--mx-space-1);
+    }
+
+.app-rail-subtitle {
+    margin: 0 0 var(--mx-space-3);
+    color: var(--mx-text-secondary);
+    font-size: var(--mx-fs-helper);
+}
+
+.app-shortcuts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mx-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.app-shortcut {
+    display: flex;
+    align-items: center;
+    gap: var(--mx-space-3);
+    min-height: 2.75rem;
+    padding: var(--mx-space-1) var(--mx-space-2);
+    border: 1px solid var(--mx-panel-border);
+    border-radius: var(--mx-radius-button);
+    color: var(--mx-text-primary);
+    font-size: var(--mx-fs-body);
+    font-weight: 600;
+    text-decoration: none;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+    .app-shortcut:hover {
+        background: var(--mx-surface-muted);
+        border-color: var(--mx-brand-primary);
+        color: var(--mx-text-primary);
+    }
+
+    .app-shortcut > .app-icon {
+        flex: none;
+        color: var(--mx-text-secondary);
+    }
+
+.app-shortcut-icon {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.6rem;
+    background: var(--mx-tone-brand-bg);
+    color: var(--mx-tone-brand-fg);
+}
+
+.app-shortcut-name {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* Kart ve yıldız düğmesi aynı hücrede: yıldız kartın sağ üst köşesinde, bağlantının dışındadır. */
+.app-card-item {
+    position: relative;
+}
+
+.app-card-star {
+    position: absolute;
+    top: var(--mx-space-3);
+    right: var(--mx-space-3);
+    color: var(--mx-text-secondary);
+}
+
+    .app-card-star.is-on {
+        color: var(--mx-brand-primary);
+    }
+
+        .app-card-star.is-on .app-icon {
+            fill: currentColor;
+        }
 
 /* Uygulama kartı: tamamı bağlantıdır. Sağdaki büyük ikon süs amaçlıdır (ton zemininde, tokenlardan). */
 .app-card {
@@ -484,6 +648,8 @@ html.app-launcher-open {
     }
 
 .app-card:focus-visible,
+.app-favorite:focus-visible,
+.app-shortcut:focus-visible,
 .app-category:focus-visible {
     outline: 2px solid var(--mx-brand-primary);
     outline-offset: 2px;
@@ -495,6 +661,25 @@ html.app-launcher-open {
     color: var(--mx-text-secondary);
     font-size: var(--mx-fs-body);
     text-align: center;
+}
+
+/* Orta genişlik: kısayollar sütunu kartların altına iner. */
+@media (max-width: 1199.98px) {
+    .app-dialog-body.has-rail {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .app-dialog-body.has-categories.has-rail {
+        grid-template-columns: 16.5rem minmax(0, 1fr);
+    }
+
+        .app-dialog-body.has-categories.has-rail .app-rail {
+            grid-column: 2;
+        }
+
+    .app-rail {
+        position: static;
+    }
 }
 
 /* Dar ekran: kategoriler kartların üstünde yatay kayan satır olur, kartlar tek sütuna iner. */
@@ -514,10 +699,15 @@ html.app-launcher-open {
     }
 
     .app-dialog-body,
-    .app-dialog-body.has-categories {
+    .app-dialog-body.has-categories,
+    .app-dialog-body.has-categories.has-rail {
         grid-template-columns: minmax(0, 1fr);
         padding: 0 var(--mx-space-4) var(--mx-space-4);
     }
+
+        .app-dialog-body.has-categories.has-rail .app-rail {
+            grid-column: 1;
+        }
 
     .app-categories {
         position: static;

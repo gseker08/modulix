@@ -19,6 +19,10 @@ public static class AppNames
 
     public static string KeyOf(PlannedApp planned) => $"nav.app.{planned.Id}";
 
+    public static string KeyOf(AppShortcut shortcut) => $"nav.shortcut.{shortcut.Id}";
+
+    public static string Of(AppShortcut shortcut) => Texts.GetOr(KeyOf(shortcut), shortcut.Name);
+
     public static string Of(AppDefinition app) => Texts.GetOr(KeyOf(app), app.Name);
 
     /// <summary>Paneldeki kart açıklaması; uygulamanın açıklaması yoksa <c>null</c>.</summary>

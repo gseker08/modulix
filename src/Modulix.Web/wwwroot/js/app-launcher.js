@@ -63,4 +63,21 @@ function detach() {
     }
 }
 
-window.modulixAppLauncher = { attach, detach };
+// Sık kullanılanlar tarayıcıda saklanır; depolama kapalıysa seçim yalnızca açık panelde geçerli olur.
+function readFavorites(key) {
+    try {
+        return window.localStorage.getItem(key);
+    } catch {
+        return null;
+    }
+}
+
+function writeFavorites(key, value) {
+    try {
+        window.localStorage.setItem(key, value);
+    } catch {
+        // Depolama kapalı.
+    }
+}
+
+window.modulixAppLauncher = { attach, detach, readFavorites, writeFavorites };
