@@ -58,7 +58,7 @@
                             @if (section.Movable)
                             {
                                 string sectionName = AppNames.Of(section.Group!);
-                                <th class="actions">
+                                <td class="actions">
                                     <button type="button" class="btn btn-icon btn-ghost" disabled="@(!CanMoveSection(menu, section, -1))"
                                             aria-label="@Texts.Get("admin.roleMenu.sectionUp", sectionName)" @onclick="() => MoveSection(menu, section, -1)">
                                         <AppIcon Name="arrow-up" Size="18" />
@@ -67,7 +67,7 @@
                                             aria-label="@Texts.Get("admin.roleMenu.sectionDown", sectionName)" @onclick="() => MoveSection(menu, section, 1)">
                                         <AppIcon Name="arrow-down" Size="18" />
                                     </button>
-                                </th>
+                                </td>
                             }
                         </tr>
                         @for (int i = 0; i < section.Items.Count; i++)
