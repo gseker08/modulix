@@ -103,23 +103,9 @@
                 }
                 else
                 {
-                    <label class="visually-hidden" for="rsp-member-filter">@Texts.Get("reports.searchUser")</label>
-                    <input id="rsp-member-filter" class="form-control mb-2" type="search" placeholder="@Texts.Get("reports.searchUser")" aria-describedby="rsp-recipients-help" @bind="memberFilter" @bind:event="oninput" />
-                    <div class="report-member-list" role="group" aria-label="@Texts.Get("reports.schedules.recipients")">
-                        @foreach (var member in FilteredMembers())
-                        {
-                            var memberId = member.UserId;
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="rsp-mem-@memberId" checked="@recipientIds.Contains(memberId)" @onchange="e => ToggleRecipient(memberId, e.Value is true)" />
-                                <label class="form-check-label" for="rsp-mem-@memberId">@member.DisplayName</label>
-                            </div>
-                        }
-                        @if (!FilteredMembers().Any())
-                        {
-                            <EmptyState Compact="true" Title="@Texts.Get("reports.noUserFound")" />
-                        }
-                    </div>
-                    <p class="small text-muted mt-1" role="status">@Texts.Get("reports.schedules.recipientsSelected", recipientIds.Count)</p>
+                    <label class="visually-hidden" for="rsp-members">@Texts.Get("reports.schedules.recipients")</label>
+                    <PickField TKey="Guid" Id="rsp-members" Title="@Texts.Get("reports.schedules.recipients")" Icon="users" SearchPlaceholder="@Texts.Get("reports.searchUser")"
+                               Items="MemberItems" Selected="recipientIds" SelectedChanged="SetRecipients" UnknownName="@(_ => Texts.Get("crm.sales.unknownUser"))" />
                 }
             </fieldset>
             <div class="form-actions">
@@ -233,7 +219,6 @@
     private readonly HashSet<Guid> recipientIds = [];
     private List<TenantMemberResponse>? members;
     private string? membersError;
-    private string memberFilter = string.Empty;
 
     /// <summary>Verilirse yalnızca bu raporun zamanlamaları; boşsa kullanıcının tüm zamanlamaları.</summary>
     [Parameter] public Guid? ReportId { get; set; }
@@ -283,7 +268,6 @@
         hour = 9;
         format = "csv";
         recipientIds.Clear();
-        memberFilter = string.Empty;
         message = null;
         conflict = false;
         formOpen = true;
@@ -305,7 +289,6 @@
             recipientIds.Add(recipient.UserId);
         }
 
-        memberFilter = string.Empty;
         message = null;
         conflict = false;
         formOpen = true;
@@ -329,20 +312,14 @@
         StateHasChanged();
     }
 
-    private IEnumerable<TenantMemberResponse> FilteredMembers() =>
-        (members ?? []).Where(m => m.UserId != Session.User?.UserId
-            && (memberFilter.Length == 0 || m.DisplayName.Contains(memberFilter, StringComparison.CurrentCultureIgnoreCase)));
+    // Kullanıcı kendisini seçemez; seçim atama penceresinde yapılır (PickField).
+    private IReadOnlyList<PickItem<Guid>> MemberItems =>
+        [.. (members ?? []).Where(m => m.UserId != Session.User?.UserId).Select(m => new PickItem<Guid>(m.UserId, m.DisplayName))];
 
-    private void ToggleRecipient(Guid id, bool selected)
+    private void SetRecipients(IReadOnlyList<Guid> ids)
     {
-        if (selected)
-        {
-            recipientIds.Add(id);
-        }
-        else
-        {
-            recipientIds.Remove(id);
-        }
+        recipientIds.Clear();
+        recipientIds.UnionWith(ids);
     }
 
     private void CloseForm() => formOpen = false;
