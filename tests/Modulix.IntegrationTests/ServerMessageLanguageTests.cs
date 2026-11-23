@@ -38,6 +38,37 @@ public class ServerMessageLanguageTests(ModulixApiFactory factory) : IClassFixtu
     }
 
     [Fact]
+    public async Task Setting_save_errors_come_in_the_users_language_with_the_same_field_keys()
+    {
+        // E8: vurgu rengi kontrast ve biçim iletileri ile genel ayar kuralları sözlükten çevrilir; alan anahtarı ve durum kodu değişmez.
+        var tenant = await CrmTenantAsync();
+        var english = await factory.CreateUserAsync(tenant);
+        var turkish = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [ManageSettings], english, turkish);
+        using var englishClient = await LoginAsync(english, "en");
+        using var turkishClient = await LoginAsync(turkish);
+        var request = new SaveSettingsRequest(new Dictionary<string, SettingWriteDto>
+        {
+            [SettingKeys.AccentLight] = new("#7DD3FC", 0),
+            [SettingKeys.AccentDark] = new("red", 0),
+        });
+
+        var inEnglish = await englishClient.PutAsJsonAsync("/api/settings", request);
+        var inTurkish = await turkishClient.PutAsJsonAsync("/api/settings", request);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, inEnglish.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, inTurkish.StatusCode);
+        var englishErrors = (await inEnglish.Content.ReadFromJsonAsync<JsonObject>())!["errors"]!.AsObject();
+        var turkishErrors = (await inTurkish.Content.ReadFromJsonAsync<JsonObject>())!["errors"]!.AsObject();
+        Assert.Equal([SettingKeys.AccentDark, SettingKeys.AccentLight], englishErrors.Select(e => e.Key).Order().ToArray());
+        Assert.Equal(englishErrors.Select(e => e.Key).Order(), turkishErrors.Select(e => e.Key).Order());
+        Assert.StartsWith("This color is not readable enough in the light theme", englishErrors[SettingKeys.AccentLight]![0]!.GetValue<string>());
+        Assert.Equal("The color must be in #RRGGBB format (e.g. #087DB8).", englishErrors[SettingKeys.AccentDark]![0]!.GetValue<string>());
+        Assert.StartsWith("Bu renk açık temada yeterince okunmuyor", turkishErrors[SettingKeys.AccentLight]![0]!.GetValue<string>());
+        Assert.Equal("Renk #RRGGBB biçiminde olmalıdır (ör. #087DB8).", turkishErrors[SettingKeys.AccentDark]![0]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task Tenant_default_applies_without_a_user_preference_and_does_not_leak_to_another_tenant()
     {
         var tenant = await CrmTenantAsync();

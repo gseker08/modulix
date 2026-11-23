@@ -1,10 +1,15 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Core.Settings;
 
-/// <summary>Vurgu renginin kontrol sonucu: geçerlilik, en düşük kontrast oranı (varsa) ve hata metni (geçmiyorsa).</summary>
-public sealed record AccentCheck(bool Valid, double? Contrast, string? Message);
+/// <summary>Vurgu renginin kontrol sonucu: geçerlilik, en düşük kontrast oranı (varsa) ve hata iletisi (geçmiyorsa).</summary>
+public sealed record AccentCheck(bool Valid, double? Contrast, ServerMessage? Error)
+{
+    /// <summary>Hata iletisinin Türkçe kaynak metni; çevrilmesi gereken yerde <see cref="Error"/> kullanılır.</summary>
+    public string? Message => Error?.Text;
+}
 
 /// <summary>
 /// Firmanın vurgu rengi kuralları (E8; <c>docs/design-system/theme-tokens.md</c> "Firmanın değiştirebileceği tokenlar").
@@ -24,8 +29,8 @@ public static partial class AccentColor
     private static readonly string[] DarkSurfaces = ["#121D33", "#0B1322", "#192842"];
     private const string DarkOnBrand = "#07111F";
 
-    /// <summary>Renk geçerliyse <c>null</c>, değilse kullanıcıya gösterilecek hata. Boş değer "firma rengi yok" demektir.</summary>
-    public static string? Validate(string value, bool dark) => Check(value, dark).Message;
+    /// <summary>Renk geçerliyse <c>null</c>, değilse kullanıcıya gösterilecek (çevrilebilir) hata. Boş değer "firma rengi yok" demektir.</summary>
+    public static ServerMessage? Validate(string value, bool dark) => Check(value, dark).Error;
 
     /// <summary>
     /// Rengin sonucu: geçerli mi, hesaplanabildiyse en düşük kontrast (biçim hatalıysa ve boş değerde <c>null</c>) ve geçmiyorsa
@@ -40,7 +45,7 @@ public static partial class AccentColor
 
         if (!HexPattern().IsMatch(value))
         {
-            return new AccentCheck(false, null, "Renk #RRGGBB biçiminde olmalıdır (ör. #087DB8).");
+            return new AccentCheck(false, null, ServerMessages.Setting.AccentFormat);
         }
 
         var luminance = Luminance(value);
@@ -48,8 +53,12 @@ public static partial class AccentColor
         var worst = against.Min(other => Contrast(luminance, Luminance(other)));
         return worst >= MinContrast
             ? new AccentCheck(true, worst, null)
-            : new AccentCheck(false, worst, $"Bu renk {(dark ? "koyu" : "açık")} temada yeterince okunmuyor (kontrast {worst:0.0}:1, en az {MinContrast:0.0}:1 gerekir).");
+            : new AccentCheck(false, worst, dark
+                ? ServerMessages.Setting.AccentLowContrastDark(Ratio(worst), Ratio(MinContrast))
+                : ServerMessages.Setting.AccentLowContrastLight(Ratio(worst), Ratio(MinContrast)));
     }
+
+    private static string Ratio(double value) => value.ToString("0.0", CultureInfo.InvariantCulture);
 
     /// <summary>WCAG göreli parlaklığı (0–1). <paramref name="hex"/> <c>#RRGGBB</c> olmalıdır.</summary>
     public static double Luminance(string hex)

@@ -78,6 +78,6 @@ public class AccentColorTests
         Assert.Null(bad.Contrast);
 
         // Kaydetme doğrulaması önizlemeyle aynı sonucu verir.
-        Assert.Equal(low.Message, AccentColor.Validate("#7DD3FC", dark: false));
+        Assert.Equal(low.Message, AccentColor.Validate("#7DD3FC", dark: false)?.Text);
     }
 }
