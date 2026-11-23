@@ -15,7 +15,7 @@ namespace Modulix.Modules.Marketing.Records;
 /// </summary>
 internal sealed partial class JourneyRecordStore(MarketingStoreContext context) : MarketingRecordStore<Journey>(context)
 {
-    private readonly Dictionary<Guid, (string Code, string Target, Guid SegmentId)> before = [];
+    private readonly Dictionary<Guid, (string Code, string Target, Guid SegmentId, string Status)> before = [];
 
     public override string EntityKey => MarketingModule.Entities.Journey;
 
@@ -65,7 +65,7 @@ internal sealed partial class JourneyRecordStore(MarketingStoreContext context) 
     protected override IQueryable<Journey> Search(IQueryable<Journey> source, string term) =>
         source.Where(j => j.Name.Contains(term) || j.Code.Contains(term));
 
-    protected override void OnUpdating(Journey entity) => before[entity.Id] = (entity.Code, entity.Target, entity.SegmentId);
+    protected override void OnUpdating(Journey entity) => before[entity.Id] = (entity.Code, entity.Target, entity.SegmentId, entity.Status);
 
     protected override async Task AppliedAsync(Journey entity, JsonObject values, bool isNew, CancellationToken cancellationToken)
     {
@@ -93,6 +93,14 @@ internal sealed partial class JourneyRecordStore(MarketingStoreContext context) 
             {
                 errors.Add(new RecordFieldError("segmentId", MarketingMessages.Journey.SegmentLocked));
             }
+        }
+
+        // Yolculuğu etkinleştiren geçiş (yayın, sürdürme) yalnızca giriş segmenti hâlâ etkinken yapılır.
+        var activating = !isNew && Context.Gate.IsOpen && entity.Status == JourneyStatuses.Active
+            && before.TryGetValue(entity.Id, out var previous) && previous.Status != JourneyStatuses.Active;
+        if (activating && !await Context.Data.Set<Segment>().AsNoTracking().AnyAsync(s => s.Id == entity.SegmentId && s.Status == SegmentStatuses.Active, cancellationToken))
+        {
+            throw new RecordConflictException(MarketingMessages.Journey.SegmentNotActive);
         }
 
         if (!string.IsNullOrWhiteSpace(entity.ExitCondition) && !IsJsonObject(entity.ExitCondition))

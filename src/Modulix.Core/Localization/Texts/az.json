@@ -13868,5 +13868,12 @@
   "server.shared.lat-long-together": "Enlik və uzunluq birlikdə daxil edilməlidir.",
   "server.shared.place-exists": "Bu ölkədə eyni adlı yer artıq var.",
   "server.shared.activity-unknown": "Kataloqda olmayan fəaliyyət: {0}.",
-  "logistics.server.workflow.unknown-action": "Naməlum əməliyyat."
+  "logistics.server.workflow.unknown-action": "Naməlum əməliyyat.",
+  "marketing.server.journey.only-draft-publish": "Yalnız layihə səviyyəsindəki səyahət dərc edilə bilər.",
+  "marketing.server.journey.only-active-pause": "Yalnız aktiv səyahət fasilə verilə bilər.",
+  "marketing.server.journey.only-paused-resume": "Yalnız fasilə verilmiş səyahət davam etdirilə bilər.",
+  "marketing.server.journey.already-archived": "Səyahət artıq arxivdədir.",
+  "marketing.server.journey.segment-not-active": "Giriş seqmenti aktiv deyil; səyahət başladıla bilməz.",
+  "meta.permission.marketing.journeys.publish": "Müştəri səyahətini dərc edir, fasilə verir, davam etdirir və arxivləşdirir",
+  "meta.permission.marketing.journeys.publish.resource": "Səyahətlər"
 }

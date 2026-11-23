@@ -587,6 +587,21 @@ internal static class MarketingMessages
     /// <summary>Müşteri yolculuğu ve kayıtları.</summary>
     public static class Journey
     {
+        public static ServerMessage SegmentNotActive =>
+            ServerMessage.Of("marketing.server.journey.segment-not-active", "Giriş segmenti etkin değil; yolculuk başlatılamaz.");
+
+        public static ServerMessage AlreadyArchived =>
+            ServerMessage.Of("marketing.server.journey.already-archived", "Yolculuk zaten arşivde.");
+
+        public static ServerMessage OnlyPausedResume =>
+            ServerMessage.Of("marketing.server.journey.only-paused-resume", "Yalnızca duraklatılmış yolculuk sürdürülür.");
+
+        public static ServerMessage OnlyActivePause =>
+            ServerMessage.Of("marketing.server.journey.only-active-pause", "Yalnızca etkin yolculuk duraklatılır.");
+
+        public static ServerMessage OnlyDraftPublish =>
+            ServerMessage.Of("marketing.server.journey.only-draft-publish", "Yalnızca taslak yolculuk yayımlanır.");
+
         public static ServerMessage CodeFormat =>
             ServerMessage.Of("marketing.server.journey.code-format", "Kod 2-40 karakter olmalı; küçük harf, rakam ve tire kullanılabilir (ör. hosgeldin-serisi).");
 
