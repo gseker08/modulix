@@ -78,6 +78,27 @@ public class MenuLayoutTests
     }
 
     [Fact]
+    public void Items_without_an_explicit_order_follow_the_ordered_ones_in_catalog_order()
+    {
+        // Satış bölümü katalogda: Müşteri adayları 10, Fırsatlar 20, Teklifler 30. A rolünün düzeninde Fırsatlar'ın satırı yok
+        // (ör. sonradan eklendi); B rolünün düzeni var ama o da Fırsatlar'a sıra vermiyor. Eski kuralda Fırsatlar katalog sırası (20)
+        // ile Teklifler'in (25) önüne düşerdi; şimdi sıra verilmeyen öğe açık sıralıların arkasına gider.
+        var nav = Nav([new(RoleA, "crm.quotes", 25, false), new(RoleA, "crm.leads", 35, false), new(RoleB, "crm.contacts", null, false)],
+            [CrmAccess.CompaniesRead, CrmAccess.LeadsRead, CrmAccess.OpportunitiesRead, CrmAccess.QuotesRead]);
+
+        string[] sales = [.. nav.Context("crm/firmalar")!.Sections.Where(s => s.Group?.Id == AppCatalog.CrmSalesGroup).SelectMany(s => s.Entries).Select(e => e.App.Id)];
+        Assert.Equal(["crm.quotes", "crm.leads", "crm.opportunities"], sales);
+    }
+
+    [Fact]
+    public void A_section_where_no_role_gives_an_order_keeps_the_catalog_order()
+    {
+        // Yalnızca gizleme satırı olan (sırası null) bölümde sıra değişmez.
+        var hideOnly = Nav([new(RoleA, "crm.leads", null, true)]);
+        Assert.Equal(CustomerIds(Nav(null)).Where(id => id != "crm.leads"), CustomerIds(hideOnly));
+    }
+
+    [Fact]
     public void Unknown_keys_are_ignored_and_permissions_still_filter()
     {
         // Katalogda olmayan satır sessizce yok sayılır.
