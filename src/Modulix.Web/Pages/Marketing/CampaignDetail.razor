@@ -143,6 +143,9 @@
                     <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button></div>
                 }
             </form>
+
+            @* Ekli notlar (ADR-0057): her not ayrı kayıttır ve kendi dosya ekleri vardır. *@
+            <NotesPanel ParentEntityKey="marketing.campaign" ParentId="Id" CanWrite="CanWrite" />
         </div>
 
         @if (tabState.Rendered("kitle"))
