@@ -5514,6 +5514,7 @@
   "pick.remove": "{0}: remove",
   "pick.noMatch": "No matching records.",
   "pick.apply": "Apply",
+  "pick.choose": "Choose",
   "pick.activity.choose": "Choose activities",
   "pick.activity.search": "Search activities",
   "pick.activity.group": "Sector / group",

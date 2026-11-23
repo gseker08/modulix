@@ -23,6 +23,10 @@ window.modulixLookup = {
             if (event.key === 'Enter') { event.preventDefault(); }
         });
     },
+    // Seçimi pencerede yapılan alan (PickField) değişince formun "değişti" izlemesi (form üstündeki oninput) haberdar olsun.
+    notifyInput: function (element) {
+        if (element) { element.dispatchEvent(new Event('input', { bubbles: true })); }
+    },
     reveal: function (id) {
         var option = id ? document.getElementById(id) : null;
         if (option && option.scrollIntoView) { option.scrollIntoView({ block: 'nearest' }); }

@@ -35,15 +35,9 @@
             <FieldError Field="department" Errors="errors" />
         </div>
         <div class="span-all">
-            <span class="form-label">@Texts.Get("crm.link.editor.roles")</span>
-            <div class="role-options">
-                @foreach (var (key, label) in RelationshipRoleNames.All())
-                {
-                    <label class="form-check-inline">
-                        <input type="checkbox" checked="@form.Roles.Contains(key)" @onchange="e => ToggleRole(key, (bool)e.Value!)" /> @label
-                    </label>
-                }
-            </div>
+            <label class="form-label" for="link-roles">@Texts.Get("crm.link.editor.roles")</label>
+            <PickField TKey="string" Id="link-roles" Title="@Texts.Get("crm.link.editor.roles")" Icon="users" Items="@([.. RelationshipRoleNames.All().Select(r => new PickItem<string>(r.Key, r.Value))])"
+                       Selected="form.Roles" SelectedChanged="keys => form.Roles = [.. keys]" />
             <FieldError Field="roles" Errors="errors" />
         </div>
         <div>
@@ -111,18 +105,6 @@
                 : new LinkForm { StartDate = DateOnly.FromDateTime(DateTime.Today) };
             errors = null;
             message = null;
-        }
-    }
-
-    private void ToggleRole(string key, bool on)
-    {
-        if (on)
-        {
-            form.Roles.Add(key);
-        }
-        else
-        {
-            form.Roles.Remove(key);
         }
     }
 
