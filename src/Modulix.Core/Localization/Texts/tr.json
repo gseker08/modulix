@@ -104,6 +104,7 @@
   "shell.launcher.favorites.remove": "Sık kullanılanlardan çıkar: {0}",
   "shell.launcher.shortcuts": "Kısayollar",
   "shell.launcher.shortcuts.subtitle": "Sık yaptığınız işlemlere hızlı erişim.",
+  "shell.launcher.shortcuts.waiting": "{0} onay sizi bekliyor",
   "shell.search.label": "Arama yapın",
   "shell.search.placeholder": "Arama yapın...",
   "shell.search.results": "Arama sonuçları",

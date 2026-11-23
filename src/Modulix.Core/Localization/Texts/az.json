@@ -104,6 +104,7 @@
   "shell.launcher.favorites.remove": "Tez-tez istifadə olunanlardan çıxar: {0}",
   "shell.launcher.shortcuts": "Qısayollar",
   "shell.launcher.shortcuts.subtitle": "Tez-tez etdiyiniz əməliyyatlara sürətli keçid.",
+  "shell.launcher.shortcuts.waiting": "{0} təsdiq sizi gözləyir",
   "shell.search.label": "Axtarış edin",
   "shell.search.placeholder": "Axtarış edin...",
   "shell.search.results": "Axtarış nəticələri",

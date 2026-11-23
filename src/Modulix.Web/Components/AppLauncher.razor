@@ -3,6 +3,7 @@
 @inject AppNavigation Apps
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject ApiClient Api
 
 @* Modulix logosu (BrandLogo): tıklanınca "Tüm Uygulamalar" diyaloğu açılır (sayfanın üzerinde, içeriği kaydırmaz).
    Solda kategori menüsü (AppCatalog.Groups), ortada sık kullanılanlar ve açıklamalı uygulama kartları, sağda kısayollar
@@ -169,6 +170,13 @@
                                     <a href="@shortcut.Route" class="app-shortcut" @onclick="() => Close(true)">
                                         <span class="app-shortcut-icon"><AppIcon Name="@shortcut.Icon" Size="18" /></span>
                                         <span class="app-shortcut-name">@AppNames.Of(shortcut)</span>
+                                        @if (shortcut.Id == AppCatalog.PendingApprovalsShortcut && waitingApprovals > 0)
+                                        {
+                                            <span class="app-shortcut-count" title="@Texts.Get("shell.launcher.shortcuts.waiting", waitingApprovals)">
+                                                <span aria-hidden="true">@(waitingApprovals > 99 ? "99+" : waitingApprovals.ToString())</span>
+                                                <span class="visually-hidden">@Texts.Get("shell.launcher.shortcuts.waiting", waitingApprovals)</span>
+                                            </span>
+                                        }
                                         <AppIcon Name="chevron-right" Size="16" />
                                     </a>
                                 </li>
@@ -225,6 +233,9 @@
     private IReadOnlyList<AppDefinition> favoriteApps = [];
     private IReadOnlyList<AppShortcut> shortcuts = [];
     private bool favoritesPending;
+
+    // "Onay bekleyenler" kısayolunun sayacı: kullanıcıyı bekleyen onaylar. Panel açılınca okunur; okunamazsa rozet çıkmaz.
+    private int waitingApprovals;
 
     // Kategori menüsü yalnızca birden çok grup görünürken çıkar; aksi halde kartlar tam genişlikte düz listedir.
     private IReadOnlyList<AppRootGroup> groups = [];
@@ -324,6 +335,24 @@
         }
     }
 
+    // Sayaç yalnızca kısayol kullanıcıya görünüyorsa istenir (izni olmayan için uç zaten 403 döner); sunucu kullanıcının
+    // kapsamını uygular. Panel bu arada kapandıysa ya da tenant değiştiyse sonuç yazılmaz.
+    private async Task LoadWaitingApprovalsAsync()
+    {
+        if (shortcuts.All(s => s.Id != AppCatalog.PendingApprovalsShortcut))
+        {
+            return;
+        }
+
+        Guid? tenant = Session.User?.ActiveTenantId;
+        ApprovalOverviewDto? overview = (await Api.GetAsync<ApprovalOverviewDto>("/api/approvals/overview")).Value;
+        if (isOpen && overview is not null && tenant == Session.User?.ActiveTenantId)
+        {
+            waitingApprovals = overview.WaitingForMe;
+            StateHasChanged();
+        }
+    }
+
     private static bool Matches(string name, string text) =>
         System.Globalization.CultureInfo.GetCultureInfo("tr-TR").CompareInfo
             .IndexOf(name, text, System.Globalization.CompareOptions.IgnoreCase) >= 0;
@@ -367,6 +396,7 @@
         query = "";
         category = null;
         favorites = [];
+        waitingApprovals = 0;
     }
 
     private void Toggle()
@@ -430,6 +460,8 @@
                 Recompute();
                 StateHasChanged();
             }
+
+            await LoadWaitingApprovalsAsync();
         }
 
         FocusTarget target = pendingFocus;

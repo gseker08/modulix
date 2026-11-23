@@ -479,6 +479,19 @@ html.app-launcher-open {
     overflow-wrap: anywhere;
 }
 
+/* "Onay bekleyenler" sayacı: kullanıcıyı bekleyen onay sayısı. */
+.app-shortcut-count {
+    flex: none;
+    min-width: 1.6rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: var(--mx-tone-teal-bg);
+    color: var(--mx-tone-teal-fg);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+    text-align: center;
+}
+
 /* Kart ve yıldız düğmesi aynı hücrede: yıldız kartın sağ üst köşesinde, bağlantının dışındadır. */
 .app-card-item {
     position: relative;

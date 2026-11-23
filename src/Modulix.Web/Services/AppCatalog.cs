@@ -180,13 +180,16 @@ public static class AppCatalog
     [
     ];
 
+    /// <summary>"Onay bekleyenler" kısayolu: panelde yanında kullanıcıyı bekleyen onay sayısı gösterilir.</summary>
+    public const string PendingApprovalsShortcut = "approvals.pending";
+
     /// <summary>Paneldeki kısayollar. Yeni kısayol bu listeye satır eklemektir; hedefi var olan bir ekrandır.</summary>
     public static IReadOnlyList<AppShortcut> Shortcuts { get; } =
     [
         new("crm.new-company", "Yeni firma ekle", "building", "crm/firmalar?yeni=1", 10, CrmAccess.ModuleKey, CrmAccess.CompaniesWrite),
         new("support.new-ticket", "Destek talebi oluştur", "message-square", "destek/talepler/yeni", 20, SupportAccess.ModuleKey, SupportAccess.TicketsCreate),
         new("logistics.shipments", "Sevkiyat takibi", "truck", "lojistik/sevkiyatlar", 30, LogisticsAccess.ModuleKey, LogisticsAccess.ShipmentsRead),
-        new("approvals.pending", "Onay bekleyenler", "check-circle", "onaylar", 40, AnyPermission: [CoreAccess.RequestApprovals, CoreAccess.DecideApprovals, CoreAccess.ManageApprovals]),
+        new(PendingApprovalsShortcut, "Onay bekleyenler", "check-circle", "onaylar", 40, AnyPermission: [CoreAccess.RequestApprovals, CoreAccess.DecideApprovals, CoreAccess.ManageApprovals]),
     ];
 
     public static IReadOnlyList<AppDefinition> All { get; } =

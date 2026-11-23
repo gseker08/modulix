@@ -104,6 +104,7 @@
   "shell.launcher.favorites.remove": "Remove from favourites: {0}",
   "shell.launcher.shortcuts": "Shortcuts",
   "shell.launcher.shortcuts.subtitle": "Quick access to the things you do most.",
+  "shell.launcher.shortcuts.waiting": "{0} approvals waiting for you",
   "shell.search.label": "Search",
   "shell.search.placeholder": "Search...",
   "shell.search.results": "Search results",
