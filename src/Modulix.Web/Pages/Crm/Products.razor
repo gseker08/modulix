@@ -701,15 +701,12 @@
     {
         busy = true;
         message = null;
-        var targets = (page?.Items ?? []).Where(p => picked.Contains(p.Id) && p.Status != "Active").ToList();
+        var targets = (page?.Items ?? []).Where(p => picked.Contains(p.Id) && ProductBulkActivation.NeedsActivation(p)).ToList();
         var failures = new List<string>();
         var done = 0;
         foreach (var p in targets)
         {
-            var request = new SaveProductRequest(
-                p.Code, p.Name, p.BaseUnitId, p.Kind, "Active", p.Description, p.CategoryId, p.ExternalCode, p.Barcode, p.Brand, p.Model, p.Tags,
-                p.SaleStart, p.SaleEnd, p.TaxCategory, p.PriceIncludesTax, p.QuantityPrecision, p.Cost, p.CostCurrency ?? "TRY",
-                p.ServiceDurationMinutes, p.DeliveryMode, p.ChargeType, p.RecurringPeriod, p.Version);
+            var request = ProductBulkActivation.ActivationRequest(p);
             var result = await Api.PutAsync<ProductDto>($"{Url}/{p.Id}", request);
             if (result.IsSuccess)
             {
