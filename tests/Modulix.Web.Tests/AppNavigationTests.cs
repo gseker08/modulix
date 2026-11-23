@@ -505,6 +505,50 @@ public class AppNavigationTests
     }
 
     [Fact]
+    public void Shortcuts_list_the_ones_the_user_can_use()
+    {
+        var nav = Nav(
+            [CrmAccess.ModuleKey, SupportAccess.ModuleKey, LogisticsAccess.ModuleKey],
+            [CrmAccess.CompaniesWrite, SupportAccess.TicketsCreate, LogisticsAccess.ShipmentsRead, CoreAccess.DecideApprovals]);
+
+        Assert.Equal(
+            ["crm.new-company", "support.new-ticket", "logistics.shipments", "approvals.pending"],
+            nav.Shortcuts().Select(s => s.Id));
+    }
+
+    [Fact]
+    public void Shortcut_without_permission_is_hidden()
+    {
+        // Okuma izni yazma kısayolunu açmaz; izni olmayan kullanıcı kısayol görmez.
+        var reader = Nav([CrmAccess.ModuleKey, SupportAccess.ModuleKey], [CrmAccess.CompaniesRead, SupportAccess.TicketsRead]);
+
+        Assert.Empty(reader.Shortcuts());
+    }
+
+    [Fact]
+    public void Shortcut_of_a_module_that_is_not_enabled_for_the_tenant_is_hidden()
+    {
+        // Tenant izolasyonu: başka firmada açık olan modülün kısayolu, modülü kapalı firmada izin olsa da çıkmaz.
+        var nav = Nav([CrmAccess.ModuleKey], [CrmAccess.CompaniesWrite, SupportAccess.TicketsCreate, LogisticsAccess.ShipmentsRead]);
+
+        Assert.Equal(["crm.new-company"], nav.Shortcuts().Select(s => s.Id));
+    }
+
+    [Fact]
+    public void Shortcut_catalog_is_consistent()
+    {
+        var ids = AppCatalog.Shortcuts.Select(s => s.Id).ToList();
+        Assert.Equal(ids.Count, ids.Distinct().Count());
+
+        // Her kısayol var olan bir ekrana gider ve korumasız değildir.
+        Assert.All(AppCatalog.Shortcuts, s =>
+        {
+            Assert.NotNull(AppNavigation.Resolve(s.Route));
+            Assert.True(s.Permission is not null || s.AnyPermission is { Count: > 0 }, s.Id);
+        });
+    }
+
+    [Fact]
     public void Catalog_is_consistent()
     {
         var ids = AppCatalog.All.Select(a => a.Id).ToList();

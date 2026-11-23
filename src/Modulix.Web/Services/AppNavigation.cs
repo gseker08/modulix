@@ -46,6 +46,15 @@ public sealed class AppNavigation(SessionState session)
         return app.AnyPermission is null || session.CanAny(app.AnyPermission);
     }
 
+    /// <summary>Kullanıcının kullanabildiği panel kısayolları, sıralı: modülü açık ve izni olanlar.</summary>
+    public IReadOnlyList<AppShortcut> Shortcuts() =>
+        AppCatalog.Shortcuts
+            .Where(s => (s.ModuleKey is null || session.IsModuleEnabled(s.ModuleKey))
+                && (s.Permission is null || session.Can(s.Permission))
+                && (s.AnyPermission is null || session.CanAny(s.AnyPermission)))
+            .OrderBy(s => s.Order)
+            .ToList();
+
     /// <summary>Kullanıcının görebildiği alt uygulamalar, sıralı.</summary>
     public IReadOnlyList<AppDefinition> Children(string parentId) => Children(parentId, IsVisible);
 

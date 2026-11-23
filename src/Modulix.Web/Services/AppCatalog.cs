@@ -36,6 +36,28 @@ public sealed record HostPlacement(string Group, string? Name, int Order, string
 public sealed record PlannedApp(string Id, string Name, string Icon);
 
 /// <summary>
+/// Paneldeki "Kısayollar" satırı: sık yapılan bir işleme doğrudan giden bağlantı. Görünürlük uygulamalarla aynı kurala bağlıdır
+/// (modül açık + izin; <see cref="AppNavigation.Shortcuts"/>); gizlemek yetkilendirme değildir, hedef ekran ve sunucu yine denetler.
+/// </summary>
+/// <param name="Id">Benzersiz kısayol kimliği (çevirisi <c>nav.shortcut.{id}</c>).</param>
+/// <param name="Name">Kullanıcıya görünen ad (Türkçe kaynak metin).</param>
+/// <param name="Icon">İkon adı (<c>AppIcon</c>).</param>
+/// <param name="Route">Tabana göreli hedef adres.</param>
+/// <param name="Order">Sıra.</param>
+/// <param name="ModuleKey">Tenant için açık olması gereken modül; çekirdek ekranı için <c>null</c>.</param>
+/// <param name="Permission">Gereken izin.</param>
+/// <param name="AnyPermission">Bunlardan en az biri gerekir.</param>
+public sealed record AppShortcut(
+    string Id,
+    string Name,
+    string Icon,
+    string Route,
+    int Order,
+    string? ModuleKey = null,
+    string? Permission = null,
+    IReadOnlyList<string>? AnyPermission = null);
+
+/// <summary>
 /// Uygulama menüsünün (Modulix paneli) ve sol menünün ortak tanımı. <see cref="ParentId"/> boşsa ana uygulama (modül
 /// ya da alan), doluysa onun alt uygulamasıdır. Görünürlük <see cref="AppNavigation"/> ile oturumdan hesaplanır;
 /// menüde gizlemek yetkilendirme değildir, route ve sunucu denetimleri aynen geçerlidir.
@@ -158,6 +180,18 @@ public static class AppCatalog
     [
     ];
 
+    /// <summary>"Onay bekleyenler" kısayolu: panelde yanında kullanıcıyı bekleyen onay sayısı gösterilir.</summary>
+    public const string PendingApprovalsShortcut = "approvals.pending";
+
+    /// <summary>Paneldeki kısayollar. Yeni kısayol bu listeye satır eklemektir; hedefi var olan bir ekrandır.</summary>
+    public static IReadOnlyList<AppShortcut> Shortcuts { get; } =
+    [
+        new("crm.new-company", "Yeni firma ekle", "building", "crm/firmalar?yeni=1", 10, CrmAccess.ModuleKey, CrmAccess.CompaniesWrite),
+        new("support.new-ticket", "Destek talebi oluştur", "message-square", "destek/talepler/yeni", 20, SupportAccess.ModuleKey, SupportAccess.TicketsCreate),
+        new("logistics.shipments", "Sevkiyat takibi", "truck", "lojistik/sevkiyatlar", 30, LogisticsAccess.ModuleKey, LogisticsAccess.ShipmentsRead),
+        new(PendingApprovalsShortcut, "Onay bekleyenler", "check-circle", "onaylar", 40, AnyPermission: [CoreAccess.RequestApprovals, CoreAccess.DecideApprovals, CoreAccess.ManageApprovals]),
+    ];
+
     public static IReadOnlyList<AppDefinition> All { get; } =
     [
         new(Crm, null, "CRM", "users", null, 10, ModuleKey: CrmAccess.ModuleKey, Group: SalesGroup, Description: "Müşteri ilişkilerini yönetin, fırsatları takip edin."),
@@ -260,7 +294,7 @@ public static class AppCatalog
         new("logistics.drivers", Logistics, "Sürücüler", "user", "lojistik/suruculer", 10, LogisticsAccess.ModuleKey, LogisticsAccess.DriversRead),
         new("logistics.carrier-terms", Logistics, "Taşıyıcı anlaşmaları", "file-text", "lojistik/tasiyici-anlasmalari", 20, LogisticsAccess.ModuleKey, LogisticsAccess.CarriersRead, Tone: AppTone.Teal),
         new("logistics.credentials", Logistics, "Sürücü belgeleri", "calendar", "lojistik/surucu-belgeleri", 30, LogisticsAccess.ModuleKey, LogisticsAccess.DriversRead, Tone: AppTone.Indigo),
-        new(Hr, null, "İnsan Kaynakları", "users", null, 50, ModuleKey: HrAccess.ModuleKey, Tone: AppTone.Teal, Group: ManagementGroup, Description: "Çalışan, izin ve masraf süreçlerini yönetin."),
+        new(Hr, null, "İnsan Kaynakları", "users", null, 50, ModuleKey: HrAccess.ModuleKey, Tone: AppTone.Teal, Group: ManagementGroup, Description: "Çalışan, izin ve masraf süreçlerini yönetin.", Art: "hr"),
         new("hr.employees", Hr, "Çalışanlar", "users", "ik/calisanlar", 10, HrAccess.ModuleKey, HrAccess.EmployeesRead),
         new("hr.directory", Hr, "Rehber", "phone", "ik/rehber", 20, HrAccess.ModuleKey, HrAccess.EmployeesRead, Tone: AppTone.Teal),
         new("hr.org-chart", Hr, "Organizasyon şeması", "layers", "ik/organizasyon-semasi", 30, HrAccess.ModuleKey, HrAccess.EmployeesRead),
