@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Marketing.Domain;
 
@@ -19,7 +20,7 @@ internal sealed class CampaignResponseRecordStore(MarketingStoreContext context)
 
     protected override IReadOnlyList<RecordField<CampaignResponse>> Fields { get; } =
     [
-        Field.Reference<CampaignResponse, Campaign>("campaignId", "Kampanya bulunamadı.", r => r.CampaignId, (r, v) => r.CampaignId = v ?? Guid.Empty, required: true, createOnly: true).AsSystem(),
+        Field.Reference<CampaignResponse, Campaign>("campaignId", MarketingMessages.NotFound.Campaign, r => r.CampaignId, (r, v) => r.CampaignId = v ?? Guid.Empty, required: true, createOnly: true).AsSystem(),
         Field.Id<CampaignResponse>("runId", r => r.RunId, (r, v) => r.RunId = v).AsSystem(),
         Field.Id<CampaignResponse>("deliveryId", r => r.DeliveryId, (r, v) => r.DeliveryId = v ?? Guid.Empty).AsSystem(),
         Field.Id<CampaignResponse>("targetId", r => r.TargetId, (r, v) => r.TargetId = v ?? Guid.Empty).AsSystem(),
@@ -67,5 +68,5 @@ internal sealed class CampaignResponseRecordStore(MarketingStoreContext context)
     }
 
     protected override Task BeforeDeleteAsync(CampaignResponse entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Yanıt kaydı silinmez; kapatın.");
+        throw new RecordConflictException(MarketingMessages.Response.NoDelete);
 }

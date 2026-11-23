@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Communication;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Marketing.Domain;
 using Modulix.Modules.Marketing.Runs;
@@ -27,7 +28,7 @@ internal sealed class CampaignContentRecordStore(MarketingStoreContext context) 
 
     protected override IReadOnlyList<RecordField<CampaignContent>> Fields { get; } =
     [
-        Field.Reference<CampaignContent, Campaign>("campaignId", "Kampanya bulunamadı.", c => c.CampaignId, (c, v) => c.CampaignId = v ?? Guid.Empty, required: true, createOnly: true),
+        Field.Reference<CampaignContent, Campaign>("campaignId", MarketingMessages.NotFound.Campaign, c => c.CampaignId, (c, v) => c.CampaignId = v ?? Guid.Empty, required: true, createOnly: true),
         Field.Integer<CampaignContent>("versionNo", c => c.VersionNo, (c, v) => c.VersionNo = v ?? 0).AsSystem(),
         Field.Text<CampaignContent>("subject", CampaignContent.SubjectMaxLength, c => c.Subject, (c, v) => c.Subject = v),
         Field.Text<CampaignContent>("body", CampaignContent.BodyMaxLength, c => c.Body, (c, v) => c.Body = v ?? string.Empty, required: true),
@@ -68,13 +69,13 @@ internal sealed class CampaignContentRecordStore(MarketingStoreContext context) 
     {
         if (!isNew)
         {
-            throw new RecordConflictException("Yayımlanmış içerik sürümü değiştirilemez; yeni sürüm oluşturun.");
+            throw new RecordConflictException(MarketingMessages.Content.PublishedLocked);
         }
 
         var campaign = await Context.Data.Set<Campaign>().AsNoTracking().SingleAsync(c => c.Id == entity.CampaignId, cancellationToken);
         if (campaign.Status == CampaignStatuses.Archived)
         {
-            throw new RecordConflictException("Arşivlenen kampanyaya içerik eklenemez.");
+            throw new RecordConflictException(MarketingMessages.Content.ArchivedNoAdd);
         }
 
         var errors = ContentRules.Validate(Enum.Parse<CommunicationChannel>(campaign.Channel), entity.Subject, entity.Body);
@@ -87,7 +88,7 @@ internal sealed class CampaignContentRecordStore(MarketingStoreContext context) 
     }
 
     protected override Task BeforeDeleteAsync(CampaignContent entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("İçerik sürümü silinemez.");
+        throw new RecordConflictException(MarketingMessages.Content.NoDelete);
 }
 
 /// <summary>
@@ -104,7 +105,7 @@ internal sealed class CampaignRunRecordStore(MarketingStoreContext context) : Ma
 
     protected override IReadOnlyList<RecordField<CampaignRun>> Fields { get; } =
     [
-        Field.Reference<CampaignRun, Campaign>("campaignId", "Kampanya bulunamadı.", r => r.CampaignId, (r, v) => r.CampaignId = v ?? Guid.Empty, required: true, createOnly: true),
+        Field.Reference<CampaignRun, Campaign>("campaignId", MarketingMessages.NotFound.Campaign, r => r.CampaignId, (r, v) => r.CampaignId = v ?? Guid.Empty, required: true, createOnly: true),
         Field.Id<CampaignRun>("snapshotId", r => r.SnapshotId, (r, v) => r.SnapshotId = v),
         Field.Id<CampaignRun>("contentId", r => r.ContentId, (r, v) => r.ContentId = v),
         Field.Time<CampaignRun>("scheduledAt", r => r.ScheduledAt, (r, v) => r.ScheduledAt = v),
@@ -138,7 +139,7 @@ internal sealed class CampaignRunRecordStore(MarketingStoreContext context) : Ma
     {
         if (!isNew && !Context.Gate.IsOpen && !RunTransitions.IsEditable(entity.Status))
         {
-            throw new RecordConflictException("Onaya gönderilmiş çalıştırma düzenlenemez; önce taslağa alın (onay yeniden alınır).");
+            throw new RecordConflictException(MarketingMessages.Run.SubmittedLocked);
         }
 
         if (Context.Gate.IsOpen)
@@ -152,24 +153,24 @@ internal sealed class CampaignRunRecordStore(MarketingStoreContext context) : Ma
         var campaign = await Context.Data.Set<Campaign>().AsNoTracking().SingleAsync(c => c.Id == entity.CampaignId, cancellationToken);
         if (campaign.Status == CampaignStatuses.Archived)
         {
-            throw new RecordConflictException("Arşivlenen kampanyada çalıştırma oluşturulamaz ya da düzenlenemez.");
+            throw new RecordConflictException(MarketingMessages.Run.ArchivedLocked);
         }
 
         if (entity.SnapshotId is { } snapshotId
             && !await Context.Data.Set<AudienceSnapshot>().AsNoTracking().AnyAsync(s => s.Id == snapshotId && s.CampaignId == entity.CampaignId, cancellationToken))
         {
-            errors.Add(new RecordFieldError("snapshotId", "Hedef kitle anlık görüntüsü bu kampanyada bulunamadı."));
+            errors.Add(new RecordFieldError("snapshotId", MarketingMessages.Run.SnapshotMissing));
         }
 
         if (entity.ContentId is { } contentId
             && !await Context.Data.Set<CampaignContent>().AsNoTracking().AnyAsync(c => c.Id == contentId && c.CampaignId == entity.CampaignId, cancellationToken))
         {
-            errors.Add(new RecordFieldError("contentId", "İçerik sürümü bu kampanyada bulunamadı."));
+            errors.Add(new RecordFieldError("contentId", MarketingMessages.Run.ContentMissing));
         }
 
         if (values.ContainsKey("scheduledAt") && entity.ScheduledAt is { } at && at <= Context.Time.GetUtcNow())
         {
-            errors.Add(new RecordFieldError("scheduledAt", "Planlanan zaman geçmişte olamaz."));
+            errors.Add(new RecordFieldError("scheduledAt", MarketingMessages.Run.ScheduledPast));
         }
 
         if (errors.Count > 0)
@@ -191,7 +192,7 @@ internal sealed class CampaignRunRecordStore(MarketingStoreContext context) : Ma
     }
 
     protected override Task BeforeDeleteAsync(CampaignRun entity, CancellationToken cancellationToken) =>
-        entity.Status == RunStatuses.Draft ? Task.CompletedTask : throw new RecordConflictException("Yalnızca taslak çalıştırma silinir; diğerleri iptal edilir.");
+        entity.Status == RunStatuses.Draft ? Task.CompletedTask : throw new RecordConflictException(MarketingMessages.Run.OnlyDraftDelete);
 }
 
 /// <summary>Kapsam yardımcısı: kampanya kimliği taşıyan kayıt, kampanyanın sorumlusu veri kapsamındaysa görünür.</summary>

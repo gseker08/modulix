@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Marketing.Domain;
@@ -92,30 +93,30 @@ internal sealed partial class SegmentRecordStore(MarketingStoreContext context) 
         var errors = new List<RecordFieldError>();
         if (!CodePattern().IsMatch(entity.Code))
         {
-            errors.Add(new RecordFieldError("code", "Kod 2-40 karakter olmalı; küçük harf, rakam ve tire kullanılabilir (ör. tekstil-marmara)."));
+            errors.Add(new RecordFieldError("code", MarketingMessages.Segment.CodeFormat));
         }
 
         if (!isNew && before.TryGetValue(entity.Id, out var old))
         {
             if (old.Code != entity.Code)
             {
-                errors.Add(new RecordFieldError("code", "Kod oluşturulduktan sonra değiştirilemez."));
+                errors.Add(new RecordFieldError("code", MarketingMessages.Segment.CodeLocked));
             }
 
             if (old.Target != entity.Target)
             {
-                errors.Add(new RecordFieldError("target", "Hedef türü oluşturulduktan sonra değiştirilemez."));
+                errors.Add(new RecordFieldError("target", MarketingMessages.Segment.TargetLocked));
             }
 
             if (old.Kind != entity.Kind)
             {
-                errors.Add(new RecordFieldError("kind", "Segment türü (statik/dinamik) oluşturulduktan sonra değiştirilemez."));
+                errors.Add(new RecordFieldError("kind", MarketingMessages.Segment.KindLocked));
             }
         }
 
         if (entity.Kind == SegmentKinds.Static && !string.IsNullOrEmpty(entity.Draft))
         {
-            errors.Add(new RecordFieldError("draft", "Statik segmentin koşulu olmaz; üyeler elle seçilir."));
+            errors.Add(new RecordFieldError("draft", MarketingMessages.Segment.StaticNoCondition));
         }
         else if (!string.IsNullOrEmpty(entity.Draft) && values.ContainsKey("draft"))
         {
@@ -137,7 +138,7 @@ internal sealed partial class SegmentRecordStore(MarketingStoreContext context) 
 
         if (!isNew && entity.Status == SegmentStatuses.Archived && !Context.Gate.IsOpen)
         {
-            throw new RecordConflictException("Arşivlenen segment düzenlenemez; önce geri alın.");
+            throw new RecordConflictException(MarketingMessages.Segment.ArchivedLocked);
         }
 
         if (await Context.Data.Set<Segment>().AsNoTracking().AnyAsync(s => s.Code == entity.Code && s.Id != entity.Id, cancellationToken))
@@ -157,7 +158,7 @@ internal sealed partial class SegmentRecordStore(MarketingStoreContext context) 
         if (entity.PublishedVersion > 0
             || await Context.Data.Set<SegmentMember>().AnyAsync(m => m.SegmentId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Yayımlanmış ya da üyesi olan segment silinemez; arşivleyin.");
+            throw new RecordConflictException(MarketingMessages.Segment.NoDelete);
         }
     }
 
@@ -188,7 +189,7 @@ internal sealed class SegmentMemberRecordStore(MarketingStoreContext context) : 
 
     protected override IReadOnlyList<RecordField<SegmentMember>> Fields { get; } =
     [
-        Field.Reference<SegmentMember, Segment>("segmentId", "Segment bulunamadı.", m => m.SegmentId, (m, v) => m.SegmentId = v ?? Guid.Empty, required: true, createOnly: true),
+        Field.Reference<SegmentMember, Segment>("segmentId", MarketingMessages.NotFound.Segment, m => m.SegmentId, (m, v) => m.SegmentId = v ?? Guid.Empty, required: true, createOnly: true),
         Field.Id<SegmentMember>("targetId", m => m.TargetId, (m, v) => m.TargetId = v ?? Guid.Empty),
         Field.Choice<SegmentMember>("kind", MemberKinds.All, m => m.Kind, (m, v) => m.Kind = v),
         Field.Text<SegmentMember>("reason", SegmentMember.ReasonMaxLength, m => m.Reason, (m, v) => m.Reason = v),
@@ -237,7 +238,7 @@ internal sealed class SegmentMemberRecordStore(MarketingStoreContext context) : 
 
         if (!isNew && before.TryGetValue(entity.Id, out var old) && old.TargetId != entity.TargetId)
         {
-            errors.Add(new RecordFieldError("targetId", "Hedef oluşturulduktan sonra değiştirilemez; üyeyi silip yeniden ekleyin."));
+            errors.Add(new RecordFieldError("targetId", MarketingMessages.Segment.MemberTargetLocked));
         }
 
         if (errors.Count > 0)
@@ -248,12 +249,12 @@ internal sealed class SegmentMemberRecordStore(MarketingStoreContext context) : 
         var segment = await Context.Data.Set<Segment>().AsNoTracking().SingleAsync(s => s.Id == entity.SegmentId, cancellationToken);
         if (segment.Status == SegmentStatuses.Archived)
         {
-            throw new RecordConflictException("Arşivlenen segmentin üyeleri değiştirilemez.");
+            throw new RecordConflictException(MarketingMessages.Segment.MemberArchivedLocked);
         }
 
         if (segment.Kind == SegmentKinds.Static && entity.Kind == MemberKinds.Exclude)
         {
-            throw new RecordValidationException([new RecordFieldError("kind", "Statik segmentte yalnızca dahil edilen üye bulunur.")]);
+            throw new RecordValidationException([new RecordFieldError("kind", MarketingMessages.Segment.MemberStaticOnly)]);
         }
 
         if (isNew)
@@ -268,13 +269,13 @@ internal sealed class SegmentMemberRecordStore(MarketingStoreContext context) : 
             // Hedef çağıranın yetkisi ve veri kapsamıyla okunur; başka tenant'ın ya da erişemediği kayıt aynı hatayı verir.
             if (await Context.ReadRecordAsync(key, entity.TargetId, cancellationToken) is null)
             {
-                throw new RecordValidationException([new RecordFieldError("targetId", "Hedef kayıt bulunamadı ya da erişiminiz yok.")]);
+                throw new RecordValidationException([new RecordFieldError("targetId", MarketingMessages.Audience.TargetInaccessible)]);
             }
 
             if (await Context.Data.Set<SegmentMember>().AsNoTracking()
                     .AnyAsync(m => m.SegmentId == entity.SegmentId && m.TargetId == entity.TargetId && m.Id != entity.Id, cancellationToken))
             {
-                throw new RecordConflictException("Bu kayıt segmentte zaten var.");
+                throw new RecordConflictException(MarketingMessages.Segment.MemberAlreadyIn);
             }
         }
 
@@ -342,11 +343,11 @@ internal sealed class SegmentVersionRecordStore(MarketingStoreContext context) :
     protected override Task<JsonObject> PrepareNewAsync(SegmentVersion entity, JsonObject values, CancellationToken cancellationToken) =>
         Context.Gate.IsOpen
             ? Task.FromResult(values)
-            : throw new RecordValidationException([new RecordFieldError("segmentId", "Sürüm yalnızca yayım eylemiyle oluşur.")]);
+            : throw new RecordValidationException([new RecordFieldError("segmentId", MarketingMessages.Segment.VersionViaPublish)]);
 
     protected override Task AppliedAsync(SegmentVersion entity, JsonObject values, bool isNew, CancellationToken cancellationToken) =>
-        isNew ? Task.CompletedTask : throw new RecordConflictException("Yayımlanmış sürüm değiştirilemez.");
+        isNew ? Task.CompletedTask : throw new RecordConflictException(MarketingMessages.Segment.VersionLocked);
 
     protected override Task BeforeDeleteAsync(SegmentVersion entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Yayımlanmış sürüm silinemez.");
+        throw new RecordConflictException(MarketingMessages.Segment.VersionNoDelete);
 }
