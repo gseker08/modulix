@@ -5,6 +5,7 @@ using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Orders.Domain;
 using Modulix.Modules.Orders.Records;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Orders.Lifecycle;
 
@@ -228,7 +229,7 @@ internal sealed class OperationJobs(
         var rule = JobTransitions.Can(action, state);
         if (!rule.Allowed)
         {
-            return RecordResult<OperationJobView>.Fail(RecordErrorCode.Conflict, rule.Message ?? "Bu işlem şu an yapılamaz.", [new RecordFieldError(rule.Code ?? "status", rule.Message ?? string.Empty)]);
+            return RecordResult<OperationJobView>.Fail(RecordErrorCode.Conflict, rule.Message ?? OrdersMessages.Workflow.NotNow, [new RecordFieldError(rule.Code ?? "status", rule.Message ?? OrdersMessages.Workflow.NotNow)]);
         }
 
         var now = time.GetUtcNow();
@@ -491,7 +492,7 @@ internal sealed class OperationJobs(
         foreach (var action in JobAction.All.Where(a => granted.Contains(PermissionOf[a])))
         {
             var rule = JobTransitions.Can(action, state);
-            actions.Add(new JobActionState(action, rule.Allowed, rule.Code, rule.Message, JobTransitions.RequiresReason(action)));
+            actions.Add(new JobActionState(action, rule.Allowed, rule.Code, rule.Message?.Text, JobTransitions.RequiresReason(action)));
         }
 
         var events = await reader.JobEventsAsync(job.Id, cancellationToken);

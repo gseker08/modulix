@@ -1,3 +1,5 @@
+using Modulix.Core.Contracts.Localization;
+
 namespace Modulix.Modules.Orders.Lifecycle;
 
 public static class HandoverPriority
@@ -118,31 +120,31 @@ public static class HandoverRules
             case HandoverAction.Send:
                 if (orderStatus != OrderStatus.Approved)
                 {
-                    return OrderRuleResult.Deny("order-not-approved", "Devir yalnızca onaylanmış siparişten operasyona gönderilebilir.");
+                    return OrderRuleResult.Deny("order-not-approved", OrdersMessages.HandoverRule.OrderNotApproved);
                 }
 
                 if (status is HandoverStatus.Sent)
                 {
-                    return OrderRuleResult.Deny("already-sent", "Devir zaten operasyona gönderilmiş.");
+                    return OrderRuleResult.Deny("already-sent", OrdersMessages.HandoverRule.AlreadySent);
                 }
 
                 if (status is HandoverStatus.Accepted)
                 {
-                    return OrderRuleResult.Deny("accepted", "Devir operasyon tarafından kabul edilmiş.");
+                    return OrderRuleResult.Deny("accepted", OrdersMessages.HandoverRule.Accepted);
                 }
 
                 return missing.Count == 0
                     ? OrderRuleResult.Ok
-                    : OrderRuleResult.Deny("missing-info", "Zorunlu bilgi ya da belgeler eksik: " + missing[0] + (missing.Count > 1 ? $" (+{missing.Count - 1} eksik daha)" : string.Empty));
+                    : OrderRuleResult.Deny("missing-info", missing.Count > 1 ? OrdersMessages.HandoverRule.MissingInfoMore(missing[0], missing.Count - 1) : OrdersMessages.HandoverRule.MissingInfo(missing[0]));
 
             case HandoverAction.RequestInfo:
             case HandoverAction.Accept:
                 return status == HandoverStatus.Sent
                     ? OrderRuleResult.Ok
-                    : OrderRuleResult.Deny("not-sent", "Yalnızca operasyona gönderilmiş ve henüz karara bağlanmamış devir için yapılabilir.");
+                    : OrderRuleResult.Deny("not-sent", OrdersMessages.HandoverRule.NotSent);
 
             default:
-                return OrderRuleResult.Deny("unknown", "Bilinmeyen eylem.");
+                return OrderRuleResult.Deny("unknown", OrdersMessages.Workflow.UnknownAction);
         }
     }
 

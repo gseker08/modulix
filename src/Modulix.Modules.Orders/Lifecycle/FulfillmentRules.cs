@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Modulix.Modules.Orders.Domain;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Orders.Lifecycle;
 
@@ -95,7 +96,7 @@ public static class FulfillmentCalculator
 
 public sealed record QuantityRequest(Guid LineId, decimal Quantity);
 
-public readonly record struct DeliveryError(string Field, string Message);
+public readonly record struct DeliveryError(string Field, ServerMessage Message);
 
 /// <summary>Teslimat miktar kuralları (saf): fazla teslimat ve planlama aşımı sunucuda engellenir.</summary>
 public static class DeliveryRules
@@ -110,37 +111,37 @@ public static class DeliveryRules
         var errors = new List<DeliveryError>();
         if (requested.Count == 0)
         {
-            errors.Add(new DeliveryError("lines", "Teslimat için en az bir kalem ve miktar girin."));
+            errors.Add(new DeliveryError("lines", OrdersMessages.FulfillmentRule.PlanNeedLine));
             return errors;
         }
 
         if (requested.Select(r => r.LineId).Distinct().Count() != requested.Count)
         {
-            errors.Add(new DeliveryError("lines", "Aynı kalem birden çok kez verilemez."));
+            errors.Add(new DeliveryError("lines", OrdersMessages.FulfillmentRule.PlanDuplicate));
         }
 
         foreach (var request in requested)
         {
             if (!lines.TryGetValue(request.LineId, out var line))
             {
-                errors.Add(new DeliveryError("lines", "Teslimattaki kalemlerden biri bu siparişte yok ya da iptal edilmiş."));
+                errors.Add(new DeliveryError("lines", OrdersMessages.FulfillmentRule.PlanLineMissing));
                 continue;
             }
 
             if (!LineKinds.IsDeliverable(line.Kind))
             {
-                errors.Add(new DeliveryError("lines", $"'{line.Name}' bir ürün kalemi değil; hizmet kalemleri başlangıç kaydıyla izlenir."));
+                errors.Add(new DeliveryError("lines", OrdersMessages.FulfillmentRule.PlanNotProduct(line.Name)));
             }
             else if (request.Quantity <= 0m)
             {
-                errors.Add(new DeliveryError("lines", $"'{line.Name}' miktarı sıfırdan büyük olmalıdır."));
+                errors.Add(new DeliveryError("lines", OrdersMessages.FulfillmentRule.PlanQuantityPositive(line.Name)));
             }
             else
             {
                 var capacity = line.Remaining - plannedElsewhere.GetValueOrDefault(request.LineId);
                 if (request.Quantity > capacity)
                 {
-                    errors.Add(new DeliveryError("lines", $"'{line.Name}' için en fazla {Math.Max(0m, capacity):0.####} planlanabilir (kalan {line.Remaining:0.####}, başka teslimatlarda planlı {plannedElsewhere.GetValueOrDefault(request.LineId):0.####})."));
+                    errors.Add(new DeliveryError("lines", OrdersMessages.FulfillmentRule.PlanCapacity(line.Name, OrdersMessages.Q(Math.Max(0m, capacity)), OrdersMessages.Q(line.Remaining), OrdersMessages.Q(plannedElsewhere.GetValueOrDefault(request.LineId)))));
                 }
             }
         }
@@ -157,7 +158,7 @@ public static class DeliveryRules
         var errors = new List<DeliveryError>();
         if (actual.All(a => a.Quantity <= 0m))
         {
-            errors.Add(new DeliveryError("lines", "Teslim edilen miktar sıfırdan büyük olmalıdır; teslim edilemediyse teslimatı başarısız işaretleyin."));
+            errors.Add(new DeliveryError("lines", OrdersMessages.FulfillmentRule.DeliverPositive));
             return errors;
         }
 
@@ -169,11 +170,11 @@ public static class DeliveryRules
             }
             else if (item.Quantity < 0m)
             {
-                errors.Add(new DeliveryError("lines", $"'{line.Name}' miktarı negatif olamaz."));
+                errors.Add(new DeliveryError("lines", OrdersMessages.FulfillmentRule.DeliverNegative(line.Name)));
             }
             else if (item.Quantity > line.Remaining)
             {
-                errors.Add(new DeliveryError("lines", $"'{line.Name}' için fazla teslimat girilemez: kalan {line.Remaining:0.####}, girilen {item.Quantity:0.####}."));
+                errors.Add(new DeliveryError("lines", OrdersMessages.FulfillmentRule.DeliverExcess(line.Name, OrdersMessages.Q(line.Remaining), OrdersMessages.Q(item.Quantity))));
             }
         }
 
@@ -188,17 +189,17 @@ public static class FulfillmentTransitions
     {
         if (orderStatus != OrderStatus.Approved && action != DeliveryAction.Cancel)
         {
-            return OrderRuleResult.Deny("order-not-approved", "Teslimat yalnızca onaylanmış siparişte kaydedilir.");
+            return OrderRuleResult.Deny("order-not-approved", OrdersMessages.FulfillmentRule.OrderNotApproved);
         }
 
         return action switch
         {
             DeliveryAction.Deliver or DeliveryAction.Fail or DeliveryAction.Cancel =>
-                status == DeliveryStatus.Planned ? OrderRuleResult.Ok : OrderRuleResult.Deny("not-planned", "Yalnızca planlı teslimat için yapılabilir."),
+                status == DeliveryStatus.Planned ? OrderRuleResult.Ok : OrderRuleResult.Deny("not-planned", OrdersMessages.FulfillmentRule.NotPlanned),
             DeliveryAction.Reschedule => status != DeliveryStatus.Failed
-                ? OrderRuleResult.Deny("not-failed", "Yalnızca başarısız teslimat yeniden planlanır.")
-                : alreadyRescheduled ? OrderRuleResult.Deny("already-rescheduled", "Bu başarısız teslimat zaten yeniden planlanmış.") : OrderRuleResult.Ok,
-            _ => OrderRuleResult.Deny("unknown", "Bilinmeyen eylem."),
+                ? OrderRuleResult.Deny("not-failed", OrdersMessages.FulfillmentRule.NotFailed)
+                : alreadyRescheduled ? OrderRuleResult.Deny("already-rescheduled", OrdersMessages.FulfillmentRule.AlreadyRescheduled) : OrderRuleResult.Ok,
+            _ => OrderRuleResult.Deny("unknown", OrdersMessages.Workflow.UnknownAction),
         };
     }
 
@@ -206,10 +207,10 @@ public static class FulfillmentTransitions
 
     public static OrderRuleResult CanServiceAct(string action, string status) => action switch
     {
-        ServiceAction.Start => status == ServiceStatus.Planned ? OrderRuleResult.Ok : OrderRuleResult.Deny("not-planned", status == ServiceStatus.Started ? "Hizmet zaten başlamış." : "Hizmet zaten tamamlanmış."),
-        ServiceAction.Confirm => status == ServiceStatus.Started ? OrderRuleResult.Ok : OrderRuleResult.Deny("not-started", "Müşteri başlangıç onayı yalnızca başlamış hizmet için girilir."),
-        ServiceAction.Complete => status == ServiceStatus.Started ? OrderRuleResult.Ok : OrderRuleResult.Deny("not-started", status == ServiceStatus.Planned ? "Hizmet başlamadan tamamlanamaz." : "Hizmet zaten tamamlanmış."),
-        _ => OrderRuleResult.Deny("unknown", "Bilinmeyen eylem."),
+        ServiceAction.Start => status == ServiceStatus.Planned ? OrderRuleResult.Ok : OrderRuleResult.Deny("not-planned", status == ServiceStatus.Started ? OrdersMessages.FulfillmentRule.ServiceAlreadyStarted : OrdersMessages.FulfillmentRule.ServiceAlreadyCompleted),
+        ServiceAction.Confirm => status == ServiceStatus.Started ? OrderRuleResult.Ok : OrderRuleResult.Deny("not-started", OrdersMessages.FulfillmentRule.ConfirmNeedsStarted),
+        ServiceAction.Complete => status == ServiceStatus.Started ? OrderRuleResult.Ok : OrderRuleResult.Deny("not-started", status == ServiceStatus.Planned ? OrdersMessages.FulfillmentRule.CompleteBeforeStart : OrdersMessages.FulfillmentRule.ServiceAlreadyCompleted),
+        _ => OrderRuleResult.Deny("unknown", OrdersMessages.Workflow.UnknownAction),
     };
 
     /// <summary>
@@ -246,29 +247,29 @@ public static class EvidenceRules
         ["image/jpeg"] = ".jpg",
     };
 
-    public static string? Validate(string? fileName, string? contentType, byte[] content)
+    public static ServerMessage? Validate(string? fileName, string? contentType, byte[] content)
     {
         if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 120 || fileName.IndexOfAny(['/', '\\', '\0']) >= 0)
         {
-            return "Dosya adı geçersiz (en fazla 120 karakter, yol içeremez).";
+            return OrdersMessages.Evidence.FileName;
         }
 
         if (content.Length == 0)
         {
-            return "Dosya boş.";
+            return OrdersMessages.Evidence.Empty;
         }
 
         if (content.Length > OrderDeliveryEvidence.MaxBytes)
         {
-            return $"Dosya en fazla {OrderDeliveryEvidence.MaxBytes / (1024 * 1024)} MB olabilir.";
+            return OrdersMessages.Evidence.TooBig(OrderDeliveryEvidence.MaxBytes / (1024 * 1024));
         }
 
         if (contentType is null || !AllowedTypes.ContainsKey(contentType.Split(';')[0].Trim()))
         {
-            return "Yalnızca PDF, PNG ve JPEG dosyaları yüklenebilir.";
+            return OrdersMessages.Evidence.Type;
         }
 
-        return Matches(contentType.Split(';')[0].Trim().ToLowerInvariant(), content) ? null : "Dosya içeriği bildirilen türle uyuşmuyor.";
+        return Matches(contentType.Split(';')[0].Trim().ToLowerInvariant(), content) ? null : OrdersMessages.Evidence.Mismatch;
     }
 
     private static bool Matches(string type, byte[] content) => type switch
