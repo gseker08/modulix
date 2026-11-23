@@ -32,6 +32,7 @@ kontrast kuralıyla birlikte yazılır (`theme-tokens.md`).
   orada değişirse `AccentColor` da değişir, birim test aynı değerleri sabitler.
 - **Uygulama:** Web oturum yüklenince iki ayarı okur (`SessionState`) ve `modulixShell.setAccent` ile tek bir `<style id="mx-accent-style">` yazar;
   yalnızca `--mx-brand-primary`, `-rgb` ve `-hover` tokenları açık/koyu temaya göre değişir, bileşen CSS'i değişmez. Ayar yoksa hiçbir şey yazılmaz.
+- **Renk seçici ve önizleme:** Yönetim > Ayarlar > Görünüm'de iki ayar `AccentColorField` ile girilir (renk seçici, `#RRGGBB` kutusu, "Varsayılana dön", seçilen temanın yüzeyinde önizleme). Kaydetmeden önce kontrast `POST /api/settings/accent/preview` (`{ color, dark }` → `{ valid, contrast, minContrast, message }`, `core.settings.manage`) ile sunucudaki aynı `AccentColor` kuralından sorulur; uç hiçbir şey yazmaz (yolu `/preview` ile biter) ve ikinci bir kural tanımlamaz. Kaydetmeyi yine sunucu doğrular (422), önizleme yalnızca erken geri bildirimdir.
 - **Hover sunucuda ayrıca doğrulanmaz.** Hover tonu istemcide (`shell.js`) türetilir: açık temada rengin %12'si siyaha, koyu temada %12'si beyaza
   doğru çekilir. Açık temada koyulaşan renk beyazla, koyu temada açılan renk koyu yüzey ve metinle daha çok kontrast verir; yani temel renk kuralı
   geçtiyse türetilen ton da geçer ve ayrı bir sunucu kontrolü hiç devreye girmez. Bu, formülün yönüne dayanır: türetme yön değiştirirse
@@ -73,6 +74,7 @@ ve satırın bölüm içindeki sırasını değiştirebilir. Modül ve bölüm s
 
 0. **Tasarım sistemi (22 Kasım 2026, PR #509):** "Firmanın değiştirebileceği tokenlar" bölümü, izinli liste ve kontrast kuralı.
 1. **Vurgu rengi (22 Kasım 2026, PR #513):** iki firma ayarı, `AccentColor` kuralı, oturumda uygulama; migration yok.
+   - **Renk seçici (22 Kasım 2026):** ayar ekranında seçici ve `POST /api/settings/accent/preview` önizleme ucu (`a8ecdd1a`).
 2. **Rol menüsü:**
    - **2a (22 Kasım 2026, PR #525):** tablo, servis, uç noktalar, erişim yanıtında `RoleIds` ve `MenuLayout`.
    - **2b (22 Kasım 2026, PR #528, #533):** menüye uygulama (`MenuLayoutRules`, `AppNavigation`), rol ekranında düzenleyici, kayıtta olmayan satırların korunması.
