@@ -543,6 +543,10 @@ public sealed class CoreModule : IModule
                 ["status"] = new Dictionary<string, string> { [CredentialStatuses.Active] = "Geçerli", [CredentialStatuses.Revoked] = "İptal edildi" },
             },
         },
+        new(Modulix.Core.Contracts.Notes.NoteEntities.Note, "Not", null, new Dictionary<string, string>
+        {
+            ["parentEntityKey"] = "Bağlı kayıt türü", ["parentId"] = "Bağlı kayıt", ["body"] = "Not", ["createdByUserId"] = "Yazan", ["createdAt"] = "Yazılma zamanı",
+        }, "body"),
         new(AuditedEntityKeys.File, "Dosya", null, new Dictionary<string, string>
         {
             ["fileName"] = "Dosya adı", ["contentType"] = "Tür", ["sizeBytes"] = "Boyut (bayt)", ["sha256"] = "SHA-256 özeti",
