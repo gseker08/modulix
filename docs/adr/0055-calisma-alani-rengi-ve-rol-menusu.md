@@ -66,7 +66,7 @@ panelindeki **sırasını** (dilim 4) değiştirebilir. Uygulamanın uygulama pa
   4. **Bölüm sırası (dilim 3)** aynı tabloda `section.<uygulama>.<bölüm>` anahtarlı satırla saklanır (`MenuLayoutRules.SectionKey`, ör.
      `section.crm.crm.customers`); `SortOrder` bölümün uygulamanın menüsündeki sırasıdır, `Hidden` kullanılmaz. Sunucu yeni bir kural,
      tablo ya da migration eklemez: anahtar öğe anahtarıyla aynı biçim doğrulamasından (küçük harf, rakam, nokta, tire) geçer. Kural öğeyle
-     aynıdır: sıra veren rollerin en küçüğü, hiçbiri vermezse bölümün katalog sırası (`MenuLayoutRules.OrderSections`). Yalnızca başlıklı ve
+     aynıdır: sıra veren rollerin en küçüğü; sırası verilmeyen bölüm açık sıralıların arkasına katalog sırasıyla gelir (`MenuLayoutRules.OrderSections`). Yalnızca başlıklı ve
      alt sabitli (`Footer`) olmayan bölümler yer değiştirir; alt sabitli (CRM Ayarları) ve başlıksız ("Diğer") bölümler yerinde kalır.
      Başka uygulamanın ya da katalogda olmayan bölümün satırı etkisizdir; bölüm satırı öğe görünürlüğünü etkilemez ve bölümü gizlemez
      (bölüm düzeyinde gizleme yoktur, bir bölüm yalnızca bütün öğeleri gizlenince kaybolur).
@@ -97,19 +97,17 @@ panelindeki **sırasını** (dilim 4) değiştirebilir. Uygulamanın uygulama pa
 2. **Rol menüsü:**
    - **2a (22 Kasım 2026, PR #525):** tablo, servis, uç noktalar, erişim yanıtında `RoleIds` ve `MenuLayout`.
    - **2b (22 Kasım 2026, PR #528, #533):** menüye uygulama (`MenuLayoutRules`, `AppNavigation`), rol ekranında düzenleyici, kayıtta olmayan satırların korunması.
-   - **Sıra kuralı düzeltmesi (23 Kasım 2026, PR #552):** sırası verilmeyen öğe açık sıralıların arkasına alındı (kural 3).
+   - **Sıra kuralı düzeltmesi (23 Kasım 2026, PR #552):** sırası verilmeyen öğe açık sıralıların arkasına alındı (kural 3). Aynı kural bölümlere ve uygulamalara da uygulandı (kural 4 ve 5).
 3. **Bölüm sırası (22 Kasım 2026, `d76bbdbc`):** bölüm başlığında yukarı/aşağı, `section.<uygulama>.<bölüm>` satırı, `MenuLayoutRules.OrderSections`; şema ve migration değişmedi.
-4. **Uygulama sırası (23 Kasım 2026):** uygulama başlığında yukarı/aşağı, `app.<uygulama>` satırı, `MenuLayoutRules.OrderApps` ve `AppNavigation.Roots`; uygulama
+4. **Uygulama sırası (23 Kasım 2026, PR #561):** uygulama başlığında yukarı/aşağı, `app.<uygulama>` satırı, `MenuLayoutRules.OrderApps` ve `AppNavigation.Roots`; uygulama
    kendi uygulama paneli grubu içinde yer değiştirir; şema ve migration değişmedi.
 
 ## Yapılmadı / sınırlar
 
 - **Uygulama paneli grupları** düzenlenemez (grup sırası ve bir uygulamanın grubu katalogdadır); uygulama yalnızca kendi grubu içinde yer değiştirir.
   Uygulama gizlenemez. Hiçbir rolün sıra satırı olmayan uygulama (ör. katalog sonradan yeni uygulama eklerse) grubun sonuna gider; öğelerde olduğu
-  gibi sırasız öğe arkaya alınır, bölümlerde bu kural henüz yok (yukarıdaki madde).
-- **Bölüm düzeyinde gizleme ve sırasız bölüm:** bölüm gizlenemez. Bir bölümün hiçbir rolde sıra satırı yoksa katalog sırasını (`Group.Order`) korur;
-  öğelerdeki "sırasız öğe arkaya" kuralı bölümlere uygulanmadı. Bölüm sırası ekranı uygulamanın bütün taşınabilir bölümlerini birlikte yazdığı için
-  bugün bölümlerin biri satırsız kalmaz; katalog sonradan yeni bir bölüm eklerse o bölüm katalog numarasıyla diğerlerinin arasına düşebilir.
+  gibi sırasız öğe arkaya alınır; aynı kural bölümlerde de geçerlidir (kural 4).
+- **Bölüm düzeyinde gizleme:** bölüm gizlenemez; bir bölüm yalnızca bütün öğeleri gizlenince kaybolur.
 - **CTA degradesi ve marka turkuazı** sabit onaltılık değerle yazıldığı için vurgu rengine bağlı değildir. Bağlanması önce `tokens.css`'te türetmeye
   çevrilmeyi ve ayrı bir kontrast kuralını gerektirir.
 - **Görsel doğrulama:** vurgu rengi ve rol menüsü ekranlarının açık ve koyu temada, telefon genişliğinde ekran görüntüsü kontrolü yapılmadı

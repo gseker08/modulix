@@ -232,6 +232,23 @@ public class MenuLayoutTests
     }
 
     [Fact]
+    public void Sections_without_an_explicit_order_follow_the_ordered_ones_in_catalog_order()
+    {
+        string[] catalog = GroupIds(Nav(null));
+        string[] movable = [.. catalog.Where(g => g != "-" && g != AppCatalog.CrmSettingsGroup)];
+        Assert.True(movable.Length >= 3);
+        string last = movable[^1];
+
+        // Yalnızca en sondaki bölüme (büyük) açık sıra verilirse öne çıkar; sırasızlar arkasından katalog sırasıyla gelir.
+        // Eski kuralda sırasız bölüm katalog numarasını (küçük sayı) korur, büyük numaralı bölüm yine sonda kalırdı.
+        string[] moved = GroupIds(Nav([new(RoleA, Key(last), 1000, false)]));
+        Assert.Equal([last, .. movable.Take(movable.Length - 1)], moved.Where(g => g != "-" && g != AppCatalog.CrmSettingsGroup));
+
+        // Alt sabitli bölüm yerinde kalır.
+        Assert.Equal(Array.IndexOf(catalog, AppCatalog.CrmSettingsGroup), Array.IndexOf(moved, AppCatalog.CrmSettingsGroup));
+    }
+
+    [Fact]
     public void Section_order_takes_the_smallest_order_across_roles_and_ignores_other_apps_and_unknown_sections()
     {
         string[] catalog = GroupIds(Nav(null));
