@@ -107,6 +107,9 @@ token yoktur. Fırsat ve teklif satırı kendi sayfasına bağlanır; "Daha eski
 - Firma kartındaki ilişkili sipariş, destek ve kampanya listeleri yerinde duruyor (Sipariş 2a, Sözleşme 2b, Destek 2c, Pazarlama 2d satırları çizelgeye geldi).
 - Kişiye ya da müşteri adayına giden kampanya iletileri firma çizelgesinde yalnızca kişi, firmanın ortak taraf kimliğiyle eşleşiyorsa görünür; kişi kartında çizelge yoktur.
 - Bir kayıt, kayıt satırının yanında yalnızca bu üç durum değişikliğinde ek satır üretir (fırsat kazanıldı/kaybedildi, teklif kabul edildi, aday dönüştü); diğer geçişler (aşama, iptal, red, süre dolumu) satır vermez ve rozet güncel durumu gösterir.
-- Sipariş, sözleşme, destek talebi ve pazarlama satırları (dilim 2a–2d) tarayıcıda gözle doğrulanmadı.
+- Sipariş, sözleşme, destek talebi ve pazarlama satırları (dilim 2a–2d), özet şeridi, kaynak çipleri ve durum satırları (dilim 3 ve 4) 23 Kasım 2026'da
+  açık ve koyu temada, 1440 px ve 390 px genişlikte gözle doğrulandı; ancak **gerçek veriyle değil, sahte API ile**: `Modulix.Web` yayınlanıp tarayıcıda
+  (Playwright) API çağrıları sabit yanıtlarla karşılandı. Bu turda özet şeridinin 390 px'te "Son hareket" tarihini kırptığı bulundu ve düzeltildi (PR #570).
+  Gerçek veriyle çıkma, izinle süzülme ve veri kapsamı gözle doğrulanmadı; bunlar CI'daki entegrasyon testleriyle sınanır (`CustomerTimelineContractTests`, `CustomerTimelineFilterTests` ve kaynak testleri).
 - Ekran 17 Kasım 2026'da açık ve koyu temada, 1440 px ve 390 px genişlikte gözle doğrulandı. Yeni sekmeyle firma detayının sekme çubuğu
   1440 px'te taşıyordu; "Fırsatlar ve müşteri adayları" sekmesinin adı "Satış" olarak kısaltıldı (kişi detayında da aynı etiket).
