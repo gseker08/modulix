@@ -129,7 +129,7 @@
                         @* Yazma izni olan kullanıcıya alanlar doğrudan açık gelir (ayrı "Düzenle" adımı yok); izin yoksa salt okunur özet. *@
                         @if (Session.Can(CrmAccess.CompaniesWrite))
                         {
-                            <CompanyEditor Embedded="true" Company="company" Lookups="Lookups" Saved="CompanySaved" Deleted="CompanyDeleted" />
+                            <CompanyEditor Embedded="true" Company="company" Lookups="Lookups" Saved="CompanySaved" Deleted="CompanyDeleted" ContactsChanged="ReloadCompanyAsync" />
                         }
                         else
                         {
@@ -164,13 +164,16 @@
                             <PartyRelationshipsSection PartyId="partyId" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" />
                         }
 
-                        @* Adresler ve iletişim (ADR-0012): ana kayıtlar yukarıdaki telefon/e-posta/adres alanlarının kaynağıdır. *@
-                        <FormSection Title="@Texts.Get("crm.company.addressContact")" Icon="map-pin">
-                            <AddressesSection CompanyId="Id" Title="@Texts.Get("crm.company.addresses")" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Changed="ReloadCompanyAsync" />
-                            <ContactPointsSection CompanyId="Id" Title="@Texts.Get("crm.company.phoneEmail")" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Changed="ReloadCompanyAsync" />
-                        </FormSection>
+                        @* Adresler, telefon/e-posta ve lokasyonlar (ADR-0012): yazma izni olanlar için formun İletişim sekmesindedir; yalnızca okuyanlar için burada salt okunur listelenir. *@
+                        @if (!Session.Can(CrmAccess.CompaniesWrite))
+                        {
+                            <FormSection Title="@Texts.Get("crm.company.addressContact")" Icon="map-pin">
+                                <AddressesSection CompanyId="Id" Title="@Texts.Get("crm.company.addresses")" CanWrite="false" />
+                                <ContactPointsSection CompanyId="Id" Title="@Texts.Get("crm.company.phoneEmail")" CanWrite="false" />
+                            </FormSection>
 
-                        <LocationsSection CompanyId="Id" CanWrite="Session.Can(CrmAccess.CompaniesWrite)" Lookups="Lookups" />
+                            <LocationsSection CompanyId="Id" CanWrite="false" Lookups="Lookups" />
+                        }
 
                         @* Ekli notlar (ADR-0057): her not ayrı kayıttır ve kendi dosya ekleri vardır. *@
                         <FormSection Title="@Texts.Get("notes.panel.title")" Icon="message-square">

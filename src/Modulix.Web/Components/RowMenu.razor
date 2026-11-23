@@ -4,10 +4,21 @@
 @if (ChildContent is not null)
 {
     <div class="row-menu" @onkeydown="OnKeyDown">
-        <button type="button" class="btn btn-ghost row-menu-button" aria-haspopup="menu" aria-expanded="@(open ? "true" : "false")"
-                aria-label="@LabelText" @onclick="Toggle">
-            <AppIcon Name="more-horizontal" Size="18" />
-        </button>
+        @if (ButtonText is not null)
+        {
+            @* Metinli açıcı ("Adres ekle ▾"): satır menüsü değil, bölüm başlığındaki seçenekli eylem içindir. *@
+            <button type="button" class="btn btn-outline-primary btn-sm" aria-haspopup="menu" aria-expanded="@(open ? "true" : "false")"
+                    aria-label="@LabelText" @onclick="Toggle">
+                @ButtonText <AppIcon Name="chevron-down" Size="16" />
+            </button>
+        }
+        else
+        {
+            <button type="button" class="btn btn-ghost row-menu-button" aria-haspopup="menu" aria-expanded="@(open ? "true" : "false")"
+                    aria-label="@LabelText" @onclick="Toggle">
+                <AppIcon Name="more-horizontal" Size="18" />
+            </button>
+        }
         @if (pending is { } ask)
         {
             @* Onay kutusu menünün yerinde açılır; menü dışına tıklamak vazgeçmektir. *@
@@ -32,6 +43,9 @@
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
     [Parameter] public string? Label { get; set; }
+
+    /// <summary>Doluysa "⋯" yerine bu metinli düğme çizilir (ör. "Adres ekle ▾").</summary>
+    [Parameter] public string? ButtonText { get; set; }
 
     private string LabelText => Label ?? Texts.Get("common.rowActions");
 

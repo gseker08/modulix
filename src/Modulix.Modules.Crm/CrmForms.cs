@@ -33,12 +33,18 @@ public static class CrmForms
             new("taxOffice", "Vergi dairesi", "temel", 4),
             new("taxNumber", "Vergi no / T.C. kimlik no", "temel", 4),
             new("tags", "Etiketler", "temel", 4),
+            new("website", "Web sitesi", "iletisim", 6),
+            new("preferredLanguage", "Yazışma dili", "iletisim", 6),
+            // Yeni firmada hızlı giriş: kayıt ana adres/telefon/e-posta kaydını açar (ADR-0012). Kayıtlı firmada bu dört alan
+            // çizilmez; yerlerini aşağıdaki liste alanları alır (ana kayıtların aynasıdır, API'de durur).
             new("address", "Adres", "iletisim", 12),
             new("phone", "Telefon", "iletisim", 4),
             new("email", "E-posta", "iletisim", 4),
-            new("website", "Web sitesi", "iletisim", 4),
-            new("preferredLanguage", "Yazışma dili", "iletisim", 4),
             new("city", "Şehir", "iletisim", 4),
+            // Kayıtlı firmada çoklu kayıt listeleri (kendi uçlarıyla anında kaydedilir; formun Kaydet düğmesine bağlı değildir).
+            new("addresses", "Adresler", "iletisim", 12),
+            new("contactPoints", "Telefon ve e-postalar", "iletisim", 12),
+            new("locations", "Lokasyonlar", "iletisim", 12),
         ]),
 
         new(CrmModule.Entities.Contact, "Kişi",
