@@ -47,6 +47,17 @@ public class DatabaseSetupTests
     }
 
     [Fact]
+    public async Task Database_reads_committed_snapshots_so_readers_never_wait_for_writers()
+    {
+        // Kapalıyken tablo taraması başka tenant'ın kilitli satırına takılıp kilitlenme (1205) üretir; istek 500 döner (ADR-0058).
+        await using var connection = await OpenAsync(PersistenceSetup.AppConnectionName);
+
+        var enabled = await ScalarAsync<int>(connection, "SELECT CAST(is_read_committed_snapshot_on AS int) FROM sys.databases WHERE name = DB_NAME()");
+
+        Assert.True(enabled == 1, "READ_COMMITTED_SNAPSHOT kapalı: docker/sqlserver/init.sql'i yeniden çalıştırın (canlı veritabanı için docs/tenant-isletim.md).");
+    }
+
+    [Fact]
     public async Task All_schemas_exist()
     {
         await using var connection = await OpenAsync(PersistenceSetup.MigrationsConnectionName);

@@ -99,6 +99,23 @@ aksi halde `TableInventoryTests` kırılır.
 dotnet ef migrations add <Ad> --project src/Modulix.Infrastructure --startup-project src/Modulix.Api
 ```
 
+## Okuma anlık görüntüsü (ADR-0058)
+
+Veritabanında `READ_COMMITTED_SNAPSHOT` açık olmalıdır. Kapalıyken okuyucular, başka bir tenant'ın henüz onaylanmamış satırlarını beklerken iki işlem birbirine kilitlenebilir (SQL Server hata 1205; kurban seçilen istek 500 döner). Yerel ve CI kurulumunda `docker/sqlserver/init.sql` bunu açar (`db-init`); `DatabaseSetupTests` denetler.
+
+**Canlı (var olan) veritabanı için tek seferlik adım:**
+
+```sql
+-- Durum
+SELECT is_read_committed_snapshot_on FROM sys.databases WHERE name = N'Modulix';
+-- Aç (master'dan, db_owner/sysadmin ile). Açılırken diğer bağlantılar geri alınır: kısa bakım penceresinde yapın.
+ALTER DATABASE [Modulix] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;
+```
+
+- Uygulama kodu değişmez; geri alma `OFF` ile aynı komuttur.
+- Sürüm deposu `tempdb`'de tutulur: açtıktan sonra `tempdb` boyutunu ve uzun süren işlemleri izleyin.
+- `sp_getapplock` kilitleri (`ITransactionLock`) ve sürüm belirteçleri (`rowversion`) etkilenmez.
+
 ## Kayıt görünürlük tavanı (ADR-0030)
 
 Platform yöneticisi bir firma için kayıt türü başına görünürlük tavanı koyar (`PUT /api/platform/tenants/{id}/scope-limits`; `platform.TenantScopeLimits`, RLS dışı). Tavan firmanın bir sonraki isteğinde geçerlidir; rol kayıtları değişmez, okuma tarafı kapsamı tavana indirir.
