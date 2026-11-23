@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Logistics.Domain;
 
@@ -21,13 +22,13 @@ internal sealed class DeliveryProofRecordStore(LogisticsStoreContext context) : 
 
     protected override string WritePermission => LogisticsModule.Permissions.ShipmentsWrite;
 
-    protected override string? ImmutableMessage => "Teslim kanıtı değiştirilemez ve silinemez; düzeltme için yeni kanıt girin.";
+    protected override ServerMessage? ImmutableMessage => LogisticsMessages.Proof.Immutable;
 
-    protected override string? CreateBlockedMessage => Context.Gate.IsOpen ? null : "Teslim kanıtı yalnızca sevkiyatın teslim komutuyla oluşur.";
+    protected override ServerMessage? CreateBlockedMessage => Context.Gate.IsOpen ? null : LogisticsMessages.Proof.ViaDelivery;
 
     protected override IReadOnlyList<RecordField<DeliveryProof>> Fields { get; } =
     [
-        Field.Reference<DeliveryProof, Shipment>("shipmentId", "Sevkiyat bulunamadı.", p => p.ShipmentId, (p, v) => p.ShipmentId = v!.Value, required: true, createOnly: true),
+        Field.Reference<DeliveryProof, Shipment>("shipmentId", LogisticsMessages.NotFound.Shipment, p => p.ShipmentId, (p, v) => p.ShipmentId = v!.Value, required: true, createOnly: true),
         Field.Choice<DeliveryProof>("outcome", DeliveryProof.Outcomes.All, p => p.Outcome, (p, v) => p.Outcome = v, createOnly: true),
         Field.Text<DeliveryProof>("receivedBy", DeliveryProof.ReceivedByMaxLength, p => p.ReceivedBy, (p, v) => p.ReceivedBy = v),
         Field.Computed<DeliveryProof>("receivedAt", p => JsonValue.Create(p.ReceivedAt.ToString("O", CultureInfo.InvariantCulture))),
@@ -56,7 +57,7 @@ internal sealed class DeliveryProofRecordStore(LogisticsStoreContext context) : 
             .Select(s => s.Status).SingleAsync(cancellationToken);
         if (status != Shipment.Statuses.InTransit)
         {
-            throw new RecordConflictException("Teslim kanıtı yalnızca yoldaki sevkiyata yazılır.");
+            throw new RecordConflictException(LogisticsMessages.Proof.OnlyRunning);
         }
 
         entity.ReceivedAt = DateTimeOffset.UtcNow;
@@ -67,29 +68,29 @@ internal sealed class DeliveryProofRecordStore(LogisticsStoreContext context) : 
         var errors = new List<RecordFieldError>();
         if (entity.Outcome != DeliveryProof.Outcomes.Failed && entity.ReceivedBy is null)
         {
-            errors.Add(new RecordFieldError("receivedBy", "Teslim alanın adı zorunludur."));
+            errors.Add(new RecordFieldError("receivedBy", LogisticsMessages.Proof.ReceivedByRequired));
         }
 
         if (entity.Outcome == DeliveryProof.Outcomes.Partial && entity.Notes is null)
         {
-            errors.Add(new RecordFieldError("notes", "Kısmi teslimde neyin teslim edilmediğini açıklayın."));
+            errors.Add(new RecordFieldError("notes", LogisticsMessages.Proof.NotesRequired));
         }
 
         if (entity.Outcome == DeliveryProof.Outcomes.Failed)
         {
             if (entity.FailureReason is null)
             {
-                errors.Add(new RecordFieldError("failureReason", "Başarısız teslimin nedeni zorunludur."));
+                errors.Add(new RecordFieldError("failureReason", LogisticsMessages.Proof.FailureReasonRequired));
             }
 
             if (entity.ReceivedBy is not null || entity.Damaged || entity.Shortage)
             {
-                errors.Add(new RecordFieldError("outcome", "Teslim edilemeyen sevkiyatta teslim alan, hasar ya da eksik işaretlenmez."));
+                errors.Add(new RecordFieldError("outcome", LogisticsMessages.Proof.OutcomeMismatch));
             }
         }
         else if (entity.FailureReason is not null)
         {
-            errors.Add(new RecordFieldError("failureReason", "Başarısız neden yalnızca teslim edilemeyen sevkiyatta girilir."));
+            errors.Add(new RecordFieldError("failureReason", LogisticsMessages.Proof.FailureReasonOnly));
         }
 
         if (errors.Count > 0)

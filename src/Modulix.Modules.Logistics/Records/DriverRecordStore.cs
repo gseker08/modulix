@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Logistics.Domain;
@@ -31,9 +32,9 @@ internal sealed class DriverRecordStore(LogisticsStoreContext context) : Logisti
 
     protected override IReadOnlyList<RecordField<Driver>> Fields { get; } =
     [
-        Field.PersonRef<Driver>("personId", "Kişi bulunamadı.", d => d.PersonId, (d, v) => d.PersonId = v!.Value, required: true, createOnly: true),
+        Field.PersonRef<Driver>("personId", LogisticsMessages.NotFound.Person, d => d.PersonId, (d, v) => d.PersonId = v!.Value, required: true, createOnly: true),
         Field.Choice<Driver>("driverType", Driver.Types.All, d => d.DriverType, (d, v) => d.DriverType = v),
-        Field.PartyRef<Driver>("carrierPartyId", "Taşıyıcı firma bulunamadı.", d => d.CarrierPartyId, (d, v) => d.CarrierPartyId = v),
+        Field.PartyRef<Driver>("carrierPartyId", LogisticsMessages.NotFound.Carrier, d => d.CarrierPartyId, (d, v) => d.CarrierPartyId = v),
         Field.Id<Driver>("defaultVehicleId", d => d.DefaultVehicleId, (d, v) => d.DefaultVehicleId = v),
         Field.Choice<Driver>("status", Driver.Statuses.All, d => d.Status, (d, v) => d.Status = v),
         Field.Text<Driver>("notes", Driver.NotesMaxLength, d => d.Notes, (d, v) => d.Notes = v),
@@ -83,14 +84,14 @@ internal sealed class DriverRecordStore(LogisticsStoreContext context) : Logisti
 
         if (isNew && await Context.Data.Set<Driver>().AsNoTracking().AnyAsync(d => d.PersonId == entity.PersonId && d.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("personId", "Bu kişinin zaten bir sürücü kartı var."));
+            errors.Add(new RecordFieldError("personId", LogisticsMessages.Driver.Duplicate));
         }
 
         if (entity.DriverType == Driver.Types.Subcontracted)
         {
             if (entity.CarrierPartyId is not { } carrier)
             {
-                errors.Add(new RecordFieldError("carrierPartyId", "Taşeron sürücüde taşıyıcı firma seçilmelidir."));
+                errors.Add(new RecordFieldError("carrierPartyId", LogisticsMessages.Driver.SubcontractNeedsCarrier));
             }
             else if (isNew || values.ContainsKey("carrierPartyId") || values.ContainsKey("driverType"))
             {
@@ -101,32 +102,32 @@ internal sealed class DriverRecordStore(LogisticsStoreContext context) : Logisti
                         .Contains(LogisticsModule.RelationshipRoles.Carrier))
                 {
                     errors.Add(new RecordFieldError(
-                        "carrierPartyId", "Seçilen firma \"Taşıyıcı\" ilişki rolüne sahip değil; önce firma kaydından rolü ekleyin."));
+                        "carrierPartyId", LogisticsMessages.Carrier.RoleMissing));
                 }
             }
         }
         else if (entity.CarrierPartyId is not null)
         {
-            errors.Add(new RecordFieldError("carrierPartyId", "Taşıyıcı firma yalnızca taşeron sürücüde seçilir."));
+            errors.Add(new RecordFieldError("carrierPartyId", LogisticsMessages.Driver.CarrierOnlySubcontract));
         }
 
         if (entity.DefaultVehicleId is { } vehicleId && (isNew || values.ContainsKey("defaultVehicleId")))
         {
             if (!await Context.Vehicles.IsAvailableAsync(cancellationToken))
             {
-                errors.Add(new RecordFieldError("defaultVehicleId", "Filo modülü bu firmada açık değil; araç seçilemez."));
+                errors.Add(new RecordFieldError("defaultVehicleId", LogisticsMessages.Vehicle.FleetClosed));
             }
             else if ((await Context.Vehicles.GetAsync([vehicleId], cancellationToken)).SingleOrDefault() is not { } vehicle)
             {
-                errors.Add(new RecordFieldError("defaultVehicleId", "Araç bulunamadı."));
+                errors.Add(new RecordFieldError("defaultVehicleId", LogisticsMessages.NotFound.Vehicle));
             }
             else if (vehicle.KindCategory == LogisticsModule.VehicleKindTowed)
             {
-                errors.Add(new RecordFieldError("defaultVehicleId", "Dorse ve römork sürücüye varsayılan araç olarak atanamaz; çekici ya da kamyon seçin."));
+                errors.Add(new RecordFieldError("defaultVehicleId", LogisticsMessages.Vehicle.NoTrailerAsDefault));
             }
             else if (vehicle.Status == "passive")
             {
-                errors.Add(new RecordFieldError("defaultVehicleId", "Pasif araç sürücüye atanamaz."));
+                errors.Add(new RecordFieldError("defaultVehicleId", LogisticsMessages.Vehicle.InactiveDriver));
             }
         }
 
@@ -137,5 +138,5 @@ internal sealed class DriverRecordStore(LogisticsStoreContext context) : Logisti
     }
 
     protected override Task BeforeDeleteAsync(Driver entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Sürücü kartları silinmez; çalışmayan sürücünün durumunu \"Pasif\" yapın.");
+        throw new RecordConflictException(LogisticsMessages.Driver.NoDelete);
 }

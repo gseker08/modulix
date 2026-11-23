@@ -1,3 +1,4 @@
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Logistics.Domain;
 
@@ -20,15 +21,15 @@ internal static class MoneyRules
     {
         if (amount is not null && currency is null)
         {
-            errors.Add(new RecordFieldError(currencyField, "Tutar girildiğinde para birimi seçilmelidir."));
+            errors.Add(new RecordFieldError(currencyField, LogisticsMessages.Money.CurrencyNeeded));
         }
         else if (amount is null && currency is not null)
         {
-            errors.Add(new RecordFieldError(amountField, "Para birimi seçildiğinde tutar girilmelidir."));
+            errors.Add(new RecordFieldError(amountField, LogisticsMessages.Money.AmountNeeded));
         }
         else if (currency is not null && (currency.Length != LogisticsEntity.CurrencyLength || !currency.All(char.IsAsciiLetterUpper)))
         {
-            errors.Add(new RecordFieldError(currencyField, "Üç harfli para birimi kodu girin (ör. TRY, EUR, USD)."));
+            errors.Add(new RecordFieldError(currencyField, LogisticsMessages.Money.CurrencyFormat));
         }
     }
 }

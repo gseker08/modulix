@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Logistics.Domain;
@@ -18,15 +19,15 @@ internal abstract class CargoRecordStore<TEntity>(LogisticsStoreContext context)
     /// <summary>Genel uçtan düzenlenebilen durumlar; diğerlerinde kayıt yalnızca iş akışıyla değişir.</summary>
     protected abstract IReadOnlyCollection<string> EditableStatuses { get; }
 
-    protected abstract string LockedMessage { get; }
+    protected abstract ServerMessage LockedMessage { get; }
 
-    protected abstract string DeleteMessage { get; }
+    protected abstract ServerMessage DeleteMessage { get; }
 
     protected static IEnumerable<RecordField<TEntity>> CargoFields() =>
     [
-        Field.PartyRef<TEntity>("customerPartyId", "Müşteri firma bulunamadı.", e => e.CustomerPartyId, (e, v) => e.CustomerPartyId = v!.Value, required: true),
-        Field.PartyRef<TEntity>("senderPartyId", "Gönderen firma bulunamadı.", e => e.SenderPartyId, (e, v) => e.SenderPartyId = v),
-        Field.PartyRef<TEntity>("receiverPartyId", "Alıcı firma bulunamadı.", e => e.ReceiverPartyId, (e, v) => e.ReceiverPartyId = v),
+        Field.PartyRef<TEntity>("customerPartyId", LogisticsMessages.NotFound.Customer, e => e.CustomerPartyId, (e, v) => e.CustomerPartyId = v!.Value, required: true),
+        Field.PartyRef<TEntity>("senderPartyId", LogisticsMessages.NotFound.Sender, e => e.SenderPartyId, (e, v) => e.SenderPartyId = v),
+        Field.PartyRef<TEntity>("receiverPartyId", LogisticsMessages.NotFound.Receiver, e => e.ReceiverPartyId, (e, v) => e.ReceiverPartyId = v),
         Field.ListChoice<TEntity>("transportModeKey", LogisticsModule.Lists.TransportMode, e => e.TransportModeKey, (e, v) => e.TransportModeKey = v!),
         Field.Text<TEntity>("pickupCity", CargoEntity.CityMaxLength, e => e.PickupCity, (e, v) => e.PickupCity = v!, required: true),
         Field.Text<TEntity>("pickupCountry", CargoEntity.CountryLength, e => e.PickupCountry, (e, v) => e.PickupCountry = v ?? string.Empty, upperCase: true),
@@ -120,7 +121,7 @@ internal abstract class CargoRecordStore<TEntity>(LogisticsStoreContext context)
 
         if (entity.DeliveryBy is { } by && by < entity.PickupDate)
         {
-            throw new RecordValidationException([new RecordFieldError("deliveryBy", "Teslim günü yükleme gününden önce olamaz.")]);
+            throw new RecordValidationException([new RecordFieldError("deliveryBy", LogisticsMessages.Cargo.DeliveryBeforePickup)]);
         }
 
         if (entity.CustomerPartyId == Guid.Empty)
@@ -167,7 +168,7 @@ internal abstract class CargoRecordStore<TEntity>(LogisticsStoreContext context)
         }
     }
 
-    private const string CountryMessage = "Geçerli bir ülke kodu girin (ISO 3166-1 alfa-2, ör. TR, DE).";
+    private static ServerMessage CountryMessage => LogisticsMessages.Cargo.CountryFormat;
 
     /// <summary>Türe özgü kurallar (ortak kurallardan sonra).</summary>
     protected virtual Task CargoAppliedAsync(TEntity entity, JsonObject values, bool isNew, CancellationToken cancellationToken) => Task.CompletedTask;
@@ -202,9 +203,9 @@ internal sealed class TransportRequestRecordStore(LogisticsStoreContext context)
 
     protected override IReadOnlyCollection<string> EditableStatuses { get; } = [TransportRequest.Statuses.New];
 
-    protected override string LockedMessage => "Onaylanan, reddedilen ya da iptal edilen talep değiştirilemez.";
+    protected override ServerMessage LockedMessage => LogisticsMessages.Cargo.RequestLocked;
 
-    protected override string DeleteMessage => "Taşıma talebi silinmez; gerekirse iptal edin.";
+    protected override ServerMessage DeleteMessage => LogisticsMessages.Cargo.RequestNoDelete;
 
     protected override bool IsClosed(TransportRequest entity) => entity.Status != TransportRequest.Statuses.New;
 
@@ -235,7 +236,7 @@ internal sealed class TransportRequestRecordStore(LogisticsStoreContext context)
         if (entity.ExternalRef is { } reference && await Context.Data.Set<TransportRequest>().AsNoTracking()
                 .AnyAsync(r => r.Id != entity.Id && r.Source == entity.Source && r.ExternalRef == reference, cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError("externalRef", "Bu referansla açılmış bir talep zaten var.")]);
+            throw new RecordValidationException([new RecordFieldError("externalRef", LogisticsMessages.Cargo.ExternalRefExists)]);
         }
     }
 }
@@ -255,21 +256,21 @@ internal sealed class ShipmentRecordStore(LogisticsStoreContext context) : Cargo
 
     protected override IReadOnlyCollection<string> EditableStatuses { get; } = [Shipment.Statuses.Pending, Shipment.Statuses.Planned];
 
-    protected override string LockedMessage => "Yüklemesi başlamış, teslim edilmiş ya da iptal edilmiş sevkiyatın yük bilgisi değiştirilemez.";
+    protected override ServerMessage LockedMessage => LogisticsMessages.Cargo.ShipmentLocked;
 
-    protected override string DeleteMessage => "Sevkiyat silinmez; gerekirse iptal edin.";
+    protected override ServerMessage DeleteMessage => LogisticsMessages.Cargo.ShipmentNoDelete;
 
     protected override bool IsClosed(Shipment entity) => entity.Status is Shipment.Statuses.Delivered or Shipment.Statuses.Partial
         or Shipment.Statuses.Failed or Shipment.Statuses.Cancelled;
 
     protected override string ClosedFilesMessage => "Teslim sonucu girilen ya da iptal edilen sevkiyatın belgeleri değiştirilemez; teslim belgesini teslim kanıtına ekleyin.";
 
-    protected override string? CreateBlockedMessage => Context.Gate.IsOpen ? null : "Sevkiyat yalnızca taşıma talebi onaylanınca oluşur.";
+    protected override ServerMessage? CreateBlockedMessage => Context.Gate.IsOpen ? null : LogisticsMessages.Cargo.ShipmentViaRequest;
 
     protected override IReadOnlyList<RecordField<Shipment>> Fields { get; } =
     [
         .. CargoFields(),
-        Field.Reference<Shipment, TransportRequest>("requestId", "Taşıma talebi bulunamadı.", s => s.RequestId, (s, v) => s.RequestId = v!.Value, required: true, createOnly: true),
+        Field.Reference<Shipment, TransportRequest>("requestId", LogisticsMessages.NotFound.Request, s => s.RequestId, (s, v) => s.RequestId = v!.Value, required: true, createOnly: true),
         Field.Computed<Shipment>("tripId", s => s.TripId?.ToString()),
         MoneyRules.Amount<Shipment>("freightAmount", s => s.FreightAmount, (s, v) => s.FreightAmount = v),
         MoneyRules.Currency<Shipment>("freightCurrency", s => s.FreightCurrency, (s, v) => s.FreightCurrency = v),
@@ -304,7 +305,7 @@ internal sealed class ShipmentRecordStore(LogisticsStoreContext context) : Cargo
         if (isNew && (entity.RequestId == Guid.Empty
             || await Context.Data.Set<Shipment>().AsNoTracking().AnyAsync(s => s.RequestId == entity.RequestId, cancellationToken)))
         {
-            throw new RecordConflictException("Bu talep için sevkiyat zaten açılmış.");
+            throw new RecordConflictException(LogisticsMessages.Cargo.ShipmentExists);
         }
     }
 }

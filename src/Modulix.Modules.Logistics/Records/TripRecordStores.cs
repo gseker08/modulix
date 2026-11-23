@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Logistics.Domain;
@@ -30,9 +31,9 @@ internal sealed class TripRecordStore(LogisticsStoreContext context) : Logistics
         Field.Date<Trip>("plannedEnd", t => t.PlannedEnd, (t, v) => t.PlannedEnd = v),
         Field.Id<Trip>("vehicleId", t => t.VehicleId, (t, v) => t.VehicleId = v),
         Field.Id<Trip>("trailerId", t => t.TrailerId, (t, v) => t.TrailerId = v),
-        Field.Reference<Trip, Driver>("driverId", "Sürücü bulunamadı.", t => t.DriverId, (t, v) => t.DriverId = v),
-        Field.Reference<Trip, Driver>("coDriverId", "İkinci sürücü bulunamadı.", t => t.CoDriverId, (t, v) => t.CoDriverId = v),
-        Field.PartyRef<Trip>("carrierPartyId", "Taşıyıcı firma bulunamadı.", t => t.CarrierPartyId, (t, v) => t.CarrierPartyId = v),
+        Field.Reference<Trip, Driver>("driverId", LogisticsMessages.NotFound.Driver, t => t.DriverId, (t, v) => t.DriverId = v),
+        Field.Reference<Trip, Driver>("coDriverId", LogisticsMessages.NotFound.CoDriver, t => t.CoDriverId, (t, v) => t.CoDriverId = v),
+        Field.PartyRef<Trip>("carrierPartyId", LogisticsMessages.NotFound.Carrier, t => t.CarrierPartyId, (t, v) => t.CarrierPartyId = v),
         MoneyRules.Amount<Trip>("settlementAmount", t => t.SettlementAmount, (t, v) => t.SettlementAmount = v),
         MoneyRules.Currency<Trip>("settlementCurrency", t => t.SettlementCurrency, (t, v) => t.SettlementCurrency = v),
         Field.Text<Trip>("notes", Trip.TextMaxLength, t => t.Notes, (t, v) => t.Notes = v),
@@ -90,18 +91,18 @@ internal sealed class TripRecordStore(LogisticsStoreContext context) : Logistics
         }
         else if (!isNew && entity.Status != Trip.Statuses.Planning)
         {
-            throw new RecordConflictException("Yalnızca planlanan sefer düzenlenir; hazır seferi önce planlamaya geri alın.");
+            throw new RecordConflictException(LogisticsMessages.Trip.PlannedOnlyEdit);
         }
 
         var errors = new List<RecordFieldError>();
         if (entity.PlannedEnd is { } end && end < entity.PlannedStart)
         {
-            errors.Add(new RecordFieldError("plannedEnd", "Bitiş günü başlangıç gününden önce olamaz."));
+            errors.Add(new RecordFieldError("plannedEnd", LogisticsMessages.Trip.PlannedEndBeforeStart));
         }
 
         if (entity.CoDriverId is { } co && (entity.DriverId is null || co == entity.DriverId))
         {
-            errors.Add(new RecordFieldError("coDriverId", entity.DriverId is null ? "Önce birinci sürücüyü seçin." : "İkinci sürücü birinci sürücüyle aynı olamaz."));
+            errors.Add(new RecordFieldError("coDriverId", entity.DriverId is null ? LogisticsMessages.Trip.CoDriverNeedsFirst : LogisticsMessages.Trip.CoDriverSame));
         }
 
         bool Changed(string name) => isNew || values.ContainsKey(name);
@@ -121,19 +122,19 @@ internal sealed class TripRecordStore(LogisticsStoreContext context) : Logistics
             if (driverId is { } id && Changed(name)
                 && await Context.Data.Set<Driver>().AsNoTracking().Where(d => d.Id == id).Select(d => d.Status).SingleOrDefaultAsync(cancellationToken) == Driver.Statuses.Passive)
             {
-                errors.Add(new RecordFieldError(name, "Pasif sürücü sefere atanamaz."));
+                errors.Add(new RecordFieldError(name, LogisticsMessages.Trip.DriverInactive));
             }
         }
 
         if (entity.CarrierPartyId is { } carrier && Changed("carrierPartyId") && !await CarrierRoles.HasAsync(Context, carrier, cancellationToken))
         {
-            errors.Add(new RecordFieldError("carrierPartyId", "Seçilen firma \"Taşıyıcı\" ilişki rolüne sahip değil; önce firma kaydından rolü ekleyin."));
+            errors.Add(new RecordFieldError("carrierPartyId", LogisticsMessages.Carrier.RoleMissing));
         }
 
         MoneyRules.Validate(entity.SettlementAmount, entity.SettlementCurrency, "settlementAmount", "settlementCurrency", errors);
         if (entity.SettlementAmount is not null && entity.CarrierPartyId is null)
         {
-            errors.Add(new RecordFieldError("settlementAmount", "Hakediş yalnızca taşıyıcı firma seçili (taşeron) seferde girilir."));
+            errors.Add(new RecordFieldError("settlementAmount", LogisticsMessages.Trip.SettlementCarrierOnly));
         }
 
         if (errors.Count > 0)
@@ -161,19 +162,19 @@ internal sealed class TripRecordStore(LogisticsStoreContext context) : Logistics
     {
         if (!await Context.Vehicles.IsAvailableAsync(cancellationToken))
         {
-            errors.Add(new RecordFieldError(field, "Filo modülü bu firmada açık değil; araç seçilemez."));
+            errors.Add(new RecordFieldError(field, LogisticsMessages.Vehicle.FleetClosed));
         }
         else if ((await Context.Vehicles.GetAsync([vehicleId], cancellationToken)).SingleOrDefault() is not { } vehicle)
         {
-            errors.Add(new RecordFieldError(field, "Araç bulunamadı."));
+            errors.Add(new RecordFieldError(field, LogisticsMessages.NotFound.Vehicle));
         }
         else if ((vehicle.KindCategory == LogisticsModule.VehicleKindTowed) != towed)
         {
-            errors.Add(new RecordFieldError(field, towed ? "Dorse alanına yalnızca dorse ya da römork seçilir." : "Dorse ve römork çekici olarak seçilemez; çekici ya da kamyon seçin."));
+            errors.Add(new RecordFieldError(field, towed ? LogisticsMessages.Vehicle.TowedOnly : LogisticsMessages.Vehicle.NoTrailerAsTractor));
         }
         else if (vehicle.Status == "passive")
         {
-            errors.Add(new RecordFieldError(field, "Pasif araç sefere atanamaz."));
+            errors.Add(new RecordFieldError(field, LogisticsMessages.Vehicle.InactiveTrip));
         }
     }
 
@@ -205,7 +206,7 @@ internal sealed class TripStopRecordStore(LogisticsStoreContext context) : Logis
 
     protected override IReadOnlyList<RecordField<TripStop>> Fields { get; } =
     [
-        Field.Reference<TripStop, Trip>("tripId", "Sefer bulunamadı.", s => s.TripId, (s, v) => s.TripId = v!.Value, required: true, createOnly: true),
+        Field.Reference<TripStop, Trip>("tripId", LogisticsMessages.NotFound.Trip, s => s.TripId, (s, v) => s.TripId = v!.Value, required: true, createOnly: true),
         Field.Integer<TripStop>("sequence", s => s.Sequence == 0 ? null : s.Sequence, (s, v) => s.Sequence = v ?? 0, 1, TripStop.MaxSequence),
         Field.Choice<TripStop>("stopType", TripStop.Types.All, s => s.StopType, (s, v) => s.StopType = v),
         Field.Text<TripStop>("city", CargoEntity.CityMaxLength, s => s.City, (s, v) => s.City = v!, required: true),
@@ -237,12 +238,12 @@ internal sealed class TripStopRecordStore(LogisticsStoreContext context) : Logis
         {
             if (trip.Status != Trip.Statuses.Planning)
             {
-                throw new RecordConflictException("Durak yalnızca planlanan sefere eklenir; hazır seferi önce planlamaya geri alın.");
+                throw new RecordConflictException(LogisticsMessages.Trip.StopPlannedOnly);
             }
 
             if (entity.ArrivedAt is not null)
             {
-                throw new RecordValidationException([new RecordFieldError("arrivedAt", "Varış saati sefer yoldayken girilir.")]);
+                throw new RecordValidationException([new RecordFieldError("arrivedAt", LogisticsMessages.Trip.ArrivedWhenRunning)]);
             }
 
             if (Context.Gate.IsOpen && Context.Gate.LinkedId is { } shipment)
@@ -266,33 +267,33 @@ internal sealed class TripStopRecordStore(LogisticsStoreContext context) : Logis
 
             if ((planChanged || arrivalChanged || notesChanged) && trip.Status is Trip.Statuses.Completed or Trip.Statuses.Cancelled)
             {
-                throw new RecordConflictException("Kapanan seferin durakları değiştirilemez.");
+                throw new RecordConflictException(LogisticsMessages.Trip.StopsClosed);
             }
 
             if (planChanged && trip.Status != Trip.Statuses.Planning)
             {
-                throw new RecordConflictException("Durak planı yalnızca sefer planlanırken değişir; hazır seferi önce planlamaya geri alın.");
+                throw new RecordConflictException(LogisticsMessages.Trip.StopPlanChange);
             }
 
             if (arrivalChanged && trip.Status != Trip.Statuses.InProgress)
             {
-                throw new RecordConflictException("Varış saati yalnızca yoldaki sefere girilir.");
+                throw new RecordConflictException(LogisticsMessages.Trip.ArrivalOnlyRunning);
             }
 
             if (before.ShipmentId is not null && before.StopType != entity.StopType)
             {
-                throw new RecordConflictException("Sevkiyat durağının türü değiştirilemez.");
+                throw new RecordConflictException(LogisticsMessages.Trip.StopTypeLocked);
             }
         }
 
         if (entity.ArrivedAt is { } arrived && arrived > DateTimeOffset.UtcNow.AddMinutes(5))
         {
-            throw new RecordValidationException([new RecordFieldError("arrivedAt", "Varış saati ileri bir zaman olamaz.")]);
+            throw new RecordValidationException([new RecordFieldError("arrivedAt", LogisticsMessages.Trip.ArrivalFuture)]);
         }
 
         if (await stops.AnyAsync(s => s.Sequence == entity.Sequence, cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError("sequence", "Bu sırada başka bir durak var; boş bir sıra numarası verin.")]);
+            throw new RecordValidationException([new RecordFieldError("sequence", LogisticsMessages.Trip.SequenceTaken)]);
         }
     }
 
@@ -301,12 +302,12 @@ internal sealed class TripStopRecordStore(LogisticsStoreContext context) : Logis
         var status = await Context.Data.Set<Trip>().AsNoTracking().Where(t => t.Id == entity.TripId).Select(t => t.Status).SingleAsync(cancellationToken);
         if (status != Trip.Statuses.Planning)
         {
-            throw new RecordConflictException("Durak yalnızca sefer planlanırken kaldırılır.");
+            throw new RecordConflictException(LogisticsMessages.Trip.StopRemovePlanning);
         }
 
         if (entity.ShipmentId is not null && !Context.Gate.IsOpen)
         {
-            throw new RecordConflictException("Sevkiyat durağı elle kaldırılmaz; sevkiyatı seferden çıkarın.");
+            throw new RecordConflictException(LogisticsMessages.Trip.ShipmentStopNoRemove);
         }
     }
 
