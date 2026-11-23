@@ -126,223 +126,412 @@
     outline-offset: 2px;
 }
 
-/* Panel sayfanın üzerinde durur (fixed); içerik kaymaz. */
-.app-panel {
-    position: fixed;
-    top: 3.75rem;
-    left: 0.75rem;
-    z-index: 1060;
-    display: flex;
-    flex-direction: column;
-    width: min(25rem, calc(100vw - 1.5rem));
-    max-height: calc(100vh - 4.75rem);
-    max-height: calc(100dvh - 4.75rem);
-    padding: 1rem;
-    background: var(--mx-surface);
-    color: var(--mx-ink);
-    border: 1px solid var(--mx-border);
-    border-radius: 1rem;
-    box-shadow: var(--mx-shadow-popover);
+/* Diyalog sayfanın üzerinde, üstten sabit boşlukla yatayda ortalanır (fixed; arama sonucu değişince yeri oynamaz); içerik kaymaz. Arka plan ortak .mx-modal-backdrop'tur.
+   Diyalog sol menünün içinde çizildiği için açıkken menü, üst çubuğun (z-index 1020) üstüne alınır. */
+html.app-launcher-open {
+    overflow: hidden;
 }
 
-    .app-panel:focus {
+    html.app-launcher-open .sidebar {
+        z-index: 1061;
+    }
+
+.app-dialog {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    z-index: 1061;
+    display: flex;
+    flex-direction: column;
+    width: min(64rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+    transform: translateX(-50%);
+    background: var(--mx-background);
+    color: var(--mx-text-primary);
+    border: 1px solid var(--mx-panel-border);
+    border-radius: var(--mx-radius-panel);
+    box-shadow: var(--mx-shadow-popover);
+    overflow: hidden;
+}
+
+    .app-dialog:focus {
         outline: none;
     }
 
-.app-panel-head {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-}
-
-.app-panel-title {
+.app-dialog-head {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    justify-content: space-between;
+    gap: var(--mx-space-4);
+    padding: var(--mx-space-4) var(--mx-space-6) 0;
+}
+
+.app-dialog-hero {
+    padding: var(--mx-space-4) var(--mx-space-6) var(--mx-space-5);
+}
+
+.app-dialog-title {
     margin: 0;
-    font-size: 1.05rem;
-    font-weight: 700;
+    font-size: var(--mx-fs-page-title);
+    font-weight: 800;
 }
 
-.app-panel-title-icon {
-    display: inline-grid;
-    place-items: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 0.6rem;
+.app-dialog-subtitle {
+    margin: var(--mx-space-1) 0 var(--mx-space-4);
+    color: var(--mx-text-secondary);
+    font-size: var(--mx-fs-body);
 }
-
-.app-back {
-    align-self: flex-start;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    min-height: 36px;
-    padding: 0.25rem 0.6rem 0.25rem 0.4rem;
-    background: transparent;
-    border: 0;
-    border-radius: 0.5rem;
-    color: var(--mx-indigo);
-    font-size: 0.875rem;
-    font-weight: 600;
-}
-
-    .app-back:hover {
-        background: var(--mx-lilac);
-    }
 
 .app-search {
     position: relative;
-    margin-bottom: 0.75rem;
 }
 
     .app-search .app-icon {
         position: absolute;
-        left: 0.85rem;
+        left: 1.1rem;
         top: 50%;
         transform: translateY(-50%);
-        color: var(--mx-muted);
+        color: var(--mx-brand-primary);
         pointer-events: none;
     }
 
     .app-search .form-control {
-        padding-left: 2.4rem;
+        min-height: 3rem;
+        padding-left: 3rem;
+        background: var(--mx-surface);
+        border-color: var(--mx-brand-primary);
         border-radius: 999px;
+        font-size: var(--mx-fs-body);
     }
 
-/* Çok sayıda uygulamada panel taşmaz; liste içeride kayar. */
-.app-panel-body {
+/* Kategori menüsü solda, kartlar sağda; çok sayıda uygulamada diyalog taşmaz, gövde içeride kayar. */
+.app-dialog-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: max-content;
+    gap: var(--mx-space-5);
     min-height: 0;
+    padding: 0 var(--mx-space-6) var(--mx-space-6);
     overflow-y: auto;
     overscroll-behavior: contain;
 }
 
-.app-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.5rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
+    .app-dialog-body.has-categories {
+        grid-template-columns: 16.5rem minmax(0, 1fr);
+        align-items: start;
+    }
+
+.app-categories {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mx-space-1);
+    padding: var(--mx-space-3);
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-panel-border);
+    border-radius: var(--mx-radius-card);
 }
 
-.app-group + .app-group {
-    margin-top: 0.9rem;
-}
-
-.app-group-title {
-    margin: 0 0 0.4rem 0.15rem;
-    color: var(--mx-muted);
+.app-categories-title {
+    margin: var(--mx-space-3) var(--mx-space-2) var(--mx-space-1);
+    color: var(--mx-text-secondary);
     font-size: 0.7rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
 }
 
-.app-tile {
+.app-category {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--mx-space-3);
     width: 100%;
-    min-height: 5.5rem;
-    padding: 0.75rem 0.4rem;
-    background: var(--mx-surface);
-    border: 1px solid var(--mx-border);
-    border-radius: 0.875rem;
-    color: var(--mx-ink);
-    font-size: 0.8rem;
+    min-height: 2.75rem;
+    padding: var(--mx-space-1) var(--mx-space-2);
+    background: transparent;
+    border: 0;
+    border-radius: var(--mx-radius-button);
+    color: var(--mx-text-primary);
+    font-size: var(--mx-fs-body);
     font-weight: 600;
-    line-height: 1.2;
-    text-align: center;
-    text-decoration: none;
+    text-align: left;
     cursor: pointer;
-    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    transition: background-color 0.15s;
 }
 
-    .app-tile:hover {
-        background: var(--mx-surface-hover);
-        border-color: var(--mx-indigo);
-        box-shadow: var(--mx-shadow);
-        color: var(--mx-ink);
+    .app-category:hover {
+        background: var(--mx-surface-muted);
     }
 
-    .app-tile.is-current {
-        border-color: var(--mx-indigo);
-        background: var(--mx-lilac);
+    .app-category.is-active {
+        background: var(--mx-tone-brand-bg);
+        color: var(--mx-tone-brand-fg);
     }
+
+.app-category-icon {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.6rem;
+    background: var(--mx-tone-teal-bg);
+    color: var(--mx-tone-teal-fg);
+}
+
+.app-category.is-active .app-category-icon {
+    background: var(--mx-surface);
+    color: var(--mx-tone-brand-fg);
+}
+
+.app-category-name {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.app-category-count {
+    flex: none;
+    min-width: 1.6rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: var(--mx-surface-muted);
+    color: var(--mx-text-primary);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+    text-align: center;
+}
+
+.app-category.is-active .app-category-count {
+    background: var(--mx-surface);
+}
+
+.app-dialog-main {
+    min-width: 0;
+}
+
+.app-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr));
+    gap: var(--mx-space-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+    .app-cards > li {
+        display: flex;
+    }
+
+.app-group + .app-group {
+    margin-top: var(--mx-space-6);
+}
+
+.app-group-title {
+    margin: 0 0 var(--mx-space-3);
+    font-size: var(--mx-fs-section-title);
+    font-weight: 700;
+}
+
+/* Uygulama kartı: tamamı bağlantıdır. Sağdaki büyük ikon süs amaçlıdır (ton zemininde, tokenlardan). */
+.app-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--mx-space-2);
+    width: 100%;
+    min-height: 11.5rem;
+    padding: var(--mx-space-4);
+    background: var(--mx-surface);
+    border: 1px solid var(--mx-panel-border);
+    border-radius: var(--mx-radius-card);
+    box-shadow: var(--mx-shadow-card);
+    color: var(--mx-text-primary);
+    text-decoration: none;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+    .app-card:hover {
+        border-color: var(--mx-brand-primary);
+        box-shadow: var(--mx-shadow-raised);
+        color: var(--mx-text-primary);
+        transform: translateY(-1px);
+    }
+
+    .app-card.is-current {
+        border-color: var(--mx-brand-primary);
+    }
+
+.app-card-art {
+    position: absolute;
+    right: -1.5rem;
+    bottom: -1.5rem;
+    display: grid;
+    place-items: center;
+    width: 9.5rem;
+    height: 9.5rem;
+    border-radius: 50%;
+}
+
+    .app-card-art .app-icon {
+        opacity: 0.55;
+    }
+
+.app-card-icon {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.75rem;
+}
+
+.tone-indigo .app-card-icon,
+.tone-indigo .app-card-art {
+    background: var(--mx-tone-brand-bg);
+    color: var(--mx-tone-brand-fg);
+}
+
+.tone-teal .app-card-icon,
+.tone-teal .app-card-art {
+    background: var(--mx-tone-teal-bg);
+    color: var(--mx-tone-teal-fg);
+}
+
+.app-card-name,
+.app-card-text,
+.app-card-icon,
+.app-card-open {
+    position: relative;
+}
+
+.app-card-name {
+    font-size: var(--mx-fs-card-title);
+    font-weight: 800;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.app-card-text {
+    max-width: calc(100% - 6.5rem);
+    color: var(--mx-text-secondary);
+    font-size: var(--mx-fs-helper);
+    line-height: 1.4;
+}
+
+/* "Aç" görsel ipucudur (kartın tamamı tıklanır); tonal düğme görünümündedir, birincil düğme değildir. */
+.app-card-open {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mx-space-2);
+    margin-top: auto;
+    min-height: 2rem;
+    padding: 0 var(--mx-space-4);
+    border-radius: 999px;
+    background: var(--mx-tone-brand-bg);
+    color: var(--mx-tone-brand-fg);
+    font-size: var(--mx-fs-helper);
+    font-weight: 700;
+}
+
+.tone-teal .app-card-open {
+    background: var(--mx-tone-teal-bg);
+    color: var(--mx-tone-teal-fg);
+}
 
 /* Pasif kart (yol haritasındaki uygulama): tıklanmaz, odak almaz; kontrastı AA'nın altına inmez, pasifliği "Yakında" başlığı ve imleç anlatır. */
-.app-tile.is-planned {
+.app-card.is-planned {
+    min-height: 0;
+    flex-direction: row;
+    align-items: center;
     cursor: default;
     background: var(--mx-surface-muted);
     border-style: dashed;
+    box-shadow: none;
     color: var(--mx-text-secondary);
 }
 
-    .app-tile.is-planned:hover {
-        background: var(--mx-surface-muted);
-        border-color: var(--mx-border);
+    .app-card.is-planned:hover {
+        border-color: var(--mx-panel-border);
         box-shadow: none;
         color: var(--mx-text-secondary);
+        transform: none;
     }
 
-    .app-tile.is-planned .app-tile-icon {
+    .app-card.is-planned .app-card-icon {
         background: transparent;
         color: var(--mx-text-secondary);
     }
 
-.app-tile-name {
-    overflow-wrap: anywhere;
-}
-
-.app-tile-icon {
-    display: inline-grid;
-    place-items: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 0.75rem;
-}
-
-.tone-indigo .app-tile-icon,
-.app-panel-title-icon.tone-indigo {
-    background: var(--mx-lilac);
-    color: var(--mx-indigo);
-}
-
-.tone-teal .app-tile-icon,
-.app-panel-title-icon.tone-teal {
-    background: var(--mx-tone-success-bg);
-    color: var(--mx-teal);
-}
-
-.app-tile:focus-visible,
-.app-back:focus-visible {
-    outline: 2px solid var(--mx-indigo);
+.app-card:focus-visible,
+.app-category:focus-visible {
+    outline: 2px solid var(--mx-brand-primary);
     outline-offset: 2px;
-}
-
-.app-search .form-control:focus-visible {
-    outline: none;
 }
 
 .app-state {
     margin: 0;
-    padding: 1.5rem 0.5rem;
-    color: var(--mx-muted);
-    font-size: 0.9rem;
+    padding: var(--mx-space-8) var(--mx-space-2);
+    color: var(--mx-text-secondary);
+    font-size: var(--mx-fs-body);
     text-align: center;
 }
 
-@media (max-width: 640.98px) {
-    .app-panel {
-        left: 0.5rem;
+/* Dar ekran: kategoriler kartların üstünde yatay kayan satır olur, kartlar tek sütuna iner. */
+@media (max-width: 767.98px) {
+    .app-dialog {
+        top: 0.5rem;
         width: calc(100vw - 1rem);
+        max-height: calc(100vh - 1rem);
+        max-height: calc(100dvh - 1rem);
+        border-radius: var(--mx-radius-drawer);
     }
 
-    .app-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .app-dialog-head,
+    .app-dialog-hero {
+        padding-left: var(--mx-space-4);
+        padding-right: var(--mx-space-4);
+    }
+
+    .app-dialog-body,
+    .app-dialog-body.has-categories {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 0 var(--mx-space-4) var(--mx-space-4);
+    }
+
+    .app-categories {
+        position: static;
+        flex-direction: row;
+        overflow-x: auto;
+    }
+
+    .app-categories-title {
+        display: none;
+    }
+
+    .app-category {
+        flex: none;
+        width: auto;
+    }
+
+    .app-card {
+        min-height: 9.5rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-card,
+    .app-category {
+        transition: none;
+    }
+
+    .app-card:hover {
+        transform: none;
     }
 }
 
