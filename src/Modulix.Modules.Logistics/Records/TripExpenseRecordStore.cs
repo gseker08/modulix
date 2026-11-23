@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Customization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Logistics.Domain;
 
@@ -31,14 +32,14 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
 
     protected override IReadOnlyList<RecordField<TripExpense>> Fields => fields ??=
     [
-        Field.Reference<TripExpense, Trip>("tripId", "Sefer bulunamadı.", e => e.TripId, (e, v) => e.TripId = v!.Value, required: true, createOnly: true),
+        Field.Reference<TripExpense, Trip>("tripId", LogisticsMessages.NotFound.Trip, e => e.TripId, (e, v) => e.TripId = v!.Value, required: true, createOnly: true),
         Field.ListChoice<TripExpense>("kindKey", LogisticsModule.Lists.ExpenseKind, e => e.KindKey, (e, v) => e.KindKey = v ?? string.Empty),
         Field.Text<TripExpense>("description", TripExpense.DescriptionMaxLength, e => e.Description, (e, v) => e.Description = v ?? string.Empty, required: true),
         Field.Date<TripExpense>("expenseDate", e => e.ExpenseDate, (e, v) => e.ExpenseDate = v!.Value, required: true),
         Field.Decimal<TripExpense>("amount", e => e.Amount == 0 ? null : e.Amount, (e, v) => e.Amount = v ?? 0, 2, 0, LogisticsEntity.MaxAmount, required: true),
         MoneyRules.Currency<TripExpense>("currency", e => e.Currency.Length == 0 ? null : e.Currency, (e, v) => e.Currency = v ?? string.Empty),
         MoneyRules.Amount<TripExpense>("vatAmount", e => e.VatAmount, (e, v) => e.VatAmount = v),
-        Field.PartyRef<TripExpense>("supplierPartyId", "Tedarikçi bulunamadı.", e => e.SupplierPartyId, (e, v) => e.SupplierPartyId = v),
+        Field.PartyRef<TripExpense>("supplierPartyId", LogisticsMessages.NotFound.Supplier, e => e.SupplierPartyId, (e, v) => e.SupplierPartyId = v),
         Field.Text<TripExpense>("documentNo", TripExpense.DocumentNoMaxLength, e => e.DocumentNo, (e, v) => e.DocumentNo = v),
         Field.Decimal<TripExpense>("liters", e => e.Liters, (e, v) => e.Liters = v, 3, 0, TripExpense.MaxLiters),
         Field.Integer<TripExpense>("odometerKm", e => e.OdometerKm, (e, v) => e.OdometerKm = v, 0, TripExpense.MaxOdometerKm),
@@ -101,7 +102,7 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
         }
         else if (!isNew && entity.Status is not (TripExpense.Statuses.Pending or TripExpense.Statuses.Rejected))
         {
-            throw new RecordConflictException("Onaylanmış masraf değiştirilemez; hatalıysa yeni masraf girin.");
+            throw new RecordConflictException(LogisticsMessages.Expense.ApprovedLocked);
         }
 
         // İptal edilen sefere masraf açılmaz; beklemedeki ya da reddedilmiş masrafı da artık düzenlenmez (ADR-0038 bölüm 25). Karar komutları
@@ -112,8 +113,8 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
             if (tripStatus == Trip.Statuses.Cancelled)
             {
                 throw new RecordConflictException(isNew
-                    ? "İptal edilen sefere masraf eklenmez."
-                    : "İptal edilen seferin masrafı düzenlenmez; gerekirse masrafı reddedin.");
+                    ? LogisticsMessages.Expense.CancelledNoAdd
+                    : LogisticsMessages.Expense.CancelledNoEdit);
             }
         }
 
@@ -129,12 +130,12 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
 
         if (entity.Amount <= 0)
         {
-            errors.Add(new RecordFieldError("amount", "Tutar sıfırdan büyük olmalıdır."));
+            errors.Add(new RecordFieldError("amount", LogisticsMessages.Expense.AmountPositive));
         }
 
         if (entity.Currency.Length == 0)
         {
-            errors.Add(new RecordFieldError("currency", "Para birimi seçilmelidir."));
+            errors.Add(new RecordFieldError("currency", LogisticsMessages.Expense.CurrencyRequired));
         }
         else
         {
@@ -143,12 +144,12 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
 
         if (entity.VatAmount is { } vat && vat > entity.Amount)
         {
-            errors.Add(new RecordFieldError("vatAmount", "KDV tutarı toplam tutarı aşamaz."));
+            errors.Add(new RecordFieldError("vatAmount", LogisticsMessages.Expense.VatExceeds));
         }
 
         if (entity.ExpenseDate > DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1))
         {
-            errors.Add(new RecordFieldError("expenseDate", "Masraf tarihi ileri bir gün olamaz."));
+            errors.Add(new RecordFieldError("expenseDate", LogisticsMessages.Expense.DateFuture));
         }
 
         var category = (await Context.ChoiceLists.GetAsync(LogisticsModule.Lists.ExpenseKind, cancellationToken)).Find(entity.KindKey)?.Category;
@@ -156,25 +157,25 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
         {
             if (entity.Liters is not > 0)
             {
-                errors.Add(new RecordFieldError("liters", "Yakıt masrafında litre zorunludur."));
+                errors.Add(new RecordFieldError("liters", LogisticsMessages.Expense.LitersRequired));
             }
         }
         else
         {
             if (entity.Liters is not null)
             {
-                errors.Add(new RecordFieldError("liters", "Litre yalnızca yakıt masrafında girilir."));
+                errors.Add(new RecordFieldError("liters", LogisticsMessages.Expense.LitersFuelOnly));
             }
 
             if (entity.OdometerKm is not null)
             {
-                errors.Add(new RecordFieldError("odometerKm", "Kilometre yalnızca yakıt masrafında girilir."));
+                errors.Add(new RecordFieldError("odometerKm", LogisticsMessages.Expense.OdometerFuelOnly));
             }
         }
 
         if (entity.ChargeToDriver && category != LogisticsModule.ExpenseKindCategories.Fine)
         {
-            errors.Add(new RecordFieldError("chargeToDriver", "Sürücüye rücu yalnızca trafik cezasında işaretlenir."));
+            errors.Add(new RecordFieldError("chargeToDriver", LogisticsMessages.Expense.ChargeFineOnly));
         }
 
         if (errors.Count > 0)
@@ -192,18 +193,18 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
     {
         if (entity.Status != TripExpense.Statuses.Pending)
         {
-            throw new RecordConflictException("Yalnızca beklemedeki masraf aktarılır; reddedilen masrafı önce yeniden onaya gönderin.");
+            throw new RecordConflictException(LogisticsMessages.Expense.TransferPendingOnly);
         }
 
         var trips = Context.Data.Set<Trip>().AsNoTracking();
         if (await trips.Where(t => t.Id == entity.TripId).Select(t => t.Status).SingleAsync(cancellationToken) != Trip.Statuses.Cancelled)
         {
-            throw new RecordConflictException("Yalnızca iptal edilen seferin masrafı başka sefere aktarılır.");
+            throw new RecordConflictException(LogisticsMessages.Expense.TransferCancelledOnly);
         }
 
         var targetStatus = await trips.Where(t => t.Id == targetTrip).Select(t => t.Status).SingleOrDefaultAsync(cancellationToken);
-        var error = targetStatus is null ? "Sefer bulunamadı."
-            : targetStatus == Trip.Statuses.Cancelled ? "İptal edilen sefere masraf aktarılmaz."
+        ServerMessage? error = targetStatus is null ? LogisticsMessages.NotFound.Trip
+            : targetStatus == Trip.Statuses.Cancelled ? LogisticsMessages.Expense.TransferTargetCancelled
             : null;
         if (error is not null)
         {
@@ -226,7 +227,7 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
     }
 
     protected override Task BeforeDeleteAsync(TripExpense entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Masraf silinmez; hatalı masrafı reddedin.");
+        throw new RecordConflictException(LogisticsMessages.Expense.NoDelete);
 
     /// <summary>
     /// Makbuz ve fiş kuralı kaydın güncelleme kuralıyla aynıdır (ADR-0038 bölüm 24 ve 25): beklemedeki ve reddedilmiş masrafın belgesi değişir

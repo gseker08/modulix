@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Logistics.Domain;
@@ -47,10 +48,10 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
     /// Doluysa kayıt oluşturulduktan sonra <b>değiştirilemez ve silinemez</b>: güncelleme ve silme bu iletiyle çakışma (409) döner. Yalnızca eklenen kayıtlar
     /// (stok hareket defteri, ADR-0032 K13) ve türetilmiş kayıtlar (bakiye) kullanır.
     /// </summary>
-    protected virtual string? ImmutableMessage => null;
+    protected virtual ServerMessage? ImmutableMessage => null;
 
     /// <summary>Doluysa bu kayıt türü genel uçtan oluşturulamaz (yalnızca okunur; örn. bakiye defterden türetilir).</summary>
-    protected virtual string? CreateBlockedMessage => null;
+    protected virtual ServerMessage? CreateBlockedMessage => null;
 
     private IModuleData Data => context.Data;
 
@@ -241,7 +242,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
 
         if (!keys.Contains(sort, StringComparer.Ordinal))
         {
-            throw new RecordValidationException([new RecordFieldError("sort", "Geçersiz sıralama.")]);
+            throw new RecordValidationException([new RecordFieldError("sort", ServerMessages.Validation.InvalidSort)]);
         }
 
         return (filters.Where(f => f.Key != "sort").ToDictionary(f => f.Key, f => f.Value), sort);
@@ -269,7 +270,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
             }
             else
             {
-                errors.Add(new RecordFieldError(name, "Geçersiz filtre değeri."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.InvalidFilterValue));
             }
         }
 
@@ -311,7 +312,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
             {
                 if (value is not null && !JsonNode.DeepEquals(field.Read(entity), JsonValue.Create(value.ToString())))
                 {
-                    errors.Add(new RecordFieldError(name, "Oluşturulduktan sonra değiştirilemez."));
+                    errors.Add(new RecordFieldError(name, ServerMessages.Validation.CreateOnly));
                 }
 
                 continue;
@@ -320,7 +321,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
             if (field.Exists is { } exists && value is Guid id && !await exists(context, id, cancellationToken))
             {
                 // Başka tenant'ın kaydı da "bulunamadı" sayılır; varlığı belli edilmez.
-                errors.Add(new RecordFieldError(name, field.NotFoundMessage ?? "Kayıt bulunamadı."));
+                errors.Add(new RecordFieldError(name, field.NotFoundMessage ?? ServerMessages.Record.NotFound));
                 continue;
             }
 
@@ -330,7 +331,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
                 var unchanged = !isNew && choice is not null && field.Read(entity)?.GetValue<string>() == choice.Key;
                 if (choice is null || (!choice.Active && !unchanged))
                 {
-                    errors.Add(new RecordFieldError(name, choice is null ? "Listede olmayan değer." : "Bu değer artık kullanılmıyor."));
+                    errors.Add(new RecordFieldError(name, choice is null ? ServerMessages.Validation.NotInList : ServerMessages.Validation.Retired));
                     continue;
                 }
 
@@ -352,8 +353,7 @@ internal abstract class LogisticsRecordStore<TEntity>(LogisticsStoreContext cont
     {
         if (expectedVersion is { } expected && expected != entity.Version)
         {
-            throw new RecordConflictException(
-                $"Kayıt siz düzenlerken değişti (beklenen sürüm {expected}, güncel sürüm {entity.Version}). Güncel halini alıp tekrar deneyin.");
+            throw new RecordConflictException(ServerMessages.Record.ConcurrencyVersion(expected, entity.Version));
         }
     }
 }

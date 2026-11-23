@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Logistics.Domain;
@@ -23,7 +24,7 @@ internal sealed partial class CarrierTermsRecordStore(LogisticsStoreContext cont
 
     protected override IReadOnlyList<RecordField<CarrierTerms>> Fields { get; } =
     [
-        Field.PartyRef<CarrierTerms>("carrierPartyId", "Taşıyıcı firma bulunamadı.", t => t.CarrierPartyId, (t, v) => t.CarrierPartyId = v!.Value, required: true, createOnly: true),
+        Field.PartyRef<CarrierTerms>("carrierPartyId", LogisticsMessages.NotFound.Carrier, t => t.CarrierPartyId, (t, v) => t.CarrierPartyId = v!.Value, required: true, createOnly: true),
         Field.Text<CarrierTerms>("title", CarrierTerms.TitleMaxLength, t => t.Title, (t, v) => t.Title = v!, required: true),
         Field.Text<CarrierTerms>("agreementNo", CarrierTerms.AgreementNoMaxLength, t => t.AgreementNo, (t, v) => t.AgreementNo = v, upperCase: true),
         Field.Date<CarrierTerms>("validFrom", t => t.ValidFrom, (t, v) => t.ValidFrom = v!.Value, required: true),
@@ -83,12 +84,12 @@ internal sealed partial class CarrierTermsRecordStore(LogisticsStoreContext cont
 
         if (!CurrencyPattern().IsMatch(entity.Currency))
         {
-            errors.Add(new RecordFieldError("currency", "Üç harfli para birimi girin (ör. TRY)."));
+            errors.Add(new RecordFieldError("currency", LogisticsMessages.Carrier.CurrencyFormat));
         }
 
         if (entity.ValidTo is { } end && end < entity.ValidFrom)
         {
-            errors.Add(new RecordFieldError("validTo", "Bitiş tarihi başlangıç tarihinden önce olamaz."));
+            errors.Add(new RecordFieldError("validTo", LogisticsMessages.Carrier.ValidToBeforeFrom));
         }
 
         if (isNew)
@@ -98,14 +99,14 @@ internal sealed partial class CarrierTermsRecordStore(LogisticsStoreContext cont
                     .Contains(LogisticsModule.RelationshipRoles.Carrier))
             {
                 errors.Add(new RecordFieldError(
-                    "carrierPartyId", "Seçilen firma \"Taşıyıcı\" ilişki rolüne sahip değil; önce firma kaydından rolü ekleyin."));
+                    "carrierPartyId", LogisticsMessages.Carrier.RoleMissing));
             }
         }
 
         var siblings = Context.Data.Set<CarrierTerms>().AsNoTracking().Where(t => t.CarrierPartyId == entity.CarrierPartyId && t.Id != entity.Id);
         if (entity.AgreementNo is { } number && await siblings.AnyAsync(t => t.AgreementNo == number, cancellationToken))
         {
-            errors.Add(new RecordFieldError("agreementNo", "Bu taşıyıcıda aynı numaralı başka bir anlaşma var."));
+            errors.Add(new RecordFieldError("agreementNo", LogisticsMessages.Carrier.AgreementNoTaken));
         }
 
         // Aynı taşıyıcının etkin anlaşmaları bir günde tek olmalı: [başlangıç, bitiş] aralıkları kesişemez (boş bitiş = süresiz).
@@ -120,7 +121,7 @@ internal sealed partial class CarrierTermsRecordStore(LogisticsStoreContext cont
             if (overlapping is not null)
             {
                 errors.Add(new RecordFieldError(
-                    "validFrom", $"Bu taşıyıcının \"{overlapping}\" anlaşması aynı tarihlerde geçerli; tarihleri değiştirin ya da diğer anlaşmayı pasife alın."));
+                    "validFrom", LogisticsMessages.Carrier.Overlap(overlapping)));
             }
         }
 
