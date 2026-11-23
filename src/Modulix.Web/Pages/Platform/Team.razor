@@ -33,17 +33,11 @@
                     <FieldError Field="email" Errors="errors" />
                 </div>
             </div>
-            <fieldset class="mt-3">
-                <legend class="form-label">@Texts.Get("nav.app.admin.roles")</legend>
-                @foreach (var role in Assignable)
-                {
-                    <div class="form-check">
-                        <input id="new-@role" class="form-check-input" type="checkbox" checked="@newRoles.Contains(role)" @onchange="e => Toggle(newRoles, role, (bool)e.Value!)" />
-                        <label class="form-check-label" for="new-@role">@PlatformLabels.RoleOf(role)</label>
-                    </div>
-                }
+            <div class="mt-3">
+                <label class="form-label" for="new-roles">@Texts.Get("nav.app.admin.roles")</label>
+                <PickField TKey="string" Id="new-roles" Title="@Texts.Get("nav.app.admin.roles")" Icon="shield" Items="RoleItems" Selected="newRoles" SelectedChanged="SetNewRoles" />
                 <FieldError Field="roles" Errors="errors" />
-            </fieldset>
+            </div>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(email) || newRoles.Count == 0)">@Texts.Get("common.add")</button>
             </div>
@@ -70,14 +64,9 @@
                                 }
                                 else
                                 {
-                                    @foreach (var role in Assignable)
-                                    {
-                                        <label class="me-2">
-                                            <input type="checkbox" checked="@member.Roles.Contains(role)" disabled="@busy"
-                                                   @onchange="e => ChangeAsync(member, role, (bool)e.Value!)" />
-                                            @PlatformLabels.RoleOf(role)
-                                        </label>
-                                    }
+                                    @* Seçim uygulanınca hemen kaydedilir (eskiden her kutu tek tek kaydediyordu). *@
+                                    <PickField TKey="string" Id="@($"roles-{member.UserId}")" Title="@Texts.Get("nav.app.admin.roles")" Icon="shield" Disabled="busy"
+                                               Items="RoleItems" Selected="member.Roles.Where(r => Assignable.Contains(r))" SelectedChanged="roles => ChangeAsync(member, roles)" />
                                 }
                             </td>
                             <td data-label="@Texts.Get("admin.users.col.twoFactor")">
@@ -127,16 +116,12 @@
         }
     }
 
-    private static void Toggle(HashSet<string> set, string role, bool on)
+    private IReadOnlyList<PickItem<string>> RoleItems => [.. Assignable.Select(role => new PickItem<string>(role, PlatformLabels.RoleOf(role)))];
+
+    private void SetNewRoles(IReadOnlyList<string> roles)
     {
-        if (on)
-        {
-            set.Add(role);
-        }
-        else
-        {
-            set.Remove(role);
-        }
+        newRoles.Clear();
+        newRoles.UnionWith(roles);
     }
 
     private async Task AddAsync()
@@ -156,16 +141,9 @@
         await LoadAsync();
     }
 
-    private async Task ChangeAsync(PlatformTeamMemberDto member, string role, bool on)
-    {
-        var roles = member.Roles.Where(r => r != role).ToList();
-        if (on)
-        {
-            roles.Add(role);
-        }
-
-        await SaveAsync(member, roles, Texts.Get("platform.team.rolesUpdated", member.DisplayName));
-    }
+    // Atanabilir olmayan roller (ör. başka yoldan verilmiş) seçimden bağımsız korunur.
+    private Task ChangeAsync(PlatformTeamMemberDto member, IReadOnlyList<string> roles) =>
+        SaveAsync(member, [.. member.Roles.Where(r => !Assignable.Contains(r)), .. roles], Texts.Get("platform.team.rolesUpdated", member.DisplayName));
 
     private Task RemoveAsync(PlatformTeamMemberDto member) =>
         SaveAsync(member, [], Texts.Get("platform.team.removed", member.DisplayName));

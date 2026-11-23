@@ -43,15 +43,9 @@
             <FieldError Field="phone" Errors="errors" />
         </div>
         <div class="span-all">
-            <span class="form-label">@Texts.Get("crm.link.editor.roles")</span>
-            <div class="role-options">
-                @foreach (var (key, label) in RelationshipRoleNames.All())
-                {
-                    <label class="form-check-inline">
-                        <input type="checkbox" checked="@form.Roles.Contains(key)" @onchange="e => Toggle(key, (bool)e.Value!)" /> @label
-                    </label>
-                }
-            </div>
+            <label class="form-label" for="new-person-roles">@Texts.Get("crm.link.editor.roles")</label>
+            <PickField TKey="string" Id="new-person-roles" Title="@Texts.Get("crm.link.editor.roles")" Icon="users" Items="@([.. RelationshipRoleNames.All().Select(r => new PickItem<string>(r.Key, r.Value))])"
+                       Selected="form.Roles" SelectedChanged="SetRoles" />
         </div>
         <div>
             <label class="form-check-inline"><input type="checkbox" @bind="form.IsPrimary" /> @Texts.Get("crm.company.people.primary")</label>
@@ -81,16 +75,10 @@
 
     [Parameter] public EventCallback Cancelled { get; set; }
 
-    private void Toggle(string key, bool on)
+    private void SetRoles(IReadOnlyList<string> keys)
     {
-        if (on)
-        {
-            form.Roles.Add(key);
-        }
-        else
-        {
-            form.Roles.Remove(key);
-        }
+        form.Roles.Clear();
+        form.Roles.UnionWith(keys);
     }
 
     private async Task SaveAsync()

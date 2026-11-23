@@ -16,19 +16,10 @@
         <div class="@(wide ? "span-all" : null)">
             @if (field.Type == CustomFieldType.MultiChoice)
             {
-                <fieldset>
-                    <legend class="form-label @(required ? "required" : null)">@field.Label</legend>
-                    <div class="check-list">
-                        @foreach (var option in Selectable(field))
-                        {
-                            <label class="form-check">
-                                <input class="form-check-input" type="checkbox" checked="@Selected(field).Contains(option.Key)"
-                                       @onchange="e => Toggle(field, option.Key, (bool)e.Value!)" />
-                                <span class="form-check-label">@option.Label</span>
-                            </label>
-                        }
-                    </div>
-                </fieldset>
+                <label class="form-label @(required ? "required" : null)" for="@id">@field.Label</label>
+                <PickField TKey="string" Id="@id" Title="@field.Label" Icon="list"
+                           Items="@([.. Selectable(field).Select(o => new PickItem<string>(o.Key, o.Active ? o.Label : $"{o.Label} ({Texts.Get("common.inactiveLower")})"))])"
+                           Selected="Selected(field)" SelectedChanged="keys => SetChoices(field, keys)" />
             }
             else
             {
@@ -117,18 +108,9 @@
     private void SetYesNo(CustomFieldDto field, string? text) =>
         Values[field.Key] = text switch { "true" => JsonValue.Create(true), "false" => JsonValue.Create(false), _ => null };
 
-    private void Toggle(CustomFieldDto field, string key, bool on)
+    private void SetChoices(CustomFieldDto field, IReadOnlyList<string> keys)
     {
-        var selected = Selected(field);
-        if (on)
-        {
-            selected.Add(key);
-        }
-        else
-        {
-            selected.Remove(key);
-        }
-
+        var selected = keys.ToHashSet();
         Values[field.Key] = selected.Count == 0
             ? null
             : new JsonArray([.. field.Options.Where(o => selected.Contains(o.Key)).Select(o => (JsonNode?)JsonValue.Create(o.Key))]);

@@ -1,27 +1,11 @@
-@* Rol seçimi (onay kutuları). Seçim, verilen kümede tutulur. *@
+@* Rol seçimi: seçilen roller etiket olarak durur, seçim atama penceresinde yapılır (PickField). Seçim, verilen kümede tutulur. *@
 @if (Roles.Count == 0)
 {
     <EmptyState Compact="true" Title="@Texts.Get("admin.rolePicker.none")" />
 }
 else
 {
-    <div class="role-picker">
-        @foreach (var role in Roles)
-        {
-            var locked = role.IsSystem && !CanGrantAdministrator;
-            <label class="form-check">
-                <input class="form-check-input" type="checkbox" checked="@Selected.Contains(role.Id)" disabled="@locked"
-                       @onchange="e => Toggle(role.Id, e.Value is true)" />
-                <span class="form-check-label">
-                    @role.Name
-                    @if (role.IsSystem)
-                    {
-                        <small class="text-muted"> · @(locked ? Texts.Get("admin.rolePicker.allPermissionsLocked") : Texts.Get("admin.rolePicker.allPermissions"))</small>
-                    }
-                </span>
-            </label>
-        }
-    </div>
+    <PickField TKey="Guid" Id="@Id" Title="@Texts.Get("nav.app.admin.roles")" Icon="shield" Items="Items" Selected="Selected" SelectedChanged="Replace" />
 }
 
 @code {
@@ -32,15 +16,23 @@ else
     /// <summary>Yönetici rolü seçilebilir mi (kullanıcı yönetici mi)?</summary>
     [Parameter] public bool CanGrantAdministrator { get; set; }
 
-    private void Toggle(Guid roleId, bool on)
+    /// <summary>Pencereyi açan düğmenin kimliği.</summary>
+    [Parameter] public string? Id { get; set; }
+
+    // Sistem rolünü yalnızca yönetici verebilir: kilitli satır pencerede görünür ama değiştirilemez.
+    private IReadOnlyList<PickItem<Guid>> Items =>
+    [
+        .. Roles.Select(role =>
+        {
+            var locked = role.IsSystem && !CanGrantAdministrator;
+            var note = role.IsSystem ? Texts.Get(locked ? "admin.rolePicker.allPermissionsLocked" : "admin.rolePicker.allPermissions") : null;
+            return new PickItem<Guid>(role.Id, role.Name, note, Locked: locked);
+        }),
+    ];
+
+    private void Replace(IReadOnlyList<Guid> roleIds)
     {
-        if (on)
-        {
-            Selected.Add(roleId);
-        }
-        else
-        {
-            Selected.Remove(roleId);
-        }
+        Selected.Clear();
+        Selected.UnionWith(roleIds);
     }
 }
