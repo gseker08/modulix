@@ -94,13 +94,15 @@ public sealed class AppNavigation(SessionState session)
 
     /// <summary>
     /// Görünür ana uygulamalar. Erişilebilir ekranı ya da kendi giriş ekranı olmayan boş modül listelenmez; menüsü
-    /// görünür bir ev sahibinin (ör. CRM) içinde gösterilen uygulama ayrı listelenmez.
+    /// görünür bir ev sahibinin (ör. CRM) içinde gösterilen uygulama ayrı listelenmez. Rol düzenindeki uygulama sırası (<c>app.&lt;uygulama&gt;</c> satırı)
+    /// grubu içinde uygulanır (<see cref="MenuLayoutRules.OrderApps"/>).
     /// </summary>
     public IReadOnlyList<AppDefinition> Roots() =>
-        AppCatalog.All
-            .Where(a => a.ParentId is null && IsVisible(a) && (a.Route is not null || CatalogEntries(a.Id, IsVisible).Count > 0) && HostOf(a) is null)
-            .OrderBy(a => a.Order)
-            .ToList();
+        MenuLayoutRules.OrderApps(
+            [.. AppCatalog.All
+                .Where(a => a.ParentId is null && IsVisible(a) && (a.Route is not null || CatalogEntries(a.Id, IsVisible).Count > 0) && HostOf(a) is null)
+                .OrderBy(a => a.Order)],
+            session.Access?.MenuLayout);
 
     /// <summary>Uygulamanın ekranlarını menüsünde gösteren ve şu an görünür olan ev sahibi; yoksa <c>null</c>.</summary>
     public AppDefinition? HostOf(AppDefinition root)

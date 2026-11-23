@@ -17,10 +17,10 @@ public class MenuLayoutTests
 
     private static readonly string[] Permissions = [CrmAccess.CompaniesRead, CrmAccess.ContactsRead, CrmAccess.LeadsRead];
 
-    private static AppNavigation Nav(IReadOnlyList<RoleMenuRowDto>? layout, string[]? permissions = null)
+    private static AppNavigation Nav(IReadOnlyList<RoleMenuRowDto>? layout, string[]? permissions = null, string[]? modules = null)
     {
         var session = new SessionState(new ApiClient(new HttpClient()));
-        Set(session, nameof(SessionState.Access), new MyAccessResponse([CrmAccess.ModuleKey], permissions ?? Permissions) { MenuLayout = layout ?? [] });
+        Set(session, nameof(SessionState.Access), new MyAccessResponse(modules ?? [CrmAccess.ModuleKey], permissions ?? Permissions) { MenuLayout = layout ?? [] });
         Set(session, nameof(SessionState.User), new MeResponse(Guid.NewGuid(), "a@example.com", "Test", Guid.NewGuid(), [], false));
         return new AppNavigation(session);
     }
@@ -96,6 +96,80 @@ public class MenuLayoutTests
         // Yalnızca gizleme satırı olan (sırası null) bölümde sıra değişmez.
         var hideOnly = Nav([new(RoleA, "crm.leads", null, true)]);
         Assert.Equal(CustomerIds(Nav(null)).Where(id => id != "crm.leads"), CustomerIds(hideOnly));
+    }
+
+    // Uygulama sırası (dilim 4): uygulama paneli grubu içinde, katalogdaki ana uygulamalarla.
+    private static IReadOnlyList<AppDefinition> CatalogRoots() => [.. AppCatalog.All.Where(a => a.ParentId is null).OrderBy(a => a.Order)];
+
+    private static IReadOnlyList<AppDefinition> GroupWithAtLeast(int count) =>
+        CatalogRoots().Where(a => a.Group is not null).GroupBy(a => a.Group).First(g => g.Count() >= count).ToList();
+
+    [Fact]
+    public void App_order_row_moves_the_app_inside_its_launcher_group_only()
+    {
+        var roots = CatalogRoots();
+        var group = GroupWithAtLeast(2);
+        AppDefinition first = group[0], second = group[1];
+
+        var ordered = MenuLayoutRules.OrderApps(roots, [
+            new(RoleA, MenuLayoutRules.AppKey(second.Id), 1, false), new(RoleA, MenuLayoutRules.AppKey(first.Id), 2, false)]);
+
+        // Grup içinde sıra değişir; öbür grupların uygulamaları ve listedeki yerleri aynıdır.
+        Assert.Equal(roots.Count, ordered.Count);
+        Assert.True(ordered.ToList().IndexOf(second) < ordered.ToList().IndexOf(first));
+        for (int i = 0; i < roots.Count; i++)
+        {
+            if (roots[i].Group != first.Group)
+            {
+                Assert.Equal(roots[i], ordered[i]);
+            }
+        }
+    }
+
+    [Fact]
+    public void Apps_without_an_explicit_order_follow_the_ordered_ones_and_other_keys_are_ignored()
+    {
+        var roots = CatalogRoots();
+        var group = GroupWithAtLeast(3);
+
+        // Yalnızca en sondaki uygulamaya sıra verilirse öne çıkar; sırasızlar arkasından katalog sırasıyla gelir.
+        var ordered = MenuLayoutRules.OrderApps(roots, [new(RoleA, MenuLayoutRules.AppKey(group[^1].Id), 5, false)]);
+        var inGroup = ordered.Where(a => a.Group == group[0].Group).ToList();
+        Assert.Equal([group[^1], .. group.Take(group.Count - 1)], inGroup);
+
+        // Öğe satırı, bölüm satırı ve bilinmeyen anahtar uygulama sırasını değiştirmez; satır yoksa liste aynen döner.
+        Assert.Equal(roots, MenuLayoutRules.OrderApps(roots, [new(RoleA, "crm.leads", 1, false), new(RoleA, "section.crm.crm.sales", 1, false), new(RoleA, "app.yok", 1, false)]));
+        Assert.Same(roots, MenuLayoutRules.OrderApps(roots, null));
+    }
+
+    [Fact]
+    public void Smallest_app_order_across_roles_wins()
+    {
+        var group = GroupWithAtLeast(2);
+        AppDefinition first = group[0], second = group[1];
+
+        // Rol A ikinciyi geriye atar, rol B öne alır: en küçük sıra geçer.
+        var merged = MenuLayoutRules.OrderApps(CatalogRoots(), [
+            new(RoleA, MenuLayoutRules.AppKey(second.Id), 900, false), new(RoleB, MenuLayoutRules.AppKey(second.Id), 1, false),
+            new(RoleA, MenuLayoutRules.AppKey(first.Id), 50, false)]);
+        Assert.True(merged.ToList().IndexOf(second) < merged.ToList().IndexOf(first));
+    }
+
+    [Fact]
+    public void Roots_follow_the_app_order_of_the_layout_inside_the_launcher_group()
+    {
+        // Birden çok modül açık ve izinli kullanıcı: katalogdaki izinlerden türetilir.
+        string[] modules = ["crm", "warehouse", "logistics", "fleet", "hr"];
+        string[] permissions = [.. AppCatalog.All.Where(a => a.ModuleKey is not null && modules.Contains(a.ModuleKey))
+            .SelectMany(a => (a.AnyPermission ?? []).Append(a.Permission)).OfType<string>().Distinct()];
+        var plain = Nav(null, permissions, modules).Roots();
+        var group = plain.Where(a => a.Group is not null).GroupBy(a => a.Group).First(g => g.Count() >= 2).ToList();
+
+        var swapped = Nav([new(RoleA, MenuLayoutRules.AppKey(group[1].Id), 1, false), new(RoleA, MenuLayoutRules.AppKey(group[0].Id), 2, false)], permissions, modules).Roots();
+
+        Assert.True(swapped.ToList().IndexOf(group[1]) < swapped.ToList().IndexOf(group[0]));
+        Assert.Equal(plain.Count, swapped.Count);
+        Assert.Equal(plain.OrderBy(a => a.Id), swapped.OrderBy(a => a.Id));
     }
 
     [Fact]
