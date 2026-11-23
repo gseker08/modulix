@@ -28,7 +28,19 @@
     {
         @foreach (MenuEditor menu in menus)
         {
-            <h3>@AppNames.Of(menu.Root)</h3>
+            <div class="section-header">
+                <h3 class="mb-0">@AppNames.Of(menu.Root)</h3>
+                <div class="actions">
+                    <button type="button" class="btn btn-icon btn-ghost" disabled="@(!CanMoveApp(menu, -1))"
+                            aria-label="@Texts.Get("admin.roleMenu.appUp", AppNames.Of(menu.Root))" @onclick="() => MoveApp(menu, -1)">
+                        <AppIcon Name="arrow-up" Size="18" />
+                    </button>
+                    <button type="button" class="btn btn-icon btn-ghost" disabled="@(!CanMoveApp(menu, 1))"
+                            aria-label="@Texts.Get("admin.roleMenu.appDown", AppNames.Of(menu.Root))" @onclick="() => MoveApp(menu, 1)">
+                        <AppIcon Name="arrow-down" Size="18" />
+                    </button>
+                </div>
+            </div>
             @* Uygulamanın bütün bölümleri tek tabloda: sütunlar hizalı kalır; bölüm adı başlık satırıdır. *@
             <table class="table record-table">
                 <thead>
@@ -106,6 +118,9 @@
     private string? message;
     private bool busy;
 
+    /// <summary>Katalogdaki (varsayılan) uygulama sırası; kullanıcı uygulama sırasını değiştirdi mi anlamak için.</summary>
+    private IReadOnlyList<string> defaultAppOrder = [];
+
     private sealed class ItemEditor(MenuEntry entry)
     {
         public MenuEntry Entry { get; } = entry;
@@ -153,15 +168,18 @@
     private void Build(IReadOnlyList<RoleMenuItemDto> layout)
     {
         Dictionary<string, RoleMenuItemDto> byKey = layout.ToDictionary(i => i.ItemKey);
+        List<RoleMenuRowDto> rows = [.. layout.Select(i => new RoleMenuRowDto(RoleId, i.ItemKey, i.Order, i.Hidden))];
         menus = [];
         foreach (EditableMenu menu in Navigation.EditableMenus())
         {
             List<SectionEditor> sections = [];
             foreach (MenuSection section in menu.Sections)
             {
-                // Kayıtlı sıra varsa o, yoksa katalog sırası; kayıtlı satırın katalogda olmayan anahtarı zaten buraya girmez.
+                // Çalışma zamanıyla aynı kural (MenuLayoutRules): açık sıralılar sırasıyla, sırası olmayanlar arkada katalog sırasıyla;
+                // kayıtlı satırın katalogda olmayan anahtarı zaten buraya girmez.
                 List<ItemEditor> items = section.Entries
-                    .OrderBy(e => byKey.TryGetValue(e.App.Id, out RoleMenuItemDto? row) && row.Order is { } o ? o : e.Order)
+                    .OrderBy(e => byKey.TryGetValue(e.App.Id, out RoleMenuItemDto? row) && row.Order is { } o ? o : int.MaxValue)
+                    .ThenBy(e => e.Order)
                     .Select(e => new ItemEditor(e) { Hidden = byKey.TryGetValue(e.App.Id, out RoleMenuItemDto? row) && row.Hidden })
                     .ToList();
                 sections.Add(new SectionEditor(section.Group, items));
@@ -169,16 +187,21 @@
 
             // Kayıtlı bölüm sırası varsa o, yoksa katalog sırası (bölüm satırları aynı tabloda, MenuLayoutRules.SectionKey).
             IReadOnlyList<string> defaultOrder = [.. sections.Where(s => s.Movable).Select(s => s.Group!.Id)];
-            List<RoleMenuRowDto> rows = [.. layout.Select(i => new RoleMenuRowDto(RoleId, i.ItemKey, i.Order, i.Hidden))];
             IReadOnlyList<MenuSection> ordered = MenuLayoutRules.OrderSections(
                 menu.Root.Id, [.. sections.Select(s => new MenuSection(s.Group, []))], rows);
             sections = [.. ordered.Select(o => sections.First(s => s.Group == o.Group))];
             menus.Add(new MenuEditor(menu.Root, sections) { DefaultSectionOrder = defaultOrder });
         }
 
+        // Kayıtlı uygulama sırası varsa o, yoksa katalog sırası; uygulama kendi uygulama paneli grubu içinde yer değiştirir (MenuLayoutRules.AppKey).
+        defaultAppOrder = [.. menus.Select(m => m.Root.Id)];
+        IReadOnlyList<AppDefinition> orderedRoots = MenuLayoutRules.OrderApps([.. menus.Select(m => m.Root)], rows);
+        menus = [.. orderedRoots.Select(r => menus.First(m => m.Root.Id == r.Id))];
+
         // "Varsayılana dön" Build([]) çağırır: düzen boşaltılınca korunan satır da kalmaz.
         preserved = RoleMenuSaveRules.Preserved(layout, menus.SelectMany(m => m.Sections).SelectMany(s => s.Items).Select(i => i.Entry.App.Id)
-            .Concat(menus.SelectMany(m => m.Sections.Where(s => s.Movable).Select(s => MenuLayoutRules.SectionKey(m.Root.Id, s.Group!.Id)))));
+            .Concat(menus.SelectMany(m => m.Sections.Where(s => s.Movable).Select(s => MenuLayoutRules.SectionKey(m.Root.Id, s.Group!.Id))))
+            .Concat(menus.Select(m => MenuLayoutRules.AppKey(m.Root.Id))));
     }
 
     private static void Move(SectionEditor section, int index, int delta)
@@ -218,15 +241,51 @@
         (menu.Sections[index], menu.Sections[target]) = (menu.Sections[target], menu.Sections[index]);
     }
 
+    // Uygulama, aynı uygulama paneli grubundaki komşusuyla yer değiştirir; başka gruptaki uygulamalar atlanır (grup sırası sabittir).
+    private int AppNeighbourOf(MenuEditor menu, int delta)
+    {
+        int index = menus!.IndexOf(menu) + delta;
+        while (index >= 0 && index < menus.Count && menus[index].Root.Group != menu.Root.Group)
+        {
+            index += delta;
+        }
+
+        return index >= 0 && index < menus.Count ? index : -1;
+    }
+
+    private bool CanMoveApp(MenuEditor menu, int delta) => AppNeighbourOf(menu, delta) >= 0;
+
+    private void MoveApp(MenuEditor menu, int delta)
+    {
+        int target = AppNeighbourOf(menu, delta);
+        if (target < 0)
+        {
+            return;
+        }
+
+        int index = menus!.IndexOf(menu);
+        (menus[index], menus[target]) = (menus[target], menus[index]);
+    }
+
     private void Reset() => Build([]);
 
     /// <summary>
-    /// Yalnızca varsayılandan ayrılanlar yazılır; bölüm sırası değiştiyse bölüm satırları, ayrıca satır sırası: sırası değişen bölümün bütün satırları sıra numarasıyla (10, 20, …),
+    /// Yalnızca varsayılandan ayrılanlar yazılır; uygulama sırası değiştiyse uygulama satırları, bölüm sırası değiştiyse bölüm satırları, ayrıca satır sırası: sırası değişen bölümün bütün satırları sıra numarasıyla (10, 20, …),
     /// sırası değişmeyen bölümde yalnızca gizlenenler. Hiçbir şey değişmediyse boş liste gider (düzen kalkar).
     /// </summary>
     private List<RoleMenuItemDto> BuildRequest()
     {
         List<RoleMenuItemDto> items = [];
+
+        // Uygulama sırası değiştiyse bütün uygulamalar sıra numarasıyla yazılır; sıra yalnızca grup içinde anlamlıdır.
+        if (!menus!.Select(m => m.Root.Id).SequenceEqual(defaultAppOrder))
+        {
+            for (int i = 0; i < menus!.Count; i++)
+            {
+                items.Add(new RoleMenuItemDto(MenuLayoutRules.AppKey(menus[i].Root.Id), (i + 1) * 10, false));
+            }
+        }
+
         foreach (MenuEditor menu in menus!)
         {
             // Bölüm sırası değiştiyse o uygulamanın bütün taşınabilir bölümleri sıra numarasıyla yazılır.

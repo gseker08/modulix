@@ -5544,6 +5544,8 @@
   "admin.roleMenu.down": "{0} sətrini aşağı apar",
   "admin.roleMenu.sectionUp": "{0} bölməsini yuxarı apar",
   "admin.roleMenu.sectionDown": "{0} bölməsini aşağı apar",
+  "admin.roleMenu.appUp": "{0} tətbiqini yuxarı apar",
+  "admin.roleMenu.appDown": "{0} tətbiqini aşağı apar",
   "admin.roleMenu.reset": "Susmaya görə vəziyyətə qayıt",
   "admin.roleMenu.saved": "Menyu düzəni saxlanıldı.",
   "admin.users.locked": "Kilidli",

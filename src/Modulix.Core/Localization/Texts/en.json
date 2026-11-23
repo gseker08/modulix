@@ -5544,6 +5544,8 @@
   "admin.roleMenu.down": "Move {0} down",
   "admin.roleMenu.sectionUp": "Move section {0} up",
   "admin.roleMenu.sectionDown": "Move section {0} down",
+  "admin.roleMenu.appUp": "Move app {0} up",
+  "admin.roleMenu.appDown": "Move app {0} down",
   "admin.roleMenu.reset": "Reset to default",
   "admin.roleMenu.saved": "Menu layout saved.",
   "admin.users.locked": "Locked",
