@@ -65,7 +65,7 @@ internal sealed class SlaCalendarRecordStore(SupportStoreContext context) : Supp
     {
         if (await Context.Data.Set<SlaPolicy>().AnyAsync(p => p.CalendarId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Takvim bir SLA politikasında kullanılıyor; silinemez. Pasife alın.");
+            throw new RecordConflictException(SupportMessages.Sla.CalendarInUse);
         }
     }
 }
@@ -203,7 +203,7 @@ internal sealed class SlaPolicyRecordStore(SupportStoreContext context) : Suppor
     {
         if (await Context.Data.Set<SlaInstance>().AnyAsync(i => i.PolicyId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Politika SLA örneklerinde kullanılıyor; silinemez. Pasife alın.");
+            throw new RecordConflictException(SupportMessages.Sla.PolicyInUse);
         }
     }
 }

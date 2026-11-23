@@ -166,7 +166,7 @@ public static class DeliveryRules
         {
             if (!remaining.TryGetValue(item.LineId, out var line))
             {
-                errors.Add(new DeliveryError("lines", "Teslimattaki kalemlerden biri bu teslimatta yok."));
+                errors.Add(new DeliveryError("lines", OrdersMessages.Delivery.LineMissing));
             }
             else if (item.Quantity < 0m)
             {

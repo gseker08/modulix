@@ -6,6 +6,7 @@ using Modulix.Core.Imports;
 using Modulix.Core.Modules;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Api.Imports;
 
@@ -31,8 +32,8 @@ public sealed class ImportRollback(
         var text = reason?.Trim();
         if (string.IsNullOrEmpty(text) || text.Length > ReasonMaxLength)
         {
-            return RecordResult<ImportRollbackOutcome>.Fail(RecordErrorCode.ValidationFailed, "Geri alma gerekçesi zorunludur.",
-                [new RecordFieldError("reason", $"Gerekçe zorunludur (en çok {ReasonMaxLength} karakter).")]);
+            return RecordResult<ImportRollbackOutcome>.Fail(RecordErrorCode.ValidationFailed, ServerMessages.Import.RollbackReasonRequired,
+                [new RecordFieldError("reason", ServerMessages.Import.RollbackReasonField(ReasonMaxLength))]);
         }
 
         // Firmanın bütün koşularını görme izni yoksa yalnızca kendi koşusu geri alınabilir; başkasınınki "bulunamadı" görünür.
@@ -41,7 +42,7 @@ public sealed class ImportRollback(
         var run = await db.ImportRuns.SingleOrDefaultAsync(r => r.Id == runId, cancellationToken);
         if (run is null || (!seesAll && run.UserId != current.UserId))
         {
-            return RecordResult<ImportRollbackOutcome>.Fail(RecordErrorCode.NotFound, "İçe aktarma bulunamadı.");
+            return RecordResult<ImportRollbackOutcome>.Fail(RecordErrorCode.NotFound, ServerMessages.Import.RunNotFound);
         }
 
         if (!run.CanRollBack || run.CorrelationId is not { } correlation)

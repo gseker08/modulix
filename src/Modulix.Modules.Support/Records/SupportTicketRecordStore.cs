@@ -256,7 +256,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
             }
             else if (await Context.Data.Set<SupportTicket>().AsNoTracking().Where(t => t.ClientKey == key).Select(t => new { t.Id, t.Number }).FirstOrDefaultAsync(cancellationToken) is { } existing)
             {
-                throw new RecordConflictException($"Bu istek daha önce işlendi: talep {existing.Number} ({existing.Id}). Yeni talep açılmadı.");
+                throw new RecordConflictException(SupportMessages.Ticket.AlreadyProcessed(existing.Number, existing.Id));
             }
             else
             {
@@ -434,7 +434,7 @@ internal sealed class SupportTicketRecordStore(SupportStoreContext context) : Su
     }
 
     protected override Task BeforeDeleteAsync(SupportTicket entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Talep silinemez; geçmişi korunur. Vazgeçildiyse talebi iptal edin.");
+        throw new RecordConflictException(SupportMessages.Ticket.NotDeletable);
 }
 
 /// <summary>Liste sıralama anahtarları.</summary>

@@ -472,6 +472,9 @@ internal static class HrMessages
     /// <summary>Duyuru, blog ve içerik etkileşimleri (yorum, beğeni).</summary>
     public static class Content
     {
+        public static ServerMessage CommentDeleteViaAction =>
+            ServerMessage.Of("hr.server.content.comment-delete-via-action", "Yorum, yorum silme eylemiyle silinir.");
+
         public static ServerMessage InvalidExpiry =>
             ServerMessage.Of("hr.server.content.invalid-expiry", "Bitiş günü başlangıç gününden önce olamaz.");
 
@@ -528,6 +531,9 @@ internal static class HrMessages
     /// <summary>Anketler, sorular ve yanıtlar.</summary>
     public static class Survey
     {
+        public static ServerMessage QuestionRequired =>
+            ServerMessage.Of("hr.server.survey.question-required", "Bu soru zorunludur.");
+
         public static ServerMessage NoQuestions =>
             ServerMessage.Of("hr.server.survey.no-questions", "Sorusu olmayan anket yanıta açılmaz.");
 

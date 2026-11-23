@@ -113,7 +113,7 @@ internal sealed class SegmentService(
         }
         else if (segment.Status == SegmentStatuses.Active)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Segment zaten etkin.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, MarketingMessages.SegmentService.AlreadyActive);
         }
 
         // Yayımlamadan önce koşul bir kez çalıştırılır: alan yetkisi, süre ve sonuç doğrulanır; sayı özet olarak saklanır.

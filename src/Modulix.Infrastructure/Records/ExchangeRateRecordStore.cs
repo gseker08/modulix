@@ -43,7 +43,7 @@ internal sealed class ExchangeRateRecordStore(ModulixDbContext db) : IRecordStor
         {
             if (!Writable.Contains(name, StringComparer.Ordinal))
             {
-                errors.Add(new RecordFieldError(name, "Bilinmeyen alan."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownField));
             }
             else if (name is FromField or ToField && Currency(node) is null)
             {
@@ -55,15 +55,15 @@ internal sealed class ExchangeRateRecordStore(ModulixDbContext db) : IRecordStor
             }
             else if (name == ValidOnField && Day(node) is null)
             {
-                errors.Add(new RecordFieldError(name, "Tarih yyyy-AA-gg biçiminde olmalıdır."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.DateFormat));
             }
             else if (name == SourceField && !ExchangeRateSources.All.Contains(Text(node) ?? string.Empty, StringComparer.Ordinal))
             {
-                errors.Add(new RecordFieldError(name, $"Kaynak şunlardan biri olmalıdır: {string.Join(", ", ExchangeRateSources.All)}."));
+                errors.Add(new RecordFieldError(name, ServerMessages.ExchangeRate.SourceOneOf(string.Join(", ", ExchangeRateSources.All))));
             }
             else if (name == NoteField && node is not null && Text(node) is not { Length: <= ExchangeRate.NoteMaxLength })
             {
-                errors.Add(new RecordFieldError(name, $"Not en çok {ExchangeRate.NoteMaxLength} karakter olabilir."));
+                errors.Add(new RecordFieldError(name, ServerMessages.ExchangeRate.NoteTooLong(ExchangeRate.NoteMaxLength)));
             }
         }
 
@@ -105,7 +105,7 @@ internal sealed class ExchangeRateRecordStore(ModulixDbContext db) : IRecordStor
                     errors.Add(new RecordFieldError(name, name == "sort" ? "Geçersiz sıralama." : "Geçersiz filtre değeri."));
                     break;
                 default:
-                    errors.Add(new RecordFieldError(name, "Bilinmeyen filtre."));
+                    errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownFilter));
                     break;
             }
         }

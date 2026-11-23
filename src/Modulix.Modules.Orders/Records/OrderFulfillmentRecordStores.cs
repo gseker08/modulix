@@ -107,7 +107,7 @@ internal sealed class OrderDeliveryRecordStore(OrdersStoreContext context) : Ord
     {
         if (entity.PlannedDate == default)
         {
-            throw new RecordValidationException([new RecordFieldError("plannedDate", "Planlanan teslim tarihi zorunludur.")]);
+            throw new RecordValidationException([new RecordFieldError("plannedDate", OrdersMessages.Delivery.PlannedDateRequired)]);
         }
 
         if (!isNew && !Context.Gate.IsOpen && entity.Status != DeliveryStatus.Planned)

@@ -64,7 +64,7 @@ internal sealed class CampaignResponses(
         var note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim();
         if (note?.Length > CampaignResponse.NoteMaxLength)
         {
-            errors.Add(new RecordFieldError("note", $"Not en fazla {CampaignResponse.NoteMaxLength} karakter olabilir."));
+            errors.Add(new RecordFieldError("note", MarketingMessages.Response.NoteTooLong(CampaignResponse.NoteMaxLength)));
         }
 
         var now = time.GetUtcNow();

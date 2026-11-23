@@ -163,7 +163,7 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
 
         if (await Context.Data.Set<Campaign>().AsNoTracking().AnyAsync(c => c.Code == entity.Code && c.Id != entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Bu kodlu bir kampanya zaten var.");
+            throw new RecordConflictException(MarketingMessages.Campaign.CodeExists);
         }
 
         entity.UpdatedBy = Context.CurrentUserId;

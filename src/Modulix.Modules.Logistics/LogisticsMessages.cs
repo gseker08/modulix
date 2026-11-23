@@ -199,6 +199,9 @@ internal static class LogisticsMessages
     /// <summary>Sefer ve durakları.</summary>
     public static class Trip
     {
+        public static ServerMessage NotDeletable =>
+            ServerMessage.Of("logistics.server.trip.not-deletable", "Sefer silinmez; gerekirse iptal edin.");
+
         public static ServerMessage PlannedOnlyEdit =>
             ServerMessage.Of("logistics.server.trip.planned-only-edit", "Yalnızca planlanan sefer düzenlenir; hazır seferi önce planlamaya geri alın.");
 
@@ -292,6 +295,9 @@ internal static class LogisticsMessages
     /// <summary>Eylem uçları ve iş akışı.</summary>
     public static class Workflow
     {
+        public static ServerMessage UnknownAction =>
+            ServerMessage.Of("logistics.server.workflow.unknown-action", "Bilinmeyen eylem.");
+
         public static ServerMessage NotAllowed =>
             ServerMessage.Of("logistics.server.workflow.not-allowed", "Bu eylem için yetkiniz yok.");
 
@@ -359,6 +365,9 @@ internal static class LogisticsMessages
     /// <summary>Sefer planlama.</summary>
     public static class Planner
     {
+        public static ServerMessage NotAllowed =>
+            ServerMessage.Of("logistics.server.planner.not-allowed", "Sefer planlama yetkiniz yok.");
+
         public static ServerMessage OnlyPendingShipment =>
             ServerMessage.Of("logistics.server.planner.only-pending-shipment", "Yalnızca planlama bekleyen sevkiyat sefere eklenir.");
 

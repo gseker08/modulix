@@ -94,7 +94,7 @@ internal sealed class FormLayoutService(
         var tenant = RequireTenant();
         if (await FindEnabledAsync(entityKey, tenant, cancellationToken) is not { } form)
         {
-            return RecordResult<FormLayoutInfo>.Fail(RecordErrorCode.NotFound, "Form bulunamadı.");
+            return RecordResult<FormLayoutInfo>.Fail(RecordErrorCode.NotFound, ServerMessages.Form.NotFound);
         }
 
         var custom = await customFields.GetFieldsAsync(tenant, entityKey, cancellationToken);
@@ -106,7 +106,7 @@ internal sealed class FormLayoutService(
             var errors = FormLayoutRules.Validate(form, custom, input);
             if (errors.Count > 0)
             {
-                return RecordResult<FormLayoutInfo>.Fail(RecordErrorCode.ValidationFailed, "Form düzeni geçersiz.", errors);
+                return RecordResult<FormLayoutInfo>.Fail(RecordErrorCode.ValidationFailed, ServerMessages.Form.LayoutInvalid, errors);
             }
         }
 

@@ -9,6 +9,7 @@ using Modulix.Core.Lookups;
 using Modulix.Core.Modules;
 using Modulix.Core.Records;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Infrastructure.Lookups;
 
@@ -59,7 +60,7 @@ internal sealed class LookupService(
         var tenant = tenantAccessor.Current ?? throw new InvalidOperationException("Aktif tenant olmadan lookup ayarı yazılamaz.");
         if (catalog.FindLookup(key) is not { } found || !await IsEnabledAsync(found.ModuleKey, cancellationToken))
         {
-            return RecordResult<LookupInfo>.Fail(RecordErrorCode.NotFound, "Lookup bulunamadı.");
+            return RecordResult<LookupInfo>.Fail(RecordErrorCode.NotFound, ServerMessages.Lookup.NotFound);
         }
 
         var row = await db.LookupSettings.SingleOrDefaultAsync(s => s.LookupKey == key, cancellationToken);
@@ -110,7 +111,7 @@ internal sealed class LookupService(
     {
         if (await FindAsync(request.Key, cancellationToken) is not { } info)
         {
-            return RecordResult<LookupPage>.Fail(RecordErrorCode.NotFound, "Lookup bulunamadı.");
+            return RecordResult<LookupPage>.Fail(RecordErrorCode.NotFound, ServerMessages.Lookup.NotFound);
         }
 
         var definition = info.Definition;
@@ -148,7 +149,7 @@ internal sealed class LookupService(
     {
         if (await FindAsync(key, cancellationToken) is not { } info)
         {
-            return RecordResult<IReadOnlyList<LookupItem>>.Fail(RecordErrorCode.NotFound, "Lookup bulunamadı.");
+            return RecordResult<IReadOnlyList<LookupItem>>.Fail(RecordErrorCode.NotFound, ServerMessages.Lookup.NotFound);
         }
 
         if (ids.Count > RecordLookupLimits.MaxResolveIds)

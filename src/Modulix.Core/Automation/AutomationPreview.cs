@@ -4,6 +4,7 @@ using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Core.Automation;
 
@@ -58,7 +59,7 @@ public sealed class AutomationPreviewService(
         var fields = await catalog.GetFieldSetAsync(request.EntityKey, cancellationToken);
         if (fields is null || modules.FindAutomationEntity(request.EntityKey) is not { } entity || entity.ModuleKey != request.ModuleKey)
         {
-            return RecordResult<AutomationPreview>.Fail(RecordErrorCode.UnknownEntity, "Kayıt türü kural yazmaya açık değil ya da erişiminiz yok.");
+            return RecordResult<AutomationPreview>.Fail(RecordErrorCode.UnknownEntity, ServerMessages.Automation.EntityNotRuleable);
         }
 
         var issues = await validator.ValidateAsync(request.ModuleKey, request.EntityKey, request.Definition, cancellationToken);

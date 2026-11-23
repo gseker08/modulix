@@ -204,7 +204,7 @@ internal sealed class OperationJobs(
     {
         if (!PermissionOf.TryGetValue(action, out var permission))
         {
-            return Invalid<OperationJobView>("action", "Bilinmeyen eylem.");
+            return Invalid<OperationJobView>("action", OrdersMessages.Workflow.UnknownAction);
         }
 
         var loaded = await pipeline.GetAsync(new RecordRef(Key, jobId), cancellationToken);

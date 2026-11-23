@@ -136,7 +136,7 @@ internal sealed class LogisticsWorkflow(
     {
         if (LogisticsTransitions.Find(entityKey, action) is not { } transition)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.", [new RecordFieldError("action", "Bilinmeyen eylem.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, LogisticsMessages.Workflow.UnknownAction, [new RecordFieldError("action", LogisticsMessages.Workflow.UnknownAction)]);
         }
 
         // Önce kayıt okunur: göremeyen için kayıt yoktur (404), izin denetimi varlığı sızdırmaz.

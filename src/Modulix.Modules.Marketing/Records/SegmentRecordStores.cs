@@ -143,7 +143,7 @@ internal sealed partial class SegmentRecordStore(MarketingStoreContext context) 
 
         if (await Context.Data.Set<Segment>().AsNoTracking().AnyAsync(s => s.Code == entity.Code && s.Id != entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Bu kodlu bir segment zaten var.");
+            throw new RecordConflictException(MarketingMessages.Segment.CodeExists);
         }
 
         entity.UpdatedBy = Context.CurrentUserId;
@@ -233,7 +233,7 @@ internal sealed class SegmentMemberRecordStore(MarketingStoreContext context) : 
         var errors = new List<RecordFieldError>();
         if (entity.TargetId == Guid.Empty)
         {
-            errors.Add(new RecordFieldError("targetId", "Bu alan zorunludur."));
+            errors.Add(new RecordFieldError("targetId", ServerMessages.Validation.Required));
         }
 
         if (!isNew && before.TryGetValue(entity.Id, out var old) && old.TargetId != entity.TargetId)
