@@ -42,7 +42,7 @@
                 </div>
             </div>
             @* Uygulamanın bütün bölümleri tek tabloda: sütunlar hizalı kalır; bölüm adı başlık satırıdır. *@
-            <table class="table record-table">
+            <table class="table record-table record-table-inline">
                 <thead>
                     <tr>
                         <th>@Texts.Get("admin.roleMenu.col.item")</th>
@@ -53,12 +53,12 @@
                 <tbody>
                     @foreach (SectionEditor section in menu.Sections)
                     {
-                        <tr>
+                        <tr class="group-row">
                             <th colspan="@(section.Movable ? 2 : 3)" scope="colgroup">@(section.Group is { } group ? AppNames.Of(group) : Texts.Get("admin.roleMenu.ungrouped"))</th>
                             @if (section.Movable)
                             {
                                 string sectionName = AppNames.Of(section.Group!);
-                                <td class="actions">
+                                <td class="actions" data-label="@Texts.Get("admin.roleMenu.sectionOrder")">
                                     <button type="button" class="btn btn-icon btn-ghost" disabled="@(!CanMoveSection(menu, section, -1))"
                                             aria-label="@Texts.Get("admin.roleMenu.sectionUp", sectionName)" @onclick="() => MoveSection(menu, section, -1)">
                                         <AppIcon Name="arrow-up" Size="18" />

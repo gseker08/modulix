@@ -1,6 +1,6 @@
 # Çeviri anadil kontrolü: E8 (çalışma alanı rengi ve rol menüsü)
 
-Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** ve **Azerice (az)** karşılıklarını anadili konuşan bir gözden geçiren için toplar. Türkçe (tr) metinler kaynaktır; en/az metinleri taslaktır ve anadil kontrolünden geçmemiştir (ADR-0034, "taslak" kuralı). Toplam **43 anahtar**.
+Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** ve **Azerice (az)** karşılıklarını anadili konuşan bir gözden geçiren için toplar. Türkçe (tr) metinler kaynaktır; en/az metinleri taslaktır ve anadil kontrolünden geçmemiştir (ADR-0034, "taslak" kuralı). Toplam **44 anahtar**.
 
 ## Nasıl gözden geçirilir
 
@@ -64,6 +64,7 @@ Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** 
 | `server.setting.accent-format` | Vurgu rengi kaydedilirken hata: biçim yanlış; "#RRGGBB" ve örnek renk kodu olduğu gibi kalır | Renk #RRGGBB biçiminde olmalıdır (ör. #087DB8). | The color must be in #RRGGBB format (e.g. #087DB8). | Rəng #RRGGBB formatında olmalıdır (məs. #087DB8). | |
 | `server.setting.accent-low-contrast-light` | Vurgu rengi kaydedilirken hata: açık temada yetersiz kontrast; {0} ölçülen, {1} gereken | Bu renk açık temada yeterince okunmuyor (kontrast {0}:1, en az {1}:1 gerekir). | This color is not readable enough in the light theme (contrast {0}:1, at least {1}:1 required). | Bu rəng açıq temada kifayət qədər oxunmur (kontrast {0}:1, ən azı {1}:1 tələb olunur). | |
 | `server.setting.accent-low-contrast-dark` | Vurgu rengi kaydedilirken hata: koyu temada yetersiz kontrast; {0} ölçülen, {1} gereken | Bu renk koyu temada yeterince okunmuyor (kontrast {0}:1, en az {1}:1 gerekir). | This color is not readable enough in the dark theme (contrast {0}:1, at least {1}:1 required). | Bu rəng tünd temada kifayət qədər oxunmur (kontrast {0}:1, ən azı {1}:1 tələb olunur). | |
+| `admin.roleMenu.sectionOrder` | Telefonda bölüm başlık şeridindeki ok düğmelerinin etiketi ("Bölüm sırası: ↑ ↓") | Bölüm sırası | Section order | Bölmə sırası | |
 
 ## Sınırlar
 
