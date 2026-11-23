@@ -30,9 +30,9 @@
         @Texts.Get("admin.settings.accent.default")
     }
 </div>
-@if (check is { Valid: false, Message: { } message })
+@if (check is { Valid: false })
 {
-    <div class="invalid-feedback d-block">@message</div>
+    <div class="invalid-feedback d-block">@InvalidMessage(check)</div>
 }
 
 @* Önizleme: seçilen temanın yüzeyinde bağlantı ve ikincil düğme, firma renginde. Renk geçersizse varsayılan renk görünür. *@
@@ -55,6 +55,13 @@
 
     /// <summary>Koyu temanın rengi mi; kontrast ve önizleme o temaya göre.</summary>
     [Parameter] public bool Dark { get; set; }
+
+    // Hata metni sunucudan değil sözlükten çıkar (dil seçimi); sunucu yalnızca geçti/kaldı ve kontrast oranını verir.
+    private string InvalidMessage(AccentPreviewResponse result) => result.Contrast is { } contrast
+        ? Texts.Get(Dark ? "admin.settings.accent.lowContrastDark" : "admin.settings.accent.lowContrastLight",
+            contrast.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture),
+            result.MinContrast.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))
+        : Texts.Get("admin.settings.accent.badFormat");
 
     [Parameter] public bool Disabled { get; set; }
 
