@@ -1,5 +1,6 @@
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Communication;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Marketing.Contracts;
 using Modulix.Core.Contracts.Notifications;
 using Modulix.Core.Contracts.Persistence;
@@ -43,13 +44,13 @@ internal sealed class CampaignTestSends(
     {
         if (!await permissions.HasPermissionAsync(MarketingModule.Permissions.CampaignsWrite, cancellationToken))
         {
-            return Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{MarketingModule.Permissions.CampaignsWrite}' izni gerekir.");
+            return Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(MarketingModule.Permissions.CampaignsWrite));
         }
 
         // Alıcı oturumdaki kullanıcıdır; sistem kimliği (işçi) ve üyeliği kapalı kullanıcı test gönderemez.
         if (tenant.Current?.UserId is not { } userId || userId == Guid.Empty)
         {
-            return Fail(RecordErrorCode.PermissionDenied, "Test gönderimi yalnızca oturum açmış kullanıcı için yapılır.");
+            return Fail(RecordErrorCode.PermissionDenied, MarketingMessages.TestSend.SessionOnly);
         }
 
         var loaded = await pipeline.GetAsync(new RecordRef(MarketingModule.Entities.CampaignContent, contentId), cancellationToken);
@@ -68,7 +69,7 @@ internal sealed class CampaignTestSends(
         var channel = Enum.Parse<CommunicationChannel>(campaign.Value!.Values["channel"]!.GetValue<string>());
         if (channel != CommunicationChannel.Email)
         {
-            return Fail(RecordErrorCode.Conflict, "Test gönderimi yalnızca e-posta kampanyaları için vardır; telefon numaranız kayıtlı değildir.");
+            return Fail(RecordErrorCode.Conflict, MarketingMessages.TestSend.EmailOnly);
         }
 
         var subject = loaded.Value.Values["subject"]?.GetValue<string>();
@@ -82,20 +83,20 @@ internal sealed class CampaignTestSends(
         var provider = policy.HasProvider ? providers.FirstOrDefault(p => p.Key == policy.Provider) : null;
         if (provider is null || !provider.Supports(channel))
         {
-            return Fail(RecordErrorCode.Conflict, "Gönderim sağlayıcısı yapılandırılmamış ya da bu kanalı desteklemiyor; test gönderilemez.");
+            return Fail(RecordErrorCode.Conflict, MarketingMessages.TestSend.ProviderMissing);
         }
 
         var self = await recipients.FindAsync(userId, cancellationToken);
         var address = self is null ? null : CommunicationAddress.Normalize(channel, self.Email);
         if (address is null)
         {
-            return Fail(RecordErrorCode.Conflict, "Hesabınızda geçerli bir e-posta adresi yok.");
+            return Fail(RecordErrorCode.Conflict, MarketingMessages.TestSend.NoEmail);
         }
 
         var today = (await clock.GetAsync(cancellationToken)).Today;
         if (!await frequency.TryReserveAsync(channel, $"test:{address}", today, DailyLimit, cancellationToken))
         {
-            return Fail(RecordErrorCode.Conflict, $"Günlük test gönderimi sınırına ({DailyLimit}) ulaşıldı; yarın yeniden deneyin.");
+            return Fail(RecordErrorCode.Conflict, MarketingMessages.TestSend.DailyLimit(DailyLimit));
         }
 
         var request = new MessageRequest(
@@ -129,5 +130,5 @@ internal sealed class CampaignTestSends(
         return RecordResult<TestSendResult>.Ok(new TestSendResult(result.Outcome.ToString(), result.ErrorCode));
     }
 
-    private static RecordResult<TestSendResult> Fail(RecordErrorCode code, string message) => RecordResult<TestSendResult>.Fail(code, message, null);
+    private static RecordResult<TestSendResult> Fail(RecordErrorCode code, ServerMessage message) => RecordResult<TestSendResult>.Fail(code, message, null);
 }

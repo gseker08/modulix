@@ -421,6 +421,151 @@ internal static class MarketingMessages
             ServerMessage.Of("marketing.server.report.permissions-both", "Bu işlem için '{0}' ve '{1}' izinleri gerekir.", first, second);
     }
 
+    /// <summary>Kampanya içeriği ve şablon doğrulaması.</summary>
+    public static class ContentRule
+    {
+        public static ServerMessage BodyRequired =>
+            ServerMessage.Of("marketing.server.content-rule.body-required", "İçerik metni zorunludur.");
+
+        public static ServerMessage BodyMax(int max) =>
+            ServerMessage.Of("marketing.server.content-rule.body-max", "İçerik en fazla {0} karakter olabilir.", max);
+
+        public static ServerMessage SubjectRequired =>
+            ServerMessage.Of("marketing.server.content-rule.subject-required", "E-posta için konu zorunludur.");
+
+        public static ServerMessage SubjectMax(int max) =>
+            ServerMessage.Of("marketing.server.content-rule.subject-max", "Konu en fazla {0} karakter olabilir.", max);
+
+        public static ServerMessage SubjectOneLine =>
+            ServerMessage.Of("marketing.server.content-rule.subject-one-line", "Konu tek satır olmalıdır.");
+
+        public static ServerMessage SchemeNotAllowed(string scheme) =>
+            ServerMessage.Of("marketing.server.content-rule.scheme-not-allowed", "'{0}:' bağlantılarına izin verilmez; yalnızca http ve https.", scheme);
+
+        public static ServerMessage UnknownVariable(string name, string available) =>
+            ServerMessage.Of("marketing.server.content-rule.unknown-variable", "Bilinmeyen değişken '{0}'. Kullanılabilir: {1}.", name, available);
+
+        public static ServerMessage FallbackNeeded(string name, string example) =>
+            ServerMessage.Of("marketing.server.content-rule.fallback-needed", "'{0}' için yedek metin gerekir (ör. {1}).", name, example);
+
+        public static ServerMessage FallbackOneLine(string name) =>
+            ServerMessage.Of("marketing.server.content-rule.fallback-one-line", "'{0}' yedek metni tek satır olmalıdır.", name);
+
+        public static ServerMessage FallbackMax(string name, int max) =>
+            ServerMessage.Of("marketing.server.content-rule.fallback-max", "'{0}' yedek metni en fazla {1} karakter olabilir.", name, max);
+
+        public static ServerMessage SyntaxInvalid =>
+            ServerMessage.Of("marketing.server.content-rule.syntax-invalid", "Değişken söz dizimi geçersiz; biçim {{ad|yedek metin}} olmalıdır.");
+    }
+
+    /// <summary>Kampanya test gönderimi.</summary>
+    public static class TestSend
+    {
+        public static ServerMessage SessionOnly =>
+            ServerMessage.Of("marketing.server.test-send.session-only", "Test gönderimi yalnızca oturum açmış kullanıcı için yapılır.");
+
+        public static ServerMessage EmailOnly =>
+            ServerMessage.Of("marketing.server.test-send.email-only", "Test gönderimi yalnızca e-posta kampanyaları için vardır; telefon numaranız kayıtlı değildir.");
+
+        public static ServerMessage ProviderMissing =>
+            ServerMessage.Of("marketing.server.test-send.provider-missing", "Gönderim sağlayıcısı yapılandırılmamış ya da bu kanalı desteklemiyor; test gönderilemez.");
+
+        public static ServerMessage NoEmail =>
+            ServerMessage.Of("marketing.server.test-send.no-email", "Hesabınızda geçerli bir e-posta adresi yok.");
+
+        public static ServerMessage DailyLimit(int limit) =>
+            ServerMessage.Of("marketing.server.test-send.daily-limit", "Günlük test gönderimi sınırına ({0}) ulaşıldı; yarın yeniden deneyin.", limit);
+    }
+
+    /// <summary>Kampanya çalıştırması servisi.</summary>
+    public static class RunService
+    {
+        public static ServerMessage UnknownAction =>
+            ServerMessage.Of("marketing.server.run-service.unknown-action", "Bilinmeyen eylem.");
+
+        public static ServerMessage ActionInvalid =>
+            ServerMessage.Of("marketing.server.run-service.action-invalid", "Geçersiz eylem.");
+
+        public static ServerMessage StatusBlocked(string status) =>
+            ServerMessage.Of("marketing.server.run-service.status-blocked", "'{0}' durumundaki çalıştırmada bu işlem yapılamaz.", status);
+
+        public static ServerMessage ReasonRequired =>
+            ServerMessage.Of("marketing.server.run-service.reason-required", "Gerekçe zorunludur.");
+
+        public static ServerMessage ReasonRequiredDetail =>
+            ServerMessage.Of("marketing.server.run-service.reason-required-detail", "Bu işlem için gerekçe zorunludur.");
+
+        public static ServerMessage ReasonTooLong =>
+            ServerMessage.Of("marketing.server.run-service.reason-too-long", "Gerekçe çok uzun.");
+
+        public static ServerMessage ReasonMax(int max) =>
+            ServerMessage.Of("marketing.server.run-service.reason-max", "Gerekçe en fazla {0} karakter olabilir.", max);
+
+        public static ServerMessage SelfApproval =>
+            ServerMessage.Of("marketing.server.run-service.self-approval", "Hazırlayan kendi çalıştırmasını onaylayamaz (görev ayrılığı).");
+
+        public static ServerMessage ArchivedSubmit =>
+            ServerMessage.Of("marketing.server.run-service.archived-submit", "Arşivlenen kampanyada çalıştırma onaya gönderilemez.");
+
+        public static ServerMessage SnapshotRequired =>
+            ServerMessage.Of("marketing.server.run-service.snapshot-required", "Hedef kitle anlık görüntüsü seçilmelidir.");
+
+        public static ServerMessage SnapshotNotFound =>
+            ServerMessage.Of("marketing.server.run-service.snapshot-not-found", "Hedef kitle anlık görüntüsü bulunamadı.");
+
+        public static ServerMessage SnapshotNoRecipients =>
+            ServerMessage.Of("marketing.server.run-service.snapshot-no-recipients", "Dondurulmuş hedef kitlede uygun alıcı yok.");
+
+        public static ServerMessage ContentRequired =>
+            ServerMessage.Of("marketing.server.run-service.content-required", "İçerik sürümü seçilmelidir.");
+
+        public static ServerMessage ContentNotFound =>
+            ServerMessage.Of("marketing.server.run-service.content-not-found", "İçerik sürümü bulunamadı.");
+
+        public static ServerMessage ScheduledPast =>
+            ServerMessage.Of("marketing.server.run-service.scheduled-past", "Planlanan zaman geçmişte; yeni bir zaman seçin ya da boş bırakın.");
+
+        public static ServerMessage NotReady =>
+            ServerMessage.Of("marketing.server.run-service.not-ready", "Çalıştırma onaya hazır değil.");
+
+        public static ServerMessage ArchivedStart =>
+            ServerMessage.Of("marketing.server.run-service.archived-start", "Arşivlenen kampanya başlatılamaz.");
+
+        public static ServerMessage NotYetTime =>
+            ServerMessage.Of("marketing.server.run-service.not-yet-time", "Planlanan zaman henüz gelmedi.");
+
+        public static ServerMessage PeriodNotStarted =>
+            ServerMessage.Of("marketing.server.run-service.period-not-started", "Kampanya dönemi henüz başlamadı.");
+
+        public static ServerMessage PeriodEnded =>
+            ServerMessage.Of("marketing.server.run-service.period-ended", "Kampanya dönemi sona erdi.");
+
+        public static ServerMessage ChangedAfterApproval =>
+            ServerMessage.Of("marketing.server.run-service.changed-after-approval", "Onaydan sonra içerik ya da hedef kitle değişmiş; çalıştırma yeniden onaylanmalıdır.");
+
+        public static ServerMessage AlreadyStarted =>
+            ServerMessage.Of("marketing.server.run-service.already-started", "Çalıştırma başka bir istekle başlatılmış ya da durumu değişmiş.");
+
+        public static ServerMessage OnlyRunning(string status) =>
+            ServerMessage.Of("marketing.server.run-service.only-running", "Yalnızca çalışan çalıştırma işlenir (durum: {0}). Duraklatılan ya da iptal edilen çalıştırmada yeni iş çıkmaz.", status);
+
+        public static ServerMessage NoProvider =>
+            ServerMessage.Of("marketing.server.run-service.no-provider", "Gönderim sağlayıcısı yapılandırılmamış; gerçek gönderim bloklu. Pazarlama ayarlarında bir sağlayıcı seçilene kadar çalıştırma başlatılamaz.");
+
+        public static ServerMessage ProviderUnsupported(string provider) =>
+            ServerMessage.Of("marketing.server.run-service.provider-unsupported", "Seçilen sağlayıcı ('{0}') bu kanalı desteklemiyor ya da kayıtlı değil.", provider);
+
+        public static ServerMessage NoUnsubscribeLink =>
+            ServerMessage.Of("marketing.server.run-service.no-unsubscribe-link", "Abonelikten çıkma bağlantısı üretilemiyor (uygulamanın genel adresi, App:PublicUrl, ayarlı değil); pazarlama iletisi bağlantısız gönderilmez.");
+    }
+
+    /// <summary>Uç noktalar.</summary>
+    public static class Endpoint
+    {
+        public static ServerMessage InvalidTarget =>
+            ServerMessage.Of("marketing.server.endpoint.invalid-target", "Geçersiz hedef türü (Company, Person, Lead).");
+    }
+
     /// <summary>Sayı iletisi bağımsız değişkeni: binlik ayraçlı, kültürden bağımsız.</summary>
     public static string N(int value) => value.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
 }

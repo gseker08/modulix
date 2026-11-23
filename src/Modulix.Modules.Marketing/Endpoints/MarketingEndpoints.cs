@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Hosting;
 using Modulix.Modules.Marketing.Contracts;
@@ -87,10 +88,8 @@ internal static class MarketingEndpoints
     }
 
     private static IResult InvalidTarget() =>
-        Results.ValidationProblem(
-            new Dictionary<string, string[]> { ["target"] = ["Geçersiz hedef türü (Company, Person, Lead)."] },
-            title: "Doğrulama hatası.",
-            statusCode: StatusCodes.Status422UnprocessableEntity);
+        RecordProblems.ToProblem(new RecordError(
+            RecordErrorCode.ValidationFailed, ServerMessages.Record.ValidationFailed, [new RecordFieldError("target", MarketingMessages.Endpoint.InvalidTarget)]));
 
     private static IResult Record(RecordResult<RecordData> result) =>
         result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<SegmentDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
