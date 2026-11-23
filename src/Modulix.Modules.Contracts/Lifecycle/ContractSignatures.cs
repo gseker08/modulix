@@ -815,7 +815,7 @@ internal sealed class ContractSignatures(
             }
             else if (email is not null && (email.Length > ContractSignatory.EmailMaxLength || !MailAddress.TryCreate(email, out var parsed) || parsed.Address != email || !email.Contains('.')))
             {
-                errors.Add(new RecordFieldError(field, "Geçerli bir e-posta adresi girin."));
+                errors.Add(new RecordFieldError(field, ServerMessages.Validation.Email));
             }
             else if (email is null && needEmail)
             {

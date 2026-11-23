@@ -22,6 +22,7 @@ public partial class CoreContractsNamespaceRulesTests
         "Modulix.Core.Contracts.Currency", // firmanın döviz kurları ve kur okuyucusu (ADR-0049 dilim 5a)
         "Modulix.Core.Contracts.Communication",
         "Modulix.Core.Contracts.Credentials",
+        "Modulix.Core.Contracts.Notes",
         "Modulix.Core.Contracts.Customization",
         "Modulix.Core.Contracts.Diagnostics", // ortak gözlemleme: arka plan işçisi tur ölçümü (IJobMetrics, A2)
         "Modulix.Core.Contracts.Events",

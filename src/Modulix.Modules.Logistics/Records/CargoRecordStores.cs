@@ -126,7 +126,7 @@ internal abstract class CargoRecordStore<TEntity>(LogisticsStoreContext context)
 
         if (entity.CustomerPartyId == Guid.Empty)
         {
-            throw new RecordValidationException([new RecordFieldError("customerPartyId", "Bu alan zorunludur.")]);
+            throw new RecordValidationException([new RecordFieldError("customerPartyId", ServerMessages.Validation.Required)]);
         }
 
         await CargoAppliedAsync(entity, values, isNew, cancellationToken);

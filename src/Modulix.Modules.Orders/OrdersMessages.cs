@@ -83,6 +83,12 @@ internal static class OrdersMessages
     /// <summary>Teslimat.</summary>
     public static class Delivery
     {
+        public static ServerMessage LineMissing =>
+            ServerMessage.Of("orders.server.delivery.line-missing", "Teslimattaki kalemlerden biri bu teslimatta yok.");
+
+        public static ServerMessage PlannedDateRequired =>
+            ServerMessage.Of("orders.server.delivery.planned-date-required", "Planlanan teslim tarihi zorunludur.");
+
         public static ServerMessage ViaPlanOnly =>
             ServerMessage.Of("orders.server.delivery.via-plan-only", "Teslimat yalnızca sipariş ekranındaki teslimat planlama işlemiyle oluşur.");
 

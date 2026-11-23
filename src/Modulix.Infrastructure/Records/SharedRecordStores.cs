@@ -93,7 +93,7 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
         {
             if (!Filters.TryGetValue(name, out var filter))
             {
-                errors.Add(new RecordFieldError(name, "Bilinmeyen filtre."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownFilter));
             }
             else if (filter(source, value) is { } filtered)
             {
@@ -101,7 +101,7 @@ internal abstract class SharedRecordStore<TEntity>(ModulixDbContext db, ModuleCa
             }
             else
             {
-                errors.Add(new RecordFieldError(name, "Geçersiz filtre değeri."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.InvalidFilterValue));
             }
         }
 
@@ -381,7 +381,7 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
         if (roles.Count > 0)
         {
             var known = await Db.RelationshipRoles.AsNoTracking().Where(r => roles.Contains(r.Code)).Select(r => r.Code).ToListAsync(cancellationToken);
-            AddUnknown(unknown, "relationshipRoles", roles, known, "Katalogda olmayan ilişki rolü");
+            AddUnknown(unknown, "relationshipRoles", roles, known, ServerMessages.Shared.RoleUnknown);
         }
 
         // Sektör (ADR-0043) sektör kataloğundan bir kod olmalı; pasife alınmış kod yalnızca kayıtta zaten varsa kalabilir.
@@ -392,11 +392,11 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
                 && await Set.AsNoTracking().AnyAsync(p => p.Id == entity.Id && p.IndustryCode == industryCode, cancellationToken);
             if (industry is null)
             {
-                unknown.Add(new RecordFieldError("industryCode", "Katalogda olmayan sektör."));
+                unknown.Add(new RecordFieldError("industryCode", ServerMessages.Shared.IndustryUnknown));
             }
             else if (!industry.IsActive && !unchanged)
             {
-                unknown.Add(new RecordFieldError("industryCode", "Bu sektör artık kullanılmıyor."));
+                unknown.Add(new RecordFieldError("industryCode", ServerMessages.Shared.IndustryRetired));
             }
         }
 
@@ -406,14 +406,14 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
             if (codes.Count > 0)
             {
                 var nodes = await Db.ActivityNodes.AsNoTracking().Where(n => codes.Contains(n.Code)).Select(n => new { n.Code, n.Kind }).ToListAsync(cancellationToken);
-                AddUnknown(unknown, field, codes, nodes.Select(n => n.Code).ToList(), "Katalogda olmayan faaliyet");
+                AddUnknown(unknown, field, codes, nodes.Select(n => n.Code).ToList(), ServerMessages.Shared.ActivityUnknown);
 
                 // Hizmet ihtiyacı alınan/verilen bir hizmettir: sektör ya da grup değil, yalnızca faaliyet düğümü seçilir.
                 // Müşteri sektörü her düzeyden olabilir (geniş "Lojistik" de, dar bir faaliyet de).
                 var notActivities = field == "serviceNeeds" ? nodes.Where(n => n.Kind != ActivityNodeKind.Activity).Select(n => n.Code).Order().ToList() : [];
                 if (notActivities.Count > 0)
                 {
-                    unknown.Add(new RecordFieldError(field, $"Hizmet ihtiyacı için sektör veya grup değil, faaliyet seçilmeli: {string.Join(", ", notActivities)}."));
+                    unknown.Add(new RecordFieldError(field, ServerMessages.Shared.NeedNotActivity(string.Join(", ", notActivities))));
                 }
             }
         }
@@ -432,12 +432,12 @@ internal sealed class PartyRecordStore(ModulixDbContext db, ModuleCatalog catalo
         }
     }
 
-    private static void AddUnknown(List<RecordFieldError> errors, string field, IReadOnlyList<string> wanted, IReadOnlyCollection<string> known, string message)
+    private static void AddUnknown(List<RecordFieldError> errors, string field, IReadOnlyList<string> wanted, IReadOnlyCollection<string> known, Func<string, ServerMessage> message)
     {
         var missing = wanted.Except(known, StringComparer.Ordinal).ToList();
         if (missing.Count > 0)
         {
-            errors.Add(new RecordFieldError(field, $"{message}: {string.Join(", ", missing)}."));
+            errors.Add(new RecordFieldError(field, message(string.Join(", ", missing))));
         }
     }
 
@@ -547,20 +547,20 @@ internal sealed class PartyRelationshipRecordStore(ModulixDbContext db, ModuleCa
         if (entry.State != EntityState.Added
             && (entry.Property(r => r.PartyId).IsModified || entry.Property(r => r.RoleCode).IsModified))
         {
-            errors.Add(new RecordFieldError(entry.Property(r => r.PartyId).IsModified ? "partyId" : "roleCode", "Firma ve rol kayıt açıldıktan sonra değiştirilemez."));
+            errors.Add(new RecordFieldError(entry.Property(r => r.PartyId).IsModified ? "partyId" : "roleCode", ServerMessages.Shared.RelationshipImmutable));
         }
         else if (!await Db.RelationshipRoles.AsNoTracking().AnyAsync(r => r.Code == entity.RoleCode, cancellationToken))
         {
-            errors.Add(new RecordFieldError("roleCode", $"Katalogda olmayan ilişki rolü: {entity.RoleCode}."));
+            errors.Add(new RecordFieldError("roleCode", ServerMessages.Shared.RoleUnknown(entity.RoleCode)));
         }
         else if (await Set.AnyAsync(r => r.PartyId == entity.PartyId && r.RoleCode == entity.RoleCode && r.Id != entity.Id, cancellationToken))
         {
-            errors.Add(new RecordFieldError("roleCode", "Bu firma için bu rolün ilişki kaydı zaten var."));
+            errors.Add(new RecordFieldError("roleCode", ServerMessages.Shared.RelationshipExists));
         }
 
         if (entity.StartDate is { } start && entity.EndDate is { } end && end < start)
         {
-            errors.Add(new RecordFieldError("endDate", "Bitiş tarihi başlangıç tarihinden önce olamaz."));
+            errors.Add(new RecordFieldError("endDate", ServerMessages.Shared.EndBeforeStartDate));
         }
 
         if (errors.Count > 0)
@@ -817,7 +817,7 @@ internal sealed class PlaceRecordStore(ModulixDbContext db, ModuleCatalog catalo
 
         if (place.Latitude.HasValue != place.Longitude.HasValue)
         {
-            errors.Add(new RecordFieldError(place.Latitude.HasValue ? "longitude" : "latitude", "Enlem ve boylam birlikte girilmelidir."));
+            errors.Add(new RecordFieldError(place.Latitude.HasValue ? "longitude" : "latitude", ServerMessages.Shared.LatLongTogether));
         }
 
         if (string.IsNullOrWhiteSpace(place.KindKey))
@@ -842,7 +842,7 @@ internal sealed class PlaceRecordStore(ModulixDbContext db, ModuleCatalog catalo
         if (errors.Count == 0
             && await Set.AnyAsync(p => p.Id != place.Id && p.NormalizedName == place.NormalizedName && p.CountryCode == place.CountryCode, cancellationToken))
         {
-            errors.Add(new RecordFieldError("name", "Bu ülkede aynı adlı bir yer zaten var."));
+            errors.Add(new RecordFieldError("name", ServerMessages.Shared.PlaceExists));
         }
 
         if (errors.Count > 0)

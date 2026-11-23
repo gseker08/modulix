@@ -10,6 +10,12 @@ public static class ServerMessages
     /// <summary>Döviz kuru kaydının iletileri (ADR-0049 dilim 5a).</summary>
     public static class ExchangeRate
     {
+        public static ServerMessage NoteTooLong(int max) =>
+            ServerMessage.Of("server.exchange-rate.note-too-long", "Not en çok {0} karakter olabilir.", max);
+
+        public static ServerMessage SourceOneOf(string sources) =>
+            ServerMessage.Of("server.exchange-rate.source-one-of", "Kaynak şunlardan biri olmalıdır: {0}.", sources);
+
         public static ServerMessage CurrenciesSame => ServerMessage.Of("server.exchange-rate.currencies-same", "Kaynak ve hedef para birimi aynı olamaz.");
 
         public static ServerMessage RatePositive => ServerMessage.Of("server.exchange-rate.rate-positive", "Kur sıfırdan büyük olmalıdır.");
@@ -252,5 +258,206 @@ public static class ServerMessages
 
         public static ServerMessage HolidayDuplicate =>
             ServerMessage.Of("server.calendar.holiday-duplicate", "Aynı tarih için tek tatil kaydı olabilir.");
+    }
+
+    public static class FieldRule
+    {
+        public static ServerMessage ReadOnlyNow =>
+            ServerMessage.Of("server.field-rule.read-only-now", "Bu alan şu an salt okunur; değiştirilemez.");
+
+        public static ServerMessage ApprovalNeeded(string detail) =>
+            ServerMessage.Of("server.field-rule.approval-needed", "Onay gerekir (onay akışı henüz yok): {0}", detail);
+
+        public static ServerMessage RequiredInState =>
+            ServerMessage.Of("server.field-rule.required-in-state", "Bu alan, kayıt bu durumdayken zorunludur.");
+    }
+
+    public static class Automation
+    {
+        public static ServerMessage EntityNotRuleable =>
+            ServerMessage.Of("server.automation.entity-not-ruleable", "Kayıt türü kural yazmaya açık değil ya da erişiminiz yok.");
+    }
+
+    public static class Import
+    {
+        public static ServerMessage DesignChanged =>
+            ServerMessage.Of("server.import.design-changed", "Tasarım siz düzenlerken değişti. Sayfayı yenileyip tekrar deneyin.");
+
+        public static ServerMessage DesignInvalid =>
+            ServerMessage.Of("server.import.design-invalid", "İçe aktarma tasarımı geçersiz.");
+
+        public static ServerMessage EntityNotFound =>
+            ServerMessage.Of("server.import.entity-not-found", "Kayıt türü bulunamadı.");
+
+        public static ServerMessage RunNotFound =>
+            ServerMessage.Of("server.import.run-not-found", "İçe aktarma bulunamadı.");
+
+        public static ServerMessage RollbackReasonField(int max) =>
+            ServerMessage.Of("server.import.rollback-reason-field", "Gerekçe zorunludur (en çok {0} karakter).", max);
+
+        public static ServerMessage RollbackReasonRequired =>
+            ServerMessage.Of("server.import.rollback-reason-required", "Geri alma gerekçesi zorunludur.");
+
+        public static ServerMessage AliasDuplicated(string alias) =>
+            ServerMessage.Of("server.import.alias-duplicated", "'{0}' birden çok sütuna eşlenmiş.", alias);
+
+        public static ServerMessage AliasTooLong(int max) =>
+            ServerMessage.Of("server.import.alias-too-long", "Başlık adı en çok {0} karakter olabilir.", max);
+
+        public static ServerMessage TooManyAliases(int max) =>
+            ServerMessage.Of("server.import.too-many-aliases", "Bir sütun için en çok {0} başlık adı kaydedilebilir.", max);
+
+        public static ServerMessage OmittedAndRequired(string label) =>
+            ServerMessage.Of("server.import.omitted-and-required", "{0} hem çıkarılmış hem zorunlu olamaz.", label);
+
+        public static ServerMessage RequiredColumn(string label) =>
+            ServerMessage.Of("server.import.required-column", "{0} zorunlu sütundur, çıkarılamaz.", label);
+
+        public static ServerMessage UnknownColumn =>
+            ServerMessage.Of("server.import.unknown-column", "Bilinmeyen sütun.");
+    }
+
+    public static class Form
+    {
+        public static ServerMessage LayoutInvalid =>
+            ServerMessage.Of("server.form.layout-invalid", "Form düzeni geçersiz.");
+
+        public static ServerMessage NotFound =>
+            ServerMessage.Of("server.form.not-found", "Form bulunamadı.");
+    }
+
+    public static class View
+    {
+        public static ServerMessage NameExists =>
+            ServerMessage.Of("server.view.name-exists", "Bu adla bir görünümünüz zaten var.");
+
+        public static ServerMessage NotMovable =>
+            ServerMessage.Of("server.view.not-movable", "Görünüm başka bir ekrana taşınamaz.");
+
+        public static ServerMessage NotFound =>
+            ServerMessage.Of("server.view.not-found", "Görünüm bulunamadı.");
+
+        public static ServerMessage LimitField(int max) =>
+            ServerMessage.Of("server.view.limit-field", "En fazla {0} görünüm kaydedebilirsiniz.", max);
+
+        public static ServerMessage LimitPerScreen(int max) =>
+            ServerMessage.Of("server.view.limit-per-screen", "Bir ekran için en fazla {0} görünüm kaydedebilirsiniz.", max);
+
+        public static ServerMessage Invalid =>
+            ServerMessage.Of("server.view.invalid", "Görünüm geçersiz.");
+    }
+
+    public static class File
+    {
+        public static ServerMessage ChangedByOther =>
+            ServerMessage.Of("server.file.changed-by-other", "Dosya başkası tarafından değiştirilmiş.");
+
+        public static ServerMessage ContentNotFound =>
+            ServerMessage.Of("server.file.content-not-found", "Dosya içeriği bulunamadı.");
+
+        public static ServerMessage Scanning =>
+            ServerMessage.Of("server.file.scanning", "Dosya taranıyor; tarama bitince indirilebilir.");
+
+        public static ServerMessage NotDownloadable =>
+            ServerMessage.Of("server.file.not-downloadable", "Bu dosya indirilemez.");
+
+        public static ServerMessage NotFound =>
+            ServerMessage.Of("server.file.not-found", "Dosya bulunamadı.");
+
+        public static ServerMessage SameContent =>
+            ServerMessage.Of("server.file.same-content", "Aynı içerik zaten ekli.");
+
+        public static ServerMessage AlreadyAttached =>
+            ServerMessage.Of("server.file.already-attached", "Bu dosya kayda zaten eklenmiş.");
+    }
+
+    public static class Setting
+    {
+        public static ServerMessage NotAvailable =>
+            ServerMessage.Of("server.setting.not-available", "Bu ayar bu firmada kullanılamıyor.");
+
+        public static ServerMessage CompanyScoped =>
+            ServerMessage.Of("server.setting.company-scoped", "Bu ayar şirket başına tutulur; değer yazmak için önce bir aktif şirket seçin.");
+
+        public static ServerMessage ValueRequired =>
+            ServerMessage.Of("server.setting.value-required", "Değer zorunludur ve metin olmalıdır.");
+
+        public static ServerMessage NotDefined =>
+            ServerMessage.Of("server.setting.not-defined", "Tanımlı bir ayar değil.");
+
+        public static ServerMessage KeyRequired =>
+            ServerMessage.Of("server.setting.key-required", "Anahtar zorunludur.");
+
+        public static ServerMessage SaveFailed =>
+            ServerMessage.Of("server.setting.save-failed", "Ayarlar kaydedilemedi.");
+    }
+
+    public static class Lookup
+    {
+        public static ServerMessage NotFound =>
+            ServerMessage.Of("server.lookup.not-found", "Lookup bulunamadı.");
+    }
+
+    public static class Holiday
+    {
+        public static ServerMessage DateExists =>
+            ServerMessage.Of("server.holiday.date-exists", "Bu tarih tatil listesinde zaten var.");
+
+        public static ServerMessage NameRequired(int max) =>
+            ServerMessage.Of("server.holiday.name-required", "Ad zorunludur ve en çok {0} karakter olabilir.", max);
+    }
+
+    public static class Credential
+    {
+        public static ServerMessage OwnerTypeNotAllowed =>
+            ServerMessage.Of("server.credential.owner-type-not-allowed", "Bu kayıt türüne süreli belge eklenemez.");
+
+        public static ServerMessage NumberExists =>
+            ServerMessage.Of("server.credential.number-exists", "Bu kayıtta aynı türde ve numarada bir belge zaten var.");
+
+        public static ServerMessage TypeNotAllowed(string owner) =>
+            ServerMessage.Of("server.credential.type-not-allowed", "Bu belge türü {0} kaydına eklenemez.", owner);
+
+        public static ServerMessage LicenseReadOnly =>
+            ServerMessage.Of("server.credential.license-read-only", "Modül lisansı salt okunur evrede; belge eklenemez, değiştirilemez ya da silinemez.");
+
+        public static ServerMessage UpdateRequired =>
+            ServerMessage.Of("server.credential.update-required", "Bu kaydın belgelerini değiştirmek için kayıtta güncelleme izni gerekir.");
+
+        public static ServerMessage HasFiles =>
+            ServerMessage.Of("server.credential.has-files", "Belgenin ekli dosyaları var; önce dosyaları silin ya da belgenin durumunu \"İptal edildi\" yapın.");
+    }
+
+    public static class Shared
+    {
+        public static ServerMessage ActivityUnknown(string codes) =>
+            ServerMessage.Of("server.shared.activity-unknown", "Katalogda olmayan faaliyet: {0}.", codes);
+
+        public static ServerMessage PlaceExists =>
+            ServerMessage.Of("server.shared.place-exists", "Bu ülkede aynı adlı bir yer zaten var.");
+
+        public static ServerMessage LatLongTogether =>
+            ServerMessage.Of("server.shared.lat-long-together", "Enlem ve boylam birlikte girilmelidir.");
+
+        public static ServerMessage EndBeforeStartDate =>
+            ServerMessage.Of("server.shared.end-before-start-date", "Bitiş tarihi başlangıç tarihinden önce olamaz.");
+
+        public static ServerMessage RelationshipExists =>
+            ServerMessage.Of("server.shared.relationship-exists", "Bu firma için bu rolün ilişki kaydı zaten var.");
+
+        public static ServerMessage RoleUnknown(string codes) =>
+            ServerMessage.Of("server.shared.role-unknown", "Katalogda olmayan ilişki rolü: {0}.", codes);
+
+        public static ServerMessage RelationshipImmutable =>
+            ServerMessage.Of("server.shared.relationship-immutable", "Firma ve rol kayıt açıldıktan sonra değiştirilemez.");
+
+        public static ServerMessage NeedNotActivity(string codes) =>
+            ServerMessage.Of("server.shared.need-not-activity", "Hizmet ihtiyacı için sektör veya grup değil, faaliyet seçilmeli: {0}.", codes);
+
+        public static ServerMessage IndustryRetired =>
+            ServerMessage.Of("server.shared.industry-retired", "Bu sektör artık kullanılmıyor.");
+
+        public static ServerMessage IndustryUnknown =>
+            ServerMessage.Of("server.shared.industry-unknown", "Katalogda olmayan sektör.");
     }
 }

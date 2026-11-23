@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Contracts.Domain;
 using Modulix.Modules.Contracts.Lifecycle;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Contracts.Records;
 
@@ -206,7 +207,7 @@ internal sealed class ContractCommitmentRecordStore(ContractsStoreContext contex
 
         if (c.DueDate == default)
         {
-            errors.Add(new RecordFieldError("dueDate", "Son tarih zorunludur."));
+            errors.Add(new RecordFieldError("dueDate", ContractsMessages.Commitment.DueDateRequired));
         }
         else if (c.StartDate != default && c.DueDate < c.StartDate)
         {

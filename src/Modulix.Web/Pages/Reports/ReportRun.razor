@@ -109,8 +109,7 @@
                 @if (shareVisibility == "users")
                 {
                     <div class="mb-3">
-                        <label class="form-label" for="rr-member-filter">@Texts.Get("reports.searchUser")</label>
-                        <input id="rr-member-filter" class="form-control mb-2" type="search" placeholder="@Texts.Get("reports.run.typeName")" @bind="memberFilter" @bind:event="oninput" />
+                        <label class="form-label" for="rr-members">@Texts.Get("reports.run.shareUsers")</label>
                         @if (membersError is not null)
                         {
                             <div class="alert alert-danger" role="alert">
@@ -124,21 +123,8 @@
                         }
                         else
                         {
-                            <div class="report-member-list" role="group" aria-label="@Texts.Get("reports.run.shareUsers")">
-                                @foreach (var member in FilteredMembers())
-                                {
-                                    var id = member.UserId;
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="rr-mem-@id" checked="@shareUsers.Contains(id)" @onchange="e => ToggleMember(id, e.Value is true)" />
-                                        <label class="form-check-label" for="rr-mem-@id">@member.DisplayName</label>
-                                    </div>
-                                }
-                                @if (!FilteredMembers().Any())
-                                {
-                                    <EmptyState Compact="true" Title="@Texts.Get("reports.noUserFound")" />
-                                }
-                            </div>
-                            <p class="small text-muted mt-1" role="status">@Texts.Get("reports.run.usersSelected", shareUsers.Count)</p>
+                            <PickField TKey="Guid" Id="rr-members" Title="@Texts.Get("reports.run.shareUsers")" Icon="users" SearchPlaceholder="@Texts.Get("reports.searchUser")"
+                                       Items="MemberItems" Selected="shareUsers" SelectedChanged="SetShareUsers" UnknownName="@(_ => Texts.Get("crm.sales.unknownUser"))" />
                         }
                     </div>
                     <ShareGroupPicker Selected="shareGroups" />
@@ -235,7 +221,6 @@
     private readonly List<ShareGroupDto> shareGroups = [];
     private List<TenantMemberResponse>? members;
     private string? membersError;
-    private string memberFilter = string.Empty;
     private string? shareError;
     private bool shareConflict;
 
@@ -427,20 +412,14 @@
         membersError = response.Error;
     }
 
-    private IEnumerable<TenantMemberResponse> FilteredMembers() =>
-        (members ?? []).Where(m => m.UserId != Session.User?.UserId
-            && (memberFilter.Length == 0 || m.DisplayName.Contains(memberFilter, StringComparison.CurrentCultureIgnoreCase)));
+    // Kullanıcı kendisini seçemez; seçim atama penceresinde yapılır (PickField).
+    private IReadOnlyList<PickItem<Guid>> MemberItems =>
+        [.. (members ?? []).Where(m => m.UserId != Session.User?.UserId).Select(m => new PickItem<Guid>(m.UserId, m.DisplayName))];
 
-    private void ToggleMember(Guid id, bool selected)
+    private void SetShareUsers(IReadOnlyList<Guid> ids)
     {
-        if (selected)
-        {
-            shareUsers.Add(id);
-        }
-        else
-        {
-            shareUsers.Remove(id);
-        }
+        shareUsers.Clear();
+        shareUsers.UnionWith(ids);
     }
 
     private async Task SaveSharingAsync()

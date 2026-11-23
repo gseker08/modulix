@@ -5,6 +5,7 @@ using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Hosting;
 using Modulix.Modules.Marketing.Contracts;
+using Modulix.Modules.Marketing.Journeys;
 using Modulix.Modules.Marketing.Segments;
 using Modulix.Shared.Marketing;
 
@@ -56,6 +57,17 @@ internal static class MarketingEndpoints
 
         CampaignEndpoints.MapCampaignEndpoints(group);
 
+        // Yolculuk durum geçişleri (ADR-0056): durum genel PUT ile yazılamaz; geçişler yayın iznine bağlıdır.
+        var journeys = group.MapGroup("/journeys");
+        journeys.MapPost("/{id:guid}/publish", async (Guid id, JourneyActionRequest r, IJourneyService service, CancellationToken ct) =>
+            JourneyRecord(await service.PublishAsync(id, r.Version, ct))).RequirePermission(MarketingModule.Permissions.JourneysPublish);
+        journeys.MapPost("/{id:guid}/pause", async (Guid id, JourneyActionRequest r, IJourneyService service, CancellationToken ct) =>
+            JourneyRecord(await service.PauseAsync(id, r.Version, ct))).RequirePermission(MarketingModule.Permissions.JourneysPublish);
+        journeys.MapPost("/{id:guid}/resume", async (Guid id, JourneyActionRequest r, IJourneyService service, CancellationToken ct) =>
+            JourneyRecord(await service.ResumeAsync(id, r.Version, ct))).RequirePermission(MarketingModule.Permissions.JourneysPublish);
+        journeys.MapPost("/{id:guid}/archive", async (Guid id, JourneyActionRequest r, IJourneyService service, CancellationToken ct) =>
+            JourneyRecord(await service.ArchiveAsync(id, r.Version, ct))).RequirePermission(MarketingModule.Permissions.JourneysPublish);
+
         var segments = group.MapGroup("/segments");
 
         // Önizleme hiçbir şey yazmaz; sayı alan yetkisi ve veri kapsamıyla hesaplanır, satırlar alıcı görüntüleme yetkisine bağlıdır.
@@ -98,6 +110,9 @@ internal static class MarketingEndpoints
 
     private static IResult Record(RecordResult<RecordData> result) =>
         result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<SegmentDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
+
+    private static IResult JourneyRecord(RecordResult<RecordData> result) =>
+        result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<JourneyDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
 
     private static IResult Evaluation(RecordResult<SegmentEvaluation> result) =>
         result.IsSuccess

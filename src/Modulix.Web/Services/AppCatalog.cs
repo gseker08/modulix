@@ -237,7 +237,7 @@ public static class AppCatalog
 
         // Sözleşmeler, Siparişler ve Pazarlama kendi modülleri, izinleri ve route'larıyla ayrı uygulamalar olarak kalır;
         // CRM görünürse ekranları CRM'in menüsünde (Hosted) gösterilir, görünmüyorsa eskisi gibi ayrı uygulamadır.
-        new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal, Group: SalesGroup, HostId: Crm, Description: "Sözleşmeleri hazırlayın, onay ve yenilemeleri izleyin."),
+        new(Contracts, null, "Sözleşmeler", "file-text", null, 20, ModuleKey: ContractsAccess.ModuleKey, Tone: AppTone.Teal, Group: SalesGroup, HostId: Crm, Description: "Sözleşmeleri hazırlayın, onay ve yenilemeleri izleyin.", Art: "contracts"),
         new("contracts.dashboard", Contracts, "Pano", "dashboard", "sozlesmeler/ozet", 5, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, ExactMatch: true, Hosted: new(CrmReportsGroup, "Sözleşme panosu", 60)),
         new("contracts.list", Contracts, "Sözleşmeler", "file-text", "sozlesmeler", 10, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmSalesGroup, "Satış sözleşmeleri", 40, Route: "sozlesmeler?gorunum=sales")),
         new("contracts.templates", Contracts, "Şablonlar", "layers", "sozlesmeler/sablonlar", 20, ContractsAccess.ModuleKey, ContractsAccess.ContractsRead, Hosted: new(CrmSalesGroup, "Sözleşme şablonları", 45)),
@@ -248,7 +248,7 @@ public static class AppCatalog
         new("contracts.settings", Contracts, "Sözleşme ayarları", "wrench", ModuleSettingsRoute(ContractsAccess.ModuleKey), 90, ContractsAccess.ModuleKey, CoreAccess.ManageSettings, Hosted: new(CrmSettingsGroup, null, 90)),
         new("contracts.approval-rules", Contracts, "Onay kuralları", "shield", "sozlesmeler/onay-kurallari", 40, ContractsAccess.ModuleKey, ContractsAccess.ApprovalsManage, Hosted: new(CrmSettingsGroup, "Sözleşme onay kuralları", 80)),
 
-        new(Orders, null, "Siparişler", "package", null, 25, ModuleKey: OrdersAccess.ModuleKey, Group: SalesGroup, HostId: Crm, Description: "Siparişleri ve operasyon işlerini takip edin."),
+        new(Orders, null, "Siparişler", "package", null, 25, ModuleKey: OrdersAccess.ModuleKey, Group: SalesGroup, HostId: Crm, Description: "Siparişleri ve operasyon işlerini takip edin.", Art: "orders"),
         new("orders.dashboard", Orders, "Pano", "dashboard", "siparisler/ozet", 5, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, ExactMatch: true, Hosted: new(CrmReportsGroup, "Sipariş panosu", 70)),
         new("orders.list", Orders, "Siparişler", "package", "siparisler", 10, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, Hosted: new(CrmSalesGroup, "Satış siparişleri", 50)),
         new("orders.jobs", Orders, "Operasyon işleri", "clipboard-list", "siparisler/isler", 20, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, Tone: AppTone.Teal, Hosted: new(CrmAfterSalesGroup, null, 40)),
@@ -264,7 +264,7 @@ public static class AppCatalog
         new("support.complaints", Support, "Şikâyet inceleme", "shield", "destek/sikayetler", 93, SupportAccess.ModuleKey, SupportAccess.ReportsRead),
         new("support.policy-settings", Support, "Politika ayarları", "wrench", ModuleSettingsRoute(SupportAccess.ModuleKey), 94, SupportAccess.ModuleKey, CoreAccess.ManageSettings),
 
-        new(Marketing, null, "Pazarlama", "trending-up", null, 28, ModuleKey: MarketingAccess.ModuleKey, Group: SalesGroup, HostId: Crm, Description: "Segmentleri ve kampanyaları yönetin, sonuçları izleyin."),
+        new(Marketing, null, "Pazarlama", "trending-up", null, 28, ModuleKey: MarketingAccess.ModuleKey, Group: SalesGroup, HostId: Crm, Description: "Segmentleri ve kampanyaları yönetin, sonuçları izleyin.", Art: "marketing"),
         new("marketing.segments", Marketing, "Segmentler", "list", "pazarlama/segmentler", 10, MarketingAccess.ModuleKey, MarketingAccess.SegmentsRead, Hosted: new(CrmMarketingGroup, null, 10)),
         new("marketing.campaigns", Marketing, "Kampanyalar", "target", "pazarlama/kampanyalar", 20, MarketingAccess.ModuleKey, MarketingAccess.CampaignsRead, Tone: AppTone.Teal, Hosted: new(CrmMarketingGroup, null, 20)),
         new("marketing.report", Marketing, "Kampanya raporu", "dashboard", "pazarlama/rapor", 30, MarketingAccess.ModuleKey, MarketingAccess.ReportsRead, Hosted: new(CrmMarketingGroup, "Kampanya sonuçları", 30)),
@@ -319,7 +319,7 @@ public static class AppCatalog
         new("hr.announcement-admin", Hr, "Duyuru yönetimi", "bell", "ik/duyuru-yonetimi", 150, HrAccess.ModuleKey, HrAccess.AnnouncementsManage),
         new("hr.expense-claims", Hr, "Masraf beyanları", "coins", "ik/masraf-beyanlari", 90, HrAccess.ModuleKey, AnyPermission: [HrAccess.ExpensesApprove, HrAccess.ExpensesManage, HrAccess.ExpensesPay]),
 
-        new(Fleet, null, "Filo", "truck", null, 45, ModuleKey: FleetAccess.ModuleKey, Group: OperationsGroup, Description: "Araçları, bakımları ve araç belgelerini izleyin."),
+        new(Fleet, null, "Filo", "truck", null, 45, ModuleKey: FleetAccess.ModuleKey, Group: OperationsGroup, Description: "Araçları, bakımları ve araç belgelerini izleyin.", Art: "fleet"),
         new("fleet.vehicles", Fleet, "Araçlar", "truck", "filo/araclar", 10, FleetAccess.ModuleKey, FleetAccess.VehiclesRead),
         new("fleet.maintenance", Fleet, "Bakım kayıtları", "wrench", "filo/bakimlar", 20, FleetAccess.ModuleKey, FleetAccess.MaintenanceRead, Tone: AppTone.Teal),
         new("fleet.credentials", Fleet, "Araç belgeleri", "calendar", "filo/belgeler", 30, FleetAccess.ModuleKey, FleetAccess.VehiclesRead, Tone: AppTone.Indigo),
@@ -356,7 +356,7 @@ public static class AppCatalog
         new("admin.form-designer", Admin, "Form tasarımı", "clipboard-list", "yonetim/form-tasarimi", 85, Permission: CoreAccess.ManageCustomization),
         new("admin.import-design", Admin, "İçe aktarma tasarımı", "clipboard-list", "yonetim/ice-aktarma-tasarimi", 86, Permission: CoreAccess.ManageCustomization),
 
-        new(Platform, null, "Platform", "shield", null, 100, PlatformOnly: true, Group: ManagementGroup, Description: "Firmaları, lisansları ve platform ayarlarını yönetin."),
+        new(Platform, null, "Platform", "shield", null, 100, PlatformOnly: true, Group: ManagementGroup, Description: "Firmaları, lisansları ve platform ayarlarını yönetin.", Art: "platform"),
         new("platform.home", Platform, "Genel bakış", "dashboard", "platform", 10, PlatformOnly: true, ExactMatch: true),
         new("platform.tenants", Platform, "Firmalar", "building", "platform/firmalar", 20, PlatformOnly: true, Tone: AppTone.Teal),
         new("platform.modules", Platform, "Modül hakları", "toggle", "platform/moduller", 30, PlatformOnly: true),

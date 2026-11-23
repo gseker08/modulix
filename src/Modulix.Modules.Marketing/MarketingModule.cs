@@ -69,6 +69,9 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
 
         /// <summary>Müşteri yolculuğu oluşturur ve düzenler.</summary>
         public const string JourneysWrite = "marketing.journeys.write";
+
+        /// <summary>Müşteri yolculuğunu yayımlar, duraklatır, sürdürür ve arşivler (ADR-0056).</summary>
+        public const string JourneysPublish = "marketing.journeys.publish";
     }
 
     public static class SettingKeys
@@ -125,6 +128,7 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
         new(Permissions.ReportsRead, "Kampanya raporunu ve firma/kişi pazarlama geçmişini görüntüler", "Raporlar"),
         new(Permissions.JourneysRead, "Müşteri yolculuklarını ve yolculuk kayıtlarını görüntüler", "Yolculuklar"),
         new(Permissions.JourneysWrite, "Müşteri yolculuğu oluşturur ve düzenler", "Yolculuklar"),
+        new(Permissions.JourneysPublish, "Müşteri yolculuğunu yayımlar, duraklatır, sürdürür ve arşivler", "Yolculuklar"),
     ];
 
     /// <summary>Devre dışı bırakılan kişinin segmentleri devredilir (ADR-0004).</summary>
@@ -147,7 +151,7 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
             "marketing.manager",
             "Pazarlama yöneticisi",
             "Bütün segmentleri yönetir, yayımlar ve arşivler.",
-            [Permissions.SegmentsRead, Permissions.SegmentsWrite, Permissions.SegmentsPublish, Permissions.RecipientsRead, Permissions.CampaignsRead, Permissions.CampaignsWrite, Permissions.CampaignsAudience, Permissions.CampaignsApprove, Permissions.CampaignsSend, Permissions.ResponsesRead, Permissions.ResponsesWrite, Permissions.ReportsRead, Permissions.JourneysRead, Permissions.JourneysWrite])
+            [Permissions.SegmentsRead, Permissions.SegmentsWrite, Permissions.SegmentsPublish, Permissions.RecipientsRead, Permissions.CampaignsRead, Permissions.CampaignsWrite, Permissions.CampaignsAudience, Permissions.CampaignsApprove, Permissions.CampaignsSend, Permissions.ResponsesRead, Permissions.ResponsesWrite, Permissions.ReportsRead, Permissions.JourneysRead, Permissions.JourneysWrite, Permissions.JourneysPublish])
         {
             Scope = RecordScope.All,
         },
@@ -384,6 +388,7 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
         services.AddSingleton<MarketingSendErrors>();
         services.AddScoped<MarketingStoreContext>();
         services.AddScoped<SegmentWorkflowGate>();
+        services.AddScoped<Journeys.IJourneyService, Journeys.JourneyService>();
         services.AddScoped<IRecordStore, SegmentRecordStore>();
         services.AddScoped<IRecordStore, SegmentMemberRecordStore>();
         services.AddScoped<IRecordStore, SegmentVersionRecordStore>();

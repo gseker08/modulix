@@ -66,7 +66,7 @@ internal sealed class SupportQueueRecordStore(SupportStoreContext context) : Sup
         if (await Context.Data.Set<SupportTicket>().AnyAsync(t => t.QueueId == entity.Id, cancellationToken)
             || await Context.Data.Set<TicketCategory>().AnyAsync(c => c.DefaultQueueId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Kuyruk talep ya da kategori tarafından kullanılıyor; silinemez. Pasife alın.");
+            throw new RecordConflictException(SupportMessages.Catalog.QueueInUse);
         }
     }
 }
@@ -143,7 +143,7 @@ internal sealed class TicketCategoryRecordStore(SupportStoreContext context) : S
         if (await Context.Data.Set<SupportTicket>().AnyAsync(t => t.CategoryId == entity.Id, cancellationToken)
             || await Context.Data.Set<TicketCategory>().AnyAsync(c => c.ParentId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Kategori talepte ya da alt kategoride kullanılıyor; silinemez. Pasife alın.");
+            throw new RecordConflictException(SupportMessages.Category.InUse);
         }
     }
 }

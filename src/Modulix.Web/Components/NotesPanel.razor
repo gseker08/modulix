@@ -1,0 +1,177 @@
+@* Bir kaydın notları (ADR-0057): her not ayrı kayıttır ve kendi ekleri vardır (AttachmentPanel, ADR-0040). Notlar genel kayıt uçlarından
+   (/api/records/core.note?parentEntityKey=&parentId=) okunur ve yazılır; erişim sunucuda bağlı kaydın erişimidir, notu yalnızca yazarı değiştirir ve siler.
+   Panel yalnızca düğmeleri gizler, kararı sunucu verir. *@
+@inject ApiClient Api
+@inject SessionState Session
+@inject ToastService Toasts
+
+<section class="settings-group" aria-label="@PanelTitle">
+    <h2>@PanelTitle</h2>
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (CanWrite)
+    {
+        <form class="record-form" novalidate @onsubmit="AddAsync" @onsubmit:preventDefault>
+            <label class="form-label" for="@newId">@Texts.Get("notes.panel.new")</label>
+            <textarea id="@newId" class="form-control" rows="3" maxlength="@NoteAccess.BodyMaxLength" @bind="draft" @bind:event="oninput"></textarea>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-tonal" aria-busy="@busy" disabled="@(busy || string.IsNullOrWhiteSpace(draft))"><AppIcon Name="plus" Size="16" /> @Texts.Get("notes.panel.add")</button>
+            </div>
+        </form>
+    }
+
+    @if (items is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (items.Count == 0)
+    {
+        <EmptyState Compact="true" Title="@Texts.Get("notes.panel.empty")" />
+    }
+    else
+    {
+        @foreach (var note in items)
+        {
+            var mine = IsMine(note);
+            <article class="settings-group" aria-label="@Texts.Get("notes.panel.note")">
+                <header class="list-toolbar">
+                    <small class="text-muted">@CrmLabels.Time(Created(note))</small>
+                    @if (mine && CanWrite)
+                    {
+                        <IconAction Icon="pencil" Label="@Texts.Get("common.edit")" OnClick="() => Edit(note)" />
+                        <ConfirmAction Icon="trash" Disabled="@busy" OnConfirm="() => DeleteAsync(note)">@Texts.Get("common.delete")</ConfirmAction>
+                    }
+                </header>
+                @if (editingId == note.Id)
+                {
+                    <textarea class="form-control" rows="3" maxlength="@NoteAccess.BodyMaxLength" aria-label="@Texts.Get("notes.panel.note")" @bind="editText" @bind:event="oninput"></textarea>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="() => editingId = null">@Texts.Get("common.cancel")</button>
+                        <button type="button" class="btn btn-primary" aria-busy="@busy" disabled="@(busy || string.IsNullOrWhiteSpace(editText))" @onclick="() => SaveEditAsync(note)">@Texts.Get("common.save")</button>
+                    </div>
+                }
+                else
+                {
+                    <p class="note-body">@WarehouseLabels.Text(note, "body")</p>
+                }
+                <AttachmentPanel EntityKey="@NoteAccess.EntityKey" RecordId="note.Id" CanWrite="@(mine && CanWrite)" Title="@Texts.Get("notes.panel.attachments")" EmptyText="@Texts.Get("notes.panel.attachments-empty")" />
+            </article>
+        }
+    }
+</section>
+
+@code {
+    private static readonly string Url = "/api/records/" + NoteAccess.EntityKey;
+
+    private readonly string newId = "note-" + Guid.NewGuid().ToString("N")[..8];
+    private List<RecordResponse>? items;
+    private string draft = string.Empty;
+    private string editText = string.Empty;
+    private Guid? editingId;
+    private string? message;
+    private bool busy;
+    private (string, Guid) loadedFor;
+
+    /// <summary>Notun bağlı olduğu kaydın türü (ör. <c>crm.company</c>).</summary>
+    [Parameter, EditorRequired] public string ParentEntityKey { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public Guid ParentId { get; set; }
+
+    /// <summary>Kullanıcının bağlı kayıtta güncelleme izni var mı? Kararı sunucu verir; panel yalnızca düğmeleri gizler.</summary>
+    [Parameter] public bool CanWrite { get; set; }
+
+    /// <summary>Boşsa "Notlar" (çeviriden).</summary>
+    [Parameter] public string? Title { get; set; }
+
+    private string PanelTitle => Title ?? Texts.Get("notes.panel.title");
+
+    private bool IsMine(RecordResponse note) =>
+        WarehouseLabels.Text(note, "createdByUserId") is { } author && Guid.TryParse(author, out var id) && id == Session.User?.UserId;
+
+    private static DateTimeOffset Created(RecordResponse note) =>
+        DateTimeOffset.TryParse(WarehouseLabels.Text(note, "createdAt"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var at) ? at : default;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (ParentEntityKey, ParentId))
+        {
+            return;
+        }
+
+        loadedFor = (ParentEntityKey, ParentId);
+        editingId = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await Api.GetAsync<RecordPageResponse>(
+            $"{Url}?parentEntityKey={Uri.EscapeDataString(ParentEntityKey)}&parentId={ParentId}&page=1&pageSize=100");
+        items = result.Value is { } page ? [.. page.Items] : [];
+        message = result.Error;
+    }
+
+    private async Task AddAsync()
+    {
+        busy = true;
+        message = null;
+        var values = new System.Text.Json.Nodes.JsonObject
+        {
+            ["parentEntityKey"] = ParentEntityKey,
+            ["parentId"] = ParentId.ToString(),
+            ["body"] = draft.Trim(),
+        };
+        var result = await Api.PostAsync<RecordResponse>(Url, new RecordWriteRequest(values));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            message = result.FieldErrors?.Values.SelectMany(v => v).FirstOrDefault() ?? result.Error;
+            return;
+        }
+
+        draft = string.Empty;
+        Toasts.Success(Texts.Get("common.saved"));
+        await LoadAsync();
+    }
+
+    private void Edit(RecordResponse note)
+    {
+        editingId = note.Id;
+        editText = WarehouseLabels.Text(note, "body") ?? string.Empty;
+    }
+
+    private async Task SaveEditAsync(RecordResponse note)
+    {
+        busy = true;
+        message = null;
+        var values = new System.Text.Json.Nodes.JsonObject { ["body"] = editText.Trim() };
+        var result = await Api.PutAsync<RecordResponse>($"{Url}/{note.Id}", new RecordWriteRequest(values, note.Version));
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            message = result.FieldErrors?.Values.SelectMany(v => v).FirstOrDefault() ?? result.Error;
+            return;
+        }
+
+        editingId = null;
+        Toasts.Success(Texts.Get("common.saved"));
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(RecordResponse note)
+    {
+        busy = true;
+        var result = await Api.DeleteAsync($"{Url}/{note.Id}?version={note.Version}");
+        busy = false;
+        message = result.Error;
+        if (result.IsSuccess)
+        {
+            Toasts.Success(Texts.Get("common.deleted"));
+            await LoadAsync();
+        }
+    }
+}

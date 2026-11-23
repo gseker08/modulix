@@ -37,11 +37,11 @@
                 <FieldError Field="businessUnitId" Errors="errors" />
             </div>
         }
-        <fieldset class="span-all">
-            <legend class="form-label">@Texts.Get("nav.app.admin.roles")</legend>
-            <RolePicker Roles="Roles" Selected="selected" CanGrantAdministrator="CanGrantAdministrator" />
+        <div class="span-all">
+            <label class="form-label" for="invite-roles">@Texts.Get("nav.app.admin.roles")</label>
+            <RolePicker Id="invite-roles" Roles="Roles" Selected="selected" CanGrantAdministrator="CanGrantAdministrator" />
             <FieldError Field="roleIds" Errors="errors" />
-        </fieldset>
+        </div>
     </div>
     </FormTabs>
 

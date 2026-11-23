@@ -1,40 +1,19 @@
 @* Faaliyet seçici (ADR-0029; docs/design-system/component-catalog.md → PickDialog): formda seçilen faaliyetler etiket olarak
-   durur, seçim atama penceresinde (PickDialog) yapılır. Pencerede yalnızca seçilebilir "Faaliyet" düğümleri listelenir ve
+   durur, seçim atama penceresinde yapılır (PickField). Pencerede yalnızca seçilebilir "Faaliyet" düğümleri listelenir ve
    "Sektör › Grup" yoluna göre gruplanır; arama ve grup süzgeci vardır. Seçili kod katalogdan düşmüş ya da pasifleşmişse formda
    "(pasif)" ile görünür ki kaldırılabilsin. Değişiklik Selected listesine yazılır (tekrarsız, sıralı). Pencere formun içinde
    açıldığı için içindeki girdi olayları forma taşınmaz; form "değişti" bilgisini SelectedChanged'den alır. *@
 @inject ActivityOptions Options
 
-<div class="activity-picker" @oninput:stopPropagation="true">
-    @if (Selected.Count > 0)
-    {
-        <div class="assigned-tags">
-            @foreach (var code in Selected)
-            {
-                var name = NameOf(code);
-                <button type="button" class="badge tag pick-chip" title="@PathOf(code)" aria-label="@Texts.Get("pick.remove", name)"
-                        @onclick="() => RemoveAsync(code)">
-                    @name
-                    <AppIcon Name="x" Size="12" />
-                </button>
-            }
-        </div>
-    }
-    <button type="button" id="@Id" class="btn btn-tonal" @onclick="() => picking = true">
-        <AppIcon Name="plus" Size="16" /> @Texts.Get("pick.activity.choose")
-    </button>
-
-    <PickDialog TKey="string" Open="picking" Title="@(Title ?? Texts.Get("pick.activity.choose"))"
-                SearchPlaceholder="@Texts.Get("pick.activity.search")" GroupLabel="@Texts.Get("pick.activity.group")"
-                Items="Items" Selected="Selected" SaveLabel="@Texts.Get("pick.apply")" OnSave="ApplyAsync" OnClose="() => picking = false" />
-</div>
+<PickField TKey="string" Id="@Id" Title="@(Title ?? Texts.Get("pick.activity.choose"))" ButtonLabel="@Texts.Get("pick.activity.choose")"
+           SearchPlaceholder="@Texts.Get("pick.activity.search")" GroupLabel="@Texts.Get("pick.activity.group")"
+           Items="items" Selected="Selected" SelectedChanged="SetAsync" ChipTitle="PathOf" />
 
 @code {
     private const string ActivityKind = "Activity";
 
     private IReadOnlyList<ActivityOptionDto> options = [];
     private IReadOnlyList<PickItem<string>> items = [];
-    private bool picking;
 
     [Parameter, EditorRequired] public string Id { get; set; } = "activity-codes";
 
@@ -49,23 +28,13 @@
     /// <summary>Yalnızca "Faaliyet" düğümleri seçilebilir (hizmet kapsamı, hizmet ihtiyacı); değilse sektör ve grup da listelenir.</summary>
     [Parameter] public bool ActivitiesOnly { get; set; }
 
-    private IReadOnlyList<PickItem<string>> Items => items;
-
     protected override async Task OnInitializedAsync()
     {
         options = await Options.LoadAsync();
         items = BuildItems();
     }
 
-    private Task ApplyAsync(IReadOnlyList<string> result)
-    {
-        picking = false;
-        return SetAsync(result);
-    }
-
-    private Task RemoveAsync(string code) => SetAsync(Selected.Where(c => c != code));
-
-    private async Task SetAsync(IEnumerable<string> codes)
+    private async Task SetAsync(IReadOnlyList<string> codes)
     {
         Selected = [.. new SortedSet<string>(codes, StringComparer.Ordinal)];
         await SelectedChanged.InvokeAsync(Selected);
@@ -103,8 +72,6 @@
     private static string? Join(string? left, string? right) => left is null ? right : right is null ? left : $"{left} › {right}";
 
     private ActivityOptionDto? Find(string code) => options.FirstOrDefault(a => a.Code == code);
-
-    private string NameOf(string code) => Find(code)?.Name ?? $"{code} ({Texts.Get("common.inactiveLower")})";
 
     private string PathOf(string code) => Find(code) is { } option ? Options.PathOf(option) : code;
 }

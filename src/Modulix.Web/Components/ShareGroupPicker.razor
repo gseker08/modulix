@@ -1,4 +1,4 @@
-@* Hedefli paylaşım (ADR-0054 dilim 4a): rapor ve pano paylaşım panellerinin ortak rol / ekip / iş birimi seçicisi. Seçim üst bileşenin listesindedir (yerinde değişir); yetki ve doğrulama sunucudadır. *@
+@* Hedefli paylaşım (ADR-0054 dilim 4a): rapor ve pano paylaşım panellerinin ortak rol / ekip / iş birimi seçicisi; seçilenler etiket olarak durur, seçim atama penceresinde yapılır (PickField). Seçim üst bileşenin listesindedir (yerinde değişir); yetki ve doğrulama sunucudadır. *@
 @inject ApiClient Api
 
 <div class="mb-3">
@@ -15,30 +15,9 @@
     }
     else
     {
-        @foreach (var (kind, titleKey) in Kinds)
-        {
-            var items = options.Where(o => o.Kind == kind).ToList();
-            if (items.Count == 0)
-            {
-                continue;
-            }
-
-            <fieldset class="mb-2">
-                <legend class="form-label">@Texts.Get(titleKey)</legend>
-                <div class="report-member-list" role="group" aria-label="@Texts.Get(titleKey)">
-                    @foreach (var item in items)
-                    {
-                        var option = item;
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="sg-@option.Kind-@option.Id" checked="@IsSelected(option)" @onchange="e => Toggle(option, e.Value is true)" />
-                            <label class="form-check-label" for="sg-@option.Kind-@option.Id">@option.Name</label>
-                        </div>
-                    }
-                </div>
-            </fieldset>
-        }
-
-        <p class="small text-muted mt-1" role="status">@Texts.Get("reports.share.groupsSelected", Selected.Count)</p>
+        <label class="form-label" for="share-groups">@Texts.Get("reports.share.groups")</label>
+        <PickField TKey="string" Id="share-groups" Title="@Texts.Get("reports.share.groups")" GroupLabel="@Texts.Get("reports.share.groupKind")" Icon="users"
+                   Items="Items" Selected="Selected.Select(Key)" SelectedChanged="Replace" UnknownName="@(_ => Texts.Get("reports.share.unknownGroup"))" />
     }
 </div>
 
@@ -66,15 +45,27 @@
         error = response.Error;
     }
 
-    private bool IsSelected(ShareGroupOptionDto option) =>
-        Selected.Any(s => s.Kind == option.Kind && s.Id == option.Id);
+    // Rol, ekip ve iş birimi tek pencerede, türüne göre gruplu listelenir; anahtar "tür:kimlik".
+    private IReadOnlyList<PickItem<string>> Items =>
+    [
+        .. Kinds.SelectMany(kind => (options ?? []).Where(o => o.Kind == kind.Kind)
+            .Select(o => new PickItem<string>(Key(o.Kind, o.Id), o.Name, Group: Texts.Get(kind.TitleKey)))),
+    ];
 
-    private void Toggle(ShareGroupOptionDto option, bool selected)
+    private static string Key(ShareGroupDto group) => Key(group.Kind, group.Id);
+
+    private static string Key(string kind, Guid id) => $"{kind}:{id}";
+
+    private void Replace(IReadOnlyList<string> keys)
     {
-        Selected.RemoveAll(s => s.Kind == option.Kind && s.Id == option.Id);
-        if (selected)
+        Selected.Clear();
+        foreach (var key in keys)
         {
-            Selected.Add(new ShareGroupDto(option.Kind, option.Id));
+            var separator = key.IndexOf(':');
+            if (separator > 0 && Guid.TryParse(key[(separator + 1)..], out var id))
+            {
+                Selected.Add(new ShareGroupDto(key[..separator], id));
+            }
         }
     }
 }

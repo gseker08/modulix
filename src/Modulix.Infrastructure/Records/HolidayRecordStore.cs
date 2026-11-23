@@ -40,19 +40,19 @@ internal sealed class HolidayRecordStore(ModulixDbContext db) : IRecordStore
         {
             if (!Writable.Contains(name, StringComparer.Ordinal))
             {
-                errors.Add(new RecordFieldError(name, "Bilinmeyen alan."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownField));
             }
             else if (name == DateField && Day(node) is null)
             {
-                errors.Add(new RecordFieldError(name, "Tarih yyyy-AA-gg biçiminde olmalıdır."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.DateFormat));
             }
             else if (name == NameField && Text(node) is not { Length: > 0 and <= Holiday.NameMaxLength })
             {
-                errors.Add(new RecordFieldError(name, $"Ad zorunludur ve en çok {Holiday.NameMaxLength} karakter olabilir."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Holiday.NameRequired(Holiday.NameMaxLength)));
             }
             else if (name == HalfDayField && node is not null && Flag(node) is null)
             {
-                errors.Add(new RecordFieldError(name, "Evet ya da hayır olmalıdır."));
+                errors.Add(new RecordFieldError(name, ServerMessages.Validation.YesNo));
             }
         }
 
@@ -99,7 +99,7 @@ internal sealed class HolidayRecordStore(ModulixDbContext db) : IRecordStore
                     errors.Add(new RecordFieldError(name, name == "sort" ? "Geçersiz sıralama." : "Geçersiz filtre değeri."));
                     break;
                 default:
-                    errors.Add(new RecordFieldError(name, "Bilinmeyen filtre."));
+                    errors.Add(new RecordFieldError(name, ServerMessages.Validation.UnknownFilter));
                     break;
             }
         }
@@ -170,7 +170,7 @@ internal sealed class HolidayRecordStore(ModulixDbContext db) : IRecordStore
     {
         if (await db.Holidays.AsNoTracking().AnyAsync(h => h.Date == date && h.Id != id, cancellationToken))
         {
-            throw new RecordValidationException([new RecordFieldError(DateField, "Bu tarih tatil listesinde zaten var.")]);
+            throw new RecordValidationException([new RecordFieldError(DateField, ServerMessages.Holiday.DateExists)]);
         }
     }
 

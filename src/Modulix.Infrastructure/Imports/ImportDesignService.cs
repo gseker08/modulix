@@ -60,14 +60,14 @@ internal sealed class ImportDesignService(
         var enabled = await entitlements.GetEnabledAsync(tenant.TenantId, cancellationToken);
         if (catalog.FindImport(entityKey) is not { } found || !catalog.IsEnabled(found.ModuleKey, enabled))
         {
-            return RecordResult<ImportDesignInfo>.Fail(RecordErrorCode.NotFound, "Kayıt türü bulunamadı.");
+            return RecordResult<ImportDesignInfo>.Fail(RecordErrorCode.NotFound, ServerMessages.Import.EntityNotFound);
         }
 
         var fields = await schema.AllFieldsAsync(tenant, found.Definition, cancellationToken);
         var errors = ImportDesignRules.Validate(fields, input);
         if (errors.Count > 0)
         {
-            return RecordResult<ImportDesignInfo>.Fail(RecordErrorCode.ValidationFailed, "İçe aktarma tasarımı geçersiz.", errors);
+            return RecordResult<ImportDesignInfo>.Fail(RecordErrorCode.ValidationFailed, ServerMessages.Import.DesignInvalid, errors);
         }
 
         var row = await db.ImportDesigns.SingleOrDefaultAsync(d => d.EntityKey == entityKey, cancellationToken);
@@ -139,7 +139,7 @@ internal sealed class ImportDesignService(
     };
 
     private static RecordResult<ImportDesignInfo> Conflict() =>
-        RecordResult<ImportDesignInfo>.Fail(RecordErrorCode.Conflict, "Tasarım siz düzenlerken değişti. Sayfayı yenileyip tekrar deneyin.");
+        RecordResult<ImportDesignInfo>.Fail(RecordErrorCode.Conflict, ServerMessages.Import.DesignChanged);
 
     private TenantContext RequireTenant() => tenantAccessor.Current ?? throw new InvalidOperationException("Aktif tenant yok.");
 }

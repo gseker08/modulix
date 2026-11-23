@@ -32,6 +32,9 @@ internal static class MarketingMessages
     /// <summary>Kampanya kaydı.</summary>
     public static class Campaign
     {
+        public static ServerMessage CodeExists =>
+            ServerMessage.Of("marketing.server.campaign.code-exists", "Bu kodlu bir kampanya zaten var.");
+
         public static ServerMessage CodeFormat =>
             ServerMessage.Of("marketing.server.campaign.code-format", "Kod 2-40 karakter olmalı; küçük harf, rakam ve tire kullanılabilir (ör. antrepo-2026).");
 
@@ -109,6 +112,9 @@ internal static class MarketingMessages
     /// <summary>Segment kaydı, üyeleri ve sürümleri.</summary>
     public static class Segment
     {
+        public static ServerMessage CodeExists =>
+            ServerMessage.Of("marketing.server.segment.code-exists", "Bu kodlu bir segment zaten var.");
+
         public static ServerMessage CodeFormat =>
             ServerMessage.Of("marketing.server.segment.code-format", "Kod 2-40 karakter olmalı; küçük harf, rakam ve tire kullanılabilir (ör. tekstil-marmara).");
 
@@ -190,6 +196,9 @@ internal static class MarketingMessages
     /// <summary>Kampanya yanıtı.</summary>
     public static class Response
     {
+        public static ServerMessage NoteTooLong(int max) =>
+            ServerMessage.Of("marketing.server.response.note-too-long", "Not en fazla {0} karakter olabilir.", max);
+
         public static ServerMessage NoDelete =>
             ServerMessage.Of("marketing.server.response.no-delete", "Yanıt kaydı silinmez; kapatın.");
     }
@@ -197,6 +206,9 @@ internal static class MarketingMessages
     /// <summary>Segment koşulu doğrulaması.</summary>
     public static class Condition
     {
+        public static ServerMessage FieldRequired =>
+            ServerMessage.Of("marketing.server.condition.field-required", "Alan zorunludur.");
+
         public static ServerMessage Empty =>
             ServerMessage.Of("marketing.server.condition.empty", "Koşul boş olamaz.");
 
@@ -276,6 +288,9 @@ internal static class MarketingMessages
     /// <summary>Segment servisi.</summary>
     public static class SegmentService
     {
+        public static ServerMessage AlreadyActive =>
+            ServerMessage.Of("marketing.server.segment-service.already-active", "Segment zaten etkin.");
+
         public static ServerMessage InvalidTarget =>
             ServerMessage.Of("marketing.server.segment-service.invalid-target", "Geçersiz hedef türü.");
 
@@ -572,6 +587,21 @@ internal static class MarketingMessages
     /// <summary>Müşteri yolculuğu ve kayıtları.</summary>
     public static class Journey
     {
+        public static ServerMessage SegmentNotActive =>
+            ServerMessage.Of("marketing.server.journey.segment-not-active", "Giriş segmenti etkin değil; yolculuk başlatılamaz.");
+
+        public static ServerMessage AlreadyArchived =>
+            ServerMessage.Of("marketing.server.journey.already-archived", "Yolculuk zaten arşivde.");
+
+        public static ServerMessage OnlyPausedResume =>
+            ServerMessage.Of("marketing.server.journey.only-paused-resume", "Yalnızca duraklatılmış yolculuk sürdürülür.");
+
+        public static ServerMessage OnlyActivePause =>
+            ServerMessage.Of("marketing.server.journey.only-active-pause", "Yalnızca etkin yolculuk duraklatılır.");
+
+        public static ServerMessage OnlyDraftPublish =>
+            ServerMessage.Of("marketing.server.journey.only-draft-publish", "Yalnızca taslak yolculuk yayımlanır.");
+
         public static ServerMessage CodeFormat =>
             ServerMessage.Of("marketing.server.journey.code-format", "Kod 2-40 karakter olmalı; küçük harf, rakam ve tire kullanılabilir (ör. hosgeldin-serisi).");
 

@@ -14,7 +14,7 @@ using static Modulix.Modules.Marketing.MarketingModule.Permissions;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0056 dilim 1a: müşteri yolculuğu kaydı ve yolculuk kayıtları. Dört test türü: mutlu yol (oluşturma, listeleme, güncelleme, silme),
+/// ADR-0056 dilim 1a ve 1b: müşteri yolculuğu kaydı, yolculuk kayıtları ve durum geçişleri (yayın, duraklatma, sürdürme, arşiv). Dört test türü: mutlu yol (oluşturma, listeleme, güncelleme, silme),
 /// hata/doğrulama (kod, hedef türü, giriş segmenti, çıkış koşulu, elle kayıt), tenant izolasyonu ve yetki.
 /// </summary>
 public class JourneyTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
@@ -25,7 +25,7 @@ public class JourneyTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
         CrmModule.Permissions.ContactsRead, CrmModule.Permissions.ContactsWrite,
     ];
 
-    private static readonly string[] AllMarketing = [SegmentsRead, SegmentsWrite, SegmentsPublish, RecipientsRead, JourneysRead, JourneysWrite];
+    private static readonly string[] AllMarketing = [SegmentsRead, SegmentsWrite, SegmentsPublish, RecipientsRead, JourneysRead, JourneysWrite, JourneysPublish];
 
     // ---- Arayüz sözleşmesi ----
 
@@ -34,6 +34,7 @@ public class JourneyTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
     {
         Assert.Equal(MarketingAccess.JourneysRead, JourneysRead);
         Assert.Equal(MarketingAccess.JourneysWrite, JourneysWrite);
+        Assert.Equal(MarketingAccess.JourneysPublish, JourneysPublish);
     }
 
     // ---- Mutlu yol ----
@@ -142,6 +143,107 @@ public class JourneyTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
         // Kapsamı "kendi" olan kullanıcı başkasının yolculuğunu görmez.
         var own = await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions], RecordScope.Own);
         Assert.DoesNotContain((await own.GetFromJsonAsync<PagedResult<JourneyDto>>("/api/marketing/journeys"))!.Items, j => j.Id == journey.Id);
+    }
+
+    // ---- Dilim 1b: durum geçişleri ----
+
+    [Fact]
+    public async Task A_draft_journey_is_published_paused_resumed_and_archived()
+    {
+        var (client, _) = await ManagerAsync();
+        var segment = await ActiveSegmentAsync(client, "gecis-segmenti");
+        var journey = await CreateJourneyAsync(client, "gecis", segment.Id);
+
+        var published = await TransitionAsync(client, journey, "publish");
+        Assert.Equal("Active", published.Status);
+        Assert.True(published.Version > journey.Version);
+
+        var paused = await TransitionAsync(client, published, "pause");
+        Assert.Equal("Paused", paused.Status);
+
+        var resumed = await TransitionAsync(client, paused, "resume");
+        Assert.Equal("Active", resumed.Status);
+
+        var archived = await TransitionAsync(client, resumed, "archive");
+        Assert.Equal("Archived", archived.Status);
+
+        // Arşivlenmiş yolculuk silinemez (taslak değil) ve yeniden etkinleştirilemez.
+        Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync($"/api/marketing/journeys/{archived.Id}?version={archived.Version}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await PostActionAsync(client, archived, "resume")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Invalid_transitions_and_an_inactive_entry_segment_are_refused_with_conflict()
+    {
+        var (client, _) = await ManagerAsync();
+        var segment = await ActiveSegmentAsync(client, "gecis-hata-segmenti");
+        var journey = await CreateJourneyAsync(client, "gecis-hata", segment.Id);
+
+        // Taslak duraklatılamaz ve sürdürülemez; etkin yolculuk yeniden yayımlanamaz.
+        Assert.Equal(HttpStatusCode.Conflict, (await PostActionAsync(client, journey, "pause")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await PostActionAsync(client, journey, "resume")).StatusCode);
+        var published = await TransitionAsync(client, journey, "publish");
+        Assert.Equal(HttpStatusCode.Conflict, (await PostActionAsync(client, published, "publish")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await PostActionAsync(client, published, "resume")).StatusCode);
+
+        // Eski sürümle geçiş eşzamanlılık çatışmasıdır (durum değişmez).
+        var stale = await client.PostAsJsonAsync($"/api/marketing/journeys/{published.Id}/pause", new JourneyActionRequest(published.Version - 1));
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        Assert.Equal("Active", (await client.GetFromJsonAsync<JourneyDto>($"/api/marketing/journeys/{published.Id}"))!.Status);
+
+        // Giriş segmenti etkin değilse (arşivlendi) taslak yolculuk yayımlanamaz, duraklatılmış yolculuk sürdürülemez.
+        var otherSegment = await ActiveSegmentAsync(client, "gecis-arsiv-segmenti");
+        var draft = await CreateJourneyAsync(client, "gecis-arsiv", otherSegment.Id);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/marketing/segments/{otherSegment.Id}/archive", new SegmentActionRequest())).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await PostActionAsync(client, draft, "publish")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync($"/api/marketing/journeys/{Guid.NewGuid()}/publish", new JourneyActionRequest())).StatusCode);
+    }
+
+    [Fact]
+    public async Task Another_tenant_cannot_change_the_status_of_a_foreign_journey()
+    {
+        var (clientA, _) = await ManagerAsync();
+        var (clientB, _) = await ManagerAsync();
+        var journeyA = await CreateJourneyAsync(clientA, "yabanci-gecis", (await ActiveSegmentAsync(clientA, "yabanci-segment")).Id);
+
+        foreach (var action in new[] { "publish", "pause", "resume", "archive" })
+        {
+            Assert.Equal(HttpStatusCode.NotFound, (await PostActionAsync(clientB, journeyA, action)).StatusCode);
+        }
+
+        Assert.Equal("Draft", (await clientA.GetFromJsonAsync<JourneyDto>($"/api/marketing/journeys/{journeyA.Id}"))!.Status);
+    }
+
+    [Fact]
+    public async Task Status_transitions_need_the_publish_permission_and_record_scope_applies()
+    {
+        var tenant = await TenantAsync();
+        var manager = await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions]);
+        var journey = await CreateJourneyAsync(manager, "yetki-gecis", (await ActiveSegmentAsync(manager, "yetki-gecis-segment")).Id);
+
+        // Yazma izni yayın izni değildir; izleyici de geçiş yapamaz.
+        var writer = await UserClientAsync(tenant, [SegmentsRead, JourneysRead, JourneysWrite]);
+        var viewer = await UserClientAsync(tenant, [JourneysRead]);
+        foreach (var client in new[] { writer, viewer })
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, (await PostActionAsync(client, journey, "publish")).StatusCode);
+        }
+
+        Assert.Equal("Draft", (await manager.GetFromJsonAsync<JourneyDto>($"/api/marketing/journeys/{journey.Id}"))!.Status);
+
+        // Kapsamı "kendi" olan yayıncı başkasının yolculuğunu göremez, geçiş yapamaz.
+        var own = await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions], RecordScope.Own);
+        Assert.Equal(HttpStatusCode.NotFound, (await PostActionAsync(own, journey, "publish")).StatusCode);
+    }
+
+    private static Task<HttpResponseMessage> PostActionAsync(HttpClient client, JourneyDto journey, string action) =>
+        client.PostAsJsonAsync($"/api/marketing/journeys/{journey.Id}/{action}", new JourneyActionRequest(journey.Version));
+
+    private static async Task<JourneyDto> TransitionAsync(HttpClient client, JourneyDto journey, string action)
+    {
+        var response = await PostActionAsync(client, journey, action);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<JourneyDto>())!;
     }
 
     // ---- Yardımcılar ----

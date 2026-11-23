@@ -75,6 +75,9 @@ public sealed record SegmentEvaluationDto(int Count, IReadOnlyList<SegmentRowDto
 /// <summary>Eylem isteği: kaydın sürümü verilirse eşzamanlılık denetlenir (409).</summary>
 public sealed record SegmentActionRequest(long? Version = null);
 
+/// <summary>Yolculuk durum geçişi isteği (ADR-0056): okunan kaydın sürümü (eşzamanlılık denetimi).</summary>
+public sealed record JourneyActionRequest(long? Version = null);
+
 public sealed record CopySegmentRequest(string Code, string Name);
 
 /// <summary>Arayüz menüsünün ve ekran denetimlerinin baktığı izin anahtarları; <c>MarketingModule.Permissions</c> ile aynı olmalıdır (mimari testle denetlenir).</summary>
@@ -124,6 +127,7 @@ public static class MarketingAccess
     public const string SegmentsRead = "marketing.segments.read";
     public const string SegmentsWrite = "marketing.segments.write";
     public const string SegmentsPublish = "marketing.segments.publish";
+    public const string JourneysPublish = "marketing.journeys.publish";
     public const string RecipientsRead = "marketing.recipients.read";
     public const string CampaignsRead = "marketing.campaigns.read";
     public const string CampaignsWrite = "marketing.campaigns.write";

@@ -215,6 +215,7 @@ public class ModulixDbContext(
 
     /// <summary>Süreli belgeler (ADR-0038 K3): sahibi bir modül kaydıdır; dosyası Core dosya deposundadır.</summary>
     public DbSet<Modulix.Core.Credentials.Credential> Credentials => Set<Modulix.Core.Credentials.Credential>();
+    public DbSet<Modulix.Core.Notes.RecordNote> RecordNotes => Set<Modulix.Core.Notes.RecordNote>();
 
     public DbSet<ActivityNode> ActivityNodes => Set<ActivityNode>();
 

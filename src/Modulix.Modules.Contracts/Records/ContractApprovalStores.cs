@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Contracts.Domain;
 using Modulix.Modules.Contracts.Lifecycle;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Contracts.Records;
 
@@ -150,7 +151,7 @@ internal sealed class ContractApprovalDelegationRecordStore(ContractsStoreContex
 
         if (entity.ToUserId == Guid.Empty)
         {
-            errors.Add(new RecordFieldError("toUserId", "Vekil zorunludur."));
+            errors.Add(new RecordFieldError("toUserId", ContractsMessages.Approval.DelegateRequired));
         }
 
         if (entity.FromUserId != Guid.Empty && entity.FromUserId == entity.ToUserId)

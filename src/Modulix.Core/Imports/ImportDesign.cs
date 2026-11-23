@@ -1,6 +1,7 @@
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Core.Imports;
 
@@ -137,17 +138,17 @@ public static class ImportDesignRules
         var errors = new List<RecordFieldError>();
         foreach (var key in design.Excluded.Concat(design.Required).Where(k => fields.All(f => f.Key != k)).Distinct())
         {
-            errors.Add(new RecordFieldError(key, "Bilinmeyen sütun."));
+            errors.Add(new RecordFieldError(key, ServerMessages.Import.UnknownColumn));
         }
 
         foreach (var field in fields.Where(f => f.Required && design.Excluded.Contains(f.Key)))
         {
-            errors.Add(new RecordFieldError(field.Key, $"{field.Label} zorunlu sütundur, çıkarılamaz."));
+            errors.Add(new RecordFieldError(field.Key, ServerMessages.Import.RequiredColumn(field.Label)));
         }
 
         foreach (var field in fields.Where(f => !f.Required && design.Excluded.Contains(f.Key) && design.Required.Contains(f.Key)))
         {
-            errors.Add(new RecordFieldError(field.Key, $"{field.Label} hem çıkarılmış hem zorunlu olamaz."));
+            errors.Add(new RecordFieldError(field.Key, ServerMessages.Import.OmittedAndRequired(field.Label)));
         }
 
         // Ek başlık adları: bilinen alana ait, sınır içinde, başka bir alanın adı/anahtarı değil ve iki alanda birden kullanılmıyor.
@@ -160,13 +161,13 @@ public static class ImportDesignRules
         {
             if (fields.All(f => f.Key != key))
             {
-                errors.Add(new RecordFieldError(key, "Bilinmeyen sütun."));
+                errors.Add(new RecordFieldError(key, ServerMessages.Import.UnknownColumn));
                 continue;
             }
 
             if (aliases.Count > MaxAliasesPerField)
             {
-                errors.Add(new RecordFieldError(key, $"Bir sütun için en çok {MaxAliasesPerField} başlık adı kaydedilebilir."));
+                errors.Add(new RecordFieldError(key, ServerMessages.Import.TooManyAliases(MaxAliasesPerField)));
             }
 
             foreach (var alias in aliases)
@@ -174,7 +175,7 @@ public static class ImportDesignRules
                 var name = ImportColumns.Name(alias);
                 if (alias.Length > MaxAliasLength)
                 {
-                    errors.Add(new RecordFieldError(key, $"Başlık adı en çok {MaxAliasLength} karakter olabilir."));
+                    errors.Add(new RecordFieldError(key, ServerMessages.Import.AliasTooLong(MaxAliasLength)));
                 }
                 else if (names.FirstOrDefault(n => n.Name == name && n.Key != key) is { Name: not null } taken)
                 {
@@ -184,7 +185,7 @@ public static class ImportDesignRules
                 }
                 else if (!claimed.TryAdd(name, key) && claimed[name] != key)
                 {
-                    errors.Add(new RecordFieldError(key, $"'{alias}' birden çok sütuna eşlenmiş."));
+                    errors.Add(new RecordFieldError(key, ServerMessages.Import.AliasDuplicated(alias)));
                 }
             }
         }

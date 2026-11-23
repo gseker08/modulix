@@ -143,7 +143,7 @@ internal abstract class ContentCommentRecordStore<TContent>(HrStoreContext conte
     }
 
     protected override Task BeforeDeleteAsync(ContentComment entity, CancellationToken cancellationToken) =>
-        Context.Gate.IsOpen ? Task.CompletedTask : throw new RecordConflictException("Yorum, yorum silme eylemiyle silinir.");
+        Context.Gate.IsOpen ? Task.CompletedTask : throw new RecordConflictException(HrMessages.Content.CommentDeleteViaAction);
 }
 
 internal sealed class AnnouncementCommentRecordStore(HrStoreContext context)

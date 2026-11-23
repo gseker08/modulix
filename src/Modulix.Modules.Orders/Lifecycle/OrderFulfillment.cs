@@ -233,7 +233,7 @@ internal sealed class OrderFulfillment(
     {
         if (!DeliveryAction.All.Contains(action))
         {
-            return Invalid<DeliveryView>("action", "Bilinmeyen eylem.");
+            return Invalid<DeliveryView>("action", OrdersMessages.Workflow.UnknownAction);
         }
 
         var loaded = await pipeline.GetAsync(new RecordRef(OrdersModule.Entities.Delivery, deliveryId), cancellationToken);
@@ -585,7 +585,7 @@ internal sealed class OrderFulfillment(
     {
         if (!ServiceAction.All.Contains(action))
         {
-            return Invalid<ServiceLineView>("action", "Bilinmeyen eylem.");
+            return Invalid<ServiceLineView>("action", OrdersMessages.Workflow.UnknownAction);
         }
 
         var loaded = await pipeline.GetAsync(new RecordRef(OrdersModule.Entities.ServiceStart, serviceStartId), cancellationToken);

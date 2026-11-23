@@ -463,15 +463,12 @@
                     <div class="inline-form">
                         <label class="form-label" for="oc-contact">@Texts.Get("crm.contact.fallbackTitle")</label>
                         <LookupPicker Id="oc-contact" LookupKey="crm.opportunity.contact" @bind-Value="newContact" ParentId="opportunity.CompanyId" Placeholder="@Texts.Get("crm.opp.chooseContact")" />
-                        <fieldset>
-                            <legend class="form-label">@Texts.Get("crm.opp.contactRoles")</legend>
-                            @foreach (var role in OpportunityContactRoles.All)
-                            {
-                                <label class="form-check form-check-inline">
-                                    <input type="checkbox" class="form-check-input" checked="@newRoles.Contains(role)" @onchange="e => ToggleRole(role, (bool)e.Value!)" /> @CrmText.OpportunityContactRoleName(role)
-                                </label>
-                            }
-                        </fieldset>
+                        <div>
+                            <label class="form-label" for="oc-roles">@Texts.Get("crm.opp.contactRoles")</label>
+                            <PickField TKey="string" Id="oc-roles" Title="@Texts.Get("crm.opp.contactRoles")" Icon="users"
+                                       Items="@([.. OpportunityContactRoles.All.Select(r => new PickItem<string>(r, CrmText.OpportunityContactRoleName(r)))])"
+                                       Selected="newRoles" SelectedChanged="SetNewRoles" />
+                        </div>
                         <label class="form-check"><input type="checkbox" class="form-check-input" @bind="newPrimary" /> @Texts.Get("crm.company.people.primary")</label>
                         <button type="button" class="btn btn-primary" disabled="@(busy || newContact is null)" @onclick="AddContactAsync">@Texts.Get("crm.opp.link")</button>
                         <button type="button" class="btn btn-outline-secondary" @onclick="() => addingContact = false">@Texts.Get("common.dismiss")</button>
@@ -1041,9 +1038,10 @@
     private Task ReopenAsync() => RunAsync("reopen", new ReopenOpportunityRequestDto(
         opportunity!.Version, note ?? string.Empty, stage, reviewDate ?? default, ShowAmounts ? reopenProbability : null));
 
-    private void ToggleRole(string role, bool on)
+    private void SetNewRoles(IReadOnlyList<string> roles)
     {
-        if (on) { newRoles.Add(role); } else { newRoles.Remove(role); }
+        newRoles.Clear();
+        newRoles.UnionWith(roles);
     }
 
     private async Task AddContactAsync()

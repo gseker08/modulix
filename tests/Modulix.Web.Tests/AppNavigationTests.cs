@@ -548,6 +548,54 @@ public class AppNavigationTests
         });
     }
 
+    private static AppNavigation AdminNav(string[] modules)
+    {
+        var session = new SessionState(new ApiClient(new HttpClient()));
+        Set(session, nameof(SessionState.Access), new MyAccessResponse(modules, [], IsAdministrator: true));
+        Set(session, nameof(SessionState.User), new MeResponse(Guid.NewGuid(), "a@example.com", "Test", Guid.NewGuid(), []));
+        return new AppNavigation(session);
+    }
+
+    [Fact]
+    public void Suggested_lists_modules_that_are_not_enabled_for_the_administrator()
+    {
+        var suggested = AdminNav([CrmAccess.ModuleKey, SupportAccess.ModuleKey]).Suggested().Select(a => a.Id).ToList();
+
+        Assert.Contains(AppCatalog.Logistics, suggested);
+        Assert.Contains(AppCatalog.Hr, suggested);
+        Assert.DoesNotContain(AppCatalog.Crm, suggested);
+        Assert.DoesNotContain(AppCatalog.Support, suggested);
+    }
+
+    [Fact]
+    public void Suggested_never_lists_core_areas_or_the_platform_app()
+    {
+        // Modülü olmayan alanlar (Yönetim, Raporlar, Onay merkezi) ve platform uygulaması öneri değildir.
+        var suggested = AdminNav([]).Suggested();
+
+        Assert.NotEmpty(suggested);
+        Assert.All(suggested, a => Assert.True(a.ParentId is null && a.ModuleKey is not null && !a.PlatformOnly, a.Id));
+    }
+
+    [Fact]
+    public void Suggested_is_empty_for_a_user_who_is_not_an_administrator()
+    {
+        // Yetki: modül açtırma kararı yöneticinindir; diğer kullanıcılar kapalı modülleri görmez.
+        Assert.Empty(Nav([CrmAccess.ModuleKey], SalesUser).Suggested());
+    }
+
+    [Fact]
+    public void Suggested_follows_the_modules_of_the_active_tenant_and_grants_no_access()
+    {
+        // Tenant izolasyonu: öneri yalnızca etkin firmanın açık modüllerinden hesaplanır; her modülü açık firmada öneri yoktur.
+        var all = AppCatalog.All.Where(a => a.ModuleKey is not null).Select(a => a.ModuleKey!).Distinct().ToArray();
+        Assert.Empty(AdminNav(all).Suggested());
+
+        // Öneri erişim değildir: kapalı modül panelde uygulama olarak listelenmez.
+        var nav = AdminNav([CrmAccess.ModuleKey]);
+        Assert.DoesNotContain(nav.Roots(), r => nav.Suggested().Any(s => s.Id == r.Id));
+    }
+
     [Fact]
     public void Catalog_is_consistent()
     {

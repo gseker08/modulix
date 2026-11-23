@@ -89,18 +89,13 @@
                     </div>
                     @if (TargetCommands() is { Count: > 0 } commands)
                     {
-                        <fieldset class="mb-3">
-                            <legend class="form-label">@Texts.Get("admin.approvalProcesses.gated")</legend>
-                            @foreach (var command in commands)
-                            {
-                                <label class="form-check">
-                                    <input class="form-check-input" type="checkbox" checked="@gated.Contains(command.Key)"
-                                           @onchange="e => Toggle(command.Key, e.Value is true)" />
-                                    <span class="form-check-label">@command.DisplayName</span>
-                                </label>
-                            }
-                            <small class="text-muted">@Texts.Get("admin.approvalProcesses.gatedHelp")</small>
-                        </fieldset>
+                        <div class="mb-3">
+                            <label class="form-label" for="process-gated">@Texts.Get("admin.approvalProcesses.gated")</label>
+                            <PickField TKey="string" Id="process-gated" Title="@Texts.Get("admin.approvalProcesses.gated")" Icon="shield"
+                                       Items="@([.. commands.Select(c => new PickItem<string>(c.Key, c.DisplayName))])"
+                                       Selected="gated.Where(g => commands.Any(c => c.Key == g))" SelectedChanged="keys => gated = [.. keys]" />
+                            <small class="text-muted d-block">@Texts.Get("admin.approvalProcesses.gatedHelp")</small>
+                        </div>
                     }
                     <div class="mb-3">
                         <label class="form-label" for="process-currency">@Texts.Get("admin.automationEditor.currency")</label>
@@ -382,18 +377,6 @@
     // Seçili kayıt türünün onaya bağlanabilen işlemleri; tür değişince başka türün işlemi gönderilmez.
     private IReadOnlyList<ApprovalCommandDto> TargetCommands() =>
         targets.FirstOrDefault(t => t.EntityKey == target)?.Commands ?? [];
-
-    private void Toggle(string command, bool on)
-    {
-        if (on)
-        {
-            gated.Add(command);
-        }
-        else
-        {
-            gated.Remove(command);
-        }
-    }
 
     private async Task SaveAsync()
     {

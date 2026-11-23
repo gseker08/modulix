@@ -6,6 +6,7 @@ using Modulix.Core.Modules;
 using Modulix.Core.Settings;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Infrastructure.Records;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Infrastructure.Settings;
 
@@ -75,7 +76,7 @@ internal sealed class TenantSettings(
 
         if (errors.Count > 0)
         {
-            return RecordResult<IReadOnlyList<TenantSettingValue>>.Fail(RecordErrorCode.ValidationFailed, "Ayarlar kaydedilemedi.", errors);
+            return RecordResult<IReadOnlyList<TenantSettingValue>>.Fail(RecordErrorCode.ValidationFailed, ServerMessages.Setting.SaveFailed, errors);
         }
 
         // Okunduktan sonra başkası kaydettiyse hiçbir değer yazılmaz.

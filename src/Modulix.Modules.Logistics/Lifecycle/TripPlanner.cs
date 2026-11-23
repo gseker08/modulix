@@ -411,7 +411,7 @@ internal sealed class TripPlanner(
 
         if (!await access.HasPermissionAsync(LogisticsModule.Permissions.TripsWrite, cancellationToken))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, "Sefer planlama yetkiniz yok.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, LogisticsMessages.Planner.NotAllowed);
         }
 
         return Text(trip.Value!, "status") == Trip.Statuses.Planning
