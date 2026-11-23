@@ -52,7 +52,7 @@
                 }
             </div>
 
-            <div class="app-dialog-body @(groups.Count > 0 ? "has-categories" : null) @(shortcuts.Count > 0 ? "has-rail" : null)">
+            <div class="app-dialog-body @(groups.Count > 0 ? "has-categories" : null) @(shortcuts.Count > 0 || suggested.Count > 0 ? "has-rail" : null)">
                 @if (groups.Count > 0)
                 {
                     @* Kategori menüsü: ana uygulamaların alan başlıkları (AppCatalog.Groups); yalnızca görsel süzgeçtir. *@
@@ -157,10 +157,13 @@
                     }
                 </div>
 
+                @if (shortcuts.Count > 0 || suggested.Count > 0)
+                {
+                    <aside class="app-rail">
                 @* Kısayollar: sık yapılan işlemlere doğrudan bağlantılar; yalnızca modülü açık ve izni olanlar listelenir. *@
                 @if (shortcuts.Count > 0)
                 {
-                    <aside class="app-rail" aria-labelledby="app-rail-title">
+                    <section class="app-rail-card" aria-labelledby="app-rail-title">
                         <h3 id="app-rail-title" class="app-group-title"><AppIcon Name="zap" Size="18" /> @Texts.Get("shell.launcher.shortcuts")</h3>
                         <p class="app-rail-subtitle">@Texts.Get("shell.launcher.shortcuts.subtitle")</p>
                         <ul class="app-shortcuts">
@@ -182,6 +185,43 @@
                                 </li>
                             }
                         </ul>
+                    </section>
+                }
+
+                @* Önerilenler: firmada açık olmayan modüller (yalnızca yöneticiye). "İncele" tanıtımı açar; modül buradan açılamaz. *@
+                @if (suggested.Count > 0)
+                {
+                    <section class="app-rail-card" aria-labelledby="app-suggested-title">
+                        <h3 id="app-suggested-title" class="app-group-title"><AppIcon Name="package" Size="18" /> @Texts.Get("shell.launcher.suggested")</h3>
+                        <p class="app-rail-subtitle">@Texts.Get("shell.launcher.suggested.subtitle")</p>
+                        <ul class="app-suggestions">
+                            @foreach (AppDefinition app in suggested)
+                            {
+                                bool open = inspected == app.Id;
+                                <li class="app-suggestion tone-@ToneClass(app)">
+                                    <div class="app-suggestion-row">
+                                        <span class="app-suggestion-icon"><AppIcon Name="@app.Icon" Size="18" /></span>
+                                        <span class="app-suggestion-name">@AppNames.Of(app)</span>
+                                        <button type="button" class="btn btn-tonal btn-sm" aria-expanded="@(open ? "true" : "false")"
+                                                aria-controls="app-suggestion-@(app.Id)" @onclick="() => Inspect(app.Id)">
+                                            @Texts.Get("shell.launcher.suggested.inspect")
+                                        </button>
+                                    </div>
+                                    @if (open)
+                                    {
+                                        <div id="app-suggestion-@(app.Id)" class="app-suggestion-detail">
+                                            @if (AppNames.DescriptionOf(app) is { } description)
+                                            {
+                                                <p>@description</p>
+                                            }
+                                            <p class="app-suggestion-note"><AppIcon Name="info" Size="16" /> @Texts.Get("shell.launcher.suggested.note")</p>
+                                        </div>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
                     </aside>
                 }
             </div>
@@ -232,6 +272,10 @@
     private IReadOnlyList<string> favorites = [];
     private IReadOnlyList<AppDefinition> favoriteApps = [];
     private IReadOnlyList<AppShortcut> shortcuts = [];
+
+    // Önerilenler: firmada açık olmayan modüller (yalnızca yöneticiye) ve tanıtımı açık olan satır.
+    private IReadOnlyList<AppDefinition> suggested = [];
+    private string? inspected;
     private bool favoritesPending;
 
     // "Onay bekleyenler" kısayolunun sayacı: kullanıcıyı bekleyen onaylar. Panel açılınca okunur; okunamazsa rozet çıkmaz.
@@ -261,6 +305,7 @@
         listed = Apps.Roots();
         favoriteApps = LauncherFavorites.Visible(favorites, listed);
         shortcuts = Session.IsLoaded && !loadFailed ? Apps.Shortcuts() : [];
+        suggested = Session.IsLoaded && !loadFailed ? Apps.Suggested() : [];
         IReadOnlyList<AppRootGroup> grouped = Apps.Grouped(listed);
         groups = grouped.Count > 1 ? grouped : [];
 
@@ -397,7 +442,10 @@
         category = null;
         favorites = [];
         waitingApprovals = 0;
+        inspected = null;
     }
+
+    private void Inspect(string appId) => inspected = inspected == appId ? null : appId;
 
     private void Toggle()
     {
