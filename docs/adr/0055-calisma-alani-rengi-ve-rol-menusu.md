@@ -2,7 +2,7 @@
 
 - **Durum:** Dilim 0 (tasarım sisteminde firmanın değiştirebileceği tokenlar, PR #509), dilim 1 (firma vurgu rengi ve sunucuda kontrast
   doğrulaması, PR #513), dilim 2a (rol menü düzeni, sunucu, PR #525) ve dilim 2b (menüye uygulama ve rol ekranında düzen düzenleme, PR #528;
-  kayıtta ekranda olmayan satırların korunması, PR #533) 22 Kasım 2026'da teslim edildi. Bu ADR kod teslim edildikten sonra yazıldı:
+  kayıtta ekranda olmayan satırların korunması, PR #533) 22 Kasım 2026'da teslim edildi; sırası verilmeyen öğenin açık sıralıların arkasına alınması 23 Kasım 2026'da eklendi. Bu ADR kod teslim edildikten sonra yazıldı:
   kararlar o PR'lardaki gerçek davranışı kayda geçirir, yeni bir karar getirmez.
 - **Kaynak:** [CRM eksik süreç epic listesi](../crm-eksik-surecler-epicleri.md) E8. Tasarım sistemi tarafı:
   [Tema tokenları](../design-system/theme-tokens.md) "Firmanın değiştirebileceği tokenlar".
@@ -57,8 +57,10 @@ ve satırın bölüm içindeki sırasını değiştirebilir. Modül ve bölüm s
   1. Yalnızca düzeni tanımlı (en az bir satırı olan) roller sayılır; hiçbiri yoksa katalog düzeni aynen kalır.
   2. Bir öğe, düzeni tanımlı rollerinden **herhangi birinde** görünüyorsa görünür. Rolde öğenin satırı yoksa öğe o rolde görünür sayılır; yalnızca
      açıkça gizlenmişse görünmez.
-  3. Sıra, öğeyi gösteren ve ona sıra veren rollerin en küçüğüdür; hiçbiri sıra vermezse katalog sırası kalır. Sıra bölüm içinde uygulanır,
-     öğe bölümünü değiştirmez.
+  3. Sıra, öğeyi gösteren ve ona sıra veren rollerin en küçüğüdür. Bölümde en az bir öğeye açık sıra verilmişse, sıra verilmeyen öğeler
+     (hiçbir rolün satırında sırası yok) açık sıralı öğelerin arkasına katalog sırasıyla dizilir; katalog numaraları ile rolün yazdığı
+     numaralar (10, 20, …) aynı ölçekte olmadığından karıştırılmaz. Bölümde hiçbir öğeye sıra verilmemişse katalog sırası kalır. Sıra bölüm
+     içinde uygulanır, öğe bölümünü değiştirmez.
 - **Gizlemek yetki değildir.** Düzen, modül, izin ve lisans süzgecinin **üstüne** biner; hiçbir zaman izinsiz bir öğeyi görünür yapmaz. Gizli
   öğenin adresi doğrudan açılırsa sayfa yine açılır (erişimi izin ve sunucu belirler). Bir uygulamanın bütün satırları gizlense de uygulama
   uygulama panelinden kaybolmaz.
@@ -83,10 +85,6 @@ ve satırın bölüm içindeki sırasını değiştirebilir. Modül ve bölüm s
 
 - **Modül ve bölüm sırası** düzenlenemez; epikte "modül/öğe sırası" geçiyordu, bugün yalnızca öğe sırası ve gizleme vardır. Eklenecekse sunucu
   anahtar adlandırmasını (bölüm kimlikleri) ya da şemayı genişletmeyi gerektirir.
-- **Çok rollü kullanıcıda sıra:** bir öğenin bir rolde satırı yoksa o rolde görünür sayılır ve o rolden sıra gelmez. Bir rol bir bölümü yeniden
-  numaralarken (10, 20, …) başka bir rolün düzeninde satırı olmayan bir öğe katalog sırasını (küçük bir sayı) korur ve bölümde öbürlerinin
-  önüne düşebilir. Yanlış yetki vermez, yalnızca sıra beklenmedik olabilir; gerçek firma verisinde sorun çıkarsa kural (örneğin satırı olmayan
-  öğeye bölümün sonunu vermek) ayrı bir kararla değiştirilir. Bugün kod bu hâliyle bırakılmıştır.
 - **CTA degradesi ve marka turkuazı** sabit onaltılık değerle yazıldığı için vurgu rengine bağlı değildir. Bağlanması önce `tokens.css`'te türetmeye
   çevrilmeyi ve ayrı bir kontrast kuralını gerektirir.
 - **Görsel doğrulama:** vurgu rengi ve rol menüsü ekranlarının açık ve koyu temada, telefon genişliğinde ekran görüntüsü kontrolü yapılmadı
