@@ -86,36 +86,20 @@
                         <p class="text-muted">@Texts.Get(selectedProfile is null ? "admin.sectorSetup.chooseSector" : "admin.sectorSetup.noSectorCatalog")</p>
                     }
 
-                    <fieldset disabled="@busy">
-                        <legend class="visually-hidden">@Texts.Get("admin.activities.legend")</legend>
-                        @foreach (var group in Groups())
-                        {
-                            <div class="mb-3">
-                                <h3 class="form-label">@group.Title</h3>
-                                <div class="check-list">
-                                    @foreach (var node in group.Items)
-                                    {
-                                        <button type="button" class="chip chip-soft @(selectedNodes.Contains(node.Id) ? "active" : null)" aria-pressed="@(selectedNodes.Contains(node.Id) ? "true" : "false")"
-                                                @onclick="() => ToggleActivityAsync(node.Id)">
-                                            @if (IconOf(node) is { } nodeIcon)
-                                            {
-                                                <AppIcon Name="@nodeIcon" Size="16" />
-                                            }
-                                            @(node.IsActive ? LabelOf(node) : $"{LabelOf(node)} ({Texts.Get("common.inactive")})")
-                                        </button>
-                                    }
-                                </div>
-                                @foreach (var item in group.Hints)
-                                {
-                                    <p class="form-text"><strong>@item.Label:</strong> @item.Hint</p>
-                                }
-                                @foreach (var hint in ComboHints().Where(h => group.Items.Any(n => h.Codes.Contains(n.Code))))
-                                {
-                                    <div class="alert alert-info alert-inline" role="status"><AppIcon Name="shuffle" Size="18" /><span>@hint.Text</span></div>
-                                }
-                            </div>
-                        }
-                    </fieldset>
+                    @* Faaliyetler atama penceresinde seçilir (PickField): pencerede gruplu ve aramalı, burada seçilenler etiket olarak durur.
+                       Profilin öne çıkardığı ayrımın açıklamaları ve birlikte seçilen faaliyetlerin önerdiği paketler alanın altında kalır. *@
+                    <label class="visually-hidden" for="sector-activities">@Texts.Get("admin.activities.legend")</label>
+                    <PickField TKey="Guid" Id="sector-activities" Title="@Texts.Get("admin.sectorSetup.step2.title")" ButtonLabel="@Texts.Get("pick.activity.choose")"
+                               SearchPlaceholder="@Texts.Get("pick.activity.search")" GroupLabel="@Texts.Get("pick.activity.group")" Disabled="busy"
+                               Items="ActivityItems" Selected="selectedNodes" SelectedChanged="SetActivitiesAsync" UnknownName="NameOf" />
+                    @foreach (var item in Groups().SelectMany(g => g.Hints))
+                    {
+                        <p class="form-text"><strong>@item.Label:</strong> @item.Hint</p>
+                    }
+                    @foreach (var hint in ComboHints())
+                    {
+                        <div class="alert alert-info alert-inline" role="status"><AppIcon Name="shuffle" Size="18" /><span>@hint.Text</span></div>
+                    }
 
                     @if (preview is not null)
                     {
@@ -152,33 +136,10 @@
             }
             else
             {
-                <div class="profile-cards">
-                    @foreach (var starter in VisibleStarters)
-                    {
-                        <label class="profile-card profile-card-check @(CanAdd(starter) && IsCombo(starter) ? "suggested" : null)" title="@starter.Description">
-                            <input class="form-check-input" type="checkbox" checked="@(starter.Added || chosenStarters.Contains(starter.Key))"
-                                   disabled="@(busy || !CanAdd(starter))" @onchange="() => ToggleStarter(starter.Key)" />
-                            <div>
-                                <p>
-                                    <strong>@starter.Name</strong>
-                                    @if (starter.Added)
-                                    {
-                                        <span class="badge category">@Texts.Get("admin.subProfiles.added")</span>
-                                    }
-                                    else if (starter.MissingModules.Count > 0)
-                                    {
-                                        <span class="badge">@Texts.Get("admin.subProfiles.moduleOff", string.Join(", ", starter.MissingModules))</span>
-                                    }
-                                    else if (IsCombo(starter))
-                                    {
-                                        <span class="badge user-active">@Texts.Get("admin.sectorSetup.suggested")</span>
-                                    }
-                                </p>
-                                <p class="text-muted">@string.Join(", ", starter.Options)</p>
-                            </div>
-                        </label>
-                    }
-                </div>
+                @* Hazır alt profiller de atama penceresinde seçilir; zaten eklenmiş ya da modülü kapalı olan satır kilitlidir. *@
+                <label class="visually-hidden" for="sector-starters">@Texts.Get("admin.sectorSetup.step3.title")</label>
+                <PickField TKey="string" Id="sector-starters" Title="@Texts.Get("admin.sectorSetup.step3.title")" Icon="layers" Disabled="busy"
+                           Items="StarterItems" Selected="SelectedStarterKeys" SelectedChanged="SetStarters" />
             }
             <p class="form-text"><a href="yonetim/sektor-profili#alt-profiller">@Texts.Get("admin.sectorSetup.createOwn")</a></p>
         </FormSection>
@@ -267,7 +228,7 @@
 
     private sealed record ActivityGroup(string Title, List<ActivityNodeDto> Items)
     {
-        // Yalnızca profilin öne çıkardığı grupta doludur: çiplerin altındaki tek cümlelik açıklamalar.
+        // Yalnızca profilin öne çıkardığı grupta doludur: seçim alanının altındaki tek cümlelik açıklamalar.
         public List<ActivityFocusItemDto> Hints { get; init; } = [];
     }
 
@@ -506,15 +467,34 @@
         }
     }
 
-    private async Task ToggleActivityAsync(Guid id)
+    // Pencerede görünen faaliyetler, ekrandaki gruplarıyla; öne çıkarılan faaliyet profilin verdiği kısa adla listelenir.
+    private IReadOnlyList<PickItem<Guid>> ActivityItems =>
+    [
+        .. Groups().SelectMany(group => group.Items.Select(node => new PickItem<Guid>(
+            node.Id, node.IsActive ? LabelOf(node) : $"{LabelOf(node)} ({Texts.Get("common.inactive")})", Group: group.Title))),
+    ];
+
+    // Paketin notu: durumu (eklendi / modül kapalı / önerilen) ve getirdiği seçenekler.
+    private IReadOnlyList<PickItem<string>> StarterItems =>
+    [
+        .. VisibleStarters.Select(starter =>
+        {
+            var state = starter.Added ? Texts.Get("admin.subProfiles.added")
+                : starter.MissingModules.Count > 0 ? Texts.Get("admin.subProfiles.moduleOff", string.Join(", ", starter.MissingModules))
+                : IsCombo(starter) ? Texts.Get("admin.sectorSetup.suggested") : null;
+            var options = string.Join(", ", starter.Options);
+            return new PickItem<string>(starter.Key, starter.Name, state is null ? options : $"{state} · {options}", Locked: !CanAdd(starter));
+        }),
+    ];
+
+    private IEnumerable<string> SelectedStarterKeys => VisibleStarters.Where(s => s.Added || chosenStarters.Contains(s.Key)).Select(s => s.Key);
+
+    private async Task SetActivitiesAsync(IReadOnlyList<Guid> ids)
     {
         previewing = false;
         var codes = SelectedCodes;
         HashSet<string> suggestedBefore =[.. starters.Where(s => IsSuggested(s, codes)).Select(s => s.Key)];
-        if (!selectedNodes.Remove(id))
-        {
-            selectedNodes.Add(id);
-        }
+        selectedNodes = [.. ids];
 
         SyncChosenStarters(suggestedBefore);
         var result = await Api.PostAsync<SelectionPreviewDto>("/api/sectors/selection/preview", new ActivityIdsRequest([.. selectedNodes]));
@@ -522,13 +502,11 @@
         preview = result.Value ?? preview;
     }
 
-    private void ToggleStarter(string key)
+    private void SetStarters(IReadOnlyList<string> keys)
     {
         previewing = false;
-        if (!chosenStarters.Remove(key))
-        {
-            chosenStarters.Add(key);
-        }
+        chosenStarters.Clear();
+        chosenStarters.UnionWith(starters.Where(s => CanAdd(s) && keys.Contains(s.Key)).Select(s => s.Key));
     }
 
     /// <summary>Üç adımı sırayla uygular: profil, faaliyet seçimi, işaretli paketler (eklenir ve etkinleştirilir). İlk hatada durur; yapılanlar kalır ve ekran yeniden yüklenir.</summary>
