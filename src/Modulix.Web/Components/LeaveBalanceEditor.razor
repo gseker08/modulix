@@ -3,6 +3,7 @@
    aşağı çekilemez (sunucu denetler). *@
 @using System.Text.Json.Nodes
 @inject ApiClient Api
+@inject SessionState Session
 @inject FormLayouts Layouts
 @inject ToastService Toasts
 
@@ -93,6 +94,12 @@
         </div>
     </div>
 </form>
+
+@* Ekli notlar (ADR-0057): her not ayrı kayıttır ve kendi dosya ekleri vardır; yalnızca kayıtlı kayıtta, form dışında. *@
+@if (form.Id is { } noteParentId)
+{
+    <NotesPanel ParentEntityKey="@HrAccess.LeaveBalanceEntityKey" ParentId="noteParentId" CanWrite="Session.Can(HrAccess.LeavesManage)" />
+}
 
 @code {
     private const string EntityKey = HrAccess.LeaveBalanceEntityKey;
