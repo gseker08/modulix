@@ -224,9 +224,16 @@
     // Uygulama kartı doğrudan uygulamanın ilk ekranına gider; uygulamanın ekranları sol menüde bölümler halinde gelir.
     // Kartın tamamı bağlantıdır; "Aç" görsel ipucudur (ekranda tek birincil düğme kuralı gereği tonal).
     private RenderFragment Card(AppDefinition app) => @<li>
-        <a href="@Apps.EntryRoute(app)" class="app-card tone-@ToneClass(app) @(IsCurrent(app) ? "is-current" : null)"
+        <a href="@Apps.EntryRoute(app)" class="app-card tone-@ToneClass(app) @(app.Art is null ? null : "has-art") @(IsCurrent(app) ? "is-current" : null)"
            aria-current="@(IsCurrent(app) ? "page" : null)" @onclick="() => Close(true)">
-            <span class="app-card-art" aria-hidden="true"><AppIcon Name="@app.Icon" Size="72" /></span>
+            @if (AppCatalog.ArtUrl(app) is { } art)
+            {
+                <img class="app-card-image" src="@art" alt="" width="160" height="160" loading="lazy" />
+            }
+            else
+            {
+                <span class="app-card-art" aria-hidden="true"><AppIcon Name="@app.Icon" Size="72" /></span>
+            }
             <span class="app-card-icon"><AppIcon Name="@app.Icon" /></span>
             <span class="app-card-name">@AppNames.Of(app)</span>
             @if (AppNames.DescriptionOf(app) is { } description)

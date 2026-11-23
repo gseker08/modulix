@@ -77,6 +77,23 @@ public class AppNamesTests
     }
 
     [Fact]
+    public void Every_card_illustration_file_exists()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !Directory.Exists(Path.Combine(directory.FullName, "src", "Modulix.Web", "wwwroot")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        var root = Path.Combine(directory!.FullName, "src", "Modulix.Web", "wwwroot");
+        var withArt = AppCatalog.All.Where(a => a.Art is not null).ToList();
+
+        Assert.NotEmpty(withArt);
+        Assert.All(withArt, a => Assert.True(a.ParentId is null && File.Exists(Path.Combine(root, AppCatalog.ArtUrl(a)!)), a.Id));
+    }
+
+    [Fact]
     public void Without_a_loaded_dictionary_the_catalog_name_is_shown()
     {
         var app = AppCatalog.All.First(a => a.Id == "contracts.list");

@@ -56,6 +56,7 @@ public sealed record PlannedApp(string Id, string Name, string Icon);
 /// <param name="HostId">Ana uygulamada: bu uygulamanın ekranlarını kendi menüsünde gösteren uygulama (ör. CRM). Ev sahibi görünürse bu uygulama panelde ayrı kart olmaz; görünmüyorsa (ör. tenant'ta CRM yok) eskisi gibi ayrı uygulama olarak kalır.</param>
 /// <param name="Hosted">Alt uygulamada: ev sahibinin menüsündeki yeri; <c>null</c> ise ev sahibinin menüsünde görünmez.</param>
 /// <param name="Description">Ana uygulamada: paneldeki kartta adın altında görünen kısa açıklama (Türkçe kaynak metin; çevirisi <c>nav.app.{id}.desc</c>).</param>
+/// <param name="Art">Ana uygulamada: paneldeki kartın illüstrasyonu (<c>wwwroot/img/apps/{Art}.webp</c>, saydam zeminli); <c>null</c> ise kartta ton zemininde büyük ikon çizilir.</param>
 /// <param name="MenuParentId">Alt uygulamada: bu ekran menüde ayrı satır olmaz, belirtilen ekranın (aynı uygulamada) altında sayılır; route'u çalışmaya devam eder.</param>
 public sealed record AppDefinition(
     string Id,
@@ -74,7 +75,8 @@ public sealed record AppDefinition(
     string? HostId = null,
     HostPlacement? Hosted = null,
     string? MenuParentId = null,
-    string? Description = null);
+    string? Description = null,
+    string? Art = null);
 
 /// <summary>
 /// Panelde ana uygulamaları ya da sol menüde bir uygulamanın ekranlarını bir araya getiren başlık. Yalnızca görsel
@@ -124,6 +126,9 @@ public static class AppCatalog
     public const string CrmAfterSalesGroup = "crm.aftersales";
     public const string CrmReportsGroup = "crm.reports";
     public const string CrmSettingsGroup = "crm.settings";
+
+    /// <summary>Kart illüstrasyonunun tabana göreli adresi; uygulamanın illüstrasyonu yoksa <c>null</c>.</summary>
+    public static string? ArtUrl(AppDefinition app) => app.Art is null ? null : $"img/apps/{app.Art}.webp";
 
     /// <summary>Bir modülün ayar ekranı. Çekirdeğin ayarları burada değil, Yönetim'de "Kuruluş ayarları"ndadır.</summary>
     public static string ModuleSettingsRoute(string moduleKey) => $"modul-ayarlari/{moduleKey}";
@@ -215,7 +220,7 @@ public static class AppCatalog
         new("orders.jobs", Orders, "Operasyon işleri", "clipboard-list", "siparisler/isler", 20, OrdersAccess.ModuleKey, OrdersAccess.OrdersRead, Tone: AppTone.Teal, Hosted: new(CrmAfterSalesGroup, null, 40)),
         new("orders.settings", Orders, "Sipariş ayarları", "wrench", ModuleSettingsRoute(OrdersAccess.ModuleKey), 90, OrdersAccess.ModuleKey, CoreAccess.ManageSettings, Hosted: new(CrmSettingsGroup, null, 95)),
 
-        new(Support, null, "Destek", "message-square", null, 27, ModuleKey: SupportAccess.ModuleKey, Tone: AppTone.Teal, Group: ServiceGroup, Description: "Talep, bildirim ve destek süreçlerini yönetin."),
+        new(Support, null, "Destek", "message-square", null, 27, ModuleKey: SupportAccess.ModuleKey, Tone: AppTone.Teal, Group: ServiceGroup, Description: "Talep, bildirim ve destek süreçlerini yönetin.", Art: "support"),
         new("support.tickets", Support, "Talepler", "inbox", "destek/talepler", 10, SupportAccess.ModuleKey, SupportAccess.TicketsRead, ExactMatch: true),
         new("support.new", Support, "Yeni talep", "clipboard-list", "destek/talepler/yeni", 20, SupportAccess.ModuleKey, SupportAccess.TicketsCreate, ExactMatch: true),
         new("support.settings", Support, "Kuyruklar ve kategoriler", "wrench", "destek/ayarlar", 90, SupportAccess.ModuleKey, SupportAccess.SettingsManage),
@@ -245,7 +250,7 @@ public static class AppCatalog
         new("warehouse.stock-balances", Warehouse, "Stok bakiyeleri", "list", "depo/bakiyeler", 66, WarehouseAccess.ModuleKey, WarehouseAccess.MovementsRead),
         new("warehouse.customs-declarations", Warehouse, "Beyannameler", "clipboard-list", "depo/beyannameler", 70, WarehouseAccess.ModuleKey, WarehouseAccess.DeclarationsRead),
         new("warehouse.regime-bindings", Warehouse, "Rejim profilleri", "shield", "depo/rejim-profilleri", 80, WarehouseAccess.ModuleKey, WarehouseAccess.RegimesRead, Tone: AppTone.Teal),
-        new(Logistics, null, "Lojistik", "truck", null, 42, ModuleKey: LogisticsAccess.ModuleKey, Group: OperationsGroup, Description: "Sevkiyat, teslimat ve lojistik operasyonlarını kontrol edin."),
+        new(Logistics, null, "Lojistik", "truck", null, 42, ModuleKey: LogisticsAccess.ModuleKey, Group: OperationsGroup, Description: "Sevkiyat, teslimat ve lojistik operasyonlarını kontrol edin.", Art: "logistics"),
         new("logistics.dashboard", Logistics, "Pano", "dashboard", "lojistik/pano", 2, LogisticsAccess.ModuleKey, AnyPermission: LogisticsAccess.DashboardAny, ExactMatch: true),
         new("logistics.places", Logistics, "Yerler", "map-pin", "lojistik/yerler", 12, LogisticsAccess.ModuleKey, AnyPermission: LogisticsAccess.PlacesReadAny, Tone: AppTone.Teal),
         new("logistics.requests", Logistics, "Taşıma talepleri", "inbox", "lojistik/talepler", 4, LogisticsAccess.ModuleKey, LogisticsAccess.RequestsRead),
@@ -287,12 +292,12 @@ public static class AppCatalog
 
         // Rapor merkezi çekirdeğe aittir (modül anahtarı yok; yönetim girdileri gibi yalnızca izne bağlıdır). Tek ekranlı olduğu için alt uygulaması yoktur,
         // kendi route'u vardır; /raporlar altındaki oluşturucu ve çalıştırma ekranları da bu uygulamanın bağlamında kalır.
-        new(Reports, null, "Raporlar", "file-text", "raporlar", 85, Permission: ReportAccess.Read, Tone: AppTone.Teal, Group: ManagementGroup, Description: "Operasyon ve performans raporlarını analiz edin."),
+        new(Reports, null, "Raporlar", "file-text", "raporlar", 85, Permission: ReportAccess.Read, Tone: AppTone.Teal, Group: ManagementGroup, Description: "Operasyon ve performans raporlarını analiz edin.", Art: "reports"),
 
         // Onay merkezi çekirdeğe aittir (ADR-0027 Dilim 4a): modül anahtarı yoktur, yalnızca izne bağlıdır.
-        new(Approvals, null, "Onay merkezi", "check-circle", "onaylar", 84, AnyPermission: [CoreAccess.RequestApprovals, CoreAccess.DecideApprovals, CoreAccess.ManageApprovals], Tone: AppTone.Teal, Group: ManagementGroup, Description: "Bekleyen onayları görüntüleyin ve hızlıca sonuçlandırın."),
+        new(Approvals, null, "Onay merkezi", "check-circle", "onaylar", 84, AnyPermission: [CoreAccess.RequestApprovals, CoreAccess.DecideApprovals, CoreAccess.ManageApprovals], Tone: AppTone.Teal, Group: ManagementGroup, Description: "Bekleyen onayları görüntüleyin ve hızlıca sonuçlandırın.", Art: "approvals"),
 
-        new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal, Group: ManagementGroup, Description: "Sistem, kullanıcı ve genel yönetim ayarlarını belirleyin."),
+        new(Admin, null, "Yönetim", "sliders", null, 90, AnyPermission: CoreAccess.AdministrationPermissions, Tone: AppTone.Teal, Group: ManagementGroup, Description: "Sistem, kullanıcı ve genel yönetim ayarlarını belirleyin.", Art: "admin"),
         new("admin.home", Admin, "Genel bakış", "dashboard", "yonetim", 10, AnyPermission: CoreAccess.AdministrationPermissions, ExactMatch: true),
         new("admin.users", Admin, "Kullanıcılar", "user-check", "yonetim/kullanicilar", 20, Permission: CoreAccess.ManageUsers, Tone: AppTone.Teal),
         new("admin.teams", Admin, "Ekipler", "users", "yonetim/ekipler", 30, Permission: CoreAccess.ManageUsers),

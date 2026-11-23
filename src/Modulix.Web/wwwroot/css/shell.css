@@ -382,6 +382,17 @@ html.app-launcher-open {
         opacity: 0.55;
     }
 
+/* İllüstrasyonlu kart (AppDefinition.Art): saydam zeminli görsel, süs ikonunun yerinde durur. */
+.app-card-image {
+    position: absolute;
+    right: -0.25rem;
+    bottom: -0.25rem;
+    width: 9rem;
+    height: 9rem;
+    object-fit: contain;
+    pointer-events: none;
+}
+
 .app-card-icon {
     display: inline-grid;
     place-items: center;
@@ -422,6 +433,10 @@ html.app-launcher-open {
     color: var(--mx-text-secondary);
     font-size: var(--mx-fs-helper);
     line-height: 1.4;
+}
+
+.app-card.has-art .app-card-text {
+    max-width: calc(100% - 8.75rem);
 }
 
 /* "Aç" görsel ipucudur (kartın tamamı tıklanır); tonal düğme görünümündedir, birincil düğme değildir. */
@@ -521,6 +536,11 @@ html.app-launcher-open {
 
     .app-card {
         min-height: 9.5rem;
+    }
+
+    .app-card-image {
+        width: 7.5rem;
+        height: 7.5rem;
     }
 }
 
