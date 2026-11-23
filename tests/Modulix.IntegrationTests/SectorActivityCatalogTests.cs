@@ -122,6 +122,7 @@ public class SectorActivityCatalogTests(ModulixApiFactory factory) : IClassFixtu
         var node = new ActivityNode(code ?? Code(), null, ActivityNodeKind.Sector, "Test sektörü");
         Db(scope).ActivityNodes.Add(node);
         await Db(scope).SaveChangesAsync();
+        factory.TrackCatalogNode(node.Id);
         return node.Id;
     }
 

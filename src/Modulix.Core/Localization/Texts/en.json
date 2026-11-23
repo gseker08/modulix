@@ -663,6 +663,8 @@
   "crm.party.needHelp": "The services the company receives from you or wants to receive (only activities can be selected); independent of the relationship role.",
   "crm.party.noRecord": "— (do not create a record)",
   "crm.party.note": "Note",
+  "crm.party.chooseRoles": "Choose roles",
+  "crm.party.searchRoles": "Search roles",
   "crm.party.partialSave": "Some relationship records could not be saved; fix the errors and save again.",
   "crm.party.sectorHelp": "The sectors the company operates in. The free-text \"Industry\" field stays as it is.",
   "crm.party.status.active": "Active",

@@ -71,27 +71,36 @@
         await SelectedChanged.InvokeAsync(Selected);
     }
 
-    /// <summary>Ağaç sırasıyla seçilebilir düğümler; grup, üst düğümlerin "Sektör › Grup" yoludur (kök düğümde kendi türü yoktur).</summary>
+    /// <summary>
+    /// Ağaç sırasıyla seçilebilir düğümler. Yalnızca faaliyet seçiliyorsa grup, üst düğümlerin "Sektör › Grup" yoludur. Sektör ve grup da
+    /// seçilebiliyorsa (müşteri sektörü) her düğüm kendi sektörünün grubunda durur: sektör ilk satırdır, alt düğümlerin notu aradaki yoldur.
+    /// </summary>
     private IReadOnlyList<PickItem<string>> BuildItems()
     {
         var byParent = options.ToLookup(a => a.ParentCode);
         var list = new List<PickItem<string>>();
-        void Walk(string? parent, string? path)
+        void Walk(string? parent, string? root, string? path)
         {
             foreach (var node in byParent[parent])
             {
-                if (!ActivitiesOnly || node.Kind == ActivityKind)
+                if (!ActivitiesOnly)
                 {
-                    list.Add(new PickItem<string>(node.Code, node.Name, Group: path));
+                    list.Add(new PickItem<string>(node.Code, node.Name, Note: path, Group: root ?? node.Name));
+                }
+                else if (node.Kind == ActivityKind)
+                {
+                    list.Add(new PickItem<string>(node.Code, node.Name, Group: Join(root, path)));
                 }
 
-                Walk(node.Code, path is null ? node.Name : $"{path} › {node.Name}");
+                Walk(node.Code, root ?? node.Name, root is null ? null : Join(path, node.Name));
             }
         }
 
-        Walk(null, null);
+        Walk(null, null, null);
         return list;
     }
+
+    private static string? Join(string? left, string? right) => left is null ? right : right is null ? left : $"{left} › {right}";
 
     private ActivityOptionDto? Find(string code) => options.FirstOrDefault(a => a.Code == code);
 
