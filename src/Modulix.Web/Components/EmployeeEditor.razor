@@ -234,11 +234,6 @@
                             <input id="employee-emergency-phone" class="form-control" type="tel" maxlength="50" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.EmergencyContactPhone" />
                             <FieldError Field="emergencyContactPhone" Errors="errors" />
                             break;
-                        case "notes":
-                            <label class="@f.LabelClass()" for="employee-notes">@f.Label</label>
-                            <textarea id="employee-notes" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
-                            <FieldError Field="notes" Errors="errors" />
-                            break;
                     }
                     }
                 </Field>

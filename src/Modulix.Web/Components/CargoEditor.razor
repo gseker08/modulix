@@ -176,11 +176,6 @@
                         <datalist id="cargo-currencies"><option value="TRY"></option><option value="EUR"></option><option value="USD"></option><option value="GBP"></option></datalist>
                         <FieldError Field="freightCurrency" Errors="errors" />
                         break;
-                    case "notes":
-                        <label class="@f.LabelClass()" for="cargo-notes">@f.Label</label>
-                        <textarea id="cargo-notes" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
-                        <FieldError Field="notes" Errors="errors" />
-                        break;
                 }
             </Field>
         </LayoutForm>

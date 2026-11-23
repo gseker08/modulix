@@ -17,11 +17,10 @@ public static class CrmForms
     public static IReadOnlyList<FormDefinition> All { get; } =
     [
         new(CrmModule.Entities.Company, "Firma",
-        [new(General, "Genel bilgiler"), new("iletisim", "İletişim"), new("notlar", "Notlar ve ek bilgiler")],
+        [new(General, "Genel bilgiler"), new("iletisim", "İletişim"), new("notlar", "Ek bilgiler")],
         [
             new("temel", "Temel bilgiler", "building"),
             new("iletisim", "Genel iletişim bilgileri", "phone", Tab: "iletisim"),
-            new("notlar", "Notlar", "message-square", Tab: "notlar"),
             new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
@@ -40,15 +39,13 @@ public static class CrmForms
             new("website", "Web sitesi", "iletisim", 4),
             new("preferredLanguage", "Yazışma dili", "iletisim", 4),
             new("city", "Şehir", "iletisim", 4),
-            new("notes", "Notlar", "notlar", 12),
         ]),
 
         new(CrmModule.Entities.Contact, "Kişi",
-        [new(General, "Kişi bilgileri"), new("iletisim", "İletişim"), new("notlar", "Notlar ve ek bilgiler")],
+        [new(General, "Kişi bilgileri"), new("iletisim", "İletişim"), new("notlar", "Ek bilgiler")],
         [
             new("kisi", "Kişi bilgileri", "user"),
             new("iletisim", "İletişim", "phone", Tab: "iletisim"),
-            new("notlar", "Notlar", "message-square", Tab: "notlar"),
             new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
@@ -60,16 +57,15 @@ public static class CrmForms
             new("email", "E-posta (ana)", "iletisim", 6),
             new("phone", "Telefon (ana)", "iletisim", 6),
             new("preferredLanguage", "Yazışma dili", "iletisim", 6),
-            new("notes", "Notlar", "notlar", 12),
         ]),
 
         new(CrmModule.Entities.Opportunity, "Fırsat",
-        [new(General, "Genel bilgiler"), new("tutar", "Tutar ve zamanlama"), new("detay", "Detaylar"), new("notlar", "Notlar ve ek bilgiler")],
+        [new(General, "Genel bilgiler"), new("tutar", "Tutar ve zamanlama"), new("detay", "Detaylar"), new("notlar", "Açıklama ve ek bilgiler")],
         [
             new("temel", "Temel bilgiler", "target"),
             new("tutar", "Tutar ve zamanlama", "coins", Tab: "tutar"),
             new("detay", "Detaylar", "clipboard-list", Tab: "detay"),
-            new("aciklama", "Açıklama ve notlar", "message-square", Tab: "notlar"),
+            new("aciklama", "Açıklama", "message-square", Tab: "notlar"),
             new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
@@ -100,7 +96,6 @@ public static class CrmForms
             new("risks", "Riskler ve engeller", "detay", 6),
             new("decisionProcess", "Karar süreci", "detay", 12),
             new("description", "Açıklama", "aciklama", 12),
-            new("notes", "Notlar", "aciklama", 12),
         ]),
 
         new(CrmModule.Entities.Lead, "Lead",

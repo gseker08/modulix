@@ -147,11 +147,6 @@
                             <input id="vehicle-pallets" class="form-control" type="number" min="0" max="100" step="1" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.PalletCapacity" />
                             <FieldError Field="palletCapacity" Errors="errors" />
                             break;
-                        case "notes":
-                            <label class="@f.LabelClass()" for="vehicle-notes">@f.Label</label>
-                            <textarea id="vehicle-notes" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
-                            <FieldError Field="notes" Errors="errors" />
-                            break;
                     }
                 </Field>
             </LayoutForm>

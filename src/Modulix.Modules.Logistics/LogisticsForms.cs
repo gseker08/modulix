@@ -14,12 +14,11 @@ public static class LogisticsForms
     public static IReadOnlyList<FormDefinition> All { get; } =
     [
         new(LogisticsModule.Entities.Driver, "Sürücü",
-        [new(General, "Genel bilgiler"), new("notlar", "Notlar ve ek bilgiler")],
+        [new(General, "Genel bilgiler"), new("notlar", "Ek bilgiler")],
         [
             new("kimlik", "Sürücü", "user"),
             new("calisma", "Çalışma şekli", "briefcase"),
             new("arac", "Araç", "truck"),
-            new("notlar", "Notlar", "message-square", Tab: "notlar"),
             new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
@@ -28,7 +27,6 @@ public static class LogisticsForms
             new("driverType", "Sürücü tipi", "calisma", 6, Fixed: true),
             new("carrierPartyId", "Taşıyıcı firma", "calisma", 6, Fixed: true),
             new("defaultVehicleId", "Varsayılan araç", "arac", 6),
-            new("notes", "Notlar", "notlar", 12),
         ]),
 
         new(LogisticsModule.Entities.CarrierTerms, "Taşıyıcı anlaşması",
@@ -58,14 +56,13 @@ public static class LogisticsForms
 
         // Sefer: plan ve atama (araç, dorse, sürücüler ya da taşeron), notlar. Duraklar ve sevkiyatlar formun altındaki durak panelindedir.
         new(LogisticsModule.Entities.Trip, "Sefer",
-        [new(General, "Plan ve atama"), new("notlar", "Notlar ve ek bilgiler")],
+        [new(General, "Plan ve atama"), new("notlar", "Ek bilgiler")],
         [
             new("plan", "Plan", "calendar"),
             new("arac", "Araç", "truck"),
             new("surucu", "Sürücüler", "user"),
             new("tasiyici", "Taşeron", "building"),
             new("hakedis", "Hakediş", "wallet"),
-            new("notlar", "Notlar", "message-square", Tab: "notlar"),
             new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
@@ -78,20 +75,18 @@ public static class LogisticsForms
             new("carrierPartyId", "Taşıyıcı firma", "tasiyici", 12),
             new("settlementAmount", "Hakediş tutarı", "hakedis", 6),
             new("settlementCurrency", "Para birimi", "hakedis", 6),
-            new("notes", "Notlar", "notlar", 12),
         ]),
     ];
 
     /// <summary>Talep ve sevkiyatın ortak düzeni: taraflar ve güzergâh, yük, notlar (üç sekme).</summary>
     private static FormDefinition Cargo(string entity, string name, IReadOnlyList<FormFieldDefinition> extra, bool freight = false) =>
         new(entity, name,
-        [new(General, "Taraflar ve güzergâh"), new("yuk", "Yük"), new("notlar", "Notlar ve ek bilgiler")],
+        [new(General, "Taraflar ve güzergâh"), new("yuk", "Yük"), new("notlar", "Ek bilgiler")],
         [
             new("taraflar", "Taraflar", "building"),
             new("guzergah", "Güzergâh ve tarih", "map-pin"),
             new("yuk", "Yük", "package", Tab: "yuk"),
             .. (freight ? (FormSectionDefinition[])[new("navlun", "Navlun", "wallet", Tab: "yuk")] : []),
-            new("notlar", "Notlar", "message-square", Tab: "notlar"),
             new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
@@ -113,6 +108,5 @@ public static class LogisticsForms
             new("loadingMeters", "Yükleme metresi (LDM)", "yuk", 3),
             new("hazardous", "Tehlikeli madde (ADR)", "yuk", 6),
             .. (freight ? (FormFieldDefinition[])[new("freightAmount", "Navlun tutarı", "navlun", 6), new("freightCurrency", "Para birimi", "navlun", 6)] : []),
-            new("notes", "Notlar", "notlar", 12),
         ]);
 }
