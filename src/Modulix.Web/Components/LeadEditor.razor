@@ -95,7 +95,7 @@
                     break;
                 case "serviceScope":
                     <label class="@f.LabelClass()" for="lead-service-scope">@f.Label</label>
-                    <ActivityCodePicker Id="lead-service-scope" ActivitiesOnly="true" @bind-Selected="form.ServiceScope" />
+                    <ActivityCodePicker Id="lead-service-scope" Title="@f.Label" ActivitiesOnly="true" Selected="form.ServiceScope" SelectedChanged="SetServiceScope" />
                     <FieldError Field="serviceScope" Errors="errors" />
                     break;
                 case "industry":
@@ -249,6 +249,14 @@
 
 @code {
     private bool dirty;
+
+    /// <summary>Hizmet kapsamı pencereden seçilir; girdi olayı forma ulaşmadığı için "değişti" bilgisi burada işaretlenir.</summary>
+    private void SetServiceScope(List<string> codes)
+    {
+        form.ServiceScope = codes;
+        dirty = true;
+    }
+
     private FormLayoutDto? layout;
     private string? layoutError;
 

@@ -79,7 +79,7 @@ Kurallar:
 
 ## 4. Lojistik başlangıç paketi (öneri; doğrulanmadı)
 
-Taşımacılık (karayolu, denizyolu, havayolu, demiryolu), Depolama (gümrüklü antrepo, serbest depolama), Dağıtım ve son kilometre, Taşıma organizasyonu, Transit aktarma, Diğer. Özellikler: komple/parsiyel, yurt içi/uluslararası, sıcaklık kontrollü.
+Taşımacılık (karayolu, denizyolu, havayolu, demiryolu, intermodal, proje ve ağır yük), Depolama (gümrüklü antrepo, serbest depolama, katma değerli depo hizmetleri, sipariş karşılama), Gümrük ve dış ticaret (gümrük müşavirliği, ithalat ve ihracat operasyonu), Dağıtım ve son kilometre, Taşıyıcılık, Taşıma organizasyonu, Transit aktarma, Taşıma sigortası, Diğer. Özellikler: komple/parsiyel, yurt içi/uluslararası, sıcaklık kontrollü.
 
 - Bu sınıflandırma ürün önerisidir; Makaroğlu'nun gerçek işleyişiyle doğrulanmadı.
 - "Antrepo sınıfı/tipi" tesis özelliğidir ve ülkeye bağlıdır: firma türüne veya tenant genelindeki tek alana dönüştürülmez.
