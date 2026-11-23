@@ -6969,6 +6969,7 @@
   "platform.team.add": "Komandaya əlavə et",
   "platform.team.addIntro": "Şəxsin Modulix hesabı olmalıdır (bir şirkətə dəvət edilmiş); hesab burada açılmır.",
   "platform.team.revoke": "Girişi bağla",
+  "platform.team.lastRoleQuestion": "{0} üçün son rol götürülür. Platforma giriş bağlansın? Hesabı və məlumatı silinmir.",
   "platform.team.added": "{0} komandaya əlavə edildi.",
   "platform.team.rolesUpdated": "{0} üçün rollar yeniləndi.",
   "platform.team.removed": "{0} üçün platforma girişi bağlandı; hesabı və məlumatı silinmədi.",

@@ -6969,6 +6969,7 @@
   "platform.team.add": "Ekibe ekle",
   "platform.team.addIntro": "Kişinin Modulix hesabı olmalı (bir firmaya davet edilmiş); hesap burada açılmaz.",
   "platform.team.revoke": "Erişimi kapat",
+  "platform.team.lastRoleQuestion": "{0} için son rol kaldırılıyor. Platform erişimi kapansın mı? Hesabı ve verisi silinmez.",
   "platform.team.added": "{0} ekibe eklendi.",
   "platform.team.rolesUpdated": "{0} için roller güncellendi.",
   "platform.team.removed": "{0} için platform erişimi kapatıldı; hesabı ve verisi silinmedi.",

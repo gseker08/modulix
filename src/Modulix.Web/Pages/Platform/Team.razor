@@ -62,6 +62,12 @@
                                 {
                                     <span class="badge user-active">@PlatformLabels.RoleOf(PlatformRoleNames.Owner)</span>
                                 }
+                                else if (pendingRemoval == member.UserId)
+                                {
+                                    @* Son rolü kaldırmak platform erişimini kapatır: ayrı adımda onaylanır, "Vazgeç" rolleri olduğu gibi bırakır. *@
+                                    <ConfirmBox Text="@Texts.Get("platform.team.lastRoleQuestion", member.DisplayName)" ConfirmLabel="@Texts.Get("platform.team.revoke")"
+                                                Busy="busy" Confirm="() => RemoveAsync(member)" Cancel="() => pendingRemoval = null" />
+                                }
                                 else
                                 {
                                     @* Seçim uygulanınca hemen kaydedilir (eskiden her kutu tek tek kaydediyordu). *@
@@ -96,6 +102,7 @@
     private string? notice;
     private bool failed;
     private bool busy;
+    private Guid? pendingRemoval;
 
     protected override async Task OnInitializedAsync()
     {
@@ -141,9 +148,18 @@
         await LoadAsync();
     }
 
-    // Atanabilir olmayan roller (ör. başka yoldan verilmiş) seçimden bağımsız korunur.
-    private Task ChangeAsync(PlatformTeamMemberDto member, IReadOnlyList<string> roles) =>
-        SaveAsync(member, [.. member.Roles.Where(r => !Assignable.Contains(r)), .. roles], Texts.Get("platform.team.rolesUpdated", member.DisplayName));
+    // Atanabilir olmayan roller (ör. başka yoldan verilmiş) seçimden bağımsız korunur. Hiç rol kalmıyorsa kaydetmeden önce onay istenir.
+    private Task ChangeAsync(PlatformTeamMemberDto member, IReadOnlyList<string> roles)
+    {
+        List<string> wanted = [.. member.Roles.Where(r => !Assignable.Contains(r)), .. roles];
+        if (wanted.Count == 0)
+        {
+            pendingRemoval = member.UserId;
+            return Task.CompletedTask;
+        }
+
+        return SaveAsync(member, wanted, Texts.Get("platform.team.rolesUpdated", member.DisplayName));
+    }
 
     private Task RemoveAsync(PlatformTeamMemberDto member) =>
         SaveAsync(member, [], Texts.Get("platform.team.removed", member.DisplayName));
@@ -151,6 +167,7 @@
     private async Task SaveAsync(PlatformTeamMemberDto member, IReadOnlyList<string> roles, string success)
     {
         busy = true;
+        pendingRemoval = null;
         var result = await Api.PutAsync<PlatformTeamMemberDto>($"/api/platform/team/{member.UserId}", new SetPlatformRolesRequest(roles));
         busy = false;
         (notice, failed) = result.IsSuccess ? (success, false) : (result.Error, true);

@@ -6969,6 +6969,7 @@
   "platform.team.add": "Add to team",
   "platform.team.addIntro": "The person must have a Modulix account (invited to a company); accounts are not created here.",
   "platform.team.revoke": "Close access",
+  "platform.team.lastRoleQuestion": "The last role is being removed for {0}. Close platform access? The account and its data are not deleted.",
   "platform.team.added": "{0} was added to the team.",
   "platform.team.rolesUpdated": "Roles updated for {0}.",
   "platform.team.removed": "Platform access was closed for {0}; their account and data were not deleted.",

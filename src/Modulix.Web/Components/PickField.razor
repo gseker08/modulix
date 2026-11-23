@@ -93,7 +93,14 @@
     private async Task SetAsync(IReadOnlyList<TKey> keys)
     {
         await SelectedChanged.InvokeAsync(keys);
-        await Js.InvokeVoidAsync("modulixLookup.notifyInput", root);
+        try
+        {
+            await Js.InvokeVoidAsync("modulixLookup.notifyInput", root);
+        }
+        catch (JSException)
+        {
+            // Seçim sonucunda alan sayfadan kalkmış olabilir (ör. yerine onay kutusu açıldı); haber verilecek form da yoktur.
+        }
     }
 
     private sealed record Chip(TKey Key, string Name, string? Title, bool Locked);
