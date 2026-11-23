@@ -51,8 +51,8 @@ public class JourneyEntryTests(ModulixApiFactory factory) : IClassFixture<Moduli
 
         var enrollments = await EnrollmentsAsync(client, journey.Id);
         Assert.Equal(2, enrollments.Count);
-        Assert.Equivalent(new[] { bursa1.Id, bursa2.Id }, enrollments.Select(e => e.TargetId));
-        Assert.DoesNotContain(enrollments, e => e.TargetId == izmir.Id);
+        Assert.Equivalent(new[] { bursa1.PartyId!.Value, bursa2.PartyId!.Value }, enrollments.Select(e => e.TargetId));
+        Assert.DoesNotContain(enrollments, e => e.TargetId == izmir.PartyId!.Value);
         Assert.All(enrollments, e => Assert.Equal("Active", e.Status));
 
         // Her kayıt için iş olayı aynı işlemde yazılır.
@@ -71,7 +71,7 @@ public class JourneyEntryTests(ModulixApiFactory factory) : IClassFixture<Moduli
         // Segmente sonradan giren hedef bir sonraki turda girer.
         var late = await CompanyAsync(client, "Bursa Uc", "Bursa");
         Assert.Equal(1, (await RunAsync(tenantId)).Sum(o => o.Entered));
-        Assert.Contains(await EnrollmentsAsync(client, journey.Id), e => e.TargetId == late.Id);
+        Assert.Contains(await EnrollmentsAsync(client, journey.Id), e => e.TargetId == late.PartyId!.Value);
     }
 
     // ---- Hata ve doğrulama ----
@@ -138,7 +138,7 @@ public class JourneyEntryTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var journeyB = await PublishedJourneyAsync(clientB, "ortak", "bursa-b");
 
         Assert.Equal(1, (await RunAsync(tenantA)).Sum(o => o.Entered));
-        Assert.Equal([companyA.Id], (await EnrollmentsAsync(clientA, journeyA.Id)).Select(e => e.TargetId));
+        Assert.Equal([companyA.PartyId!.Value], (await EnrollmentsAsync(clientA, journeyA.Id)).Select(e => e.TargetId));
         Assert.Empty(await EnrollmentsAsync(clientB, journeyB.Id));
         Assert.Empty(await EnrollmentsAsync(clientB, journeyA.Id));
 
