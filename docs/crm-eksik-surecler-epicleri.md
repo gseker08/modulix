@@ -94,7 +94,7 @@ Bu belge tek başına hiçbir şeyi uygulamaz; her epic başlamadan önce kendi 
 
 ### E8. Çalışma alanı rengi ve menü düzeni
 - **Videoda:** "Size özel, logolu ve renkli çalışma alanı"; "Formlar, menü ve iş kuralları".
-- **Modulix'te:** logo var; firma vurgu rengi (dilim 1) ve rol bazlı menü düzeni (dilim 2, öğe düzeyinde sıra ve gizleme; dilim 3, bölüm sırası) var; modül (uygulama) sırası yok.
+- **Modulix'te:** logo var; firma vurgu rengi (dilim 1) ve rol bazlı menü düzeni (dilim 2, öğe düzeyinde sıra ve gizleme; dilim 3, bölüm sırası; dilim 4, uygulama paneli grubu içinde uygulama sırası) var.
 - **Süreç ve kurallar:** firma yalnızca izin verilen tokenları (`--mx-brand` vb.) değiştirir; kaydetmeden önce açık ve koyu temada
   AA kontrastı (4.5:1) sunucuda doğrulanır, geçmeyen renk reddedilir. Menüde modül/öğe sırası ve gizleme rol bazında yapılır;
   gizlemek yetki değildir (uç noktalar yine izinle korunur).
@@ -103,7 +103,7 @@ Bu belge tek başına hiçbir şeyi uygulamaz; her epic başlamadan önce kendi 
   token" listesi tanımlanmalı.
 - **Durum (22 Kasım 2026):** dilim 0 (tasarım sisteminde firmanın değiştirebileceği tokenlar, PR #509), dilim 1 (vurgu rengi, PR #513) ve dilim 2
   (rol menüsü: sunucu PR #525, menüye uygulama ve düzenleme ekranı PR #528, kayıtta satır koruma PR #533) teslim edildi; karar kaydı
-  [ADR-0055](adr/0055-calisma-alani-rengi-ve-rol-menusu.md). Kalan: modül (uygulama) sırası ve bölüm gizleme (ADR'de "Yapılmadı").
+  [ADR-0055](adr/0055-calisma-alani-rengi-ve-rol-menusu.md). Kalan: uygulama paneli gruplarının sırası ile bölüm ve uygulama gizleme (ADR'de "Yapılmadı").
 
 ### E9. Birleşik 360° müşteri zaman çizelgesi
 - **Videoda:** "360° müşteri profili: bütün geçmiş tek sayfada".

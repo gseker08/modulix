@@ -65,6 +65,19 @@ public class RoleMenuLayoutTests(ModulixApiFactory factory) : IClassFixture<Modu
     }
 
     [Fact]
+    public async Task App_order_rows_are_saved_and_returned_like_item_rows()
+    {
+        // E8 dilim 4: uygulama sırası aynı tabloda "app.<uygulama>" anahtarlı satırdır; sunucu yeni bir kural eklemez.
+        var (client, _, roleId) = await ManagerWithRoleAsync();
+        var saved = await client.PutAsJsonAsync($"/api/roles/{roleId}/menu", new SaveRoleMenuRequest(
+            [new("app.marketing", 10, false), new("app.crm", 20, false), new("section.crm.crm.sales", 10, false)]));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var items = (await saved.Content.ReadFromJsonAsync<RoleMenuResponse>())!.Items;
+        Assert.Equal(10, items.Single(i => i.ItemKey == "app.marketing").Order);
+        Assert.Equal(20, items.Single(i => i.ItemKey == "app.crm").Order);
+    }
+
+    [Fact]
     public async Task Invalid_keys_orders_and_duplicates_are_rejected_and_nothing_is_written()
     {
         var (client, tenantId, roleId) = await ManagerWithRoleAsync();

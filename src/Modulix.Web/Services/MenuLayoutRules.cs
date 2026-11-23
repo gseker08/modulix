@@ -72,6 +72,42 @@ public static class MenuLayoutRules
     /// <summary>Bir uygulamanın menüsündeki bölümün düzen anahtarı (ör. <c>section.crm.crm.customers</c>); uygulama kimliği ve bölüm kimliği küçük harf, rakam, nokta ve tiredir.</summary>
     public static string SectionKey(string rootId, string groupId) => $"section.{rootId}.{groupId}";
 
+    /// <summary>Uygulamanın uygulama panelindeki sıra anahtarı (ör. <c>app.crm</c>); uygulama kimliği küçük harf, rakam, nokta ve tiredir.</summary>
+    public static string AppKey(string rootId) => $"app.{rootId}";
+
+    /// <summary>
+    /// Rolün uygulama sırasını uygular (E8 dilim 4): uygulamalar kendi uygulama paneli grubu içinde yer değiştirir, grupların sırası ve
+    /// her uygulamanın grubu sabittir. Kural öğeyle aynıdır: sıra veren satırların en küçüğü; bir grupta en az bir uygulamaya açık sıra
+    /// verilmişse sırası verilmeyen uygulamalar açık sıralıların arkasına gelen sıradaki (katalog) sırasıyla dizilir. Satır yoksa sıra olduğu gibi döner.
+    /// </summary>
+    public static IReadOnlyList<AppDefinition> OrderApps(IReadOnlyList<AppDefinition> roots, IReadOnlyList<RoleMenuRowDto>? rows)
+    {
+        if (rows is null || rows.Count == 0)
+        {
+            return roots;
+        }
+
+        int? Explicit(AppDefinition app) => rows
+            .Where(r => r.ItemKey == AppKey(app.Id) && r.Order is not null)
+            .Select(r => r.Order)
+            .Min();
+
+        // Grup içinde: açık sıralılar sırasıyla, sonra sırasızlar gelen sırada; grubun listedeki yerleri korunur.
+        List<AppDefinition> result = [.. roots];
+        foreach (IGrouping<string, int> slots in Enumerable.Range(0, roots.Count).GroupBy(i => roots[i].Group ?? string.Empty))
+        {
+            List<int> indexes = [.. slots];
+            List<AppDefinition> ordered = [.. indexes.Select(i => roots[i]).Select((app, position) => (app, position))
+                .OrderBy(x => Explicit(x.app) ?? int.MaxValue).ThenBy(x => x.position).Select(x => x.app)];
+            for (int k = 0; k < indexes.Count; k++)
+            {
+                result[indexes[k]] = ordered[k];
+            }
+        }
+
+        return result;
+    }
+
     /// <summary>Rolün bölüm sırasını uygular; sıra veren satır yoksa bölümler olduğu gibi döner. Yalnızca <paramref name="rows"/>'taki bölüm satırlarına bakar.</summary>
     public static IReadOnlyList<MenuSection> OrderSections(string rootId, IReadOnlyList<MenuSection> sections, IReadOnlyList<RoleMenuRowDto>? rows)
     {

@@ -5547,6 +5547,8 @@
   "admin.roleMenu.down": "{0} satırını aşağı taşı",
   "admin.roleMenu.sectionUp": "{0} bölümünü yukarı taşı",
   "admin.roleMenu.sectionDown": "{0} bölümünü aşağı taşı",
+  "admin.roleMenu.appUp": "{0} uygulamasını yukarı taşı",
+  "admin.roleMenu.appDown": "{0} uygulamasını aşağı taşı",
   "admin.roleMenu.reset": "Varsayılana dön",
   "admin.roleMenu.saved": "Menü düzeni kaydedildi.",
   "admin.users.locked": "Kilitli",
