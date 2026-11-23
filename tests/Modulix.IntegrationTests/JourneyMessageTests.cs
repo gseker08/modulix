@@ -236,6 +236,7 @@ public class JourneyMessageTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         await factory.CreateRoleAsync(tenant.Id, Preparer, RecordScope.All, user);
         var client = await LoginAsync(user);
         await SetSettingAsync(client, MarketingModule.SettingKeys.Provider, provider);
+        await SetSettingAsync(client, MarketingModule.SettingKeys.DailyLimit, "0");
 
         var company = await CompanyAsync(client, "Anka Tekstil");
         await ContactAsync(client, company.Id, "Anka", "Kişi", email);
