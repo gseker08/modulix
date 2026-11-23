@@ -15,6 +15,14 @@ IF DB_ID(N'Modulix') IS NULL
     CREATE DATABASE [Modulix];
 GO
 
+-- Okuma anlik goruntusu (ADR-0058): okuyucular yazicilari beklemez, yazicilar okuyunculari kilitlemez. Kapaliyken, tablo
+-- taramasi yapan bir sorgu baska tenant'in kilitli satirlarina takilip kilitlenme (1205) uretebilir. Acik degilse ac;
+-- acik veritabaninda atlanir. Acarken diger baglantilar geri alinir (yerel/CI kurulumunda sorun degildir; canli veritabani
+-- icin docs/tenant-isletim.md "Okuma anlik goruntusu" adimini izleyin).
+IF EXISTS (SELECT 1 FROM sys.databases WHERE name = N'Modulix' AND is_read_committed_snapshot_on = 0)
+    ALTER DATABASE [Modulix] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;
+GO
+
 USE [master];
 GO
 
