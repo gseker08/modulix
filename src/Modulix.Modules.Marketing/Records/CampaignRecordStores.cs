@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Communication;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Marketing.Contracts;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
@@ -100,21 +101,21 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
         var errors = new List<RecordFieldError>();
         if (!CodePattern().IsMatch(entity.Code))
         {
-            errors.Add(new RecordFieldError("code", "Kod 2-40 karakter olmalı; küçük harf, rakam ve tire kullanılabilir (ör. antrepo-2026)."));
+            errors.Add(new RecordFieldError("code", MarketingMessages.Campaign.CodeFormat));
         }
 
         if (!isNew && before.TryGetValue(entity.Id, out var old))
         {
-            if (old.Code != entity.Code) { errors.Add(new RecordFieldError("code", "Kod oluşturulduktan sonra değiştirilemez.")); }
-            if (old.Target != entity.Target) { errors.Add(new RecordFieldError("target", "Hedef türü oluşturulduktan sonra değiştirilemez.")); }
-            if (old.Channel != entity.Channel) { errors.Add(new RecordFieldError("channel", "Kanal oluşturulduktan sonra değiştirilemez.")); }
+            if (old.Code != entity.Code) { errors.Add(new RecordFieldError("code", MarketingMessages.Campaign.CodeLocked)); }
+            if (old.Target != entity.Target) { errors.Add(new RecordFieldError("target", MarketingMessages.Campaign.TargetLocked)); }
+            if (old.Channel != entity.Channel) { errors.Add(new RecordFieldError("channel", MarketingMessages.Campaign.ChannelLocked)); }
         }
 
         if (entity.RecipientRule == nameof(RecipientRule.Role))
         {
             if (string.IsNullOrWhiteSpace(entity.RecipientRole))
             {
-                errors.Add(new RecordFieldError("recipientRole", "Rol kuralında aranan rol zorunludur."));
+                errors.Add(new RecordFieldError("recipientRole", MarketingMessages.Campaign.RoleRequired));
             }
         }
         else
@@ -124,17 +125,17 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
 
         if (!CurrencyPattern().IsMatch(entity.CostCurrency))
         {
-            errors.Add(new RecordFieldError("costCurrency", "Para birimi 3 harfli kod olmalıdır (ör. TRY)."));
+            errors.Add(new RecordFieldError("costCurrency", MarketingMessages.Campaign.CostCurrency));
         }
 
         if (entity.MaxPerTarget is < 1)
         {
-            errors.Add(new RecordFieldError("maxPerTarget", "Hedef başına alıcı sınırı en az 1 olmalıdır (sınır yoksa boş bırakın)."));
+            errors.Add(new RecordFieldError("maxPerTarget", MarketingMessages.Campaign.MaxPerTarget));
         }
 
         if (entity.StartsOn is { } start && entity.EndsOn is { } end && end < start)
         {
-            errors.Add(new RecordFieldError("endsOn", "Bitiş tarihi başlangıçtan önce olamaz."));
+            errors.Add(new RecordFieldError("endsOn", MarketingMessages.Campaign.EndBeforeStart));
         }
 
         // Kaynak/UTM değerleri küçük harfe çevrilir ve lead'e olduğu gibi geçtiği için güvenli karakterlerle sınırlıdır (bağlantı parametresi gibi kullanılabilir).
@@ -147,7 +148,7 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
         var previousTopic = !isNew && before.TryGetValue(entity.Id, out var prior) ? prior.Topic : null;
         if (entity.Topic is not null && entity.Topic != previousTopic && !await Context.Topics.IsActiveAsync(entity.Topic, cancellationToken))
         {
-            errors.Add(new RecordFieldError("topic", "Konu tanımlı ve açık olmalıdır (Yönetim → İletişim tercihleri → Konular)."));
+            errors.Add(new RecordFieldError("topic", MarketingMessages.Campaign.TopicInvalid));
         }
 
         if (errors.Count > 0)
@@ -157,7 +158,7 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
 
         if (!isNew && entity.Status == CampaignStatuses.Archived && !Context.Gate.IsOpen)
         {
-            throw new RecordConflictException("Arşivlenen kampanya düzenlenemez; önce geri alın.");
+            throw new RecordConflictException(MarketingMessages.Campaign.ArchivedLocked);
         }
 
         if (await Context.Data.Set<Campaign>().AsNoTracking().AnyAsync(c => c.Code == entity.Code && c.Id != entity.Id, cancellationToken))
@@ -178,7 +179,7 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
             || await Context.Data.Set<AudienceSnapshot>().AnyAsync(s => s.CampaignId == entity.Id, cancellationToken)
             || await Context.Data.Set<CampaignResponse>().AnyAsync(r => r.CampaignId == entity.Id, cancellationToken))
         {
-            throw new RecordConflictException("Hedef kitlesi, dondurulmuş kitlesi ya da yanıtı olan kampanya silinemez; arşivleyin.");
+            throw new RecordConflictException(MarketingMessages.Campaign.NoDelete);
         }
     }
 
@@ -187,7 +188,7 @@ internal sealed partial class CampaignRecordStore(MarketingStoreContext context)
         var text = UtmRules.Normalize(value, out var valid);
         if (!valid)
         {
-            errors.Add(new RecordFieldError(field, "Kaynak/UTM değeri harf, rakam, nokta, alt çizgi, tire ya da ~ içerebilir (en fazla 80 karakter, boşluk yok)."));
+            errors.Add(new RecordFieldError(field, MarketingMessages.Campaign.UtmFormat));
         }
 
         return text;
@@ -222,7 +223,7 @@ internal sealed class CampaignAudienceRecordStore(MarketingStoreContext context)
 
     protected override IReadOnlyList<RecordField<CampaignAudienceEntry>> Fields { get; } =
     [
-        Field.Reference<CampaignAudienceEntry, Campaign>("campaignId", "Kampanya bulunamadı.", e => e.CampaignId, (e, v) => e.CampaignId = v ?? Guid.Empty, required: true, createOnly: true),
+        Field.Reference<CampaignAudienceEntry, Campaign>("campaignId", MarketingMessages.NotFound.Campaign, e => e.CampaignId, (e, v) => e.CampaignId = v ?? Guid.Empty, required: true, createOnly: true),
         Field.Choice<CampaignAudienceEntry>("mode", AudienceModes.All, e => e.Mode, (e, v) => e.Mode = v),
         Field.Id<CampaignAudienceEntry>("segmentId", e => e.SegmentId, (e, v) => e.SegmentId = v),
         Field.Id<CampaignAudienceEntry>("targetId", e => e.TargetId, (e, v) => e.TargetId = v),
@@ -266,18 +267,18 @@ internal sealed class CampaignAudienceRecordStore(MarketingStoreContext context)
     {
         if ((entity.SegmentId is null) == (entity.TargetId is null))
         {
-            throw new RecordValidationException([new RecordFieldError("segmentId", "Segment ya da hedef kayıttan tam biri seçilmelidir.")]);
+            throw new RecordValidationException([new RecordFieldError("segmentId", MarketingMessages.Audience.ExactlyOne)]);
         }
 
         if (!isNew && before.TryGetValue(entity.Id, out var old) && (old.Segment != entity.SegmentId || old.Target != entity.TargetId))
         {
-            throw new RecordValidationException([new RecordFieldError("segmentId", "Kaynak oluşturulduktan sonra değiştirilemez; kaydı silip yeniden ekleyin.")]);
+            throw new RecordValidationException([new RecordFieldError("segmentId", MarketingMessages.Audience.SourceLocked)]);
         }
 
         var campaign = await Context.Data.Set<Campaign>().AsNoTracking().SingleAsync(c => c.Id == entity.CampaignId, cancellationToken);
         if (campaign.Status == CampaignStatuses.Archived)
         {
-            throw new RecordConflictException("Arşivlenen kampanyanın hedef kitlesi değiştirilemez.");
+            throw new RecordConflictException(MarketingMessages.Audience.ArchivedLocked);
         }
 
         if (isNew)
@@ -287,17 +288,17 @@ internal sealed class CampaignAudienceRecordStore(MarketingStoreContext context)
                 var segment = await Context.ReadRecordAsync(MarketingModule.Entities.Segment, segmentId, cancellationToken);
                 if (segment is null)
                 {
-                    throw new RecordValidationException([new RecordFieldError("segmentId", "Segment bulunamadı ya da erişiminiz yok.")]);
+                    throw new RecordValidationException([new RecordFieldError("segmentId", MarketingMessages.Audience.SegmentInaccessible)]);
                 }
 
                 if (segment.Values["target"]?.GetValue<string>() != campaign.Target)
                 {
-                    throw new RecordValidationException([new RecordFieldError("segmentId", "Segmentin hedef türü kampanyanınkiyle aynı olmalıdır; karışık türler birleştirilmez.")]);
+                    throw new RecordValidationException([new RecordFieldError("segmentId", MarketingMessages.Audience.TargetMismatch)]);
                 }
 
                 if (segment.Values["status"]?.GetValue<string>() == SegmentStatuses.Archived)
                 {
-                    throw new RecordValidationException([new RecordFieldError("segmentId", "Arşivlenen segment yeni kampanyada kullanılamaz.")]);
+                    throw new RecordValidationException([new RecordFieldError("segmentId", MarketingMessages.Audience.SegmentArchived)]);
                 }
             }
             else
@@ -310,7 +311,7 @@ internal sealed class CampaignAudienceRecordStore(MarketingStoreContext context)
                 };
                 if (await Context.ReadRecordAsync(key, entity.TargetId!.Value, cancellationToken) is null)
                 {
-                    throw new RecordValidationException([new RecordFieldError("targetId", "Hedef kayıt bulunamadı ya da erişiminiz yok.")]);
+                    throw new RecordValidationException([new RecordFieldError("targetId", MarketingMessages.Audience.TargetInaccessible)]);
                 }
             }
 
@@ -319,7 +320,7 @@ internal sealed class CampaignAudienceRecordStore(MarketingStoreContext context)
             if (await Context.Data.Set<CampaignAudienceEntry>().AsNoTracking().AnyAsync(
                     e => e.CampaignId == entity.CampaignId && e.Id != entity.Id && (segmentKey != null ? e.SegmentId == segmentKey : e.TargetId == targetKey), cancellationToken))
             {
-                throw new RecordConflictException("Bu kaynak kampanyanın hedef kitlesinde zaten var.");
+                throw new RecordConflictException(MarketingMessages.Audience.AlreadyIn);
             }
 
             entity.AddedBy = Context.CurrentUserId;
@@ -395,7 +396,7 @@ internal sealed class AudienceSnapshotRecordStore(MarketingStoreContext context,
     {
         if (!Context.Gate.IsOpen || payload.Recipients is null)
         {
-            throw new RecordValidationException([new RecordFieldError("campaignId", "Dondurulmuş hedef kitle yalnızca hedef kitle eylemiyle oluşur.")]);
+            throw new RecordValidationException([new RecordFieldError("campaignId", MarketingMessages.Audience.SnapshotViaAction)]);
         }
 
         entity.Recipients = payload.Recipients;
@@ -403,10 +404,10 @@ internal sealed class AudienceSnapshotRecordStore(MarketingStoreContext context,
     }
 
     protected override Task AppliedAsync(AudienceSnapshot entity, JsonObject values, bool isNew, CancellationToken cancellationToken) =>
-        isNew ? Task.CompletedTask : throw new RecordConflictException("Dondurulmuş hedef kitle değiştirilemez.");
+        isNew ? Task.CompletedTask : throw new RecordConflictException(MarketingMessages.Audience.SnapshotLocked);
 
     protected override Task BeforeDeleteAsync(AudienceSnapshot entity, CancellationToken cancellationToken) =>
-        throw new RecordConflictException("Dondurulmuş hedef kitle silinemez.");
+        throw new RecordConflictException(MarketingMessages.Audience.SnapshotNoDelete);
 }
 
 /// <summary>Hedef kitle servisinin, dondurulacak alıcı listesini (JSON) kayıt deposuna ilettiği istek ömürlü taşıyıcı (alıcı listesi denetim kaydına girmez).</summary>
