@@ -13727,5 +13727,18 @@
   "crm.server.endpoint.form-not-found": "Form tapılmadı.",
   "crm.server.endpoint.submission-rejected": "Göndəriş qəbul edilmədi.",
   "crm.server.endpoint.link-invalid": "Keçid yanlışdır.",
-  "crm.server.endpoint.quote-state-changed": "Təklifin vəziyyəti dəyişib."
+  "crm.server.endpoint.quote-state-changed": "Təklifin vəziyyəti dəyişib.",
+  "marketing.server.notfound.journey": "Səyahət tapılmadı.",
+  "marketing.server.journey.code-format": "Kod 2-40 simvol olmalıdır; kiçik hərf, rəqəm və tire istifadə edilə bilər (məs. xosgeldin-seriyasi).",
+  "marketing.server.journey.code-locked": "Kod yaradıldıqdan sonra dəyişdirilə bilməz.",
+  "marketing.server.journey.target-locked": "Hədəf növü yaradıldıqdan sonra dəyişdirilə bilməz.",
+  "marketing.server.journey.segment-locked": "Layihə olmayan səyahətin giriş seqmenti dəyişdirilə bilməz.",
+  "marketing.server.journey.exit-condition-invalid": "Çıxış şərti düzgün JSON obyekti olmalıdır.",
+  "marketing.server.journey.segment-not-usable": "Giriş seqmenti aktiv (dərc edilmiş) olmalıdır.",
+  "marketing.server.journey.segment-target-mismatch": "Seqmentin hədəf növü səyahətinki ilə eyni olmalıdır.",
+  "marketing.server.journey.code-taken": "Bu kodlu səyahət artıq var.",
+  "marketing.server.journey.no-delete": "Layihə olmayan və ya qeydi olan səyahət silinə bilməz; arxivləyin.",
+  "marketing.server.journey.enrollment-via-entry": "Səyahət qeydi yalnız səyahət girişi ilə yaranır.",
+  "marketing.server.journey.enrollment-locked": "Səyahət qeydi əl ilə dəyişdirilə bilməz.",
+  "marketing.server.journey.enrollment-no-delete": "Səyahət qeydi silinmir; tarixçəsi qorunur."
 }

@@ -78,6 +78,46 @@ public sealed record SegmentActionRequest(long? Version = null);
 public sealed record CopySegmentRequest(string Code, string Name);
 
 /// <summary>Arayüz menüsünün ve ekran denetimlerinin baktığı izin anahtarları; <c>MarketingModule.Permissions</c> ile aynı olmalıdır (mimari testle denetlenir).</summary>
+/// <summary>Müşteri yolculuğu (ADR-0056). Durum sunucu tarafından yazılır; kod ve hedef türü oluşturulduktan sonra değişmez. Durum: Draft, Active, Paused, Archived. Yeniden giriş: Never, AfterExit, AfterCompletion.</summary>
+public sealed record JourneyDto(
+    Guid Id,
+    long Version,
+    string Code,
+    string Name,
+    string? Description,
+    string Target,
+    Guid SegmentId,
+    string ReentryPolicy,
+    string? ExitCondition,
+    Guid? OwnerId,
+    string Status,
+    Guid? CreatedBy,
+    Guid? UpdatedBy);
+
+public sealed record SaveJourneyRequest(
+    long Version = 0,
+    string? Code = null,
+    string? Name = null,
+    string? Description = null,
+    string? Target = null,
+    Guid? SegmentId = null,
+    string? ReentryPolicy = null,
+    string? ExitCondition = null,
+    Guid? OwnerId = null);
+
+/// <summary>Yolculuk kaydı (salt okunur): bir hedefin yolculuktaki durumu. Durum: Active, Completed, Exited.</summary>
+public sealed record JourneyEnrollmentDto(
+    Guid Id,
+    long Version,
+    Guid JourneyId,
+    Guid TargetId,
+    string Status,
+    DateTimeOffset EnteredAt,
+    DateTimeOffset? ExitedAt,
+    string? ExitReason);
+
+public sealed record SaveJourneyEnrollmentRequest(long Version = 0);
+
 public static class MarketingAccess
 {
     public const string ModuleKey = "marketing";
@@ -93,6 +133,8 @@ public static class MarketingAccess
     public const string ResponsesRead = "marketing.responses.read";
     public const string ResponsesWrite = "marketing.responses.write";
     public const string ReportsRead = "marketing.reports.read";
+    public const string JourneysRead = "marketing.journeys.read";
+    public const string JourneysWrite = "marketing.journeys.write";
 }
 
 /// <summary>Müşteri zaman çizelgesindeki pazarlama satırı türleri (ADR-0053); satırın kayıt kimliği kampanya kimliğidir. İzin anahtarı değildir.</summary>

@@ -13727,5 +13727,18 @@
   "crm.server.endpoint.form-not-found": "Form not found.",
   "crm.server.endpoint.submission-rejected": "The submission was not accepted.",
   "crm.server.endpoint.link-invalid": "The link is invalid.",
-  "crm.server.endpoint.quote-state-changed": "The quote state has changed."
+  "crm.server.endpoint.quote-state-changed": "The quote state has changed.",
+  "marketing.server.notfound.journey": "Journey not found.",
+  "marketing.server.journey.code-format": "Code must be 2-40 characters; lowercase letters, digits and hyphens are allowed (e.g. welcome-series).",
+  "marketing.server.journey.code-locked": "The code cannot be changed after creation.",
+  "marketing.server.journey.target-locked": "The target type cannot be changed after creation.",
+  "marketing.server.journey.segment-locked": "The entry segment of a journey that is not a draft cannot be changed.",
+  "marketing.server.journey.exit-condition-invalid": "The exit condition must be a valid JSON object.",
+  "marketing.server.journey.segment-not-usable": "The entry segment must be active (published).",
+  "marketing.server.journey.segment-target-mismatch": "The segment target type must match the journey target type.",
+  "marketing.server.journey.code-taken": "A journey with this code already exists.",
+  "marketing.server.journey.no-delete": "A journey that is not a draft or has enrollments cannot be deleted; archive it.",
+  "marketing.server.journey.enrollment-via-entry": "A journey enrollment is only created by journey entry.",
+  "marketing.server.journey.enrollment-locked": "A journey enrollment cannot be changed manually.",
+  "marketing.server.journey.enrollment-no-delete": "A journey enrollment cannot be deleted; its history is kept."
 }

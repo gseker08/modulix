@@ -24,6 +24,9 @@ internal static class MarketingMessages
 
         public static ServerMessage Segment =>
             ServerMessage.Of("marketing.server.notfound.segment", "Segment bulunamadı.");
+
+        public static ServerMessage Journey =>
+            ServerMessage.Of("marketing.server.notfound.journey", "Yolculuk bulunamadı.");
     }
 
     /// <summary>Kampanya kaydı.</summary>
@@ -564,6 +567,46 @@ internal static class MarketingMessages
     {
         public static ServerMessage InvalidTarget =>
             ServerMessage.Of("marketing.server.endpoint.invalid-target", "Geçersiz hedef türü (Company, Person, Lead).");
+    }
+
+    /// <summary>Müşteri yolculuğu ve kayıtları.</summary>
+    public static class Journey
+    {
+        public static ServerMessage CodeFormat =>
+            ServerMessage.Of("marketing.server.journey.code-format", "Kod 2-40 karakter olmalı; küçük harf, rakam ve tire kullanılabilir (ör. hosgeldin-serisi).");
+
+        public static ServerMessage CodeLocked =>
+            ServerMessage.Of("marketing.server.journey.code-locked", "Kod oluşturulduktan sonra değiştirilemez.");
+
+        public static ServerMessage TargetLocked =>
+            ServerMessage.Of("marketing.server.journey.target-locked", "Hedef türü oluşturulduktan sonra değiştirilemez.");
+
+        public static ServerMessage SegmentLocked =>
+            ServerMessage.Of("marketing.server.journey.segment-locked", "Taslak dışındaki yolculuğun giriş segmenti değiştirilemez.");
+
+        public static ServerMessage ExitConditionInvalid =>
+            ServerMessage.Of("marketing.server.journey.exit-condition-invalid", "Çıkış koşulu geçerli bir JSON nesnesi olmalıdır.");
+
+        public static ServerMessage SegmentNotUsable =>
+            ServerMessage.Of("marketing.server.journey.segment-not-usable", "Giriş segmenti etkin (yayımlanmış) olmalıdır.");
+
+        public static ServerMessage SegmentTargetMismatch =>
+            ServerMessage.Of("marketing.server.journey.segment-target-mismatch", "Segmentin hedef türü yolculuğunkiyle aynı olmalıdır.");
+
+        public static ServerMessage CodeTaken =>
+            ServerMessage.Of("marketing.server.journey.code-taken", "Bu kodlu bir yolculuk zaten var.");
+
+        public static ServerMessage NoDelete =>
+            ServerMessage.Of("marketing.server.journey.no-delete", "Taslak dışındaki ya da kaydı olan yolculuk silinemez; arşivleyin.");
+
+        public static ServerMessage EnrollmentViaEntry =>
+            ServerMessage.Of("marketing.server.journey.enrollment-via-entry", "Yolculuk kaydı yalnızca yolculuk girişiyle oluşur.");
+
+        public static ServerMessage EnrollmentLocked =>
+            ServerMessage.Of("marketing.server.journey.enrollment-locked", "Yolculuk kaydı elle değiştirilemez.");
+
+        public static ServerMessage EnrollmentNoDelete =>
+            ServerMessage.Of("marketing.server.journey.enrollment-no-delete", "Yolculuk kaydı silinemez; geçmişi korunur.");
     }
 
     /// <summary>Sayı iletisi bağımsız değişkeni: binlik ayraçlı, kültürden bağımsız.</summary>

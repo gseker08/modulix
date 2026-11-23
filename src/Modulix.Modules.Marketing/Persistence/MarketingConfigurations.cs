@@ -219,3 +219,41 @@ internal sealed class CampaignTestSendConfiguration : IEntityTypeConfiguration<C
         builder.HasIndex(t => new { t.TenantId, t.CampaignId, t.CreatedAt });
     }
 }
+
+internal sealed class JourneyConfiguration : IEntityTypeConfiguration<Journey>
+{
+    public void Configure(EntityTypeBuilder<Journey> builder)
+    {
+        MarketingTables.ConfigureCommon(builder, "Journeys");
+        builder.Property(j => j.Code).HasMaxLength(Journey.CodeMaxLength).IsRequired();
+        builder.Property(j => j.Name).HasMaxLength(Journey.NameMaxLength).IsRequired();
+        builder.Property(j => j.Description).HasMaxLength(Journey.DescriptionMaxLength);
+        builder.Property(j => j.Target).HasMaxLength(20).IsRequired();
+        builder.Property(j => j.ReentryPolicy).HasMaxLength(20).IsRequired();
+        builder.Property(j => j.ExitCondition).HasMaxLength(Journey.ExitConditionMaxLength);
+        builder.Property(j => j.Status).HasMaxLength(20).IsRequired();
+
+        builder.HasIndex(j => new { j.TenantId, j.Code }).IsUnique().HasDatabaseName("UX_Journeys_Code");
+        builder.HasIndex(j => new { j.TenantId, j.Status }).HasDatabaseName("IX_Journeys_Status");
+        builder.HasOne<Segment>().WithMany().HasForeignKey(j => new { j.TenantId, j.SegmentId })
+            .HasPrincipalKey(s => new { s.TenantId, s.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class JourneyEnrollmentConfiguration : IEntityTypeConfiguration<JourneyEnrollment>
+{
+    public void Configure(EntityTypeBuilder<JourneyEnrollment> builder)
+    {
+        MarketingTables.ConfigureCommon(builder, "JourneyEnrollments");
+        builder.Property(e => e.Status).HasMaxLength(20).IsRequired();
+        builder.Property(e => e.ExitReason).HasMaxLength(JourneyEnrollment.ExitReasonMaxLength);
+
+        // Aynı hedef aynı yolculukta aynı anda bir kez etkin olabilir (ADR-0056); çıkan ya da tamamlanan kayıt yeniden girişe engel değildir.
+        builder.HasIndex(e => new { e.TenantId, e.JourneyId, e.TargetId }).IsUnique()
+            .HasFilter("[Status] = 'Active'").HasDatabaseName("UX_JourneyEnrollments_Active");
+        builder.HasIndex(e => new { e.TenantId, e.JourneyId, e.Status }).HasDatabaseName("IX_JourneyEnrollments_Journey");
+        builder.HasOne<Journey>().WithMany().HasForeignKey(e => new { e.TenantId, e.JourneyId })
+            .HasPrincipalKey(j => new { j.TenantId, j.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+

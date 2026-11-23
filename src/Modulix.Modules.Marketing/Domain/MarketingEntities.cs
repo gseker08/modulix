@@ -165,3 +165,88 @@ public sealed class SegmentMember : MarketingEntity
 
     public Guid? AddedBy { get; internal set; }
 }
+
+public static class JourneyStatuses
+{
+    public const string Draft = "Draft";
+    public const string Active = "Active";
+    public const string Paused = "Paused";
+
+    /// <summary>Arşivlenen yolculuk yeni kayıt almaz; geçmiş raporlarda kalır.</summary>
+    public const string Archived = "Archived";
+
+    public static IReadOnlyList<string> All { get; } = [Draft, Active, Paused, Archived];
+}
+
+/// <summary>Bir hedefin aynı yolculuğa tekrar girip giremeyeceği (ADR-0056). Aynı anda en çok bir etkin kayıt vardır.</summary>
+public static class JourneyReentryPolicies
+{
+    public const string Never = "Never";
+    public const string AfterExit = "AfterExit";
+    public const string AfterCompletion = "AfterCompletion";
+
+    public static IReadOnlyList<string> All { get; } = [Never, AfterExit, AfterCompletion];
+}
+
+public static class EnrollmentStatuses
+{
+    public const string Active = "Active";
+    public const string Completed = "Completed";
+    public const string Exited = "Exited";
+
+    public static IReadOnlyList<string> All { get; } = [Active, Completed, Exited];
+}
+
+/// <summary>
+/// Müşteri yolculuğu (ADR-0056). Giriş kaynağı segmenttir (dilim 1); hedef türü segmentinkiyle aynıdır ve oluşturulduktan sonra değişmez.
+/// Durum yalnızca iş akışıyla yazılır (genel PUT yok sayar). Adımlar ADR-0027 kural sürümündedir; bu kayıt yolculuğu ve girişini yönetir.
+/// </summary>
+public sealed class Journey : MarketingEntity, IOwnedEntity
+{
+    public const int CodeMaxLength = 40;
+    public const int NameMaxLength = 150;
+    public const int DescriptionMaxLength = 1000;
+    public const int ExitConditionMaxLength = 20000;
+
+    public string Code { get; internal set; } = string.Empty;
+
+    public string Name { get; internal set; } = string.Empty;
+
+    public string? Description { get; internal set; }
+
+    public string Target { get; internal set; } = SegmentTargets.Person;
+
+    /// <summary>Giriş segmenti (yayımlanmış, etkin ve aynı hedef türünde olmalıdır).</summary>
+    public Guid SegmentId { get; internal set; }
+
+    public string ReentryPolicy { get; internal set; } = JourneyReentryPolicies.Never;
+
+    /// <summary>Her adımdan önce değerlendirilen çıkış koşulu (JSON koşul ağacı); boşsa yalnızca abonelikten çıkma çıkarır.</summary>
+    public string? ExitCondition { get; internal set; }
+
+    public Guid? OwnerId { get; internal set; }
+
+    public string Status { get; internal set; } = JourneyStatuses.Draft;
+
+    public Guid? CreatedBy { get; internal set; }
+
+    public Guid? UpdatedBy { get; internal set; }
+}
+
+/// <summary>Bir hedefin yolculuktaki kaydı (ADR-0056). Aynı hedef aynı yolculukta aynı anda bir kez etkin olabilir (filtreli benzersiz indeks).</summary>
+public sealed class JourneyEnrollment : MarketingEntity
+{
+    public const int ExitReasonMaxLength = 200;
+
+    public Guid JourneyId { get; internal set; }
+
+    public Guid TargetId { get; internal set; }
+
+    public string Status { get; internal set; } = EnrollmentStatuses.Active;
+
+    public DateTimeOffset EnteredAt { get; internal set; } = DateTimeOffset.UtcNow;
+
+    public DateTimeOffset? ExitedAt { get; internal set; }
+
+    public string? ExitReason { get; internal set; }
+}
