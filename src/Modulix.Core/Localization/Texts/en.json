@@ -13855,5 +13855,12 @@
   "server.shared.lat-long-together": "Latitude and longitude must be entered together.",
   "server.shared.place-exists": "A place with the same name already exists in this country.",
   "server.shared.activity-unknown": "Activity not in the catalog: {0}.",
-  "logistics.server.workflow.unknown-action": "Unknown action."
+  "logistics.server.workflow.unknown-action": "Unknown action.",
+  "marketing.server.journey.only-draft-publish": "Only a draft journey can be published.",
+  "marketing.server.journey.only-active-pause": "Only an active journey can be paused.",
+  "marketing.server.journey.only-paused-resume": "Only a paused journey can be resumed.",
+  "marketing.server.journey.already-archived": "The journey is already archived.",
+  "marketing.server.journey.segment-not-active": "The entry segment is not active; the journey cannot be started.",
+  "meta.permission.marketing.journeys.publish": "Publishes, pauses, resumes and archives customer journeys",
+  "meta.permission.marketing.journeys.publish.resource": "Journeys"
 }
