@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Modulix.Core.Contracts.Events;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Settings;
 using Modulix.Core.Contracts.Tenancy;
@@ -261,16 +262,16 @@ internal static class QuoteSharingEndpoints
             sizeLimit.MaxRequestBodySize = MaxBodyBytes;
         }
 
-        return http.Request.ContentLength > MaxBodyBytes ? Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "Gövde çok büyük.") : null;
+        return http.Request.ContentLength > MaxBodyBytes ? LocalizedProblems.Problem(StatusCodes.Status413PayloadTooLarge, CrmMessages.Endpoint.BodyTooLarge) : null;
     }
 
-    private static IResult Unknown() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Bağlantı geçersiz.");
+    private static IResult Unknown() => LocalizedProblems.Problem(StatusCodes.Status404NotFound, CrmMessages.Endpoint.LinkInvalid);
 
     private static IResult Failure(QuotePortalError error, string? message, IReadOnlyDictionary<string, string>? fields) => error switch
     {
         QuotePortalError.Invalid => Results.ValidationProblem(
             (fields ?? new Dictionary<string, string>()).ToDictionary(f => f.Key, f => new[] { f.Value }), title: message, statusCode: StatusCodes.Status400BadRequest),
-        QuotePortalError.Conflict => Results.Problem(statusCode: StatusCodes.Status409Conflict, title: message ?? "Teklif durumu değişti."),
+        QuotePortalError.Conflict => LocalizedProblems.Problem(StatusCodes.Status409Conflict, message is { } conflict ? (ServerMessage)conflict : CrmMessages.Endpoint.QuoteStateChanged),
         _ => Unknown(),
     };
 

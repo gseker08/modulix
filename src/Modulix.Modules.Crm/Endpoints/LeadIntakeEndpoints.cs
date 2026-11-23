@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Hosting;
 using Modulix.Modules.Crm.Leads;
 using Modulix.Shared.Crm;
@@ -89,13 +90,13 @@ internal static class LeadIntakeEndpoints
 
         if (http.Request.ContentLength > MaxBodyBytes)
         {
-            return Problem(StatusCodes.Status413PayloadTooLarge, "Gövde çok büyük.");
+            return Problem(StatusCodes.Status413PayloadTooLarge, CrmMessages.Endpoint.BodyTooLarge);
         }
 
 
         if (!http.Request.HasJsonContentType())
         {
-            return Problem(StatusCodes.Status415UnsupportedMediaType, "JSON gönderin.");
+            return Problem(StatusCodes.Status415UnsupportedMediaType, CrmMessages.Endpoint.JsonRequired);
         }
 
         JsonObject? fields;
@@ -105,18 +106,18 @@ internal static class LeadIntakeEndpoints
         }
         catch (Exception exception) when (exception is JsonException or BadHttpRequestException or InvalidOperationException)
         {
-            return Problem(StatusCodes.Status400BadRequest, "Geçersiz istek gövdesi.");
+            return Problem(StatusCodes.Status400BadRequest, CrmMessages.Endpoint.InvalidBody);
         }
 
         if (fields is null)
         {
-            return Problem(StatusCodes.Status400BadRequest, "Geçersiz istek gövdesi.");
+            return Problem(StatusCodes.Status400BadRequest, CrmMessages.Endpoint.InvalidBody);
         }
 
         // Bilinmeyen ya da erişime kapalı firma ve kapalı ya da salt okunur modül (ADR-0028) aynı yanıtı alır: form kabul edilmez.
         if (await scopes.OpenAsync(tenant, Identity, write: true, http.TraceIdentifier, ct) is not { } opened)
         {
-            return Problem(StatusCodes.Status404NotFound, "Form bulunamadı.");
+            return Problem(StatusCodes.Status404NotFound, CrmMessages.Endpoint.FormNotFound);
         }
 
         await using var scope = opened;
@@ -136,8 +137,8 @@ internal static class LeadIntakeEndpoints
             LeadIntakeOutcome.Accepted => Results.Json(new PublicLeadFormResponse(true, null), statusCode: StatusCodes.Status202Accepted),
             LeadIntakeOutcome.Invalid => Results.ValidationProblem(
                 result.Errors!.ToDictionary(e => e.Key, e => e.Value), title: "Form gönderilemedi.", statusCode: StatusCodes.Status400BadRequest),
-            LeadIntakeOutcome.NotFound => Problem(StatusCodes.Status404NotFound, "Form bulunamadı."),
-            _ => Problem(StatusCodes.Status403Forbidden, "Gönderim kabul edilmedi."),
+            LeadIntakeOutcome.NotFound => Problem(StatusCodes.Status404NotFound, CrmMessages.Endpoint.FormNotFound),
+            _ => Problem(StatusCodes.Status403Forbidden, CrmMessages.Endpoint.SubmissionRejected),
         };
     }
 
@@ -167,5 +168,5 @@ internal static class LeadIntakeEndpoints
         http.Response.Headers.Vary = "Origin";
     }
 
-    private static IResult Problem(int status, string title) => Results.Problem(statusCode: status, title: title);
+    private static IResult Problem(int status, ServerMessage title) => LocalizedProblems.Problem(status, title);
 }

@@ -74,7 +74,7 @@ internal sealed class QuoteSharing(
         var quote = loaded.Quote!;
         if (quote.Status == QuoteStatus.Draft)
         {
-            return Conflict<QuoteDocumentSnapshot>("Taslak teklif için müşteri belgesi üretilemez; önce müşteriye sunun.");
+            return Conflict<QuoteDocumentSnapshot>(CrmMessages.Sharing.DraftNoDocument);
         }
 
         var company = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Company, quote.CompanyId), cancellationToken);
@@ -119,7 +119,7 @@ internal sealed class QuoteSharing(
         var quote = loaded.Quote!;
         if (quote.Status == QuoteStatus.Draft)
         {
-            return Conflict<QuoteDocumentInfo>("Taslak teklif için müşteri belgesi üretilemez; önce müşteriye sunun.");
+            return Conflict<QuoteDocumentInfo>(CrmMessages.Sharing.DraftNoDocument);
         }
 
         // Revizyon başına tek belge: varsa mevcut belge döner, hiçbir şey değiştirilmez.
@@ -160,7 +160,7 @@ internal sealed class QuoteSharing(
         catch (DbUpdateException)
         {
             // Aynı revizyon için eşzamanlı ikinci üretim benzersiz indekste elenir.
-            return Conflict<QuoteDocumentInfo>("Belge başka bir istekte üretildi; sayfayı yenileyin.");
+            return Conflict<QuoteDocumentInfo>(CrmMessages.Sharing.DocumentRace);
         }
 
         return result.IsSuccess
@@ -298,7 +298,7 @@ internal sealed class QuoteSharing(
 
         if (link.RevokedAt is not null)
         {
-            return Conflict<QuoteShareLinkInfo>("Bağlantı zaten iptal edilmiş.");
+            return Conflict<QuoteShareLinkInfo>(CrmMessages.Sharing.LinkRevoked);
         }
 
         var now = time.GetUtcNow();

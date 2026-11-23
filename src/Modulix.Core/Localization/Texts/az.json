@@ -13676,5 +13676,19 @@
   "logistics.server.delivery.not-allowed": "Çatdırılma qeyd etmək üçün səlahiyyətiniz yoxdur.",
   "logistics.server.delivery.outcome-unknown": "Naməlum çatdırılma nəticəsi.",
   "logistics.server.delivery.only-in-transit": "Çatdırılma yalnız yoldakı göndəriş üçün qeyd edilir.",
-  "logistics.server.dashboard.forbidden": "Panelə baxmaq üçün sorğu, göndəriş, reys və ya sürücü oxuma icazəsi lazımdır."
+  "logistics.server.dashboard.forbidden": "Panelə baxmaq üçün sorğu, göndəriş, reys və ya sürücü oxuma icazəsi lazımdır.",
+  "crm.server.sharing.draft-no-document": "Layihə təklif üçün müştəri sənədi yaradıla bilməz; əvvəlcə müştəriyə təqdim edin.",
+  "crm.server.sharing.document-race": "Sənəd başqa sorğuda yaradılıb; səhifəni yeniləyin.",
+  "crm.server.sharing.link-revoked": "Keçid artıq ləğv edilib.",
+  "crm.server.forecast.compare-no-previous": "Müqayisə ediləcək əvvəlki versiya yoxdur; versiya seçin.",
+  "crm.server.forecast.compare-mismatch": "Yalnız eyni dövr, əhatə və valyutadakı versiyalar müqayisə edilir.",
+  "crm.server.forecast.lines-need-permission": "Sətirlərə baxmaq üçün imkan və məbləğ icazəsi lazımdır.",
+  "crm.server.forecast.scope-exceeds": "Bu proqnozun əhatəsi məlumat əhatənizi aşır; şəkil natamam qalacağı üçün əməliyyat edilə bilməz.",
+  "crm.server.endpoint.body-too-large": "Gövdə çox böyükdür.",
+  "crm.server.endpoint.json-required": "JSON göndərin.",
+  "crm.server.endpoint.invalid-body": "Yanlış sorğu gövdəsi.",
+  "crm.server.endpoint.form-not-found": "Form tapılmadı.",
+  "crm.server.endpoint.submission-rejected": "Göndəriş qəbul edilmədi.",
+  "crm.server.endpoint.link-invalid": "Keçid yanlışdır.",
+  "crm.server.endpoint.quote-state-changed": "Təklifin vəziyyəti dəyişib."
 }
