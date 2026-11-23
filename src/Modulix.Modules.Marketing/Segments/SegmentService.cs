@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Marketing.Contracts;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Marketing.Domain;
@@ -47,7 +48,7 @@ internal sealed class SegmentService(
     {
         if (!Enum.TryParse<SegmentTarget>(target, ignoreCase: true, out var parsedTarget) || !Enum.IsDefined(parsedTarget) || char.IsDigit(target[0]))
         {
-            return RecordResult<SegmentEvaluation>.Fail(RecordErrorCode.ValidationFailed, "Doğrulama hatası.", [new RecordFieldError("target", "Geçersiz hedef türü.")]);
+            return RecordResult<SegmentEvaluation>.Fail(RecordErrorCode.ValidationFailed, ServerMessages.Record.ValidationFailed, [new RecordFieldError("target", MarketingMessages.SegmentService.InvalidTarget)]);
         }
 
         var (parsed, errors) = SegmentConditions.Parse(condition);
@@ -89,7 +90,7 @@ internal sealed class SegmentService(
         var segment = SegmentState.From(loaded.Value!);
         if (segment.Status == SegmentStatuses.Archived)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Arşivlenen segment yayımlanamaz; önce geri alın.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, MarketingMessages.SegmentService.ArchivedPublish);
         }
 
         SegmentCondition? condition = null;
@@ -99,7 +100,7 @@ internal sealed class SegmentService(
             var (parsed, errors) = SegmentConditions.Parse(segment.Draft);
             if (parsed is null)
             {
-                return Invalid<RecordData>(errors.Count == 0 ? [new ConditionError("", "Yayımlamak için taslak koşul yazılmalıdır.")] : errors);
+                return Invalid<RecordData>(errors.Count == 0 ? [new ConditionError("", MarketingMessages.Condition.DraftRequired)] : errors);
             }
 
             condition = parsed;
@@ -107,7 +108,7 @@ internal sealed class SegmentService(
             var published = await PublishedDefinitionAsync(segmentId, cancellationToken);
             if (segment.Status == SegmentStatuses.Active && published == definition)
             {
-                return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Taslakta yayımlanmamış değişiklik yok.");
+                return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, MarketingMessages.SegmentService.NoDraftChange);
             }
         }
         else if (segment.Status == SegmentStatuses.Active)
@@ -159,7 +160,7 @@ internal sealed class SegmentService(
         var segment = SegmentState.From(loaded.Value!);
         if (segment.Status != SegmentStatuses.Active)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, "Yalnızca etkin segment yenilenir.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, MarketingMessages.SegmentService.OnlyActiveRefresh);
         }
 
         var condition = await PublishedConditionAsync(segment, cancellationToken);
@@ -196,12 +197,12 @@ internal sealed class SegmentService(
         var segment = SegmentState.From(loaded.Value!);
         if (segment.Status != SegmentStatuses.Active)
         {
-            return RecordResult<IReadOnlyList<Guid>>.Fail(RecordErrorCode.Conflict, "Segment etkin değil; yalnızca yayımlanmış (etkin) segment hedef kitlede kullanılır.");
+            return RecordResult<IReadOnlyList<Guid>>.Fail(RecordErrorCode.Conflict, MarketingMessages.SegmentService.NotActive);
         }
 
         if (segment.Target != expectedTarget)
         {
-            return RecordResult<IReadOnlyList<Guid>>.Fail(RecordErrorCode.Conflict, "Segmentin hedef türü kampanyanınkiyle aynı değil.");
+            return RecordResult<IReadOnlyList<Guid>>.Fail(RecordErrorCode.Conflict, MarketingMessages.SegmentService.TargetMismatch);
         }
 
         var condition = await PublishedConditionAsync(segment, cancellationToken);
@@ -218,27 +219,27 @@ internal sealed class SegmentService(
         catch (SegmentConditionException ex)
         {
             return RecordResult<IReadOnlyList<Guid>>.Fail(
-                RecordErrorCode.ValidationFailed, "Koşul geçersiz.", [.. ex.Errors.Select(e => new RecordFieldError("condition", e.Message))]);
+                RecordErrorCode.ValidationFailed, MarketingMessages.SegmentService.ConditionInvalid, [.. ex.Errors.Select(e => new RecordFieldError("condition", e.Message))]);
         }
         catch (SegmentTimeoutException ex)
         {
-            return RecordResult<IReadOnlyList<Guid>>.Fail(RecordErrorCode.Conflict, ex.Message);
+            return RecordResult<IReadOnlyList<Guid>>.Fail(RecordErrorCode.Conflict, ex.Reason);
         }
         catch (SegmentTooLargeException ex)
         {
-            return RecordResult<IReadOnlyList<Guid>>.Fail(RecordErrorCode.Conflict, ex.Message);
+            return RecordResult<IReadOnlyList<Guid>>.Fail(RecordErrorCode.Conflict, ex.Reason);
         }
     }
 
     public Task<RecordResult<RecordData>> ArchiveAsync(Guid segmentId, long? expectedVersion, CancellationToken cancellationToken) =>
-        ChangeStatusAsync(segmentId, expectedVersion, s => s.Status == SegmentStatuses.Archived ? null : SegmentStatuses.Archived, "Segment zaten arşivde.", cancellationToken);
+        ChangeStatusAsync(segmentId, expectedVersion, s => s.Status == SegmentStatuses.Archived ? null : SegmentStatuses.Archived, MarketingMessages.SegmentService.AlreadyArchived, cancellationToken);
 
     public Task<RecordResult<RecordData>> RestoreAsync(Guid segmentId, long? expectedVersion, CancellationToken cancellationToken) =>
         ChangeStatusAsync(
             segmentId,
             expectedVersion,
             s => s.Status != SegmentStatuses.Archived ? null : s.PublishedVersion > 0 ? SegmentStatuses.Active : SegmentStatuses.Draft,
-            "Yalnızca arşivlenen segment geri alınır.",
+            MarketingMessages.SegmentService.OnlyArchivedRestore,
             cancellationToken);
 
     public async Task<RecordResult<RecordData>> CopyAsync(Guid segmentId, string code, string name, CancellationToken cancellationToken)
@@ -269,7 +270,7 @@ internal sealed class SegmentService(
     }
 
     private async Task<RecordResult<RecordData>> ChangeStatusAsync(
-        Guid segmentId, long? expectedVersion, Func<SegmentState, string?> next, string noChangeMessage, CancellationToken cancellationToken)
+        Guid segmentId, long? expectedVersion, Func<SegmentState, string?> next, ServerMessage noChangeMessage, CancellationToken cancellationToken)
     {
         var loaded = await LoadAsync(segmentId, cancellationToken);
         if (!loaded.IsSuccess)
@@ -324,7 +325,7 @@ internal sealed class SegmentService(
         }
         catch (SegmentTimeoutException ex)
         {
-            return RecordResult<SegmentEvaluation>.Fail(RecordErrorCode.Conflict, ex.Message);
+            return RecordResult<SegmentEvaluation>.Fail(RecordErrorCode.Conflict, ex.Reason);
         }
     }
 
@@ -342,7 +343,7 @@ internal sealed class SegmentService(
         var definition = await PublishedDefinitionAsync(segment.Id, cancellationToken);
         var (condition, errors) = SegmentConditions.Parse(definition);
         return condition is null
-            ? (null, new RecordError(RecordErrorCode.ValidationFailed, "Yayımlanmış koşul okunamadı.", [.. errors.Select(e => new RecordFieldError(e.Path, e.Message))]))
+            ? (null, new RecordError(RecordErrorCode.ValidationFailed, MarketingMessages.SegmentService.PublishedUnreadable, [.. errors.Select(e => new RecordFieldError(e.Path, e.Message))]))
             : (condition, null);
     }
 
@@ -357,7 +358,7 @@ internal sealed class SegmentService(
     private static RecordResult<T> Invalid<T>(IReadOnlyList<ConditionError> errors) =>
         RecordResult<T>.Fail(
             RecordErrorCode.ValidationFailed,
-            "Koşul geçersiz.",
+            MarketingMessages.SegmentService.ConditionInvalid,
             [.. errors.Select(e => new RecordFieldError(e.Path.Length == 0 ? "condition" : "condition." + e.Path, e.Message))]);
 
     /// <summary>Segment kaydının iş akışının ihtiyaç duyduğu alanları.</summary>

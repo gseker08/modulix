@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Modules.Marketing.Contracts;
 using Modulix.Core.Contracts.Persistence;
 using Modulix.Core.Contracts.Records;
@@ -110,7 +111,7 @@ internal sealed class SegmentEngine(
     {
         if (request.Condition is null && request.SegmentId is null)
         {
-            throw new SegmentConditionException([new ConditionError("", "Koşul ya da segment gerekli.")]);
+            throw new SegmentConditionException([new ConditionError("", MarketingMessages.Condition.Required)]);
         }
 
         var catalog = await CatalogAsync(request.Target, cancellationToken);
@@ -153,7 +154,7 @@ internal sealed class SegmentEngine(
             result = (result is null ? includes : result.Union(includes)).Except(excludes);
         }
 
-        return result ?? throw new SegmentConditionException([new ConditionError("", "Koşul gerekli.")]);
+        return result ?? throw new SegmentConditionException([new ConditionError("", MarketingMessages.Condition.ConditionRequired)]);
     }
 
     private IQueryable<Guid> Compose(SegmentCondition node, Dictionary<string, SegmentFieldDefinition> byKey, SegmentEvaluationContext context)

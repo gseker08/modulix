@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Marketing.Domain;
 using Modulix.Modules.Marketing.Records;
@@ -48,7 +49,7 @@ internal sealed class CampaignReports(IRecordPipeline pipeline, MarketingStoreCo
     {
         if (!await permissions.HasPermissionAsync(MarketingModule.Permissions.ReportsRead, cancellationToken))
         {
-            return Fail<CampaignReport>(RecordErrorCode.PermissionDenied, $"Bu işlem için '{MarketingModule.Permissions.ReportsRead}' izni gerekir.");
+            return Fail<CampaignReport>(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(MarketingModule.Permissions.ReportsRead));
         }
 
         var filters = new Dictionary<string, string>();
@@ -118,7 +119,7 @@ internal sealed class CampaignReports(IRecordPipeline pipeline, MarketingStoreCo
             || !await permissions.HasPermissionAsync(MarketingModule.Permissions.RecipientsRead, cancellationToken))
         {
             return Fail<TargetHistory>(RecordErrorCode.PermissionDenied,
-                $"Bu işlem için '{MarketingModule.Permissions.ReportsRead}' ve '{MarketingModule.Permissions.RecipientsRead}' izinleri gerekir.");
+                MarketingMessages.Report.PermissionsBoth(MarketingModule.Permissions.ReportsRead, MarketingModule.Permissions.RecipientsRead));
         }
 
         var visible = await VisibleCampaignsAsync(new Dictionary<string, string>(), cancellationToken);
@@ -209,5 +210,5 @@ internal sealed class CampaignReports(IRecordPipeline pipeline, MarketingStoreCo
 
     private static decimal? Money(JsonNode? node) => node is null ? null : node.GetValue<decimal>();
 
-    private static RecordResult<T> Fail<T>(RecordErrorCode code, string message) => RecordResult<T>.Fail(code, message, null);
+    private static RecordResult<T> Fail<T>(RecordErrorCode code, ServerMessage message) => RecordResult<T>.Fail(code, message, null);
 }
