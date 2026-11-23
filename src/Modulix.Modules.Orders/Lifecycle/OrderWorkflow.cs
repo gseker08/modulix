@@ -99,13 +99,13 @@ internal sealed class OrderWorkflow(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(permission))
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir.");
+            return RecordResult<RecordData>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission));
         }
 
         var text = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         if (OrderTransitions.RequiresReason(action) && text is null)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Gerekçe zorunludur.", [new RecordFieldError("reason", "Gerekçe zorunludur.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, OrdersMessages.Workflow.ReasonRequired, [new RecordFieldError("reason", OrdersMessages.Workflow.ReasonRequired)]);
         }
 
         var rule = OrderTransitions.Can(action, await StateOfAsync(loaded.Value!, id, cancellationToken));
