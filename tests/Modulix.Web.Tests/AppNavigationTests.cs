@@ -5,6 +5,7 @@ using Modulix.Shared.Contracts;
 using Modulix.Shared.Crm;
 using Modulix.Shared.Marketing;
 using Modulix.Shared.Orders;
+using Modulix.Shared.Reporting;
 using Modulix.Shared.Support;
 using Modulix.Shared.Fleet;
 using Modulix.Shared.Hr;
@@ -482,6 +483,117 @@ public class AppNavigationTests
         var realNames = AppCatalog.All.Where(a => a.ParentId is null).Select(a => a.Name).ToHashSet();
         Assert.All(AppCatalog.Planned, p => Assert.DoesNotContain(p.Name, realNames));
         Assert.DoesNotContain(Nav(AllModules, SalesUser).Roots(), r => AppCatalog.Planned.Any(p => p.Name == r.Name));
+    }
+
+    [Fact]
+    public void Panel_categories_cover_every_root_app_and_count_only_reachable_ones()
+    {
+        // Kategori menüsü kartları süzer: kategorisi olmayan ana uygulama yalnızca "Tüm Uygulamalar"da kalırdı.
+        var rootGroups = new[] { AppCatalog.SalesGroup, AppCatalog.ServiceGroup, AppCatalog.OperationsGroup, AppCatalog.ManagementGroup };
+        Assert.All(AppCatalog.All.Where(a => a.ParentId is null), a => Assert.Contains(a.Group, rootGroups));
+        Assert.All(AppCatalog.Groups.Where(g => rootGroups.Contains(g.Id)), g => Assert.NotNull(g.Icon));
+
+        var nav = Nav([CrmAccess.ModuleKey, SupportAccess.ModuleKey], [CrmAccess.CompaniesRead, SupportAccess.TicketsRead, ReportAccess.Read, CoreAccess.DecideApprovals]);
+        var groups = nav.Grouped(nav.Roots());
+
+        Assert.Equal([AppCatalog.SalesGroup, AppCatalog.ServiceGroup, AppCatalog.ManagementGroup], groups.Select(g => g.Group?.Id));
+        Assert.Equal([AppCatalog.Approvals, AppCatalog.Reports], groups[2].Apps.Select(a => a.Id));
+
+        // Erişilemeyen uygulama sayılmaz: izni olmayan kullanıcıda Yönetim kategorisi hiç çıkmaz.
+        var limited = Nav([CrmAccess.ModuleKey, SupportAccess.ModuleKey], [CrmAccess.CompaniesRead]);
+        Assert.Equal([AppCatalog.SalesGroup], limited.Grouped(limited.Roots()).Select(g => g.Group?.Id));
+    }
+
+    [Fact]
+    public void Shortcuts_list_the_ones_the_user_can_use()
+    {
+        var nav = Nav(
+            [CrmAccess.ModuleKey, SupportAccess.ModuleKey, LogisticsAccess.ModuleKey],
+            [CrmAccess.CompaniesWrite, SupportAccess.TicketsCreate, LogisticsAccess.ShipmentsRead, CoreAccess.DecideApprovals]);
+
+        Assert.Equal(
+            ["crm.new-company", "support.new-ticket", "logistics.shipments", "approvals.pending"],
+            nav.Shortcuts().Select(s => s.Id));
+    }
+
+    [Fact]
+    public void Shortcut_without_permission_is_hidden()
+    {
+        // Okuma izni yazma kısayolunu açmaz; izni olmayan kullanıcı kısayol görmez.
+        var reader = Nav([CrmAccess.ModuleKey, SupportAccess.ModuleKey], [CrmAccess.CompaniesRead, SupportAccess.TicketsRead]);
+
+        Assert.Empty(reader.Shortcuts());
+    }
+
+    [Fact]
+    public void Shortcut_of_a_module_that_is_not_enabled_for_the_tenant_is_hidden()
+    {
+        // Tenant izolasyonu: başka firmada açık olan modülün kısayolu, modülü kapalı firmada izin olsa da çıkmaz.
+        var nav = Nav([CrmAccess.ModuleKey], [CrmAccess.CompaniesWrite, SupportAccess.TicketsCreate, LogisticsAccess.ShipmentsRead]);
+
+        Assert.Equal(["crm.new-company"], nav.Shortcuts().Select(s => s.Id));
+    }
+
+    [Fact]
+    public void Shortcut_catalog_is_consistent()
+    {
+        var ids = AppCatalog.Shortcuts.Select(s => s.Id).ToList();
+        Assert.Equal(ids.Count, ids.Distinct().Count());
+
+        // Her kısayol var olan bir ekrana gider ve korumasız değildir.
+        Assert.All(AppCatalog.Shortcuts, s =>
+        {
+            Assert.NotNull(AppNavigation.Resolve(s.Route));
+            Assert.True(s.Permission is not null || s.AnyPermission is { Count: > 0 }, s.Id);
+        });
+    }
+
+    private static AppNavigation AdminNav(string[] modules)
+    {
+        var session = new SessionState(new ApiClient(new HttpClient()));
+        Set(session, nameof(SessionState.Access), new MyAccessResponse(modules, [], IsAdministrator: true));
+        Set(session, nameof(SessionState.User), new MeResponse(Guid.NewGuid(), "a@example.com", "Test", Guid.NewGuid(), []));
+        return new AppNavigation(session);
+    }
+
+    [Fact]
+    public void Suggested_lists_modules_that_are_not_enabled_for_the_administrator()
+    {
+        var suggested = AdminNav([CrmAccess.ModuleKey, SupportAccess.ModuleKey]).Suggested().Select(a => a.Id).ToList();
+
+        Assert.Contains(AppCatalog.Logistics, suggested);
+        Assert.Contains(AppCatalog.Hr, suggested);
+        Assert.DoesNotContain(AppCatalog.Crm, suggested);
+        Assert.DoesNotContain(AppCatalog.Support, suggested);
+    }
+
+    [Fact]
+    public void Suggested_never_lists_core_areas_or_the_platform_app()
+    {
+        // Modülü olmayan alanlar (Yönetim, Raporlar, Onay merkezi) ve platform uygulaması öneri değildir.
+        var suggested = AdminNav([]).Suggested();
+
+        Assert.NotEmpty(suggested);
+        Assert.All(suggested, a => Assert.True(a.ParentId is null && a.ModuleKey is not null && !a.PlatformOnly, a.Id));
+    }
+
+    [Fact]
+    public void Suggested_is_empty_for_a_user_who_is_not_an_administrator()
+    {
+        // Yetki: modül açtırma kararı yöneticinindir; diğer kullanıcılar kapalı modülleri görmez.
+        Assert.Empty(Nav([CrmAccess.ModuleKey], SalesUser).Suggested());
+    }
+
+    [Fact]
+    public void Suggested_follows_the_modules_of_the_active_tenant_and_grants_no_access()
+    {
+        // Tenant izolasyonu: öneri yalnızca etkin firmanın açık modüllerinden hesaplanır; her modülü açık firmada öneri yoktur.
+        var all = AppCatalog.All.Where(a => a.ModuleKey is not null).Select(a => a.ModuleKey!).Distinct().ToArray();
+        Assert.Empty(AdminNav(all).Suggested());
+
+        // Öneri erişim değildir: kapalı modül panelde uygulama olarak listelenmez.
+        var nav = AdminNav([CrmAccess.ModuleKey]);
+        Assert.DoesNotContain(nav.Roots(), r => nav.Suggested().Any(s => s.Id == r.Id));
     }
 
     [Fact]

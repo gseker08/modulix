@@ -1,0 +1,100 @@
+@* Formdaki çoklu seçim alanı (docs/design-system/component-catalog.md → PickDialog): seçilenler kaldırılabilir etiket olarak durur,
+   seçim atama penceresinde (PickDialog) yapılır; forma işaret kutulu liste yazılmaz. "Uygula" seçimi SelectedChanged ile forma verir,
+   kayıt formla birlikte yapılır. Pencere formun içinde açıldığı için içindeki girdi olayları (arama, işaret kutuları) forma taşınmaz;
+   seçim gerçekten değişince alan kendi "input" olayını yayar, böylece formun "değişti" izlemesi (oninput) çalışır. Listede olmayan seçili anahtar (ör. pasife alınmış seçenek) etiket olarak kalır ki kaldırılabilsin. *@
+@typeparam TKey where TKey : notnull
+@inject IJSRuntime Js
+
+<div @ref="root">
+    @if (Chips.Count > 0)
+    {
+        <div class="assigned-tags">
+            @foreach (var chip in Chips)
+            {
+                <button type="button" class="badge tag pick-chip" title="@chip.Title" disabled="@(Disabled || chip.Locked)"
+                        aria-label="@Texts.Get("pick.remove", chip.Name)" @onclick="() => RemoveAsync(chip.Key)">
+                    @chip.Name
+                    @if (!Disabled && !chip.Locked)
+                    {
+                        <AppIcon Name="x" Size="12" />
+                    }
+                </button>
+            }
+        </div>
+    }
+    <button type="button" id="@Id" class="btn btn-tonal" disabled="@Disabled" @onclick="() => picking = true">
+        <AppIcon Name="plus" Size="16" /> @(ButtonLabel ?? Texts.Get("pick.choose"))
+    </button>
+
+    <div @oninput:stopPropagation="true">
+    <PickDialog TKey="TKey" Open="picking" Title="@Title" SearchPlaceholder="@(SearchPlaceholder ?? Texts.Get("common.search"))"
+                GroupLabel="@GroupLabel" Icon="@Icon" Items="Items" Selected="Selected" SaveLabel="@Texts.Get("pick.apply")"
+                OnSave="ApplyAsync" OnClose="() => picking = false" />
+    </div>
+</div>
+
+@code {
+    private bool picking;
+    private ElementReference root;
+
+    /// <summary>Pencereyi açan düğmenin kimliği; alan etiketi <c>for</c> ile buna bağlanır.</summary>
+    [Parameter] public string? Id { get; set; }
+
+    /// <summary>Pencerenin başlığı (alanın adı).</summary>
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    /// <summary>Düğme metni; verilmezse "Seç".</summary>
+    [Parameter] public string? ButtonLabel { get; set; }
+
+    [Parameter] public string? SearchPlaceholder { get; set; }
+
+    /// <summary>Grup süzgecinin adı; yalnızca gruplu listede (<see cref="PickItem{TKey}.Group"/>) kullanılır.</summary>
+    [Parameter] public string? GroupLabel { get; set; }
+
+    [Parameter] public string Icon { get; set; } = "layers";
+
+    [Parameter, EditorRequired] public IReadOnlyList<PickItem<TKey>> Items { get; set; } = [];
+
+    [Parameter, EditorRequired] public IEnumerable<TKey> Selected { get; set; } = [];
+
+    /// <summary>Yeni seçim (listedeki sırayla; listede olmayan eski seçimler sonda korunur).</summary>
+    [Parameter] public EventCallback<IReadOnlyList<TKey>> SelectedChanged { get; set; }
+
+    /// <summary>Listede olmayan seçili anahtarın etiketi; verilmezse anahtarın kendisi. Sonuna "(pasif)" eklenir.</summary>
+    [Parameter] public Func<TKey, string>? UnknownName { get; set; }
+
+    /// <summary>Etiketin üzerine gelince görünen açıklama (ör. faaliyetin tam yolu).</summary>
+    [Parameter] public Func<TKey, string?>? ChipTitle { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    private IReadOnlyList<Chip> Chips
+    {
+        get
+        {
+            var byKey = Items.ToDictionary(i => i.Key);
+            return
+            [
+                .. Selected.Distinct().Select(key => byKey.TryGetValue(key, out var item)
+                    ? new Chip(key, item.Name, ChipTitle?.Invoke(key), item.Locked)
+                    : new Chip(key, $"{UnknownName?.Invoke(key) ?? key.ToString()} ({Texts.Get("common.inactiveLower")})", null, false)),
+            ];
+        }
+    }
+
+    private Task ApplyAsync(IReadOnlyList<TKey> result)
+    {
+        picking = false;
+        return SetAsync(result);
+    }
+
+    private Task RemoveAsync(TKey key) => SetAsync([.. Selected.Distinct().Where(k => !EqualityComparer<TKey>.Default.Equals(k, key))]);
+
+    private async Task SetAsync(IReadOnlyList<TKey> keys)
+    {
+        await SelectedChanged.InvokeAsync(keys);
+        await Js.InvokeVoidAsync("modulixLookup.notifyInput", root);
+    }
+
+    private sealed record Chip(TKey Key, string Name, string? Title, bool Locked);
+}

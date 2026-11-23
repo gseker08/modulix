@@ -115,7 +115,7 @@ internal sealed class OrderHandovers(
     {
         if (!PermissionOf.TryGetValue(action, out var permission))
         {
-            return Invalid("action", "Bilinmeyen eylem.");
+            return Invalid("action", OrdersMessages.Workflow.UnknownAction);
         }
 
         var loaded = await pipeline.GetAsync(new RecordRef(OrdersModule.Entities.Handover, handoverId), cancellationToken);

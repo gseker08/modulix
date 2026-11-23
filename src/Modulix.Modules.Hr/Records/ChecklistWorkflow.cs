@@ -126,7 +126,7 @@ internal sealed class ChecklistWorkflow(IRecordPipeline pipeline, HrStoreContext
     {
         if (TaskDefinitions.FirstOrDefault(d => d.Action == action) is not { Action: not null } definition)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.", [new RecordFieldError("action", "Bilinmeyen eylem.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.UnknownAction, [new RecordFieldError("action", HrMessages.Workflow.UnknownAction)]);
         }
 
         var record = await pipeline.GetAsync(new RecordRef(HrModule.Entities.ChecklistTask, taskId), cancellationToken);
@@ -166,7 +166,7 @@ internal sealed class ChecklistWorkflow(IRecordPipeline pipeline, HrStoreContext
     {
         if (action != ChecklistActions.Cancel)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.", [new RecordFieldError("action", "Bilinmeyen eylem.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.UnknownAction, [new RecordFieldError("action", HrMessages.Workflow.UnknownAction)]);
         }
 
         var record = await pipeline.GetAsync(new RecordRef(HrModule.Entities.EmployeeChecklist, checklistId), cancellationToken);

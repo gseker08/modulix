@@ -36,6 +36,12 @@ internal static class SupportMessages
     /// <summary>Talep kaydı doğrulamaları.</summary>
     public static class Ticket
     {
+        public static ServerMessage NotDeletable =>
+            ServerMessage.Of("support.server.ticket.not-deletable", "Talep silinemez; geçmişi korunur. Vazgeçildiyse talebi iptal edin.");
+
+        public static ServerMessage AlreadyProcessed(object number, object id) =>
+            ServerMessage.Of("support.server.ticket.already-processed", "Bu istek daha önce işlendi: talep {0} ({1}). Yeni talep açılmadı.", number, id);
+
         public static ServerMessage Closed =>
             ServerMessage.Of("support.server.ticket.closed", "Talep kapalı.");
 
@@ -86,6 +92,9 @@ internal static class SupportMessages
     /// <summary>Kuyruk ve kategori kayıtları.</summary>
     public static class Catalog
     {
+        public static ServerMessage QueueInUse =>
+            ServerMessage.Of("support.server.catalog.queue-in-use", "Kuyruk talep ya da kategori tarafından kullanılıyor; silinemez. Pasife alın.");
+
         public static ServerMessage DefaultQueueInactive =>
             ServerMessage.Of("support.server.catalog.default-queue-inactive", "Varsayılan kuyruk pasif olamaz; önce başka bir kuyruğu varsayılan yapın.");
 
@@ -105,6 +114,12 @@ internal static class SupportMessages
     /// <summary>SLA politikası kayıtları.</summary>
     public static class Sla
     {
+        public static ServerMessage PolicyInUse =>
+            ServerMessage.Of("support.server.sla.policy-in-use", "Politika SLA örneklerinde kullanılıyor; silinemez. Pasife alın.");
+
+        public static ServerMessage CalendarInUse =>
+            ServerMessage.Of("support.server.sla.calendar-in-use", "Takvim bir SLA politikasında kullanılıyor; silinemez. Pasife alın.");
+
         public static ServerMessage PreviewInvalid =>
             ServerMessage.Of("support.server.sla.preview-invalid", "Önizleme girdileri geçersiz.");
 
@@ -142,6 +157,9 @@ internal static class SupportMessages
     /// <summary>Kategori zorunlu alan listesi doğrulaması.</summary>
     public static class Category
     {
+        public static ServerMessage InUse =>
+            ServerMessage.Of("support.server.category.in-use", "Kategori talepte ya da alt kategoride kullanılıyor; silinemez. Pasife alın.");
+
         public static ServerMessage InvalidRequiredFields(string unknown, string allowed) =>
             ServerMessage.Of("support.server.category.invalid-required-fields", "Geçersiz alan: {0}. İzin verilenler: {1}.", unknown, allowed);
     }

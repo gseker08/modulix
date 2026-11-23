@@ -48,11 +48,21 @@ public class AppNamesTests
             {
                 Check(AppNames.MenuKeyOf(app), hostedName);
             }
+
+            if (app.Description is { } description)
+            {
+                Check(AppNames.DescriptionKeyOf(app), description);
+            }
         }
 
         foreach (var group in AppCatalog.Groups)
         {
             Check(AppNames.KeyOf(group), group.Name);
+        }
+
+        foreach (var shortcut in AppCatalog.Shortcuts)
+        {
+            Check(AppNames.KeyOf(shortcut), shortcut.Name);
         }
 
         foreach (var planned in AppCatalog.Planned)
@@ -64,6 +74,31 @@ public class AppNamesTests
     }
 
     [Fact]
+    public void Every_root_app_has_a_card_description_and_screens_have_none()
+    {
+        // Paneldeki kart yalnızca ana uygulamalar içindir; açıklaması olmayan kart boş görünür.
+        Assert.All(AppCatalog.All.Where(a => a.ParentId is null), a => Assert.False(string.IsNullOrWhiteSpace(a.Description), a.Id));
+        Assert.All(AppCatalog.All.Where(a => a.ParentId is not null), a => Assert.Null(a.Description));
+    }
+
+    [Fact]
+    public void Every_card_illustration_file_exists()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !Directory.Exists(Path.Combine(directory.FullName, "src", "Modulix.Web", "wwwroot")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        var root = Path.Combine(directory!.FullName, "src", "Modulix.Web", "wwwroot");
+        var withArt = AppCatalog.All.Where(a => a.Art is not null).ToList();
+
+        Assert.NotEmpty(withArt);
+        Assert.All(withArt, a => Assert.True(a.ParentId is null && File.Exists(Path.Combine(root, AppCatalog.ArtUrl(a)!)), a.Id));
+    }
+
+    [Fact]
     public void Without_a_loaded_dictionary_the_catalog_name_is_shown()
     {
         var app = AppCatalog.All.First(a => a.Id == "contracts.list");
@@ -71,5 +106,7 @@ public class AppNamesTests
         Assert.Equal(app.Name, AppNames.Of(app));
         Assert.Equal(app.Hosted!.Name, AppNames.MenuNameOf(app));
         Assert.Equal(AppCatalog.Groups[0].Name, AppNames.Of(AppCatalog.Groups[0]));
+        Assert.Equal(AppCatalog.All[0].Description, AppNames.DescriptionOf(AppCatalog.All[0]));
+        Assert.Null(AppNames.DescriptionOf(app));
     }
 }

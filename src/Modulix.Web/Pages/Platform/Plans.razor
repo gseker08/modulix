@@ -40,18 +40,13 @@
                     <FieldError Field="limits" Errors="errors" />
                 </div>
             </div>
-            <fieldset class="mt-3">
-                <legend class="form-label">@Texts.Get("platform.modules")</legend>
-                @foreach (var module in modules.Modules)
-                {
-                    <div class="form-check">
-                        <input id="pm-@module.Key" class="form-check-input" type="checkbox" checked="@editing.Modules.Contains(module.Key)"
-                               @onchange="e => ToggleModule(module.Key, (bool)e.Value!)" />
-                        <label class="form-check-label" for="pm-@module.Key">@module.DisplayName</label>
-                    </div>
-                }
+            <div class="mt-3">
+                <label class="form-label" for="plan-modules">@Texts.Get("platform.modules")</label>
+                <PickField TKey="string" Id="plan-modules" Title="@Texts.Get("platform.modules")"
+                           Items="@([.. modules.Modules.Select(m => new PickItem<string>(m.Key, m.DisplayName))])"
+                           Selected="editing.Modules" SelectedChanged="keys => editing.Modules = [.. keys]" />
                 <FieldError Field="modules" Errors="errors" />
-            </fieldset>
+            </div>
             <div class="form-check mt-3">
                 <input id="planActive" class="form-check-input" type="checkbox" @bind="editing.IsActive" />
                 <label class="form-check-label" for="planActive">@Texts.Get("platform.plans.activeHint")</label>
@@ -179,18 +174,6 @@
             Modules = [.. plan.Modules],
         };
         errors = null;
-    }
-
-    private void ToggleModule(string key, bool on)
-    {
-        if (on)
-        {
-            editing!.Modules.Add(key);
-        }
-        else
-        {
-            editing!.Modules.Remove(key);
-        }
     }
 
     private async Task SaveAsync()

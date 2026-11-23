@@ -3,9 +3,11 @@
 @inject AppNavigation Apps
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject ApiClient Api
 
-@* Modulix logosu (BrandLogo): tıklanınca "Tüm Uygulamalar" paneli açılır (sayfanın üzerinde, içeriği kaydırmaz).
-   İki düzey: ana uygulamalar, sonra seçilen uygulamanın alt uygulamaları. Liste AppCatalog'dan ve oturumdan gelir. *@
+@* Modulix logosu (BrandLogo): tıklanınca "Tüm Uygulamalar" diyaloğu açılır (sayfanın üzerinde, içeriği kaydırmaz).
+   Solda kategori menüsü (AppCatalog.Groups), ortada sık kullanılanlar ve açıklamalı uygulama kartları, sağda kısayollar
+   (AppCatalog.Shortcuts). Liste AppCatalog'dan ve oturumdan gelir; sık kullanılanlar tarayıcıda saklanır (LauncherFavorites). *@
 <div class="app-launcher">
     @if (Session.IsSignedIn)
     {
@@ -24,90 +26,203 @@
 
     @if (isOpen)
     {
-        <div id="app-launcher-panel" class="app-panel" role="dialog" aria-labelledby="app-panel-title" tabindex="-1" @ref="panel">
-            <div class="app-panel-head">
-                <h2 id="app-panel-title" class="app-panel-title">@Texts.Get("shell.launcher.title")</h2>
+        @* Diyalog sayfanın üzerinde ortalanır; arka plan tıklanınca, Escape ile ya da kapat düğmesiyle kapanır (js/app-launcher.js). *@
+        <div class="mx-modal-backdrop" aria-hidden="true"></div>
+        <div id="app-launcher-panel" class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="app-panel-title" tabindex="-1" @ref="panel">
+            <div class="app-dialog-head">
+                <BrandLogo Size="32" />
+                <button type="button" class="btn btn-ghost btn-icon" title="@Texts.Get("common.close")" aria-label="@Texts.Get("common.close")"
+                        @onclick="() => Close(true)">
+                    <AppIcon Name="x" Size="18" />
+                </button>
             </div>
 
-            @if (showSearch)
-            {
-                <div class="app-search">
-                    <label class="visually-hidden" for="app-search-input">@Texts.Get("shell.launcher.search")</label>
-                    <AppIcon Name="search" Size="16" />
-                    <input id="app-search-input" type="search" class="form-control" autocomplete="off"
-                           placeholder="@Texts.Get("shell.launcher.search")" @ref="searchInput" @bind="Query" @bind:event="oninput" />
-                </div>
-            }
+            <div class="app-dialog-hero">
+                <h2 id="app-panel-title" class="app-dialog-title">@Texts.Get("shell.launcher.title")</h2>
+                <p class="app-dialog-subtitle">@Texts.Get("shell.launcher.subtitle")</p>
 
-            <div class="app-panel-body">
-                @if (!Session.IsLoaded)
+                @if (showSearch)
                 {
-                    <p class="app-state" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @Texts.Get("shell.launcher.loading")</p>
-                }
-                else if (loadFailed)
-                {
-                    <div class="app-state" role="alert">
-                        <p class="mb-2">@Texts.Get("shell.launcher.failed")</p>
-                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="RetryAsync">@Texts.Get("shell.launcher.retry")</button>
+                    <div class="app-search">
+                        <label class="visually-hidden" for="app-search-input">@Texts.Get("shell.launcher.search")</label>
+                        <AppIcon Name="search" Size="18" />
+                        <input id="app-search-input" type="search" class="form-control" autocomplete="off"
+                               placeholder="@Texts.Get("shell.launcher.searchPlaceholder")" @ref="searchInput" @bind="Query" @bind:event="oninput" />
                     </div>
                 }
-                else if (listed.Count == 0 && string.IsNullOrWhiteSpace(Query))
+            </div>
+
+            <div class="app-dialog-body @(groups.Count > 0 ? "has-categories" : null) @(shortcuts.Count > 0 || suggested.Count > 0 ? "has-rail" : null)">
+                @if (groups.Count > 0)
                 {
-                    <p class="app-state" role="status">@Texts.Get("shell.launcher.empty")</p>
-                }
-                else if (visible.Count == 0 && plannedVisible.Count == 0)
-                {
-                    <p class="app-state" role="status">@Texts.Get("common.noResultFor", Query)</p>
+                    @* Kategori menüsü: ana uygulamaların alan başlıkları (AppCatalog.Groups); yalnızca görsel süzgeçtir. *@
+                    <nav class="app-categories" aria-label="@Texts.Get("shell.launcher.categories")">
+                        <button type="button" class="app-category @(category is null ? "is-active" : null)"
+                                aria-pressed="@(category is null ? "true" : "false")" @onclick="() => SelectCategory(null)">
+                            <span class="app-category-icon"><AppIcon Name="dashboard" Size="18" /></span>
+                            <span class="app-category-name">@Texts.Get("shell.launcher.title")</span>
+                            <span class="app-category-count">@listed.Count</span>
+                        </button>
+                        <p class="app-categories-title" aria-hidden="true">@Texts.Get("shell.launcher.categories")</p>
+                        @foreach (AppRootGroup section in groups.Where(g => g.Group is not null))
+                        {
+                            AppGroup group = section.Group!;
+                            <button type="button" class="app-category @(category == group.Id ? "is-active" : null)"
+                                    aria-pressed="@(category == group.Id ? "true" : "false")" @onclick="() => SelectCategory(group.Id)">
+                                <span class="app-category-icon"><AppIcon Name="@(group.Icon ?? "layers")" Size="18" /></span>
+                                <span class="app-category-name">@AppNames.Of(group)</span>
+                                <span class="app-category-count">@(section.Apps.Count)</span>
+                            </button>
+                        }
+                    </nav>
                 }
 
-                @if (Session.IsLoaded && !loadFailed && visible.Count > 0)
-                {
-                    @if (groups.Count > 0)
+                <div class="app-dialog-main">
+                    @if (!Session.IsLoaded)
                     {
-                        @foreach (AppRootGroup section in groups)
-                        {
-                            <section class="app-group" aria-labelledby="@(section.Group is null ? null : $"app-group-{section.Group.Id}")">
-                                @if (section.Group is not null)
-                                {
-                                    <h3 id="app-group-@(section.Group.Id)" class="app-group-title">@AppNames.Of(section.Group)</h3>
-                                }
-                                <ul class="app-grid">
-                                    @foreach (AppDefinition app in section.Apps)
+                        <p class="app-state" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @Texts.Get("shell.launcher.loading")</p>
+                    }
+                    else if (loadFailed)
+                    {
+                        <div class="app-state" role="alert">
+                            <p class="mb-2">@Texts.Get("shell.launcher.failed")</p>
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="RetryAsync">@Texts.Get("shell.launcher.retry")</button>
+                        </div>
+                    }
+                    else if (listed.Count == 0 && string.IsNullOrWhiteSpace(Query))
+                    {
+                        <p class="app-state" role="status">@Texts.Get("shell.launcher.empty")</p>
+                    }
+                    else if (visible.Count == 0 && plannedVisible.Count == 0)
+                    {
+                        <p class="app-state" role="status">@Texts.Get("common.noResultFor", Query)</p>
+                    }
+
+                    @* Sık kullanılanlar: yıldızlanan uygulamalar; arama sırasında gizlenir. *@
+                    @if (Session.IsLoaded && !loadFailed && listed.Count > 0 && string.IsNullOrWhiteSpace(Query))
+                    {
+                        <section class="app-group app-favorites" aria-labelledby="app-group-favorites">
+                            <h3 id="app-group-favorites" class="app-group-title"><AppIcon Name="star" Size="18" /> @Texts.Get("shell.launcher.favorites")</h3>
+                            @if (favoriteApps.Count == 0)
+                            {
+                                <p class="app-favorites-empty">@Texts.Get("shell.launcher.favorites.empty")</p>
+                            }
+                            else
+                            {
+                                <ul class="app-favorites-list">
+                                    @foreach (AppDefinition app in favoriteApps)
                                     {
-                                        @Tile(app)
+                                        <li>
+                                            <a href="@Apps.EntryRoute(app)" class="app-favorite tone-@ToneClass(app)" @onclick="() => Close(true)">
+                                                <span class="app-favorite-icon"><AppIcon Name="@app.Icon" Size="18" /></span>
+                                                <span>@AppNames.Of(app)</span>
+                                            </a>
+                                        </li>
                                     }
                                 </ul>
-                            </section>
-                        }
-                    }
-                    else
-                    {
-                        <ul class="app-grid">
-                            @foreach (AppDefinition app in visible)
-                            {
-                                @Tile(app)
                             }
-                        </ul>
+                        </section>
                     }
-                }
 
-                @* Yol haritasındaki uygulamalar: pasif kartlar, tıklanınca bir şey olmaz (ekranları henüz yok). *@
-                @if (Session.IsLoaded && !loadFailed && plannedVisible.Count > 0)
+                    @if (Session.IsLoaded && !loadFailed && visible.Count > 0)
+                    {
+                        <section class="app-group" aria-labelledby="app-group-apps">
+                            <h3 id="app-group-apps" class="app-group-title">@heading</h3>
+                            <ul class="app-cards">
+                                @foreach (AppDefinition app in visible)
+                                {
+                                    @Card(app)
+                                }
+                            </ul>
+                        </section>
+                    }
+
+                    @* Yol haritasındaki uygulamalar: pasif kartlar, tıklanınca bir şey olmaz (ekranları henüz yok). *@
+                    @if (Session.IsLoaded && !loadFailed && plannedVisible.Count > 0)
+                    {
+                        <section class="app-group app-planned" aria-labelledby="app-group-planned">
+                            <h3 id="app-group-planned" class="app-group-title">@Texts.Get("shell.launcher.planned")</h3>
+                            <ul class="app-cards">
+                                @foreach (PlannedApp planned in plannedVisible)
+                                {
+                                    <li>
+                                        <span class="app-card is-planned" aria-disabled="true">
+                                            <span class="app-card-icon"><AppIcon Name="@planned.Icon" /></span>
+                                            <span class="app-card-name">@AppNames.Of(planned)</span>
+                                        </span>
+                                    </li>
+                                }
+                            </ul>
+                        </section>
+                    }
+                </div>
+
+                @if (shortcuts.Count > 0 || suggested.Count > 0)
                 {
-                    <section class="app-group app-planned" aria-labelledby="app-group-planned">
-                        <h3 id="app-group-planned" class="app-group-title">@Texts.Get("shell.launcher.planned")</h3>
-                        <ul class="app-grid">
-                            @foreach (PlannedApp planned in plannedVisible)
+                    <aside class="app-rail">
+                @* Kısayollar: sık yapılan işlemlere doğrudan bağlantılar; yalnızca modülü açık ve izni olanlar listelenir. *@
+                @if (shortcuts.Count > 0)
+                {
+                    <section class="app-rail-card" aria-labelledby="app-rail-title">
+                        <h3 id="app-rail-title" class="app-group-title"><AppIcon Name="zap" Size="18" /> @Texts.Get("shell.launcher.shortcuts")</h3>
+                        <p class="app-rail-subtitle">@Texts.Get("shell.launcher.shortcuts.subtitle")</p>
+                        <ul class="app-shortcuts">
+                            @foreach (AppShortcut shortcut in shortcuts)
                             {
                                 <li>
-                                    <span class="app-tile is-planned" aria-disabled="true">
-                                        <span class="app-tile-icon"><AppIcon Name="@planned.Icon" /></span>
-                                        <span class="app-tile-name">@AppNames.Of(planned)</span>
-                                    </span>
+                                    <a href="@shortcut.Route" class="app-shortcut" @onclick="() => Close(true)">
+                                        <span class="app-shortcut-icon"><AppIcon Name="@shortcut.Icon" Size="18" /></span>
+                                        <span class="app-shortcut-name">@AppNames.Of(shortcut)</span>
+                                        @if (shortcut.Id == AppCatalog.PendingApprovalsShortcut && waitingApprovals > 0)
+                                        {
+                                            <span class="app-shortcut-count" title="@Texts.Get("shell.launcher.shortcuts.waiting", waitingApprovals)">
+                                                <span aria-hidden="true">@(waitingApprovals > 99 ? "99+" : waitingApprovals.ToString())</span>
+                                                <span class="visually-hidden">@Texts.Get("shell.launcher.shortcuts.waiting", waitingApprovals)</span>
+                                            </span>
+                                        }
+                                        <AppIcon Name="chevron-right" Size="16" />
+                                    </a>
                                 </li>
                             }
                         </ul>
                     </section>
+                }
+
+                @* Önerilenler: firmada açık olmayan modüller (yalnızca yöneticiye). "İncele" tanıtımı açar; modül buradan açılamaz. *@
+                @if (suggested.Count > 0)
+                {
+                    <section class="app-rail-card" aria-labelledby="app-suggested-title">
+                        <h3 id="app-suggested-title" class="app-group-title"><AppIcon Name="package" Size="18" /> @Texts.Get("shell.launcher.suggested")</h3>
+                        <p class="app-rail-subtitle">@Texts.Get("shell.launcher.suggested.subtitle")</p>
+                        <ul class="app-suggestions">
+                            @foreach (AppDefinition app in suggested)
+                            {
+                                bool open = inspected == app.Id;
+                                <li class="app-suggestion tone-@ToneClass(app)">
+                                    <div class="app-suggestion-row">
+                                        <span class="app-suggestion-icon"><AppIcon Name="@app.Icon" Size="18" /></span>
+                                        <span class="app-suggestion-name">@AppNames.Of(app)</span>
+                                        <button type="button" class="btn btn-tonal btn-sm" aria-expanded="@(open ? "true" : "false")"
+                                                aria-controls="app-suggestion-@(app.Id)" @onclick="() => Inspect(app.Id)">
+                                            @Texts.Get("shell.launcher.suggested.inspect")
+                                        </button>
+                                    </div>
+                                    @if (open)
+                                    {
+                                        <div id="app-suggestion-@(app.Id)" class="app-suggestion-detail">
+                                            @if (AppNames.DescriptionOf(app) is { } description)
+                                            {
+                                                <p>@description</p>
+                                            }
+                                            <p class="app-suggestion-note"><AppIcon Name="info" Size="16" /> @Texts.Get("shell.launcher.suggested.note")</p>
+                                        </div>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
+                    </aside>
                 }
             </div>
         </div>
@@ -138,6 +253,11 @@
         set
         {
             query = value ?? "";
+            if (!string.IsNullOrWhiteSpace(query))
+            {
+                category = null;
+            }
+
             Recompute();
         }
     }
@@ -148,8 +268,25 @@
     private IReadOnlyList<PlannedApp> plannedVisible = [];
     private bool showSearch;
 
-    // Başlıklı gösterim yalnızca aramasız ve birden çok grup görünürken; aksi halde düz liste.
+    // Sık kullanılanlar (yıldızlanan uygulama kimlikleri; tarayıcıdan okunur) ve kullanıcının kullanabildiği kısayollar.
+    private IReadOnlyList<string> favorites = [];
+    private IReadOnlyList<AppDefinition> favoriteApps = [];
+    private IReadOnlyList<AppShortcut> shortcuts = [];
+
+    // Önerilenler: firmada açık olmayan modüller (yalnızca yöneticiye) ve tanıtımı açık olan satır.
+    private IReadOnlyList<AppDefinition> suggested = [];
+    private string? inspected;
+    private bool favoritesPending;
+
+    // "Onay bekleyenler" kısayolunun sayacı: kullanıcıyı bekleyen onaylar. Panel açılınca okunur; okunamazsa rozet çıkmaz.
+    private int waitingApprovals;
+
+    // Kategori menüsü yalnızca birden çok grup görünürken çıkar; aksi halde kartlar tam genişlikte düz listedir.
     private IReadOnlyList<AppRootGroup> groups = [];
+
+    // Seçili kategori (AppGroup.Id); null ise bütün uygulamalar. Arama kategoriden bağımsız bütün uygulamalarda yapılır.
+    private string? category;
+    private string heading = "";
 
     // Erişim bilgisi yüklenemedi: tenant var ama erişim okunamadı (iki adımlı doğrulama beklerken bilerek boştur).
     private bool loadFailed => Session.IsLoaded && Session.HasActiveTenant && !Session.TwoFactorRequired && Session.Access is null;
@@ -166,26 +303,100 @@
     private void Recompute()
     {
         listed = Apps.Roots();
+        favoriteApps = LauncherFavorites.Visible(favorites, listed);
+        shortcuts = Session.IsLoaded && !loadFailed ? Apps.Shortcuts() : [];
+        suggested = Session.IsLoaded && !loadFailed ? Apps.Suggested() : [];
+        IReadOnlyList<AppRootGroup> grouped = Apps.Grouped(listed);
+        groups = grouped.Count > 1 ? grouped : [];
+
+        // Seçili kategori görünmez olduysa (ör. tenant değişti) bütün uygulamalara dönülür.
+        AppRootGroup? selected = category is null ? null : groups.FirstOrDefault(g => g.Group?.Id == category);
+        if (selected is null)
+        {
+            category = null;
+        }
+
+        heading = selected?.Group is { } group ? AppNames.Of(group) : Texts.Get("shell.launcher.apps");
         visible = string.IsNullOrWhiteSpace(query)
-            ? listed
-            : listed.Where(a => Matches(AppNames.Of(a), query.Trim())).ToList();
+            ? selected?.Apps ?? listed
+            : listed.Where(a => Matches(AppNames.Of(a), query.Trim()) || (AppNames.DescriptionOf(a) is { } text && Matches(text, query.Trim()))).ToList();
         plannedVisible = string.IsNullOrWhiteSpace(query)
             ? AppCatalog.Planned
             : AppCatalog.Planned.Where(p => Matches(AppNames.Of(p), query.Trim())).ToList();
         showSearch = Session.IsLoaded && !loadFailed && (listed.Count > 0 || AppCatalog.Planned.Count > 0);
+    }
 
-        IReadOnlyList<AppRootGroup> grouped = string.IsNullOrWhiteSpace(query) ? Apps.Grouped(listed) : [];
-        groups = grouped.Count > 1 ? grouped : [];
+    private void SelectCategory(string? id)
+    {
+        category = id;
+        query = "";
+        Recompute();
     }
 
     // Uygulama kartı doğrudan uygulamanın ilk ekranına gider; uygulamanın ekranları sol menüde bölümler halinde gelir.
-    private RenderFragment Tile(AppDefinition app) => @<li>
-        <a href="@Apps.EntryRoute(app)" class="app-tile tone-@ToneClass(app) @(IsCurrent(app) ? "is-current" : null)"
+    // Kartın tamamı bağlantıdır; "Aç" görsel ipucudur (ekranda tek birincil düğme kuralı gereği tonal).
+    private RenderFragment Card(AppDefinition app) => @<li class="app-card-item">
+        <a href="@Apps.EntryRoute(app)" class="app-card tone-@ToneClass(app) @(app.Art is null ? null : "has-art") @(IsCurrent(app) ? "is-current" : null)"
            aria-current="@(IsCurrent(app) ? "page" : null)" @onclick="() => Close(true)">
-            <span class="app-tile-icon"><AppIcon Name="@app.Icon" /></span>
-            <span class="app-tile-name">@AppNames.Of(app)</span>
+            @if (AppCatalog.ArtUrl(app) is { } art)
+            {
+                <img class="app-card-image" src="@art" alt="" width="160" height="160" loading="lazy" />
+            }
+            else
+            {
+                <span class="app-card-art" aria-hidden="true"><AppIcon Name="@app.Icon" Size="72" /></span>
+            }
+            <span class="app-card-icon"><AppIcon Name="@app.Icon" /></span>
+            <span class="app-card-name">@AppNames.Of(app)</span>
+            @if (AppNames.DescriptionOf(app) is { } description)
+            {
+                <span class="app-card-text">@description</span>
+            }
+            <span class="app-card-open" aria-hidden="true">
+                @(IsCurrent(app) ? Texts.Get("shell.launcher.current") : Texts.Get("shell.launcher.open")) <AppIcon Name="arrow-right" Size="16" />
+            </span>
         </a>
+        @* Yıldız kartın (bağlantının) dışında, üstünde durur: bağlantının içine düğme konmaz. *@
+        <button type="button" class="btn btn-ghost btn-icon btn-sm app-card-star @(favorites.Contains(app.Id) ? "is-on" : null)"
+                aria-pressed="@(favorites.Contains(app.Id) ? "true" : "false")" title="@StarLabel(app)" aria-label="@StarLabel(app)"
+                disabled="@(!favorites.Contains(app.Id) && favorites.Count >= LauncherFavorites.Max)"
+                @onclick="() => ToggleFavoriteAsync(app)">
+            <AppIcon Name="star" Size="16" />
+        </button>
     </li>;
+
+    private string StarLabel(AppDefinition app) =>
+        Texts.Get(favorites.Contains(app.Id) ? "shell.launcher.favorites.remove" : "shell.launcher.favorites.add", AppNames.Of(app));
+
+    private string? FavoritesKey => Session.User is { } user ? LauncherFavorites.StorageKey(user.UserId, user.ActiveTenantId) : null;
+
+    private async Task ToggleFavoriteAsync(AppDefinition app)
+    {
+        favorites = LauncherFavorites.Toggle(favorites, app.Id);
+        Recompute();
+        if (FavoritesKey is { } key)
+        {
+            await JS.InvokeVoidAsync("modulixAppLauncher.writeFavorites", key, LauncherFavorites.Serialize(favorites));
+        }
+    }
+
+    // Sayaç yalnızca kısayol kullanıcıya görünüyorsa istenir (izni olmayan için uç zaten 403 döner); sunucu kullanıcının
+    // kapsamını uygular. Panel bu arada kapandıysa ya da tenant değiştiyse sonuç yazılmaz.
+    private async Task LoadWaitingApprovalsAsync()
+    {
+        if (shortcuts.All(s => s.Id != AppCatalog.PendingApprovalsShortcut))
+        {
+            return;
+        }
+
+        Guid? tenant = Session.User?.ActiveTenantId;
+        ApprovalOverviewDto? overview = (await Api.GetAsync<ApprovalOverviewDto>("/api/approvals/overview")).Value;
+        if (isOpen && overview is not null && tenant == Session.User?.ActiveTenantId)
+        {
+            waitingApprovals = overview.WaitingForMe;
+            StateHasChanged();
+        }
+    }
 
     private static bool Matches(string name, string text) =>
         System.Globalization.CultureInfo.GetCultureInfo("tr-TR").CompareInfo
@@ -228,7 +439,13 @@
     {
         isOpen = false;
         query = "";
+        category = null;
+        favorites = [];
+        waitingApprovals = 0;
+        inspected = null;
     }
+
+    private void Inspect(string appId) => inspected = inspected == appId ? null : appId;
 
     private void Toggle()
     {
@@ -240,6 +457,8 @@
 
         isOpen = true;
         query = "";
+        category = null;
+        favoritesPending = true;
         pendingFocus = FocusTarget.Search;
         Recompute();
     }
@@ -277,6 +496,20 @@
         {
             await JS.InvokeVoidAsync("modulixAppLauncher.detach");
             attached = false;
+        }
+
+        // Sık kullanılanlar panel her açıldığında tarayıcıdan okunur (kullanıcı + firma anahtarı; tenant değişince önceki liste kalmaz).
+        if (isOpen && favoritesPending)
+        {
+            favoritesPending = false;
+            if (FavoritesKey is { } key)
+            {
+                favorites = LauncherFavorites.Parse(await JS.InvokeAsync<string?>("modulixAppLauncher.readFavorites", key));
+                Recompute();
+                StateHasChanged();
+            }
+
+            await LoadWaitingApprovalsAsync();
         }
 
         FocusTarget target = pendingFocus;

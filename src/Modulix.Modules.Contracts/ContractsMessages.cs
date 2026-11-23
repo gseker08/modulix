@@ -49,6 +49,9 @@ internal static class ContractsMessages
     /// <summary>Onay kuralı ve vekâlet kayıtları, onay görünümü.</summary>
     public static class Approval
     {
+        public static ServerMessage DelegateRequired =>
+            ServerMessage.Of("contracts.server.approval.delegate-required", "Vekil zorunludur.");
+
         public static ServerMessage RuleConditionRequired =>
             ServerMessage.Of("contracts.server.approval.rule-condition-required",
                 "En az bir koşul girin: tutar, indirim, süre, standart dışı madde ya da risk düzeyi.");
@@ -75,6 +78,9 @@ internal static class ContractsMessages
     /// <summary>Taahhüt kayıtları, gerçekleşmeler ve değerlendirme.</summary>
     public static class Commitment
     {
+        public static ServerMessage DueDateRequired =>
+            ServerMessage.Of("contracts.server.commitment.due-date-required", "Son tarih zorunludur.");
+
         public static ServerMessage NotFound => ServerMessage.Of("contracts.server.commitment.not-found", "Taahhüt bulunamadı.");
 
         public static ServerMessage DependencyNotFound =>

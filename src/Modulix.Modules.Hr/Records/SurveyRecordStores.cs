@@ -453,7 +453,7 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
         };
         if (to is null)
         {
-            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, "Bilinmeyen eylem.", [new RecordFieldError("action", "Bilinmeyen eylem.")]);
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, HrMessages.Workflow.UnknownAction, [new RecordFieldError("action", HrMessages.Workflow.UnknownAction)]);
         }
 
         var record = await pipeline.GetAsync(new RecordRef(HrModule.Entities.Survey, surveyId), cancellationToken);
@@ -666,7 +666,7 @@ internal sealed class SurveyService(IRecordPipeline pipeline, HrStoreContext con
 
         foreach (var question in questions.Where(q => q.IsRequired && clean.All(a => a.QuestionId != q.Id) && errors.All(e => e.Field != $"answers.{q.Id}")))
         {
-            errors.Add(new RecordFieldError($"answers.{question.Id}", "Bu soru zorunludur."));
+            errors.Add(new RecordFieldError($"answers.{question.Id}", HrMessages.Survey.QuestionRequired));
         }
 
         return (clean, errors);

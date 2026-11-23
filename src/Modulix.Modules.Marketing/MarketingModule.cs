@@ -63,6 +63,12 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
 
         /// <summary>Kampanya raporunu (gönderim, yanıt, lead, ilk/son dokunuş, maliyet) ve bir firma/kişinin pazarlama geçmişini görüntüler. Kapsam kampanyanın sorumlusuna göredir.</summary>
         public const string ReportsRead = "marketing.reports.read";
+
+        /// <summary>Müşteri yolculuklarını ve kayıtlarını görüntüler (ADR-0056). Kapsam yolculuğun sorumlusuna göredir.</summary>
+        public const string JourneysRead = "marketing.journeys.read";
+
+        /// <summary>Müşteri yolculuğu oluşturur ve düzenler.</summary>
+        public const string JourneysWrite = "marketing.journeys.write";
     }
 
     public static class SettingKeys
@@ -83,6 +89,8 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
         public const string CampaignContent = "marketing.campaign-content";
         public const string CampaignRun = "marketing.campaign-run";
         public const string CampaignResponse = "marketing.campaign-response";
+        public const string Journey = "marketing.journey";
+        public const string JourneyEnrollment = "marketing.journey-enrollment";
     }
 
     /// <summary>Başka modüllerin kayıt anahtarları (yalnızca kayıt boru hattıyla okunur; modül başvurusu yok).</summary>
@@ -115,6 +123,8 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
         new(Permissions.ResponsesRead, "Kampanya yanıtlarını görüntüler", "Yanıtlar"),
         new(Permissions.ResponsesWrite, "Yanıt kaydeder, üstlenir, kapatır; yanıttan müşteri adayı ve aktivite açar; çıkış yanıtını uygular", "Yanıtlar"),
         new(Permissions.ReportsRead, "Kampanya raporunu ve firma/kişi pazarlama geçmişini görüntüler", "Raporlar"),
+        new(Permissions.JourneysRead, "Müşteri yolculuklarını ve yolculuk kayıtlarını görüntüler", "Yolculuklar"),
+        new(Permissions.JourneysWrite, "Müşteri yolculuğu oluşturur ve düzenler", "Yolculuklar"),
     ];
 
     /// <summary>Devre dışı bırakılan kişinin segmentleri devredilir (ADR-0004).</summary>
@@ -129,7 +139,7 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
             "marketing.specialist",
             "Pazarlama uzmanı",
             "Segmentleri görüntüler, oluşturur ve düzenler; alıcıları görür. Yayımlayamaz. Kendi ve ekibinin segmentlerini görür.",
-            [Permissions.SegmentsRead, Permissions.SegmentsWrite, Permissions.RecipientsRead, Permissions.CampaignsRead, Permissions.CampaignsWrite, Permissions.CampaignsAudience, Permissions.ResponsesRead, Permissions.ResponsesWrite, Permissions.ReportsRead])
+            [Permissions.SegmentsRead, Permissions.SegmentsWrite, Permissions.RecipientsRead, Permissions.CampaignsRead, Permissions.CampaignsWrite, Permissions.CampaignsAudience, Permissions.ResponsesRead, Permissions.ResponsesWrite, Permissions.ReportsRead, Permissions.JourneysRead, Permissions.JourneysWrite])
         {
             Scope = RecordScope.Team,
         },
@@ -137,7 +147,7 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
             "marketing.manager",
             "Pazarlama yöneticisi",
             "Bütün segmentleri yönetir, yayımlar ve arşivler.",
-            [Permissions.SegmentsRead, Permissions.SegmentsWrite, Permissions.SegmentsPublish, Permissions.RecipientsRead, Permissions.CampaignsRead, Permissions.CampaignsWrite, Permissions.CampaignsAudience, Permissions.CampaignsApprove, Permissions.CampaignsSend, Permissions.ResponsesRead, Permissions.ResponsesWrite, Permissions.ReportsRead])
+            [Permissions.SegmentsRead, Permissions.SegmentsWrite, Permissions.SegmentsPublish, Permissions.RecipientsRead, Permissions.CampaignsRead, Permissions.CampaignsWrite, Permissions.CampaignsAudience, Permissions.CampaignsApprove, Permissions.CampaignsSend, Permissions.ResponsesRead, Permissions.ResponsesWrite, Permissions.ReportsRead, Permissions.JourneysRead, Permissions.JourneysWrite])
         {
             Scope = RecordScope.All,
         },
@@ -145,7 +155,7 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
             "marketing.viewer",
             "Pazarlama izleyici",
             "Segmentleri ve sayılarını görüntüler; alıcı listesini görmez.",
-            [Permissions.SegmentsRead, Permissions.CampaignsRead, Permissions.ResponsesRead, Permissions.ReportsRead])
+            [Permissions.SegmentsRead, Permissions.CampaignsRead, Permissions.ResponsesRead, Permissions.ReportsRead, Permissions.JourneysRead])
         {
             Scope = RecordScope.All,
         },
@@ -257,6 +267,32 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
                 },
             },
         },
+        new(Entities.Journey, "Müşteri yolculuğu", Permissions.JourneysRead, new Dictionary<string, string>
+        {
+            ["code"] = "Kod", ["name"] = "Ad", ["description"] = "Açıklama", ["target"] = "Hedef türü", ["segmentId"] = "Giriş segmenti",
+            ["reentryPolicy"] = "Yeniden giriş", ["exitCondition"] = "Çıkış koşulu", ["ownerId"] = "Sorumlu", ["status"] = "Durum",
+        }, "name")
+        {
+            UserFields = ["ownerId", "createdBy", "updatedBy"],
+            References = new Dictionary<string, string> { ["segmentId"] = Entities.Segment },
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["target"] = new Dictionary<string, string> { ["Company"] = "Firma", ["Person"] = "Kişi", ["Lead"] = "Müşteri adayı" },
+                ["reentryPolicy"] = new Dictionary<string, string> { ["Never"] = "Hiç", ["AfterExit"] = "Çıkıştan sonra", ["AfterCompletion"] = "Tamamlandıktan sonra" },
+                ["status"] = new Dictionary<string, string> { ["Draft"] = "Taslak", ["Active"] = "Etkin", ["Paused"] = "Duraklatıldı", ["Archived"] = "Arşiv" },
+            },
+        },
+        new(Entities.JourneyEnrollment, "Yolculuk kaydı", Permissions.JourneysRead, new Dictionary<string, string>
+        {
+            ["journeyId"] = "Yolculuk", ["targetId"] = "Hedef", ["status"] = "Durum", ["enteredAt"] = "Giriş zamanı", ["exitedAt"] = "Çıkış zamanı", ["exitReason"] = "Çıkış nedeni",
+        })
+        {
+            References = new Dictionary<string, string> { ["journeyId"] = Entities.Journey },
+            Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
+            {
+                ["status"] = new Dictionary<string, string> { ["Active"] = "Etkin", ["Completed"] = "Tamamlandı", ["Exited"] = "Çıktı" },
+            },
+        },
         new(Entities.CampaignResponse, "Kampanya yanıtı", Permissions.ResponsesRead, new Dictionary<string, string>
         {
             ["campaignId"] = "Kampanya", ["runId"] = "Çalıştırma", ["deliveryId"] = "İleti", ["targetId"] = "Hedef", ["personId"] = "Kişi", ["kind"] = "Tür", ["note"] = "Not",
@@ -365,6 +401,8 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
         services.AddScoped<ICampaignRuns, CampaignRuns>();
         services.AddScoped<ICampaignTestSends, CampaignTestSends>();
         services.AddScoped<IRecordStore, CampaignResponseRecordStore>();
+        services.AddScoped<IRecordStore, JourneyRecordStore>();
+        services.AddScoped<IRecordStore, JourneyEnrollmentRecordStore>();
         services.AddScoped<ICampaignResponses, CampaignResponses>();
         services.AddScoped<ICampaignReports, CampaignReports>();
         // Müşteri zaman çizelgesinin pazarlama kaynağı (ADR-0053); CRM kayıtlı kaynakları birleştirir.

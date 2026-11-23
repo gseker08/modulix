@@ -14,8 +14,8 @@ namespace Modulix.Web.Services;
 /// Sıra bölüm içinde uygulanır, öğe bölümünü değiştirmez. Katalogda olmayan anahtarlı satır yok sayılır.
 ///
 /// Bölüm sırası (E8 dilim 3) aynı tabloda <see cref="SectionKey"/> anahtarlı satırla saklanır (şema değişmez): <c>Order</c> bölümün
-/// uygulamanın menüsündeki sırasıdır, <c>Hidden</c> kullanılmaz. Kural öğeyle aynıdır: sıra veren rollerin en küçüğü; hiçbiri vermezse
-/// katalog sırası kalır. Yalnızca başlıklı, alt sabitli olmayan bölümler yer değiştirir; alt sabitli (<c>Footer</c>) ve başlıksız
+/// uygulamanın menüsündeki sırasıdır, <c>Hidden</c> kullanılmaz. Kural öğeyle aynıdır: sıra veren rollerin en küçüğü; sırası
+/// verilmeyen bölüm açık sıralıların arkasına katalog sırasıyla gelir. Yalnızca başlıklı, alt sabitli olmayan bölümler yer değiştirir; alt sabitli (<c>Footer</c>) ve başlıksız
 /// bölümler yerinde kalır.
 /// </summary>
 public static class MenuLayoutRules
@@ -108,7 +108,7 @@ public static class MenuLayoutRules
         return result;
     }
 
-    /// <summary>Rolün bölüm sırasını uygular; sıra veren satır yoksa bölümler olduğu gibi döner. Yalnızca <paramref name="rows"/>'taki bölüm satırlarına bakar.</summary>
+    /// <summary>Rolün bölüm sırasını uygular; sıra veren satır yoksa bölümler olduğu gibi döner; sırası verilmeyen bölüm açık sıralıların arkasına gider. Yalnızca <paramref name="rows"/>'taki bölüm satırlarına bakar.</summary>
     public static IReadOnlyList<MenuSection> OrderSections(string rootId, IReadOnlyList<MenuSection> sections, IReadOnlyList<RoleMenuRowDto>? rows)
     {
         if (rows is null || rows.Count == 0)
@@ -118,14 +118,15 @@ public static class MenuLayoutRules
 
         static bool Movable(MenuSection s) => s.Group is { Footer: false };
 
-        // Bölümün sırası: sıra veren satırların en küçüğü; yoksa katalog sırası.
-        int Order(MenuSection s) => rows
+        // Bölümün açık sırası: sıra veren satırların en küçüğü; hiçbir satırda yoksa null.
+        int? Explicit(MenuSection s) => rows
             .Where(r => r.ItemKey == SectionKey(rootId, s.Group!.Id) && r.Order is not null)
-            .Select(r => r.Order!.Value)
-            .DefaultIfEmpty(s.Group!.Order)
+            .Select(r => r.Order)
             .Min();
 
-        List<MenuSection> ordered = [.. sections.Where(Movable).OrderBy(Order)];
+        // Açık sıralılar sırasıyla, sırası verilmeyenler arkada katalog sırasıyla (öğe ve uygulamalardaki kuralla aynı): katalog numarası
+        // ile rolün yazdığı numaralar (10, 20, …) aynı ölçekte olmadığından karıştırılmaz. OrderBy kararlıdır, eşitlikte katalog sırası kalır.
+        List<MenuSection> ordered = [.. sections.Where(Movable).OrderBy(s => Explicit(s) ?? int.MaxValue)];
         if (ordered.SequenceEqual(sections.Where(Movable)))
         {
             return sections;

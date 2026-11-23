@@ -54,7 +54,7 @@
         }
         else
         {
-            <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <form class="record-form" novalidate hidden="@(!OnFormTab)" @onsubmit="SaveAsync" @onsubmit:preventDefault>
                 <TabPanel State="tabs" Key="form-genel">
                 <div class="form-grid">
                     @if (IsNew && templates.Count > 0)

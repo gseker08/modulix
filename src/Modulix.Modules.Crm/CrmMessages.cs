@@ -819,4 +819,58 @@ internal static class CrmMessages
         public static ServerMessage AnalysisPermission(string permission) =>
             ServerMessage.Of("crm.server.planning.analysis-permission", "Bu analiz için '{0}' izni gerekir.", permission);
     }
+
+    /// <summary>Teklif paylaşımı ve müşteri belgesi.</summary>
+    public static class Sharing
+    {
+        public static ServerMessage DraftNoDocument =>
+            ServerMessage.Of("crm.server.sharing.draft-no-document", "Taslak teklif için müşteri belgesi üretilemez; önce müşteriye sunun.");
+
+        public static ServerMessage DocumentRace =>
+            ServerMessage.Of("crm.server.sharing.document-race", "Belge başka bir istekte üretildi; sayfayı yenileyin.");
+
+        public static ServerMessage LinkRevoked =>
+            ServerMessage.Of("crm.server.sharing.link-revoked", "Bağlantı zaten iptal edilmiş.");
+    }
+
+    /// <summary>Satış tahmini sürümleri.</summary>
+    public static class Forecast
+    {
+        public static ServerMessage CompareNoPrevious =>
+            ServerMessage.Of("crm.server.forecast.compare-no-previous", "Karşılaştırılacak önceki sürüm yok; bir sürüm seçin.");
+
+        public static ServerMessage CompareMismatch =>
+            ServerMessage.Of("crm.server.forecast.compare-mismatch", "Yalnızca aynı dönem, kapsam ve para birimindeki sürümler karşılaştırılır.");
+
+        public static ServerMessage LinesNeedPermission =>
+            ServerMessage.Of("crm.server.forecast.lines-need-permission", "Satırları görmek için fırsat ve tutar izni gerekir.");
+
+        public static ServerMessage ScopeExceeds =>
+            ServerMessage.Of("crm.server.forecast.scope-exceeds", "Bu tahminin kapsamı veri kapsamınızı aşıyor; anlık görüntü eksik kalacağından işlem yapılamaz.");
+    }
+
+    /// <summary>Uç noktalar.</summary>
+    public static class Endpoint
+    {
+        public static ServerMessage BodyTooLarge =>
+            ServerMessage.Of("crm.server.endpoint.body-too-large", "Gövde çok büyük.");
+
+        public static ServerMessage JsonRequired =>
+            ServerMessage.Of("crm.server.endpoint.json-required", "JSON gönderin.");
+
+        public static ServerMessage InvalidBody =>
+            ServerMessage.Of("crm.server.endpoint.invalid-body", "Geçersiz istek gövdesi.");
+
+        public static ServerMessage FormNotFound =>
+            ServerMessage.Of("crm.server.endpoint.form-not-found", "Form bulunamadı.");
+
+        public static ServerMessage SubmissionRejected =>
+            ServerMessage.Of("crm.server.endpoint.submission-rejected", "Gönderim kabul edilmedi.");
+
+        public static ServerMessage LinkInvalid =>
+            ServerMessage.Of("crm.server.endpoint.link-invalid", "Bağlantı geçersiz.");
+
+        public static ServerMessage QuoteStateChanged =>
+            ServerMessage.Of("crm.server.endpoint.quote-state-changed", "Teklif durumu değişti.");
+    }
 }

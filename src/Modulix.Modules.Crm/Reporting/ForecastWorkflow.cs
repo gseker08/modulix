@@ -568,7 +568,7 @@ internal sealed class ForecastWorkflow(
         var previousId = againstId ?? c.PreviousSubmissionId;
         if (previousId is not { } other)
         {
-            return Conflict<ForecastComparison>("Karşılaştırılacak önceki sürüm yok; bir sürüm seçin.");
+            return Conflict<ForecastComparison>(CrmMessages.Forecast.CompareNoPrevious);
         }
 
         var previous = await HeaderAsync(other, cancellationToken);
@@ -580,13 +580,13 @@ internal sealed class ForecastWorkflow(
         var p = previous.Value!;
         if (p.PeriodStart != c.PeriodStart || p.PeriodEnd != c.PeriodEnd || p.ScopeType != c.ScopeType || p.ScopeUserId != c.ScopeUserId || p.ReportingCurrency != c.ReportingCurrency)
         {
-            return Conflict<ForecastComparison>("Yalnızca aynı dönem, kapsam ve para birimindeki sürümler karşılaştırılır.");
+            return Conflict<ForecastComparison>(CrmMessages.Forecast.CompareMismatch);
         }
 
         var visibility = await VisibilityAsync(cancellationToken);
         if (!visibility.ItemsVisible)
         {
-            return Conflict<ForecastComparison>("Satırları görmek için fırsat ve tutar izni gerekir.");
+            return Conflict<ForecastComparison>(CrmMessages.Forecast.LinesNeedPermission);
         }
 
         var now = await LoadItemsAsync(c.Id, visibility, cancellationToken);
@@ -968,7 +968,7 @@ internal sealed class ForecastWorkflow(
         }
 
         return RecordResult<ForecastDetail>.Fail(
-            RecordErrorCode.PermissionDenied, "Bu tahminin kapsamı veri kapsamınızı aşıyor; anlık görüntü eksik kalacağından işlem yapılamaz.");
+            RecordErrorCode.PermissionDenied, CrmMessages.Forecast.ScopeExceeds);
     }
 
     private async Task<OpportunityPage> ReadOpenAsync(ReportPeriod period, Guid? ownerId, CancellationToken cancellationToken) =>

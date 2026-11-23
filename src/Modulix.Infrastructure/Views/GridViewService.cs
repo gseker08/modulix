@@ -3,6 +3,7 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Views;
 using Modulix.Infrastructure.Persistence;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Infrastructure.Views;
 
@@ -27,7 +28,7 @@ internal sealed class GridViewService(ModulixDbContext db, ITenantContextAccesso
         var tenant = RequireTenant();
         if (GridViewRules.Validate(input) is { Count: > 0 } errors)
         {
-            return RecordResult<GridViewInfo>.Fail(RecordErrorCode.ValidationFailed, "Görünüm geçersiz.", errors);
+            return RecordResult<GridViewInfo>.Fail(RecordErrorCode.ValidationFailed, ServerMessages.View.Invalid, errors);
         }
 
         var mine = db.GridViews.Where(v => v.MembershipId == tenant.MembershipId && v.ScreenKey == input.ScreenKey);
@@ -41,8 +42,8 @@ internal sealed class GridViewService(ModulixDbContext db, ITenantContextAccesso
         {
             return RecordResult<GridViewInfo>.Fail(
                 RecordErrorCode.ValidationFailed,
-                $"Bir ekran için en fazla {GridViewRules.MaxViewsPerScreen} görünüm kaydedebilirsiniz.",
-                [new RecordFieldError("name", $"En fazla {GridViewRules.MaxViewsPerScreen} görünüm kaydedebilirsiniz.")]);
+                ServerMessages.View.LimitPerScreen(GridViewRules.MaxViewsPerScreen),
+                [new RecordFieldError("name", ServerMessages.View.LimitField(GridViewRules.MaxViewsPerScreen))]);
         }
 
         var view = new GridView(tenant.MembershipId, input.ScreenKey);
@@ -67,19 +68,19 @@ internal sealed class GridViewService(ModulixDbContext db, ITenantContextAccesso
         var view = await db.GridViews.SingleOrDefaultAsync(v => v.Id == id && v.MembershipId == tenant.MembershipId, cancellationToken);
         if (view is null)
         {
-            return RecordResult<GridViewInfo>.Fail(RecordErrorCode.NotFound, "Görünüm bulunamadı.");
+            return RecordResult<GridViewInfo>.Fail(RecordErrorCode.NotFound, ServerMessages.View.NotFound);
         }
 
         // Ekran değiştirilemez: görünüm başka ekranın sütunlarıyla çalışmaz.
         if (!string.Equals(view.ScreenKey, input.ScreenKey, StringComparison.Ordinal))
         {
             return RecordResult<GridViewInfo>.Fail(
-                RecordErrorCode.ValidationFailed, "Görünüm başka bir ekrana taşınamaz.", [new RecordFieldError("screenKey", "Görünüm başka bir ekrana taşınamaz.")]);
+                RecordErrorCode.ValidationFailed, ServerMessages.View.NotMovable, [new RecordFieldError("screenKey", ServerMessages.View.NotMovable)]);
         }
 
         if (GridViewRules.Validate(input) is { Count: > 0 } errors)
         {
-            return RecordResult<GridViewInfo>.Fail(RecordErrorCode.ValidationFailed, "Görünüm geçersiz.", errors);
+            return RecordResult<GridViewInfo>.Fail(RecordErrorCode.ValidationFailed, ServerMessages.View.Invalid, errors);
         }
 
         if (view.Version != version)
@@ -113,7 +114,7 @@ internal sealed class GridViewService(ModulixDbContext db, ITenantContextAccesso
         var view = await db.GridViews.SingleOrDefaultAsync(v => v.Id == id && v.MembershipId == tenant.MembershipId, cancellationToken);
         if (view is null)
         {
-            return RecordResult<bool>.Fail(RecordErrorCode.NotFound, "Görünüm bulunamadı.");
+            return RecordResult<bool>.Fail(RecordErrorCode.NotFound, ServerMessages.View.NotFound);
         }
 
         if (view.Version != version)
@@ -133,8 +134,8 @@ internal sealed class GridViewService(ModulixDbContext db, ITenantContextAccesso
 
     private static RecordResult<GridViewInfo> NameTaken() => RecordResult<GridViewInfo>.Fail(
         RecordErrorCode.ValidationFailed,
-        "Bu adla bir görünümünüz zaten var.",
-        [new RecordFieldError("name", "Bu adla bir görünümünüz zaten var.")]);
+        ServerMessages.View.NameExists,
+        [new RecordFieldError("name", ServerMessages.View.NameExists)]);
 
     private static RecordResult<GridViewInfo> Conflict(long current, long expected) => RecordResult<GridViewInfo>.Fail(
         RecordErrorCode.Conflict,

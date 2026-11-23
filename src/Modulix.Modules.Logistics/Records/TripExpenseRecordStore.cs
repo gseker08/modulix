@@ -125,7 +125,7 @@ internal sealed class TripExpenseRecordStore(LogisticsStoreContext context) : Lo
 
         if (entity.Description.Length == 0)
         {
-            errors.Add(new RecordFieldError("description", "Bu alan zorunludur."));
+            errors.Add(new RecordFieldError("description", ServerMessages.Validation.Required));
         }
 
         if (entity.Amount <= 0)

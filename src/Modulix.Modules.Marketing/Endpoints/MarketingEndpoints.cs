@@ -33,6 +33,11 @@ internal static class MarketingEndpoints
         ResourceEndpoints.MapResource<SegmentVersionDto, SaveSegmentVersionRequest>(group, Prefix, "segment-versions", MarketingModule.Entities.SegmentVersion,
             MarketingModule.Permissions.SegmentsRead, MarketingModule.Permissions.SegmentsPublish);
 
+        ResourceEndpoints.MapResource<JourneyDto, SaveJourneyRequest>(group, Prefix, "journeys", MarketingModule.Entities.Journey,
+            MarketingModule.Permissions.JourneysRead, MarketingModule.Permissions.JourneysWrite);
+        ResourceEndpoints.MapResource<JourneyEnrollmentDto, SaveJourneyEnrollmentRequest>(group, Prefix, "journey-enrollments", MarketingModule.Entities.JourneyEnrollment,
+            MarketingModule.Permissions.JourneysRead, MarketingModule.Permissions.JourneysWrite);
+
         // Segmentte kullanılabilir alanlar: çağıranın okuyabildikleri ve kullanamadıkları (nedeniyle).
         group.MapGet("/segment-fields", async (string target, ISegmentEngine engine, CancellationToken ct) =>
         {

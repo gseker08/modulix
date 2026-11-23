@@ -131,14 +131,10 @@
                         <FieldError Field="defaultQueueId" Errors="categoryErrors" />
                     </div>
                     <div class="span-12">
-                        <span class="form-label d-block">@Texts.Get("support.settings.requiredHelp")</span>
-                        @foreach (var (key, label) in RequiredOptions)
-                        {
-                            <div class="form-check form-check-inline">
-                                <input id="req-@key" class="form-check-input" type="checkbox" checked="@categoryRequired.Contains(key)" @onchange="e => ToggleRequired(key, (bool)e.Value!)" />
-                                <label class="form-check-label" for="req-@key">@label</label>
-                            </div>
-                        }
+                        <label class="form-label d-block" for="c-required">@Texts.Get("support.settings.requiredHelp")</label>
+                        <PickField TKey="string" Id="c-required" Title="@Texts.Get("support.settings.requiredHelp")" Icon="list"
+                                   Items="@([.. RequiredOptions.Select(o => new PickItem<string>(o.Key, o.Label))])"
+                                   Selected="categoryRequired" SelectedChanged="SetRequired" />
                         <FieldError Field="requiredFields" Errors="categoryErrors" />
                     </div>
                 </div>
@@ -171,7 +167,11 @@
         ("reporterPhone", Texts.Get("support.reporterPhone")), ("eventDate", Texts.Get("support.eventDate")), ("expectedOutcome", Texts.Get("support.expectedOutcome")),
     ];
 
-    private void ToggleRequired(string key, bool on) { if (on) { categoryRequired.Add(key); } else { categoryRequired.Remove(key); } }
+    private void SetRequired(IReadOnlyList<string> keys)
+    {
+        categoryRequired.Clear();
+        categoryRequired.UnionWith(keys);
+    }
 
     private static string RequiredText(string? csv) =>
         string.IsNullOrWhiteSpace(csv) ? "—" : string.Join(", ", csv.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(k => RequiredOptions.FirstOrDefault(o => o.Key == k).Label ?? k));
