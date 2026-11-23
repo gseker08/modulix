@@ -42,7 +42,21 @@
                     @foreach (SectionEditor section in menu.Sections)
                     {
                         <tr>
-                            <th colspan="3" scope="colgroup">@(section.Group is { } group ? AppNames.Of(group) : Texts.Get("admin.roleMenu.ungrouped"))</th>
+                            <th colspan="@(section.Movable ? 2 : 3)" scope="colgroup">@(section.Group is { } group ? AppNames.Of(group) : Texts.Get("admin.roleMenu.ungrouped"))</th>
+                            @if (section.Movable)
+                            {
+                                string sectionName = AppNames.Of(section.Group!);
+                                <th class="actions">
+                                    <button type="button" class="btn btn-icon btn-ghost" disabled="@(!CanMoveSection(menu, section, -1))"
+                                            aria-label="@Texts.Get("admin.roleMenu.sectionUp", sectionName)" @onclick="() => MoveSection(menu, section, -1)">
+                                        <AppIcon Name="arrow-up" Size="18" />
+                                    </button>
+                                    <button type="button" class="btn btn-icon btn-ghost" disabled="@(!CanMoveSection(menu, section, 1))"
+                                            aria-label="@Texts.Get("admin.roleMenu.sectionDown", sectionName)" @onclick="() => MoveSection(menu, section, 1)">
+                                        <AppIcon Name="arrow-down" Size="18" />
+                                    </button>
+                                </th>
+                            }
                         </tr>
                         @for (int i = 0; i < section.Items.Count; i++)
                         {
@@ -103,13 +117,20 @@
     {
         public AppGroup? Group { get; } = group;
 
+        /// <summary>Başlıklı, alt sabitli olmayan bölüm yer değiştirebilir (MenuLayoutRules.OrderSections ile aynı kural).</summary>
+        public bool Movable => Group is { Footer: false };
+
         public List<ItemEditor> Items { get; } = items;
 
         /// <summary>Katalogdaki (varsayılan) sıra; kullanıcı sırayı değiştirdi mi anlamak için.</summary>
         public IReadOnlyList<string> DefaultOrder { get; } = [.. items.Select(i => i.Entry.App.Id)];
     }
 
-    private sealed record MenuEditor(AppDefinition Root, List<SectionEditor> Sections);
+    private sealed record MenuEditor(AppDefinition Root, List<SectionEditor> Sections)
+    {
+        /// <summary>Katalogdaki bölüm sırası (başlıklı, taşınabilir bölümler); kullanıcı değiştirdi mi anlamak için.</summary>
+        public IReadOnlyList<string> DefaultSectionOrder { get; init; } = [];
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -146,11 +167,18 @@
                 sections.Add(new SectionEditor(section.Group, items));
             }
 
-            menus.Add(new MenuEditor(menu.Root, sections));
+            // Kayıtlı bölüm sırası varsa o, yoksa katalog sırası (bölüm satırları aynı tabloda, MenuLayoutRules.SectionKey).
+            IReadOnlyList<string> defaultOrder = [.. sections.Where(s => s.Movable).Select(s => s.Group!.Id)];
+            List<RoleMenuRowDto> rows = [.. layout.Select(i => new RoleMenuRowDto(RoleId, i.ItemKey, i.Order, i.Hidden))];
+            IReadOnlyList<MenuSection> ordered = MenuLayoutRules.OrderSections(
+                menu.Root.Id, [.. sections.Select(s => new MenuSection(s.Group, []))], rows);
+            sections = [.. ordered.Select(o => sections.First(s => s.Group == o.Group))];
+            menus.Add(new MenuEditor(menu.Root, sections) { DefaultSectionOrder = defaultOrder });
         }
 
         // "Varsayılana dön" Build([]) çağırır: düzen boşaltılınca korunan satır da kalmaz.
-        preserved = RoleMenuSaveRules.Preserved(layout, menus.SelectMany(m => m.Sections).SelectMany(s => s.Items).Select(i => i.Entry.App.Id));
+        preserved = RoleMenuSaveRules.Preserved(layout, menus.SelectMany(m => m.Sections).SelectMany(s => s.Items).Select(i => i.Entry.App.Id)
+            .Concat(menus.SelectMany(m => m.Sections.Where(s => s.Movable).Select(s => MenuLayoutRules.SectionKey(m.Root.Id, s.Group!.Id)))));
     }
 
     private static void Move(SectionEditor section, int index, int delta)
@@ -164,15 +192,54 @@
         (section.Items[index], section.Items[target]) = (section.Items[target], section.Items[index]);
     }
 
+    // Bölüm, taşınabilir komşusuyla yer değiştirir; alt sabitli ve başlıksız bölümler yerinde kalır.
+    private static int NeighbourOf(MenuEditor menu, SectionEditor section, int delta)
+    {
+        int index = menu.Sections.IndexOf(section) + delta;
+        while (index >= 0 && index < menu.Sections.Count && !menu.Sections[index].Movable)
+        {
+            index += delta;
+        }
+
+        return index >= 0 && index < menu.Sections.Count ? index : -1;
+    }
+
+    private static bool CanMoveSection(MenuEditor menu, SectionEditor section, int delta) => NeighbourOf(menu, section, delta) >= 0;
+
+    private static void MoveSection(MenuEditor menu, SectionEditor section, int delta)
+    {
+        int target = NeighbourOf(menu, section, delta);
+        if (target < 0)
+        {
+            return;
+        }
+
+        int index = menu.Sections.IndexOf(section);
+        (menu.Sections[index], menu.Sections[target]) = (menu.Sections[target], menu.Sections[index]);
+    }
+
     private void Reset() => Build([]);
 
     /// <summary>
-    /// Yalnızca varsayılandan ayrılan bölümler yazılır: sırası değişen bölümün bütün satırları sıra numarasıyla (10, 20, …),
+    /// Yalnızca varsayılandan ayrılanlar yazılır; bölüm sırası değiştiyse bölüm satırları, ayrıca satır sırası: sırası değişen bölümün bütün satırları sıra numarasıyla (10, 20, …),
     /// sırası değişmeyen bölümde yalnızca gizlenenler. Hiçbir şey değişmediyse boş liste gider (düzen kalkar).
     /// </summary>
     private List<RoleMenuItemDto> BuildRequest()
     {
         List<RoleMenuItemDto> items = [];
+        foreach (MenuEditor menu in menus!)
+        {
+            // Bölüm sırası değiştiyse o uygulamanın bütün taşınabilir bölümleri sıra numarasıyla yazılır.
+            List<SectionEditor> movable = [.. menu.Sections.Where(s => s.Movable)];
+            if (!movable.Select(s => s.Group!.Id).SequenceEqual(menu.DefaultSectionOrder))
+            {
+                for (int i = 0; i < movable.Count; i++)
+                {
+                    items.Add(new RoleMenuItemDto(MenuLayoutRules.SectionKey(menu.Root.Id, movable[i].Group!.Id), (i + 1) * 10, false));
+                }
+            }
+        }
+
         foreach (SectionEditor section in menus!.SelectMany(m => m.Sections))
         {
             bool reordered = !section.Items.Select(i => i.Entry.App.Id).SequenceEqual(section.DefaultOrder);

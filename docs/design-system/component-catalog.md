@@ -15,7 +15,7 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 | Breadcrumb | Var | `Components/Breadcrumb.razor` (`page-breadcrumb`): "CRM / Satış / Teklifler"; `AppCatalog` ve route'tan türer, sayfa başına elle yazılmaz |
 | BrandLogo | Var | `Components/BrandLogo.razor` — `Size`, `ShowTagline` |
 | ThemeToggle | Var | `Components/ThemeToggle.razor` |
-| RoleMenuLayout | Var | `Components/RoleMenuLayout.razor` (rol detayında menü düzeni; tek tablo, bölüm adı başlık satırı, `form-switch` görünürlük anahtarı ve `btn-icon btn-ghost` yukarı/aşağı düğmeleri; kendi "Kaydet" düğmesi vardır, sayfa içi küçük eylem formudur) |
+| RoleMenuLayout | Var | `Components/RoleMenuLayout.razor` (rol detayında menü düzeni; tek tablo, bölüm adı başlık satırı, `form-switch` görünürlük anahtarı ve `btn-icon btn-ghost` yukarı/aşağı düğmeleri, bölüm başlık satırında da bölümü taşıyan aynı düğmeler; kendi "Kaydet" düğmesi vardır, sayfa içi küçük eylem formudur) |
 | AccentColorField | Var | `Components/AccentColorField.razor` (firma vurgu rengi: `form-control-color` renk seçici + #RRGGBB kutusu + "Varsayılana dön"; kontrast sonucu sunucudan gelir (`/api/settings/accent/preview`); önizleme `card` kutusu `data-theme` ile seçilen temanın yüzeyini alır ve yalnızca `--mx-brand-primary` satır içi geçersiz kılınır; yeni sınıf ya da token yoktur) |
 | PageHeader | Var | `Components/PageHeader.razor` — `Title`, `Icon`, `Subtitle`, aksiyonlar `ChildContent` |
 | Breadcrumb | Stil | `<ol class="breadcrumb-trail">`; bugün detay sayfaları `back-link` kullanır |
