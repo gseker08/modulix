@@ -1,4 +1,5 @@
 using Modulix.Modules.Crm.Contracts.Sales;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Orders.Lifecycle;
 
@@ -28,15 +29,15 @@ public enum PlanErrorKind
     Conflict,
 }
 
-public sealed record ConversionPlan(IReadOnlyList<PlannedOrderLine> Lines, PlanErrorKind Error, string? Field, string? Message)
+public sealed record ConversionPlan(IReadOnlyList<PlannedOrderLine> Lines, PlanErrorKind Error, string? Field, ServerMessage? Message)
 {
     public bool IsSuccess => Error == PlanErrorKind.None;
 
     public static ConversionPlan Ok(IReadOnlyList<PlannedOrderLine> lines) => new(lines, PlanErrorKind.None, null, null);
 
-    public static ConversionPlan Invalid(string field, string message) => new([], PlanErrorKind.Invalid, field, message);
+    public static ConversionPlan Invalid(string field, ServerMessage message) => new([], PlanErrorKind.Invalid, field, message);
 
-    public static ConversionPlan Conflict(string field, string message) => new([], PlanErrorKind.Conflict, field, message);
+    public static ConversionPlan Conflict(string field, ServerMessage message) => new([], PlanErrorKind.Conflict, field, message);
 }
 
 /// <summary>
@@ -51,7 +52,7 @@ public static class OrderConversionPlanner
     {
         if (lines.Count == 0)
         {
-            return ConversionPlan.Invalid("lines", "Kabul edilmiş teklifte sipariş kalemi yok.");
+            return ConversionPlan.Invalid("lines", OrdersMessages.Conversion.NoLines);
         }
 
         ConsumptionState StateOf(AcceptedQuoteLine line) => ledger.TryGetValue(line.StableKey, out var state) ? state : ConsumptionState.For(line);
@@ -60,12 +61,12 @@ public static class OrderConversionPlanner
         {
             if (requested is { Count: > 0 })
             {
-                return ConversionPlan.Invalid("lines", "Tam dönüşümde kalem miktarı verilmez; kısmi dönüşüm için kipi değiştirin.");
+                return ConversionPlan.Invalid("lines", OrdersMessages.Conversion.FullNoQuantity);
             }
 
             if (lines.Any(l => StateOf(l).ConvertedQuantity > 0m))
             {
-                return ConversionPlan.Conflict("lines", "Bu teklifin kalemlerinden bir kısmı ya da tamamı zaten siparişe alınmış.");
+                return ConversionPlan.Conflict("lines", OrdersMessages.Conversion.AlreadyTaken);
             }
 
             var all = new List<PlannedOrderLine>();
@@ -79,17 +80,17 @@ public static class OrderConversionPlanner
 
         if (mode != ConversionMode.Partial)
         {
-            return ConversionPlan.Invalid("mode", "Dönüşüm kipi Full ya da Partial olmalıdır.");
+            return ConversionPlan.Invalid("mode", OrdersMessages.Conversion.ModeInvalid);
         }
 
         if (requested is not { Count: > 0 })
         {
-            return ConversionPlan.Invalid("lines", "Kısmi dönüşümde en az bir kalem ve miktar verilmelidir.");
+            return ConversionPlan.Invalid("lines", OrdersMessages.Conversion.PartialNeedLine);
         }
 
         if (requested.Select(r => r.LineKey).Distinct().Count() != requested.Count)
         {
-            return ConversionPlan.Invalid("lines", "Aynı kalem birden çok kez verilemez.");
+            return ConversionPlan.Invalid("lines", OrdersMessages.Conversion.Duplicate);
         }
 
         var planned = new List<PlannedOrderLine>();
@@ -98,19 +99,19 @@ public static class OrderConversionPlanner
             var line = lines.FirstOrDefault(l => l.StableKey == request.LineKey);
             if (line is null)
             {
-                return ConversionPlan.Invalid("lines", "Seçilen kalemlerden biri bu teklifte yok.");
+                return ConversionPlan.Invalid("lines", OrdersMessages.Conversion.LineMissing);
             }
 
             if (request.Quantity <= 0m)
             {
-                return ConversionPlan.Invalid("lines", $"'{line.Name}' için miktar sıfırdan büyük olmalıdır.");
+                return ConversionPlan.Invalid("lines", OrdersMessages.Conversion.QuantityPositive(line.Name));
             }
 
             var state = StateOf(line);
             if (request.Quantity > state.RemainingQuantity)
             {
                 return ConversionPlan.Conflict("lines",
-                    $"'{line.Name}' için en fazla {state.RemainingQuantity:0.####} {line.Unit} kalan; {request.Quantity:0.####} istendi (kabul edilen {state.AcceptedQuantity:0.####}).");
+                    OrdersMessages.Conversion.QuantityExceeds(line.Name, OrdersMessages.Q(state.RemainingQuantity), line.Unit ?? string.Empty, OrdersMessages.Q(request.Quantity), OrdersMessages.Q(state.AcceptedQuantity)));
             }
 
             planned.Add(Take(line, state, request.Quantity));

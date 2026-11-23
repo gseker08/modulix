@@ -7,6 +7,7 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Core.Hosting;
 using Modulix.Modules.Orders.Lifecycle;
 using Modulix.Shared.Orders;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Orders.Endpoints;
 
@@ -228,7 +229,7 @@ internal static class OrdersEndpoints
         {
             if (request.ContentLength is > OrderFulfillmentAccess.MaxEvidenceBytes)
             {
-                return Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "Dosya çok büyük.", detail: $"En fazla {OrderFulfillmentAccess.MaxEvidenceBytes / (1024 * 1024)} MB.");
+                return LocalizedProblems.Problem(StatusCodes.Status413PayloadTooLarge, OrdersMessages.Upload.TooLarge, OrdersMessages.Upload.TooLargeDetail(OrderFulfillmentAccess.MaxEvidenceBytes / (1024 * 1024)));
             }
 
             using var buffer = new MemoryStream();
@@ -238,7 +239,7 @@ internal static class OrdersEndpoints
             {
                 if (buffer.Length + read > OrderFulfillmentAccess.MaxEvidenceBytes)
                 {
-                    return Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "Dosya çok büyük.", detail: $"En fazla {OrderFulfillmentAccess.MaxEvidenceBytes / (1024 * 1024)} MB.");
+                    return LocalizedProblems.Problem(StatusCodes.Status413PayloadTooLarge, OrdersMessages.Upload.TooLarge, OrdersMessages.Upload.TooLargeDetail(OrderFulfillmentAccess.MaxEvidenceBytes / (1024 * 1024)));
                 }
 
                 buffer.Write(chunk, 0, read);

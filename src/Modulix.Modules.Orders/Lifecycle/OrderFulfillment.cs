@@ -186,18 +186,18 @@ internal sealed class OrderFulfillment(
 
         if (order.Status != OrderStatus.Approved)
         {
-            return Invalid<DeliveryView>("orderId", "Teslimat yalnızca onaylanmış sipariş için planlanır.");
+            return Invalid<DeliveryView>("orderId", OrdersMessages.FulfillmentService.PlanOrderApproved);
         }
 
         var handover = await reader.HandoverOfOrderAsync(orderId, cancellationToken);
         if (handover is not { Status: HandoverStatus.Accepted })
         {
-            return Invalid<DeliveryView>("orderId", "Teslimat planlamadan önce satış devri operasyon tarafından kabul edilmiş olmalıdır.");
+            return Invalid<DeliveryView>("orderId", OrdersMessages.FulfillmentService.PlanHandoverAccepted);
         }
 
         if (input.JobId is { } jobId && await reader.JobAsync(jobId, cancellationToken) is not { Status: not JobStatus.Cancelled } job || input.JobId is { } j2 && (await reader.JobAsync(j2, cancellationToken))?.OrderId != orderId)
         {
-            return Invalid<DeliveryView>("jobId", "Operasyon işi bu siparişte bulunamadı ya da iptal edilmiş.");
+            return Invalid<DeliveryView>("jobId", OrdersMessages.FulfillmentService.JobMissing);
         }
 
         var capacity = await CapacityAsync(orderId, excludeDelivery: null, cancellationToken);
@@ -244,7 +244,7 @@ internal sealed class OrderFulfillment(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(Permission))
         {
-            return RecordResult<DeliveryView>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{Permission}' izni gerekir.");
+            return RecordResult<DeliveryView>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(Permission));
         }
 
         var delivery = (await reader.DeliveryAsync(deliveryId, cancellationToken))!;
@@ -252,7 +252,7 @@ internal sealed class OrderFulfillment(
         var reason = string.IsNullOrWhiteSpace(input.Reason) ? null : input.Reason.Trim();
         if ((FulfillmentTransitions.DeliveryRequiresReason(action) || action == DeliveryAction.Reschedule) && reason is null)
         {
-            return Invalid<DeliveryView>("reason", "Gerekçe zorunludur.");
+            return Invalid<DeliveryView>("reason", OrdersMessages.Workflow.ReasonRequired);
         }
 
         var alreadyRescheduled = (await reader.DeliveriesOfOrderAsync(order.Id, cancellationToken)).Any(d => d.RescheduledFromId == deliveryId);
@@ -277,13 +277,13 @@ internal sealed class OrderFulfillment(
                 var receiver = string.IsNullOrWhiteSpace(input.ReceiverName) ? null : input.ReceiverName.Trim();
                 if (receiver is null)
                 {
-                    return Invalid<DeliveryView>("receiverName", "Teslim alan kişi zorunludur.");
+                    return Invalid<DeliveryView>("receiverName", OrdersMessages.FulfillmentService.ReceiverRequired);
                 }
 
                 var actualDate = input.ActualDate ?? Today();
                 if (actualDate > Today())
                 {
-                    return Invalid<DeliveryView>("actualDate", "Gerçekleşen teslim tarihi gelecekte olamaz.");
+                    return Invalid<DeliveryView>("actualDate", OrdersMessages.FulfillmentService.ActualDateFuture);
                 }
 
                 var plannedLines = await reader.DeliveryLinesAsync(deliveryId, cancellationToken);
@@ -382,7 +382,7 @@ internal sealed class OrderFulfillment(
     {
         if (input.PlannedDate is not { } plannedDate)
         {
-            return Invalid<DeliveryView>("plannedDate", "Yeniden planlama için yeni teslim tarihi zorunludur.");
+            return Invalid<DeliveryView>("plannedDate", OrdersMessages.FulfillmentService.RescheduleDateRequired);
         }
 
         var plannedLines = await reader.DeliveryLinesAsync(failed.Id, cancellationToken);
@@ -468,13 +468,13 @@ internal sealed class OrderFulfillment(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(Permission))
         {
-            return RecordResult<DeliveryView>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{Permission}' izni gerekir.");
+            return RecordResult<DeliveryView>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(Permission));
         }
 
         var delivery = (await reader.DeliveryAsync(deliveryId, cancellationToken))!;
         if (delivery.Status == DeliveryStatus.Cancelled)
         {
-            return Invalid<DeliveryView>("deliveryId", "İptal edilmiş teslimata kanıt eklenemez.");
+            return Invalid<DeliveryView>("deliveryId", OrdersMessages.FulfillmentService.EvidenceCancelled);
         }
 
         if (EvidenceRules.Validate(fileName, contentType, content) is { } problem)
@@ -484,7 +484,7 @@ internal sealed class OrderFulfillment(
 
         if (await reader.EvidenceCountAsync(deliveryId, cancellationToken) >= OrderDeliveryEvidence.MaxPerDelivery)
         {
-            return Invalid<DeliveryView>("file", $"Bir teslimata en fazla {OrderDeliveryEvidence.MaxPerDelivery} kanıt eklenebilir.");
+            return Invalid<DeliveryView>("file", OrdersMessages.FulfillmentService.EvidenceMax(OrderDeliveryEvidence.MaxPerDelivery));
         }
 
         var order = (await reader.OrderAsync(delivery.OrderId, cancellationToken))!;
@@ -527,7 +527,7 @@ internal sealed class OrderFulfillment(
 
         return await reader.EvidenceAsync(deliveryId, evidenceId, cancellationToken) is { } file
             ? RecordResult<EvidenceFile>.Ok(new EvidenceFile(file.FileName, file.ContentType, file.Content, file.Sha256))
-            : RecordResult<EvidenceFile>.Fail(RecordErrorCode.NotFound, "Teslim kanıtı bulunamadı.");
+            : RecordResult<EvidenceFile>.Fail(RecordErrorCode.NotFound, OrdersMessages.FulfillmentService.EvidenceNotFound);
     }
 
     // ---- Hizmet başlangıcı
@@ -542,18 +542,18 @@ internal sealed class OrderFulfillment(
 
         if (order.Status != OrderStatus.Approved)
         {
-            return Invalid<ServiceLineView>("orderId", "Hizmet başlangıcı yalnızca onaylanmış sipariş için planlanır.");
+            return Invalid<ServiceLineView>("orderId", OrdersMessages.FulfillmentService.ServiceOrderApproved);
         }
 
         var line = (await reader.LinesAsync(orderId, cancellationToken)).FirstOrDefault(l => l.Id == orderLineId && !l.IsCancelled && l.EffectiveQuantity > 0m);
         if (line is null || LineKinds.IsDeliverable(line.Kind))
         {
-            return Invalid<ServiceLineView>("orderLineId", "Hizmet kalemi bu siparişte bulunamadı; ürün kalemleri teslimatla izlenir.");
+            return Invalid<ServiceLineView>("orderLineId", OrdersMessages.FulfillmentService.ServiceLineMissing);
         }
 
         if ((await reader.ServiceStartsOfOrderAsync(orderId, cancellationToken)).Any(s => s.OrderLineId == orderLineId))
         {
-            return RecordResult<ServiceLineView>.Fail(RecordErrorCode.Conflict, "Bu hizmet kaleminin başlangıç kaydı zaten var.");
+            return RecordResult<ServiceLineView>.Fail(RecordErrorCode.Conflict, OrdersMessages.FulfillmentService.ServiceStartExists);
         }
 
         var values = new JsonObject
@@ -596,7 +596,7 @@ internal sealed class OrderFulfillment(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(Permission))
         {
-            return RecordResult<ServiceLineView>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{Permission}' izni gerekir.");
+            return RecordResult<ServiceLineView>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(Permission));
         }
 
         var start = (await reader.ServiceStartAsync(serviceStartId, cancellationToken))!;
@@ -617,7 +617,7 @@ internal sealed class OrderFulfillment(
                 var blockers = await ServiceBlockersAsync(order, await reader.HandoverOfOrderAsync(order.Id, cancellationToken), line, cancellationToken);
                 if (blockers.Count > 0)
                 {
-                    return RecordResult<ServiceLineView>.Fail(RecordErrorCode.Conflict, "Hizmet başlangıcı kaydedilemedi: " + string.Join(" ", blockers),
+                    return RecordResult<ServiceLineView>.Fail(RecordErrorCode.Conflict, OrdersMessages.FulfillmentService.ServiceStartBlocked(string.Join(" ", blockers)),
                         [.. blockers.Select(b => new RecordFieldError("blockers", b))]);
                 }
 
@@ -630,7 +630,7 @@ internal sealed class OrderFulfillment(
                 var by = Normalize(input.ConfirmedBy);
                 if (by is null)
                 {
-                    return Invalid<ServiceLineView>("confirmedBy", "Başlangıcı onaylayan müşteri tarafı kişi zorunludur.");
+                    return Invalid<ServiceLineView>("confirmedBy", OrdersMessages.FulfillmentService.ConfirmedByRequired);
                 }
 
                 values["customerConfirmedAt"] = now.ToString("O", CultureInfo.InvariantCulture);
@@ -718,7 +718,7 @@ internal sealed class OrderFulfillment(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(Permission))
         {
-            return (null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{Permission}' izni gerekir."));
+            return (null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(Permission)));
         }
 
         return (await reader.OrderAsync(orderId, cancellationToken), null);

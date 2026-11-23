@@ -5,6 +5,7 @@ using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Crm.Contracts.Sales;
 using Modulix.Modules.Orders.Domain;
 using Modulix.Modules.Orders.Records;
+using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Modules.Orders.Lifecycle;
 
@@ -135,7 +136,7 @@ internal sealed class OrderFromQuote(
 
         if (quote.PartyId is not { } partyId)
         {
-            return Invalid("quoteId", "Teklifin müşterisi ortak müşteri kaydıyla eşleşmedi; sipariş oluşturulamaz.");
+            return Invalid("quoteId", OrdersMessages.FromQuote.PartyMismatch);
         }
 
         var mode = string.IsNullOrWhiteSpace(options.Mode) ? ConversionMode.Full : options.Mode;
@@ -148,8 +149,8 @@ internal sealed class OrderFromQuote(
             if (plan.Error == PlanErrorKind.Conflict)
             {
                 var existing = await ExistingOrdersAsync(quoteId, cancellationToken);
-                var hint = existing.Count > 0 ? $" Mevcut sipariş: {existing[0].Number}." : string.Empty;
-                return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, plan.Message + hint, [new RecordFieldError(plan.Field!, plan.Message!)]);
+                var detail = existing.Count > 0 ? OrdersMessages.FromQuote.ConflictWithOrder(plan.Message!.Text, existing[0].Number) : plan.Message!;
+                return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, detail, [new RecordFieldError(plan.Field!, plan.Message!)]);
             }
 
             return Invalid(plan.Field!, plan.Message!);
@@ -157,7 +158,7 @@ internal sealed class OrderFromQuote(
 
         if (options.PlannedStartDate is { } start && options.PlannedDeliveryDate is { } delivery && delivery < start)
         {
-            return Invalid("plannedDeliveryDate", "Planlanan teslim tarihi başlangıç tarihinden önce olamaz.");
+            return Invalid("plannedDeliveryDate", OrdersMessages.FromQuote.PlannedBeforeStart);
         }
 
         var net = plan.Lines.Sum(l => l.Net);
@@ -302,17 +303,17 @@ internal sealed class OrderFromQuote(
         if (!granted.Contains(OrdersModule.Permissions.OrdersCreate) || !granted.Contains(OrdersModule.Permissions.FinancialsRead))
         {
             return (null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied,
-                $"Tekliften sipariş oluşturmak için '{OrdersModule.Permissions.OrdersCreate}' ve '{OrdersModule.Permissions.FinancialsRead}' izinleri gerekir."));
+                OrdersMessages.FromQuote.PermissionsNeeded(OrdersModule.Permissions.OrdersCreate, OrdersModule.Permissions.FinancialsRead)));
         }
 
         if (quotes is null)
         {
-            return (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, "Teklif kaynağı kullanılamıyor; kabul edilmiş teklif bulunamadı."));
+            return (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, OrdersMessages.FromQuote.SourceUnavailable));
         }
 
         var quote = await quotes.GetAsync(quoteId, cancellationToken);
         return quote is null
-            ? (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, "Kabul edilmiş teklif bulunamadı."))
+            ? (null, RecordResult<T>.Fail(RecordErrorCode.NotFound, OrdersMessages.FromQuote.QuoteNotFound))
             : (quote, null);
     }
 
@@ -326,6 +327,6 @@ internal sealed class OrderFromQuote(
 
     private static string? Trim(string? text, int max) => text is { Length: > 0 } && text.Length > max ? text[..max] : text;
 
-    private static RecordResult<RecordData> Invalid(string field, string message) =>
+    private static RecordResult<RecordData> Invalid(string field, ServerMessage message) =>
         RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

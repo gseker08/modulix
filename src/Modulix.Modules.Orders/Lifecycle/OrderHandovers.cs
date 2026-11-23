@@ -69,7 +69,7 @@ internal sealed class OrderHandovers(
         }
 
         return query.Value!.Items.Count == 0
-            ? RecordResult<OrderHandoverView>.Fail(RecordErrorCode.NotFound, "Bu sipariş için devir kaydı yok.")
+            ? RecordResult<OrderHandoverView>.Fail(RecordErrorCode.NotFound, OrdersMessages.HandoverService.NoHandover)
             : RecordResult<OrderHandoverView>.Ok(await ViewAsync(query.Value.Items[0], cancellationToken));
     }
 
@@ -91,13 +91,13 @@ internal sealed class OrderHandovers(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(OrdersModule.Permissions.HandoversWrite))
         {
-            return RecordResult<OrderHandoverView>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{OrdersModule.Permissions.HandoversWrite}' izni gerekir.");
+            return RecordResult<OrderHandoverView>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(OrdersModule.Permissions.HandoversWrite));
         }
 
         var existing = await GetByOrderAsync(orderId, cancellationToken);
         if (existing.IsSuccess)
         {
-            return RecordResult<OrderHandoverView>.Fail(RecordErrorCode.Conflict, "Bu siparişin devir kaydı zaten var.");
+            return RecordResult<OrderHandoverView>.Fail(RecordErrorCode.Conflict, OrdersMessages.HandoverService.AlreadyExists);
         }
 
         return await pipeline.RunAtomicAsync(async ct =>
@@ -126,7 +126,7 @@ internal sealed class OrderHandovers(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(permission))
         {
-            return RecordResult<OrderHandoverView>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir.");
+            return RecordResult<OrderHandoverView>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission));
         }
 
         var handover = (await reader.HandoverAsync(handoverId, cancellationToken))!;
@@ -134,7 +134,7 @@ internal sealed class OrderHandovers(
         var text = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
         if (HandoverRules.RequiresNote(action, handover.Status) && text is null)
         {
-            return Invalid("note", action == HandoverAction.RequestInfo ? "Bilgi istemek için gerekçe zorunludur." : "Yeniden göndermek için neyin tamamlandığını yazın.");
+            return Invalid("note", action == HandoverAction.RequestInfo ? OrdersMessages.HandoverService.InfoRequestReason : OrdersMessages.HandoverService.ResendNote);
         }
 
         var missing = await MissingAsync(handover, cancellationToken);
@@ -274,6 +274,6 @@ internal sealed class OrderHandovers(
             [.. events.Select(e => new HandoverEventView(e.Id, e.Round, e.Kind, e.CreatedAt, e.ActorId, e.Note))]);
     }
 
-    private static RecordResult<OrderHandoverView> Invalid(string field, string message) =>
+    private static RecordResult<OrderHandoverView> Invalid(string field, ServerMessage message) =>
         RecordResult<OrderHandoverView>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

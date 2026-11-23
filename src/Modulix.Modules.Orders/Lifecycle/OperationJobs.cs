@@ -98,7 +98,7 @@ internal sealed class OperationJobs(
         var order = handover is null ? null : await reader.OrderAsync(handover.OrderId, cancellationToken);
         if (handover is null || order is null)
         {
-            return RecordResult<IReadOnlyList<string>>.Fail(RecordErrorCode.NotFound, "Devir ya da sipariş bulunamadı.");
+            return RecordResult<IReadOnlyList<string>>.Fail(RecordErrorCode.NotFound, OrdersMessages.JobService.HandoverOrOrderMissing);
         }
 
         var settings = policy is null ? OrderPolicySettings.Default : await policy.GetAsync(cancellationToken);
@@ -128,7 +128,7 @@ internal sealed class OperationJobs(
                 handover.TargetStartDate, handover.TargetEndDate, handover.Location, null, "Handover", dependsOn, JobEventKinds.Generated, $"Devir kabulünden üretildi ({settings.JobStrategy}).", permission, cancellationToken);
             if (!result.IsSuccess)
             {
-                return RecordResult<IReadOnlyList<string>>.Fail(result.Error!.Code, "Operasyon işi üretilemedi: " + result.Error.Message, result.Error.FieldErrors);
+                return RecordResult<IReadOnlyList<string>>.Fail(result.Error!.Code, OrdersMessages.JobService.GenerateFailed(result.Error.Message), result.Error.FieldErrors);
             }
 
             created[plan.GroupKey] = result.Value!.Id;
@@ -150,19 +150,19 @@ internal sealed class OperationJobs(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(OrdersModule.Permissions.JobsManage))
         {
-            return RecordResult<OperationJobView>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{OrdersModule.Permissions.JobsManage}' izni gerekir.");
+            return RecordResult<OperationJobView>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(OrdersModule.Permissions.JobsManage));
         }
 
         var order = (await reader.OrderAsync(orderId, cancellationToken))!;
         if (order.Status != OrderStatus.Approved)
         {
-            return Invalid<OperationJobView>("orderId", "Operasyon işi yalnızca onaylanmış siparişe açılır.");
+            return Invalid<OperationJobView>("orderId", OrdersMessages.JobService.OrderMustBeApproved);
         }
 
         var handover = await HandoverOfAsync(orderId, cancellationToken);
         if (handover is not { Status: HandoverStatus.Accepted })
         {
-            return Invalid<OperationJobView>("orderId", "Operasyon işi açmadan önce satış devri operasyon tarafından kabul edilmiş olmalıdır.");
+            return Invalid<OperationJobView>("orderId", OrdersMessages.JobService.HandoverNotAccepted);
         }
 
         var all = await reader.LinesAsync(orderId, cancellationToken);
@@ -170,18 +170,18 @@ internal sealed class OperationJobs(
         var ids = input.LineIds?.Distinct().ToList() ?? [];
         if (ids.Count == 0)
         {
-            return Invalid<OperationJobView>("lineIds", "İşe bağlanacak en az bir sipariş kalemi seçin.");
+            return Invalid<OperationJobView>("lineIds", OrdersMessages.JobService.LinesRequired);
         }
 
         if (ids.Any(id => !active.ContainsKey(id)))
         {
-            return Invalid<OperationJobView>("lineIds", "Seçilen kalemlerden biri bu siparişte yok ya da iptal edilmiş.");
+            return Invalid<OperationJobView>("lineIds", OrdersMessages.JobService.LineMissing);
         }
 
         var inOpen = await reader.LinesInOpenJobsAsync(orderId, cancellationToken);
         if (ids.Where(inOpen.Contains).Select(id => active[id].Name).ToList() is { Count: > 0 } taken)
         {
-            return RecordResult<OperationJobView>.Fail(RecordErrorCode.Conflict, "Seçilen kalemler zaten açık bir işte: " + string.Join(", ", taken) + ".", [new RecordFieldError("lineIds", "Kalem başka bir açık işte.")]);
+            return RecordResult<OperationJobView>.Fail(RecordErrorCode.Conflict, OrdersMessages.JobService.LinesTaken(string.Join(", ", taken)), [new RecordFieldError("lineIds", OrdersMessages.JobService.LineInOtherJob)]);
         }
 
         var kinds = ids.Select(id => active[id].Kind == LineKinds.Product).Distinct().ToList();
@@ -215,14 +215,14 @@ internal sealed class OperationJobs(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(permission))
         {
-            return RecordResult<OperationJobView>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{permission}' izni gerekir.");
+            return RecordResult<OperationJobView>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(permission));
         }
 
         var job = (await reader.JobAsync(jobId, cancellationToken))!;
         var reason = string.IsNullOrWhiteSpace(input.Reason) ? null : input.Reason.Trim();
         if (JobTransitions.RequiresReason(action) && reason is null)
         {
-            return Invalid<OperationJobView>("reason", "Gerekçe zorunludur.");
+            return Invalid<OperationJobView>("reason", OrdersMessages.Workflow.ReasonRequired);
         }
 
         var state = await StateOfAsync(job, cancellationToken);
@@ -244,12 +244,12 @@ internal sealed class OperationJobs(
                 var user = input.ResponsibleUserId ?? job.ResponsibleUserId;
                 if (input.ResponsibleUserId is null && input.TeamName is null)
                 {
-                    return Invalid<OperationJobView>("responsibleUserId", "Sorumlu kullanıcı ya da ekip girin.");
+                    return Invalid<OperationJobView>("responsibleUserId", OrdersMessages.JobService.ResponsibleRequired);
                 }
 
                 if (user is null && team is null)
                 {
-                    return Invalid<OperationJobView>("responsibleUserId", "Sorumlu kullanıcı ya da ekipten en az biri kalmalıdır.");
+                    return Invalid<OperationJobView>("responsibleUserId", OrdersMessages.JobService.ResponsibleKeep);
                 }
 
                 if (input.ResponsibleUserId is { } assignee)
@@ -363,7 +363,7 @@ internal sealed class OperationJobs(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(OrdersModule.Permissions.JobsManage))
         {
-            return new(null, RecordResult<OperationJobView>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{OrdersModule.Permissions.JobsManage}' izni gerekir."));
+            return new(null, RecordResult<OperationJobView>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(OrdersModule.Permissions.JobsManage)));
         }
 
         var job = (await reader.JobAsync(jobId, cancellationToken))!;
@@ -371,12 +371,12 @@ internal sealed class OperationJobs(
         var other = otherRecord.IsSuccess ? await reader.JobAsync(dependsOnJobId, cancellationToken) : null;
         if (other is null || other.OrderId != job.OrderId)
         {
-            return new(null, Invalid<OperationJobView>("dependsOnJobId", "Bağımlı olunacak iş bu siparişte bulunamadı."));
+            return new(null, Invalid<OperationJobView>("dependsOnJobId", OrdersMessages.JobService.DependencyJobMissing));
         }
 
         if (JobStatus.IsFinal(job.Status))
         {
-            return new(null, Invalid<OperationJobView>("jobId", "Tamamlanmış ya da iptal edilmiş işin bağımlılığı değiştirilemez."));
+            return new(null, Invalid<OperationJobView>("jobId", OrdersMessages.JobService.DependencyClosed));
         }
 
         var edges = await reader.JobEdgesAsync(job.OrderId, cancellationToken);
@@ -385,17 +385,17 @@ internal sealed class OperationJobs(
         {
             if (exists)
             {
-                return new(null, RecordResult<OperationJobView>.Fail(RecordErrorCode.Conflict, "Bu bağımlılık zaten var."));
+                return new(null, RecordResult<OperationJobView>.Fail(RecordErrorCode.Conflict, OrdersMessages.JobService.DependencyExists));
             }
 
             if (JobDependencyRules.WouldCycle(edges.Select(e => (e.JobId, e.DependsOnJobId)), job.Id, other.Id))
             {
-                return new(null, Invalid<OperationJobView>("dependsOnJobId", job.Id == other.Id ? "İş kendisine bağımlı olamaz." : "Bu bağımlılık döngü oluşturur."));
+                return new(null, Invalid<OperationJobView>("dependsOnJobId", job.Id == other.Id ? OrdersMessages.JobService.SelfDependency : OrdersMessages.JobService.DependencyCycle));
             }
         }
         else if (!exists)
         {
-            return new(null, RecordResult<OperationJobView>.Fail(RecordErrorCode.NotFound, "Bu bağımlılık yok."));
+            return new(null, RecordResult<OperationJobView>.Fail(RecordErrorCode.NotFound, OrdersMessages.JobService.DependencyNotFound));
         }
 
         return new(new DependencyPair(job, other), null);
@@ -513,6 +513,6 @@ internal sealed class OperationJobs(
 
     private static RecordResult<T> Fail<T>(RecordError error) => RecordResult<T>.Fail(error.Code, error.Message, error.FieldErrors);
 
-    private static RecordResult<T> Invalid<T>(string field, string message) =>
+    private static RecordResult<T> Invalid<T>(string field, ServerMessage message) =>
         RecordResult<T>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }

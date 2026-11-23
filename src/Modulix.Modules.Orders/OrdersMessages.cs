@@ -171,6 +171,9 @@ internal static class OrdersMessages
         public static ServerMessage NotNow =>
             ServerMessage.Of("orders.server.workflow.not-now", "Bu işlem şu an yapılamaz.");
 
+        public static ServerMessage ReasonRequired =>
+            ServerMessage.Of("orders.server.workflow.reason-required", "Gerekçe zorunludur.");
+
         public static ServerMessage SelfApproval =>
             ServerMessage.Of("orders.server.workflow.self-approval", "Kendi onaya gönderdiğiniz siparişi onaylayamazsınız.");
     }
@@ -380,6 +383,208 @@ internal static class OrdersMessages
 
         public static ServerMessage CancelFinal =>
             ServerMessage.Of("orders.server.job-rule.cancel-final", "Tamamlanmış ya da zaten iptal edilmiş iş iptal edilemez.");
+    }
+
+    /// <summary>Tekliften sipariş dönüşümü planı.</summary>
+    public static class Conversion
+    {
+        public static ServerMessage NoLines =>
+            ServerMessage.Of("orders.server.conversion.no-lines", "Kabul edilmiş teklifte sipariş kalemi yok.");
+
+        public static ServerMessage FullNoQuantity =>
+            ServerMessage.Of("orders.server.conversion.full-no-quantity", "Tam dönüşümde kalem miktarı verilmez; kısmi dönüşüm için kipi değiştirin.");
+
+        public static ServerMessage AlreadyTaken =>
+            ServerMessage.Of("orders.server.conversion.already-taken", "Bu teklifin kalemlerinden bir kısmı ya da tamamı zaten siparişe alınmış.");
+
+        public static ServerMessage ModeInvalid =>
+            ServerMessage.Of("orders.server.conversion.mode-invalid", "Dönüşüm kipi Full ya da Partial olmalıdır.");
+
+        public static ServerMessage PartialNeedLine =>
+            ServerMessage.Of("orders.server.conversion.partial-need-line", "Kısmi dönüşümde en az bir kalem ve miktar verilmelidir.");
+
+        public static ServerMessage Duplicate =>
+            ServerMessage.Of("orders.server.conversion.duplicate", "Aynı kalem birden çok kez verilemez.");
+
+        public static ServerMessage LineMissing =>
+            ServerMessage.Of("orders.server.conversion.line-missing", "Seçilen kalemlerden biri bu teklifte yok.");
+
+        public static ServerMessage QuantityPositive(string name) =>
+            ServerMessage.Of("orders.server.conversion.quantity-positive", "'{0}' için miktar sıfırdan büyük olmalıdır.", name);
+
+        public static ServerMessage QuantityExceeds(string name, string remaining, string unit, string requested, string accepted) =>
+            ServerMessage.Of("orders.server.conversion.quantity-exceeds", "'{0}' için en fazla {1} {2} kalan; {3} istendi (kabul edilen {4}).", name, remaining, unit, requested, accepted);
+    }
+
+    /// <summary>Tekliften sipariş oluşturma.</summary>
+    public static class FromQuote
+    {
+        public static ServerMessage PartyMismatch =>
+            ServerMessage.Of("orders.server.from-quote.party-mismatch", "Teklifin müşterisi ortak müşteri kaydıyla eşleşmedi; sipariş oluşturulamaz.");
+
+        public static ServerMessage PlannedBeforeStart =>
+            ServerMessage.Of("orders.server.from-quote.planned-before-start", "Planlanan teslim tarihi başlangıç tarihinden önce olamaz.");
+
+        public static ServerMessage PermissionsNeeded(string create, string financials) =>
+            ServerMessage.Of("orders.server.from-quote.permissions-needed", "Tekliften sipariş oluşturmak için '{0}' ve '{1}' izinleri gerekir.", create, financials);
+
+        public static ServerMessage SourceUnavailable =>
+            ServerMessage.Of("orders.server.from-quote.source-unavailable", "Teklif kaynağı kullanılamıyor; kabul edilmiş teklif bulunamadı.");
+
+        public static ServerMessage QuoteNotFound =>
+            ServerMessage.Of("orders.server.from-quote.quote-not-found", "Kabul edilmiş teklif bulunamadı.");
+
+        public static ServerMessage ConflictWithOrder(string detail, string number) =>
+            ServerMessage.Of("orders.server.from-quote.conflict-with-order", "{0} Mevcut sipariş: {1}.", detail, number);
+    }
+
+    /// <summary>Operasyon işi servisi.</summary>
+    public static class JobService
+    {
+        public static ServerMessage HandoverOrOrderMissing =>
+            ServerMessage.Of("orders.server.job-service.handover-or-order-missing", "Devir ya da sipariş bulunamadı.");
+
+        public static ServerMessage GenerateFailed(string detail) =>
+            ServerMessage.Of("orders.server.job-service.generate-failed", "Operasyon işi üretilemedi: {0}", detail);
+
+        public static ServerMessage OrderMustBeApproved =>
+            ServerMessage.Of("orders.server.job-service.order-must-be-approved", "Operasyon işi yalnızca onaylanmış siparişe açılır.");
+
+        public static ServerMessage HandoverNotAccepted =>
+            ServerMessage.Of("orders.server.job-service.handover-not-accepted", "Operasyon işi açmadan önce satış devri operasyon tarafından kabul edilmiş olmalıdır.");
+
+        public static ServerMessage LinesRequired =>
+            ServerMessage.Of("orders.server.job-service.lines-required", "İşe bağlanacak en az bir sipariş kalemi seçin.");
+
+        public static ServerMessage LineMissing =>
+            ServerMessage.Of("orders.server.job-service.line-missing", "Seçilen kalemlerden biri bu siparişte yok ya da iptal edilmiş.");
+
+        public static ServerMessage LinesTaken(string names) =>
+            ServerMessage.Of("orders.server.job-service.lines-taken", "Seçilen kalemler zaten açık bir işte: {0}.", names);
+
+        public static ServerMessage LineInOtherJob =>
+            ServerMessage.Of("orders.server.job-service.line-in-other-job", "Kalem başka bir açık işte.");
+
+        public static ServerMessage ResponsibleRequired =>
+            ServerMessage.Of("orders.server.job-service.responsible-required", "Sorumlu kullanıcı ya da ekip girin.");
+
+        public static ServerMessage ResponsibleKeep =>
+            ServerMessage.Of("orders.server.job-service.responsible-keep", "Sorumlu kullanıcı ya da ekipten en az biri kalmalıdır.");
+
+        public static ServerMessage DependencyJobMissing =>
+            ServerMessage.Of("orders.server.job-service.dependency-job-missing", "Bağımlı olunacak iş bu siparişte bulunamadı.");
+
+        public static ServerMessage DependencyClosed =>
+            ServerMessage.Of("orders.server.job-service.dependency-closed", "Tamamlanmış ya da iptal edilmiş işin bağımlılığı değiştirilemez.");
+
+        public static ServerMessage DependencyExists =>
+            ServerMessage.Of("orders.server.job-service.dependency-exists", "Bu bağımlılık zaten var.");
+
+        public static ServerMessage SelfDependency =>
+            ServerMessage.Of("orders.server.job-service.self-dependency", "İş kendisine bağımlı olamaz.");
+
+        public static ServerMessage DependencyCycle =>
+            ServerMessage.Of("orders.server.job-service.dependency-cycle", "Bu bağımlılık döngü oluşturur.");
+
+        public static ServerMessage DependencyNotFound =>
+            ServerMessage.Of("orders.server.job-service.dependency-not-found", "Bu bağımlılık yok.");
+    }
+
+    /// <summary>Sipariş değişiklik talebi servisi.</summary>
+    public static class ChangeService
+    {
+        public static ServerMessage ReasonTooLong(int max) =>
+            ServerMessage.Of("orders.server.change-service.reason-too-long", "Gerekçe en fazla {0} karakter olabilir.", max);
+
+        public static ServerMessage PendingExists(int sequence) =>
+            ServerMessage.Of("orders.server.change-service.pending-exists", "Bu siparişin karar bekleyen #{0} numaralı değişiklik talebi var; önce karara bağlanmalı ya da geri çekilmeli.", sequence);
+
+        public static ServerMessage NotFound =>
+            ServerMessage.Of("orders.server.change-service.not-found", "Değişiklik talebi bulunamadı.");
+
+        public static ServerMessage RejectReason =>
+            ServerMessage.Of("orders.server.change-service.reject-reason", "Reddetmek için gerekçe zorunludur.");
+
+        public static ServerMessage AlreadyDecided =>
+            ServerMessage.Of("orders.server.change-service.already-decided", "Bu talep zaten karara bağlanmış ya da geri çekilmiş.");
+
+        public static ServerMessage SelfDecide =>
+            ServerMessage.Of("orders.server.change-service.self-decide", "Kendi açtığınız değişiklik talebini karara bağlayamazsınız.");
+
+        public static ServerMessage NotApplicable(string detail) =>
+            ServerMessage.Of("orders.server.change-service.not-applicable", "Talep artık uygulanamaz: {0}", detail);
+    }
+
+    /// <summary>Devir servisi.</summary>
+    public static class HandoverService
+    {
+        public static ServerMessage NoHandover =>
+            ServerMessage.Of("orders.server.handover-service.no-handover", "Bu sipariş için devir kaydı yok.");
+
+        public static ServerMessage AlreadyExists =>
+            ServerMessage.Of("orders.server.handover-service.already-exists", "Bu siparişin devir kaydı zaten var.");
+
+        public static ServerMessage InfoRequestReason =>
+            ServerMessage.Of("orders.server.handover-service.info-request-reason", "Bilgi istemek için gerekçe zorunludur.");
+
+        public static ServerMessage ResendNote =>
+            ServerMessage.Of("orders.server.handover-service.resend-note", "Yeniden göndermek için neyin tamamlandığını yazın.");
+    }
+
+    /// <summary>Teslimat ve hizmet başlangıcı servisi.</summary>
+    public static class FulfillmentService
+    {
+        public static ServerMessage PlanOrderApproved =>
+            ServerMessage.Of("orders.server.fulfillment-service.plan-order-approved", "Teslimat yalnızca onaylanmış sipariş için planlanır.");
+
+        public static ServerMessage PlanHandoverAccepted =>
+            ServerMessage.Of("orders.server.fulfillment-service.plan-handover-accepted", "Teslimat planlamadan önce satış devri operasyon tarafından kabul edilmiş olmalıdır.");
+
+        public static ServerMessage JobMissing =>
+            ServerMessage.Of("orders.server.fulfillment-service.job-missing", "Operasyon işi bu siparişte bulunamadı ya da iptal edilmiş.");
+
+        public static ServerMessage ReceiverRequired =>
+            ServerMessage.Of("orders.server.fulfillment-service.receiver-required", "Teslim alan kişi zorunludur.");
+
+        public static ServerMessage ActualDateFuture =>
+            ServerMessage.Of("orders.server.fulfillment-service.actual-date-future", "Gerçekleşen teslim tarihi gelecekte olamaz.");
+
+        public static ServerMessage RescheduleDateRequired =>
+            ServerMessage.Of("orders.server.fulfillment-service.reschedule-date-required", "Yeniden planlama için yeni teslim tarihi zorunludur.");
+
+        public static ServerMessage EvidenceCancelled =>
+            ServerMessage.Of("orders.server.fulfillment-service.evidence-cancelled", "İptal edilmiş teslimata kanıt eklenemez.");
+
+        public static ServerMessage EvidenceMax(int max) =>
+            ServerMessage.Of("orders.server.fulfillment-service.evidence-max", "Bir teslimata en fazla {0} kanıt eklenebilir.", max);
+
+        public static ServerMessage EvidenceNotFound =>
+            ServerMessage.Of("orders.server.fulfillment-service.evidence-not-found", "Teslim kanıtı bulunamadı.");
+
+        public static ServerMessage ServiceOrderApproved =>
+            ServerMessage.Of("orders.server.fulfillment-service.service-order-approved", "Hizmet başlangıcı yalnızca onaylanmış sipariş için planlanır.");
+
+        public static ServerMessage ServiceLineMissing =>
+            ServerMessage.Of("orders.server.fulfillment-service.service-line-missing", "Hizmet kalemi bu siparişte bulunamadı; ürün kalemleri teslimatla izlenir.");
+
+        public static ServerMessage ServiceStartExists =>
+            ServerMessage.Of("orders.server.fulfillment-service.service-start-exists", "Bu hizmet kaleminin başlangıç kaydı zaten var.");
+
+        public static ServerMessage ServiceStartBlocked(string blockers) =>
+            ServerMessage.Of("orders.server.fulfillment-service.service-start-blocked", "Hizmet başlangıcı kaydedilemedi: {0}", blockers);
+
+        public static ServerMessage ConfirmedByRequired =>
+            ServerMessage.Of("orders.server.fulfillment-service.confirmed-by-required", "Başlangıcı onaylayan müşteri tarafı kişi zorunludur.");
+    }
+
+    /// <summary>Dosya yükleme uçları.</summary>
+    public static class Upload
+    {
+        public static ServerMessage TooLarge =>
+            ServerMessage.Of("orders.server.upload.too-large", "Dosya çok büyük.");
+
+        public static ServerMessage TooLargeDetail(int megabytes) =>
+            ServerMessage.Of("orders.server.upload.too-large-detail", "En fazla {0} MB.", megabytes);
     }
 
     /// <summary>Miktar iletisi bağımsız değişkeni: en çok dört ondalık, kültürden bağımsız.</summary>

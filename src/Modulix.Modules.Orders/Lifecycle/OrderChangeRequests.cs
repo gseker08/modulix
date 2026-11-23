@@ -84,12 +84,12 @@ internal sealed class OrderChangeRequests(
         var reason = string.IsNullOrWhiteSpace(input.Reason) ? null : input.Reason.Trim();
         if (reason is null)
         {
-            return Invalid<OrderChangeRequestView>("reason", "Gerekçe zorunludur.");
+            return Invalid<OrderChangeRequestView>("reason", OrdersMessages.Workflow.ReasonRequired);
         }
 
         if (reason.Length > SalesOrder.ReasonMaxLength)
         {
-            return Invalid<OrderChangeRequestView>("reason", $"Gerekçe en fazla {SalesOrder.ReasonMaxLength} karakter olabilir.");
+            return Invalid<OrderChangeRequestView>("reason", OrdersMessages.ChangeService.ReasonTooLong(SalesOrder.ReasonMaxLength));
         }
 
         var prepared = await PrepareAsync<OrderChangeRequestView>(orderId, input, OrdersModule.Permissions.OrdersWrite, cancellationToken);
@@ -101,7 +101,7 @@ internal sealed class OrderChangeRequests(
         if (await reader.PendingChangeRequestAsync(orderId, cancellationToken) is { } pending)
         {
             return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.Conflict,
-                $"Bu siparişin karar bekleyen #{pending.Sequence} numaralı değişiklik talebi var; önce karara bağlanmalı ya da geri çekilmeli.");
+                OrdersMessages.ChangeService.PendingExists((int)pending.Sequence));
         }
 
         var p = prepared.Value!;
@@ -139,31 +139,31 @@ internal sealed class OrderChangeRequests(
         var request = await reader.ChangeRequestAsync(requestId, cancellationToken);
         if (request is null || !(await pipeline.GetAsync(new RecordRef(OrdersModule.Entities.Order, request.OrderId), cancellationToken)).IsSuccess)
         {
-            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.NotFound, "Değişiklik talebi bulunamadı.");
+            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.NotFound, OrdersMessages.ChangeService.NotFound);
         }
 
         var granted = await access.GetPermissionsAsync(cancellationToken);
         if (!granted.Contains(OrdersModule.Permissions.OrdersApprove))
         {
-            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{OrdersModule.Permissions.OrdersApprove}' izni gerekir.");
+            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(OrdersModule.Permissions.OrdersApprove));
         }
 
         var text = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
         if (!approve && text is null)
         {
-            return Invalid<OrderChangeRequestView>("note", "Reddetmek için gerekçe zorunludur.");
+            return Invalid<OrderChangeRequestView>("note", OrdersMessages.ChangeService.RejectReason);
         }
 
         if (request.Status != ChangeRequestStatus.Pending)
         {
-            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.Conflict, "Bu talep zaten karara bağlanmış ya da geri çekilmiş.");
+            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.Conflict, OrdersMessages.ChangeService.AlreadyDecided);
         }
 
         if (request.RequestedBy is { } requester && requester == storeContext.CurrentUserId
             && !(policy is null ? OrderPolicySettings.Default : await policy.GetAsync(cancellationToken)).AllowSelfApproval)
         {
-            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.ValidationFailed, "Kendi açtığınız değişiklik talebini karara bağlayamazsınız.",
-                [new RecordFieldError("status", "Kendi açtığınız değişiklik talebini karara bağlayamazsınız.")]);
+            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.ValidationFailed, OrdersMessages.ChangeService.SelfDecide,
+                [new RecordFieldError("status", OrdersMessages.ChangeService.SelfDecide)]);
         }
 
         var financials = granted.Contains(OrdersModule.Permissions.FinancialsRead);
@@ -207,18 +207,18 @@ internal sealed class OrderChangeRequests(
         var request = await reader.ChangeRequestAsync(requestId, cancellationToken);
         if (request is null || !(await pipeline.GetAsync(new RecordRef(OrdersModule.Entities.Order, request.OrderId), cancellationToken)).IsSuccess)
         {
-            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.NotFound, "Değişiklik talebi bulunamadı.");
+            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.NotFound, OrdersMessages.ChangeService.NotFound);
         }
 
         var granted = await access.GetPermissionsAsync(cancellationToken);
         if (!granted.Contains(OrdersModule.Permissions.OrdersWrite))
         {
-            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{OrdersModule.Permissions.OrdersWrite}' izni gerekir.");
+            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(OrdersModule.Permissions.OrdersWrite));
         }
 
         if (request.Status != ChangeRequestStatus.Pending)
         {
-            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.Conflict, "Bu talep zaten karara bağlanmış ya da geri çekilmiş.");
+            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.Conflict, OrdersMessages.ChangeService.AlreadyDecided);
         }
 
         var financials = granted.Contains(OrdersModule.Permissions.FinancialsRead);
@@ -253,7 +253,7 @@ internal sealed class OrderChangeRequests(
         var errors = OrderChangeRules.Validate(set, state, amounts);
         if (errors.Count > 0)
         {
-            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.Conflict, "Talep artık uygulanamaz: " + errors[0].Message.Text,
+            return RecordResult<OrderChangeRequestView>.Fail(RecordErrorCode.Conflict, OrdersMessages.ChangeService.NotApplicable(errors[0].Message.Text),
                 [.. errors.Select(e => new RecordFieldError(e.Field, e.Message))]);
         }
 
@@ -319,7 +319,7 @@ internal sealed class OrderChangeRequests(
 
         if (!(await access.GetPermissionsAsync(cancellationToken)).Contains(requirePermission))
         {
-            return new(null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, $"Bu işlem için '{requirePermission}' izni gerekir."));
+            return new(null, RecordResult<T>.Fail(RecordErrorCode.PermissionDenied, ServerMessages.Access.PermissionRequired(requirePermission)));
         }
 
         var order = (await reader.OrderAsync(orderId, cancellationToken))!;
@@ -378,6 +378,6 @@ internal sealed class OrderChangeRequests(
             financials ? r.NetDelta : null, financials ? r.TaxDelta : null, r.RequestedBy, r.DecidedBy, r.DecidedAt, r.DecisionNote, r.CreatedAt);
     }
 
-    private static RecordResult<T> Invalid<T>(string field, string message) =>
+    private static RecordResult<T> Invalid<T>(string field, ServerMessage message) =>
         RecordResult<T>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError(field, message)]);
 }
