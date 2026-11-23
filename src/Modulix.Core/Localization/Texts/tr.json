@@ -5625,6 +5625,7 @@
   "admin.userDetail.noTeams": "Tanımlı ekip yok. {0}Ekip ekleyin{1}.",
   "admin.userDetail.teamsHelp": "\"Ekibinin kayıtları\" kapsamındaki kişi, ekip arkadaşlarının sorumlu olduğu kayıtları da görür.",
   "admin.userDetail.primaryTeam": "Birincil ekip: {0}",
+  "admin.userDetail.primaryTeamTitle": "Birincil ekip",
   "admin.userDetail.primaryTeamHelp": "Birden fazla ekibi olan kişinin raporlardaki ekip kırılımı birincil ekibine göre yapılır. Seçilmezse en önce katıldığı ekip geçerlidir.",
   "admin.userDetail.primaryTeamSaved": "Birincil ekip güncellendi.",
   "admin.userDetail.memberCount": "{0} üye",

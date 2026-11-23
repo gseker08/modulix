@@ -29,11 +29,12 @@
     @if (lists is { Count: > 0 })
     {
         <div class="filters">
-            <div class="segmented" role="group" aria-label="@Texts.Get("admin.subProfiles.list")">
-                @foreach (var list in lists)
-                {
-                    <button type="button" class="chip @(list.Key == current?.Key ? "active" : null)" @onclick="() => Select(list)">@list.Name</button>
-                }
+            @* Düzenlenecek liste tek seçimli atama penceresinde seçilir (PickField Single). *@
+            <div>
+                <label class="form-label" for="choice-list">@Texts.Get("admin.subProfiles.list")</label>
+                <PickField TKey="string" Id="choice-list" Single="true" Title="@Texts.Get("admin.subProfiles.list")" Icon="list"
+                           Items="@([.. lists.Select(l => new PickItem<string>(l.Key, l.Name))])"
+                           Selected="@(current is null ? [] : new[] { current.Key })" SelectedChanged="SelectByKey" />
             </div>
         </div>
 
@@ -126,6 +127,14 @@
     }
 
     private string CategoryName(string? key) => current?.Categories.FirstOrDefault(c => c.Key == key)?.Name ?? string.Empty;
+
+    private void SelectByKey(IReadOnlyList<string> keys)
+    {
+        if (keys.FirstOrDefault() is { } key && key != current?.Key && lists?.FirstOrDefault(l => l.Key == key) is { } list)
+        {
+            Select(list);
+        }
+    }
 
     private void Select(ChoiceListDto list)
     {

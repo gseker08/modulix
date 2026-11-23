@@ -5625,6 +5625,7 @@
   "admin.userDetail.noTeams": "Təyin olunmuş komanda yoxdur. {0}Komanda əlavə edin{1}.",
   "admin.userDetail.teamsHelp": "\"Komandasının qeydləri\" əhatəsindəki şəxs komanda yoldaşlarının cavabdeh olduğu qeydləri də görür.",
   "admin.userDetail.primaryTeam": "Əsas komanda: {0}",
+  "admin.userDetail.primaryTeamTitle": "Əsas komanda",
   "admin.userDetail.primaryTeamHelp": "Bir neçə komandada olan şəxs üçün hesabatlarda komanda bölgüsü əsas komandaya görə aparılır. Seçilməzsə ən əvvəl qoşulduğu komanda keçərlidir.",
   "admin.userDetail.primaryTeamSaved": "Əsas komanda yeniləndi.",
   "admin.userDetail.memberCount": "{0} üzv",

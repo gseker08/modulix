@@ -24,11 +24,12 @@
     @if (entities is { Count: > 0 })
     {
         <div class="filters">
-            <div class="segmented" role="group" aria-label="@Texts.Get("admin.automation.entity")">
-                @foreach (var entity in entities)
-                {
-                    <button type="button" class="chip @(entity.Key == entityKey ? "active" : null)" @onclick="() => SelectAsync(entity.Key)">@entity.Name</button>
-                }
+            @* Alanları düzenlenecek kayıt türü tek seçimli atama penceresinde seçilir (PickField Single). *@
+            <div>
+                <label class="form-label" for="custom-entity">@Texts.Get("admin.automation.entity")</label>
+                <PickField TKey="string" Id="custom-entity" Single="true" Title="@Texts.Get("admin.automation.entity")" Icon="layers"
+                           Items="@([.. entities.Select(e => new PickItem<string>(e.Key, e.Name))])"
+                           Selected="@(entityKey is null ? [] : new[] { entityKey })" SelectedChanged="SelectByKeyAsync" />
             </div>
         </div>
 
@@ -194,6 +195,9 @@
             }
         }
     }
+
+    private Task SelectByKeyAsync(IReadOnlyList<string> keys) =>
+        keys.FirstOrDefault() is { } key && key != entityKey ? SelectAsync(key) : Task.CompletedTask;
 
     private async Task SelectAsync(string key)
     {

@@ -5625,6 +5625,7 @@
   "admin.userDetail.noTeams": "No teams defined. {0}Add a team{1}.",
   "admin.userDetail.teamsHelp": "A person with the \"Team's records\" scope also sees the records owned by their teammates.",
   "admin.userDetail.primaryTeam": "Primary team: {0}",
+  "admin.userDetail.primaryTeamTitle": "Primary team",
   "admin.userDetail.primaryTeamHelp": "For a person on several teams, report team breakdowns use their primary team. If none is chosen, the team they joined first applies.",
   "admin.userDetail.primaryTeamSaved": "Primary team updated.",
   "admin.userDetail.memberCount": "{0} members",
