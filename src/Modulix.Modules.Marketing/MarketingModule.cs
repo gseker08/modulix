@@ -9,6 +9,7 @@ using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Contracts.Records;
 using Modulix.Core.Contracts.SharedRecords;
 using Modulix.Modules.Marketing.Audiences;
+using Modulix.Modules.Marketing.Journeys;
 using Modulix.Modules.Marketing.Records;
 using Modulix.Modules.Marketing.Responses;
 using Modulix.Modules.Marketing.Reports;
@@ -72,6 +73,14 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
 
         /// <summary>Müşteri yolculuğunu yayımlar, duraklatır, sürdürür ve arşivler (ADR-0056).</summary>
         public const string JourneysPublish = "marketing.journeys.publish";
+    }
+
+    public static class Events
+    {
+        /// <summary>Bir hedef yolculuğa girdi (ADR-0056). Kayıt: yolculuk kaydı; <c>target</c> türetilmiş alandır (hedef türü).</summary>
+        public const string JourneyEntered = "marketing.journey.entered";
+
+        public static IReadOnlyList<string> JourneyEnteredFields { get; } = ["journeyId", "targetId", "enteredAt", "target"];
     }
 
     public static class SettingKeys
@@ -365,6 +374,17 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
             [DomainEventTypes.RecordDeleted],
             [Entities.CampaignRun],
             [Permissions.CampaignsRead, Permissions.CampaignsWrite, Permissions.CampaignsSend, Permissions.RecipientsRead]),
+        EventSubscription.For<JourneyEntryAnchor>(
+            JourneyEntryJob.Identity,
+            [DomainEventTypes.RecordDeleted],
+            [Entities.JourneyEnrollment],
+            [Permissions.SegmentsRead, Permissions.JourneysRead, Permissions.JourneysWrite]),
+    ];
+
+    /// <summary>İş olayları (ADR-0039): yolculuğa giriş. Otomasyon kuralları bu olayla çalışabilir.</summary>
+    IReadOnlyList<BusinessEventDefinition> IModule.BusinessEvents { get; } =
+    [
+        new(Events.JourneyEntered, 1, Entities.JourneyEnrollment, "Yolculuğa girildi", Events.JourneyEnteredFields),
     ];
 
     /// <summary>
@@ -375,6 +395,8 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
     [
         ModuleJobDefinition.For<MarketingSendJob>(MarketingSendJob.JobKey, TimeSpan.FromSeconds(15), MarketingSendJob.Identity)
             with { LegacySection = "MarketingSend", BusyInterval = TimeSpan.FromSeconds(2) },
+        ModuleJobDefinition.For<JourneyEntryJob>(JourneyEntryJob.JobKey, TimeSpan.FromMinutes(5), JourneyEntryJob.Identity)
+            with { BusyInterval = TimeSpan.FromSeconds(5) },
     ];
 
     /// <summary>Pazarlama uç noktaları (<c>/api/marketing</c>) modüldedir (ADR-0046); grup host tarafından açılır.</summary>
@@ -389,6 +411,10 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
         services.AddScoped<MarketingStoreContext>();
         services.AddScoped<SegmentWorkflowGate>();
         services.AddScoped<Journeys.IJourneyService, Journeys.JourneyService>();
+        services.AddScoped<JourneyEntryAnchor>();
+        services.AddScoped<JourneyEntryJob>();
+        services.AddScoped<Records.JourneyEntryStore>();
+        services.AddScoped<Journeys.IJourneyEntry, Journeys.JourneyEntry>();
         services.AddScoped<IRecordStore, SegmentRecordStore>();
         services.AddScoped<IRecordStore, SegmentMemberRecordStore>();
         services.AddScoped<IRecordStore, SegmentVersionRecordStore>();

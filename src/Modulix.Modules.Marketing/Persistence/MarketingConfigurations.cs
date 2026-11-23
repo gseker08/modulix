@@ -231,6 +231,7 @@ internal sealed class JourneyConfiguration : IEntityTypeConfiguration<Journey>
         builder.Property(j => j.Target).HasMaxLength(20).IsRequired();
         builder.Property(j => j.ReentryPolicy).HasMaxLength(20).IsRequired();
         builder.Property(j => j.ExitCondition).HasMaxLength(Journey.ExitConditionMaxLength);
+        builder.Property(j => j.EntryPermissions).HasMaxLength(Journey.EntryPermissionsMaxLength);
         builder.Property(j => j.Status).HasMaxLength(20).IsRequired();
 
         builder.HasIndex(j => new { j.TenantId, j.Code }).IsUnique().HasDatabaseName("UX_Journeys_Code");
