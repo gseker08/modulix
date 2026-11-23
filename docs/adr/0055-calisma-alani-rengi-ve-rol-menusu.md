@@ -2,7 +2,7 @@
 
 - **Durum:** Dilim 0 (tasarım sisteminde firmanın değiştirebileceği tokenlar, PR #509), dilim 1 (firma vurgu rengi ve sunucuda kontrast
   doğrulaması, PR #513), dilim 2a (rol menü düzeni, sunucu, PR #525) ve dilim 2b (menüye uygulama ve rol ekranında düzen düzenleme, PR #528;
-  kayıtta ekranda olmayan satırların korunması, PR #533) 22 Kasım 2026'da teslim edildi; sırası verilmeyen öğenin açık sıralıların arkasına alınması 23 Kasım 2026'da eklendi. Bu ADR kod teslim edildikten sonra yazıldı:
+  kayıtta ekranda olmayan satırların korunması, PR #533) 22 Kasım 2026'da teslim edildi; sırası verilmeyen öğenin açık sıralıların arkasına alınması 23 Kasım 2026'da eklendi; bölüm sırası (dilim 3) 22 Kasım 2026'da teslim edildi. Bu ADR kod teslim edildikten sonra yazıldı:
   kararlar o PR'lardaki gerçek davranışı kayda geçirir, yeni bir karar getirmez.
 - **Kaynak:** [CRM eksik süreç epic listesi](../crm-eksik-surecler-epicleri.md) E8. Tasarım sistemi tarafı:
   [Tema tokenları](../design-system/theme-tokens.md) "Firmanın değiştirebileceği tokenlar".
@@ -42,7 +42,8 @@ kontrast kuralıyla birlikte yazılır (`theme-tokens.md`).
 ### Rol bazlı menü düzeni: sıra ve gizleme, öğe düzeyinde
 
 Menü düzeni **rol başınadır** ve yalnızca görünümdür. Kapsam öğe düzeyindedir: rol bir menü satırını (uygulama kataloğundaki öğe) gizleyebilir
-ve satırın bölüm içindeki sırasını değiştirebilir. Modül ve bölüm sırası bu kararın kapsamında değildir.
+ve satırın bölüm içindeki sırasını değiştirebilir; ayrıca uygulamanın menüsündeki **bölümlerin** sırasını değiştirebilir (dilim 3). Modül
+(uygulama) sırası bu kararın kapsamında değildir.
 
 - **Veri (dilim 2a, migration `20261122161620_CoreRoleMenuItems`):** `core.RoleMenuItems` (RoleId, ItemKey, SortOrder, Hidden). Tenant verisidir
   (`ITenantEntity`, `ICompanyShared`): `TenantId` taşır, RLS ile korunur, role bileşik yabancı anahtarla bağlıdır, rol silinince satırlar silinir.
@@ -61,14 +62,23 @@ ve satırın bölüm içindeki sırasını değiştirebilir. Modül ve bölüm s
      (hiçbir rolün satırında sırası yok) açık sıralı öğelerin arkasına katalog sırasıyla dizilir; katalog numaraları ile rolün yazdığı
      numaralar (10, 20, …) aynı ölçekte olmadığından karıştırılmaz. Bölümde hiçbir öğeye sıra verilmemişse katalog sırası kalır. Sıra bölüm
      içinde uygulanır, öğe bölümünü değiştirmez.
+  4. **Bölüm sırası (dilim 3)** aynı tabloda `section.<uygulama>.<bölüm>` anahtarlı satırla saklanır (`MenuLayoutRules.SectionKey`, ör.
+     `section.crm.crm.customers`); `SortOrder` bölümün uygulamanın menüsündeki sırasıdır, `Hidden` kullanılmaz. Sunucu yeni bir kural,
+     tablo ya da migration eklemez: anahtar öğe anahtarıyla aynı biçim doğrulamasından (küçük harf, rakam, nokta, tire) geçer. Kural öğeyle
+     aynıdır: sıra veren rollerin en küçüğü, hiçbiri vermezse bölümün katalog sırası (`MenuLayoutRules.OrderSections`). Yalnızca başlıklı ve
+     alt sabitli (`Footer`) olmayan bölümler yer değiştirir; alt sabitli (CRM Ayarları) ve başlıksız ("Diğer") bölümler yerinde kalır.
+     Başka uygulamanın ya da katalogda olmayan bölümün satırı etkisizdir; bölüm satırı öğe görünürlüğünü etkilemez ve bölümü gizlemez
+     (bölüm düzeyinde gizleme yoktur, bir bölüm yalnızca bütün öğeleri gizlenince kaybolur).
 - **Gizlemek yetki değildir.** Düzen, modül, izin ve lisans süzgecinin **üstüne** biner; hiçbir zaman izinsiz bir öğeyi görünür yapmaz. Gizli
   öğenin adresi doğrudan açılırsa sayfa yine açılır (erişimi izin ve sunucu belirler). Bir uygulamanın bütün satırları gizlense de uygulama
   uygulama panelinden kaybolmaz.
 - **Düzenleme ekranı (dilim 2b):** Yönetim > Roller > rol detayında "Menü düzeni" (`RoleMenuLayout`). Her uygulamanın satırları bölümleriyle
   listelenir; satır başına görünür/gizli anahtarı ve yukarı/aşağı düğmeleri vardır. Ekrandaki satırlar kullanıcının izninden bağımsızdır, firmada
-  modülü açık uygulamalardan gelir (platforma özel olanlar hariç). Sistem rolünde bölüm görünmez.
+  modülü açık uygulamalardan gelir (platforma özel olanlar hariç). Başlıklı ve taşınabilir bölümlerin başlığında yukarı/aşağı düğmeleri vardır (dilim 3).
+  Sistem rolünde bölüm görünmez.
 - **Kayıt biçimi:** yalnızca varsayılandan ayrılan bölümler yazılır. Sırası değişen bölümde bütün satırlar açık sıra numarasıyla (10, 20, …)
-  yazılır; sırası değişmeyen bölümde sıra `null` kalır ve yalnızca gizlenenler yazılır. PUT bütün düzeni değiştirdiği için ekranda listelenmeyen
+  yazılır; sırası değişmeyen bölümde sıra `null` kalır ve yalnızca gizlenenler yazılır. Bölümlerin sırası değişen uygulamada bütün taşınabilir
+  bölümler `section.…` satırıyla 10, 20, … yazılır; bölümler varsayılan sırasındaysa bölüm satırı yazılmaz. PUT bütün düzeni değiştirdiği için ekranda listelenmeyen
   (örneğin modülü şu an kapalı) öğelerin kayıtlı satırları olduğu gibi geri gönderilir (`RoleMenuSaveRules`, PR #533); aksi halde modül sonradan
   açılınca rolün düzeni kaybolurdu. "Varsayılana dön" ekranı sıfırlar, kaydedilince düzen kalkar.
 
@@ -80,11 +90,16 @@ ve satırın bölüm içindeki sırasını değiştirebilir. Modül ve bölüm s
 2. **Rol menüsü:**
    - **2a (22 Kasım 2026, PR #525):** tablo, servis, uç noktalar, erişim yanıtında `RoleIds` ve `MenuLayout`.
    - **2b (22 Kasım 2026, PR #528, #533):** menüye uygulama (`MenuLayoutRules`, `AppNavigation`), rol ekranında düzenleyici, kayıtta olmayan satırların korunması.
+   - **Sıra kuralı düzeltmesi (23 Kasım 2026, PR #552):** sırası verilmeyen öğe açık sıralıların arkasına alındı (kural 3).
+3. **Bölüm sırası (22 Kasım 2026, `d76bbdbc`):** bölüm başlığında yukarı/aşağı, `section.<uygulama>.<bölüm>` satırı, `MenuLayoutRules.OrderSections`; şema ve migration değişmedi.
 
 ## Yapılmadı / sınırlar
 
-- **Modül ve bölüm sırası** düzenlenemez; epikte "modül/öğe sırası" geçiyordu, bugün yalnızca öğe sırası ve gizleme vardır. Eklenecekse sunucu
-  anahtar adlandırmasını (bölüm kimlikleri) ya da şemayı genişletmeyi gerektirir.
+- **Modül (uygulama) sırası** düzenlenemez; yalnızca öğe sırası, bölüm sırası ve öğe gizleme vardır. Eklenecekse uygulama kimlikleri için ayrı bir
+  anahtar adlandırması (ör. `app.<uygulama>`) ve aynı birleştirme kuralı gerekir.
+- **Bölüm düzeyinde gizleme ve sırasız bölüm:** bölüm gizlenemez. Bir bölümün hiçbir rolde sıra satırı yoksa katalog sırasını (`Group.Order`) korur;
+  öğelerdeki "sırasız öğe arkaya" kuralı bölümlere uygulanmadı. Bölüm sırası ekranı uygulamanın bütün taşınabilir bölümlerini birlikte yazdığı için
+  bugün bölümlerin biri satırsız kalmaz; katalog sonradan yeni bir bölüm eklerse o bölüm katalog numarasıyla diğerlerinin arasına düşebilir.
 - **CTA degradesi ve marka turkuazı** sabit onaltılık değerle yazıldığı için vurgu rengine bağlı değildir. Bağlanması önce `tokens.css`'te türetmeye
   çevrilmeyi ve ayrı bir kontrast kuralını gerektirir.
 - **Görsel doğrulama:** vurgu rengi ve rol menüsü ekranlarının açık ve koyu temada, telefon genişliğinde ekran görüntüsü kontrolü yapılmadı
