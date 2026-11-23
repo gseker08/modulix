@@ -5,6 +5,7 @@ using Modulix.Shared.Contracts;
 using Modulix.Shared.Crm;
 using Modulix.Shared.Marketing;
 using Modulix.Shared.Orders;
+using Modulix.Shared.Reporting;
 using Modulix.Shared.Support;
 using Modulix.Shared.Fleet;
 using Modulix.Shared.Hr;
@@ -482,6 +483,25 @@ public class AppNavigationTests
         var realNames = AppCatalog.All.Where(a => a.ParentId is null).Select(a => a.Name).ToHashSet();
         Assert.All(AppCatalog.Planned, p => Assert.DoesNotContain(p.Name, realNames));
         Assert.DoesNotContain(Nav(AllModules, SalesUser).Roots(), r => AppCatalog.Planned.Any(p => p.Name == r.Name));
+    }
+
+    [Fact]
+    public void Panel_categories_cover_every_root_app_and_count_only_reachable_ones()
+    {
+        // Kategori menüsü kartları süzer: kategorisi olmayan ana uygulama yalnızca "Tüm Uygulamalar"da kalırdı.
+        var rootGroups = new[] { AppCatalog.SalesGroup, AppCatalog.ServiceGroup, AppCatalog.OperationsGroup, AppCatalog.ManagementGroup };
+        Assert.All(AppCatalog.All.Where(a => a.ParentId is null), a => Assert.Contains(a.Group, rootGroups));
+        Assert.All(AppCatalog.Groups.Where(g => rootGroups.Contains(g.Id)), g => Assert.NotNull(g.Icon));
+
+        var nav = Nav([CrmAccess.ModuleKey, SupportAccess.ModuleKey], [CrmAccess.CompaniesRead, SupportAccess.TicketsRead, ReportAccess.Read, CoreAccess.DecideApprovals]);
+        var groups = nav.Grouped(nav.Roots());
+
+        Assert.Equal([AppCatalog.SalesGroup, AppCatalog.ServiceGroup, AppCatalog.ManagementGroup], groups.Select(g => g.Group?.Id));
+        Assert.Equal([AppCatalog.Approvals, AppCatalog.Reports], groups[2].Apps.Select(a => a.Id));
+
+        // Erişilemeyen uygulama sayılmaz: izni olmayan kullanıcıda Yönetim kategorisi hiç çıkmaz.
+        var limited = Nav([CrmAccess.ModuleKey, SupportAccess.ModuleKey], [CrmAccess.CompaniesRead]);
+        Assert.Equal([AppCatalog.SalesGroup], limited.Grouped(limited.Roots()).Select(g => g.Group?.Id));
     }
 
     [Fact]

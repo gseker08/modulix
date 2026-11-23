@@ -1,4 +1,5 @@
-// Uygulama panelinin açıkken dış tıklama, Escape ve klavyeyle dışarı çıkma davranışları.
+// Uygulama diyaloğunun açıkken dış tıklama, Escape ve odak davranışları: Tab diyaloğun içinde döner,
+// sayfa arkada kaymaz (html.app-launcher-open).
 let cleanup = null;
 
 function attach(dotNetRef, panel, button) {
@@ -18,17 +19,37 @@ function attach(dotNetRef, panel, button) {
             dotNetRef.invokeMethodAsync('Dismiss', false);
         }
     };
+    const focusable = () => Array.from(panel.querySelectorAll('a[href], button:not([disabled]), input:not([disabled])'))
+        .filter(el => el.offsetParent !== null);
     const onKeyDown = e => {
         if (e.key === 'Escape') {
             e.preventDefault();
             dotNetRef.invokeMethodAsync('Dismiss', focusIsFree());
+        } else if (e.key === 'Tab' && panel.contains(document.activeElement)) {
+            const items = focusable();
+            if (items.length === 0) {
+                e.preventDefault();
+                return;
+            }
+
+            const first = items[0];
+            const last = items[items.length - 1];
+            if (e.shiftKey && (document.activeElement === first || document.activeElement === panel)) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
         }
     };
 
     document.addEventListener('pointerdown', onPointerDown, true);
     document.addEventListener('focusin', onFocusIn);
     document.addEventListener('keydown', onKeyDown);
+    document.documentElement.classList.add('app-launcher-open');
     cleanup = () => {
+        document.documentElement.classList.remove('app-launcher-open');
         document.removeEventListener('pointerdown', onPointerDown, true);
         document.removeEventListener('focusin', onFocusIn);
         document.removeEventListener('keydown', onKeyDown);

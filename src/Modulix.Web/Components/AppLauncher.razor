@@ -4,8 +4,8 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
-@* Modulix logosu (BrandLogo): tıklanınca "Tüm Uygulamalar" paneli açılır (sayfanın üzerinde, içeriği kaydırmaz).
-   İki düzey: ana uygulamalar, sonra seçilen uygulamanın alt uygulamaları. Liste AppCatalog'dan ve oturumdan gelir. *@
+@* Modulix logosu (BrandLogo): tıklanınca "Tüm Uygulamalar" diyaloğu açılır (sayfanın üzerinde, içeriği kaydırmaz).
+   Solda kategori menüsü (AppCatalog.Groups), ortada açıklamalı uygulama kartları. Liste AppCatalog'dan ve oturumdan gelir. *@
 <div class="app-launcher">
     @if (Session.IsSignedIn)
     {
@@ -24,91 +24,110 @@
 
     @if (isOpen)
     {
-        <div id="app-launcher-panel" class="app-panel" role="dialog" aria-labelledby="app-panel-title" tabindex="-1" @ref="panel">
-            <div class="app-panel-head">
-                <h2 id="app-panel-title" class="app-panel-title">@Texts.Get("shell.launcher.title")</h2>
+        @* Diyalog sayfanın üzerinde ortalanır; arka plan tıklanınca, Escape ile ya da kapat düğmesiyle kapanır (js/app-launcher.js). *@
+        <div class="mx-modal-backdrop" aria-hidden="true"></div>
+        <div id="app-launcher-panel" class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="app-panel-title" tabindex="-1" @ref="panel">
+            <div class="app-dialog-head">
+                <BrandLogo Size="32" />
+                <button type="button" class="btn btn-ghost btn-icon" title="@Texts.Get("common.close")" aria-label="@Texts.Get("common.close")"
+                        @onclick="() => Close(true)">
+                    <AppIcon Name="x" Size="18" />
+                </button>
             </div>
 
-            @if (showSearch)
-            {
-                <div class="app-search">
-                    <label class="visually-hidden" for="app-search-input">@Texts.Get("shell.launcher.search")</label>
-                    <AppIcon Name="search" Size="16" />
-                    <input id="app-search-input" type="search" class="form-control" autocomplete="off"
-                           placeholder="@Texts.Get("shell.launcher.search")" @ref="searchInput" @bind="Query" @bind:event="oninput" />
-                </div>
-            }
+            <div class="app-dialog-hero">
+                <h2 id="app-panel-title" class="app-dialog-title">@Texts.Get("shell.launcher.title")</h2>
+                <p class="app-dialog-subtitle">@Texts.Get("shell.launcher.subtitle")</p>
 
-            <div class="app-panel-body">
-                @if (!Session.IsLoaded)
+                @if (showSearch)
                 {
-                    <p class="app-state" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @Texts.Get("shell.launcher.loading")</p>
-                }
-                else if (loadFailed)
-                {
-                    <div class="app-state" role="alert">
-                        <p class="mb-2">@Texts.Get("shell.launcher.failed")</p>
-                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="RetryAsync">@Texts.Get("shell.launcher.retry")</button>
+                    <div class="app-search">
+                        <label class="visually-hidden" for="app-search-input">@Texts.Get("shell.launcher.search")</label>
+                        <AppIcon Name="search" Size="18" />
+                        <input id="app-search-input" type="search" class="form-control" autocomplete="off"
+                               placeholder="@Texts.Get("shell.launcher.searchPlaceholder")" @ref="searchInput" @bind="Query" @bind:event="oninput" />
                     </div>
                 }
-                else if (listed.Count == 0 && string.IsNullOrWhiteSpace(Query))
-                {
-                    <p class="app-state" role="status">@Texts.Get("shell.launcher.empty")</p>
-                }
-                else if (visible.Count == 0 && plannedVisible.Count == 0)
-                {
-                    <p class="app-state" role="status">@Texts.Get("common.noResultFor", Query)</p>
-                }
+            </div>
 
-                @if (Session.IsLoaded && !loadFailed && visible.Count > 0)
+            <div class="app-dialog-body @(groups.Count > 0 ? "has-categories" : null)">
+                @if (groups.Count > 0)
                 {
-                    @if (groups.Count > 0)
-                    {
-                        @foreach (AppRootGroup section in groups)
+                    @* Kategori menüsü: ana uygulamaların alan başlıkları (AppCatalog.Groups); yalnızca görsel süzgeçtir. *@
+                    <nav class="app-categories" aria-label="@Texts.Get("shell.launcher.categories")">
+                        <button type="button" class="app-category @(category is null ? "is-active" : null)"
+                                aria-pressed="@(category is null ? "true" : "false")" @onclick="() => SelectCategory(null)">
+                            <span class="app-category-icon"><AppIcon Name="dashboard" Size="18" /></span>
+                            <span class="app-category-name">@Texts.Get("shell.launcher.title")</span>
+                            <span class="app-category-count">@listed.Count</span>
+                        </button>
+                        <p class="app-categories-title" aria-hidden="true">@Texts.Get("shell.launcher.categories")</p>
+                        @foreach (AppRootGroup section in groups.Where(g => g.Group is not null))
                         {
-                            <section class="app-group" aria-labelledby="@(section.Group is null ? null : $"app-group-{section.Group.Id}")">
-                                @if (section.Group is not null)
-                                {
-                                    <h3 id="app-group-@(section.Group.Id)" class="app-group-title">@AppNames.Of(section.Group)</h3>
-                                }
-                                <ul class="app-grid">
-                                    @foreach (AppDefinition app in section.Apps)
-                                    {
-                                        @Tile(app)
-                                    }
-                                </ul>
-                            </section>
+                            AppGroup group = section.Group!;
+                            <button type="button" class="app-category @(category == group.Id ? "is-active" : null)"
+                                    aria-pressed="@(category == group.Id ? "true" : "false")" @onclick="() => SelectCategory(group.Id)">
+                                <span class="app-category-icon"><AppIcon Name="@(group.Icon ?? "layers")" Size="18" /></span>
+                                <span class="app-category-name">@AppNames.Of(group)</span>
+                                <span class="app-category-count">@(section.Apps.Count)</span>
+                            </button>
                         }
-                    }
-                    else
-                    {
-                        <ul class="app-grid">
-                            @foreach (AppDefinition app in visible)
-                            {
-                                @Tile(app)
-                            }
-                        </ul>
-                    }
+                    </nav>
                 }
 
-                @* Yol haritasındaki uygulamalar: pasif kartlar, tıklanınca bir şey olmaz (ekranları henüz yok). *@
-                @if (Session.IsLoaded && !loadFailed && plannedVisible.Count > 0)
-                {
-                    <section class="app-group app-planned" aria-labelledby="app-group-planned">
-                        <h3 id="app-group-planned" class="app-group-title">@Texts.Get("shell.launcher.planned")</h3>
-                        <ul class="app-grid">
-                            @foreach (PlannedApp planned in plannedVisible)
-                            {
-                                <li>
-                                    <span class="app-tile is-planned" aria-disabled="true">
-                                        <span class="app-tile-icon"><AppIcon Name="@planned.Icon" /></span>
-                                        <span class="app-tile-name">@AppNames.Of(planned)</span>
-                                    </span>
-                                </li>
-                            }
-                        </ul>
-                    </section>
-                }
+                <div class="app-dialog-main">
+                    @if (!Session.IsLoaded)
+                    {
+                        <p class="app-state" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @Texts.Get("shell.launcher.loading")</p>
+                    }
+                    else if (loadFailed)
+                    {
+                        <div class="app-state" role="alert">
+                            <p class="mb-2">@Texts.Get("shell.launcher.failed")</p>
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="RetryAsync">@Texts.Get("shell.launcher.retry")</button>
+                        </div>
+                    }
+                    else if (listed.Count == 0 && string.IsNullOrWhiteSpace(Query))
+                    {
+                        <p class="app-state" role="status">@Texts.Get("shell.launcher.empty")</p>
+                    }
+                    else if (visible.Count == 0 && plannedVisible.Count == 0)
+                    {
+                        <p class="app-state" role="status">@Texts.Get("common.noResultFor", Query)</p>
+                    }
+
+                    @if (Session.IsLoaded && !loadFailed && visible.Count > 0)
+                    {
+                        <section class="app-group" aria-labelledby="app-group-apps">
+                            <h3 id="app-group-apps" class="app-group-title">@heading</h3>
+                            <ul class="app-cards">
+                                @foreach (AppDefinition app in visible)
+                                {
+                                    @Card(app)
+                                }
+                            </ul>
+                        </section>
+                    }
+
+                    @* Yol haritasındaki uygulamalar: pasif kartlar, tıklanınca bir şey olmaz (ekranları henüz yok). *@
+                    @if (Session.IsLoaded && !loadFailed && plannedVisible.Count > 0)
+                    {
+                        <section class="app-group app-planned" aria-labelledby="app-group-planned">
+                            <h3 id="app-group-planned" class="app-group-title">@Texts.Get("shell.launcher.planned")</h3>
+                            <ul class="app-cards">
+                                @foreach (PlannedApp planned in plannedVisible)
+                                {
+                                    <li>
+                                        <span class="app-card is-planned" aria-disabled="true">
+                                            <span class="app-card-icon"><AppIcon Name="@planned.Icon" /></span>
+                                            <span class="app-card-name">@AppNames.Of(planned)</span>
+                                        </span>
+                                    </li>
+                                }
+                            </ul>
+                        </section>
+                    }
+                </div>
             </div>
         </div>
     }
@@ -138,6 +157,11 @@
         set
         {
             query = value ?? "";
+            if (!string.IsNullOrWhiteSpace(query))
+            {
+                category = null;
+            }
+
             Recompute();
         }
     }
@@ -148,8 +172,12 @@
     private IReadOnlyList<PlannedApp> plannedVisible = [];
     private bool showSearch;
 
-    // Başlıklı gösterim yalnızca aramasız ve birden çok grup görünürken; aksi halde düz liste.
+    // Kategori menüsü yalnızca birden çok grup görünürken çıkar; aksi halde kartlar tam genişlikte düz listedir.
     private IReadOnlyList<AppRootGroup> groups = [];
+
+    // Seçili kategori (AppGroup.Id); null ise bütün uygulamalar. Arama kategoriden bağımsız bütün uygulamalarda yapılır.
+    private string? category;
+    private string heading = "";
 
     // Erişim bilgisi yüklenemedi: tenant var ama erişim okunamadı (iki adımlı doğrulama beklerken bilerek boştur).
     private bool loadFailed => Session.IsLoaded && Session.HasActiveTenant && !Session.TwoFactorRequired && Session.Access is null;
@@ -166,24 +194,55 @@
     private void Recompute()
     {
         listed = Apps.Roots();
+        IReadOnlyList<AppRootGroup> grouped = Apps.Grouped(listed);
+        groups = grouped.Count > 1 ? grouped : [];
+
+        // Seçili kategori görünmez olduysa (ör. tenant değişti) bütün uygulamalara dönülür.
+        AppRootGroup? selected = category is null ? null : groups.FirstOrDefault(g => g.Group?.Id == category);
+        if (selected is null)
+        {
+            category = null;
+        }
+
+        heading = selected?.Group is { } group ? AppNames.Of(group) : Texts.Get("shell.launcher.apps");
         visible = string.IsNullOrWhiteSpace(query)
-            ? listed
-            : listed.Where(a => Matches(AppNames.Of(a), query.Trim())).ToList();
+            ? selected?.Apps ?? listed
+            : listed.Where(a => Matches(AppNames.Of(a), query.Trim()) || (AppNames.DescriptionOf(a) is { } text && Matches(text, query.Trim()))).ToList();
         plannedVisible = string.IsNullOrWhiteSpace(query)
             ? AppCatalog.Planned
             : AppCatalog.Planned.Where(p => Matches(AppNames.Of(p), query.Trim())).ToList();
         showSearch = Session.IsLoaded && !loadFailed && (listed.Count > 0 || AppCatalog.Planned.Count > 0);
+    }
 
-        IReadOnlyList<AppRootGroup> grouped = string.IsNullOrWhiteSpace(query) ? Apps.Grouped(listed) : [];
-        groups = grouped.Count > 1 ? grouped : [];
+    private void SelectCategory(string? id)
+    {
+        category = id;
+        query = "";
+        Recompute();
     }
 
     // Uygulama kartı doğrudan uygulamanın ilk ekranına gider; uygulamanın ekranları sol menüde bölümler halinde gelir.
-    private RenderFragment Tile(AppDefinition app) => @<li>
-        <a href="@Apps.EntryRoute(app)" class="app-tile tone-@ToneClass(app) @(IsCurrent(app) ? "is-current" : null)"
+    // Kartın tamamı bağlantıdır; "Aç" görsel ipucudur (ekranda tek birincil düğme kuralı gereği tonal).
+    private RenderFragment Card(AppDefinition app) => @<li>
+        <a href="@Apps.EntryRoute(app)" class="app-card tone-@ToneClass(app) @(app.Art is null ? null : "has-art") @(IsCurrent(app) ? "is-current" : null)"
            aria-current="@(IsCurrent(app) ? "page" : null)" @onclick="() => Close(true)">
-            <span class="app-tile-icon"><AppIcon Name="@app.Icon" /></span>
-            <span class="app-tile-name">@AppNames.Of(app)</span>
+            @if (AppCatalog.ArtUrl(app) is { } art)
+            {
+                <img class="app-card-image" src="@art" alt="" width="160" height="160" loading="lazy" />
+            }
+            else
+            {
+                <span class="app-card-art" aria-hidden="true"><AppIcon Name="@app.Icon" Size="72" /></span>
+            }
+            <span class="app-card-icon"><AppIcon Name="@app.Icon" /></span>
+            <span class="app-card-name">@AppNames.Of(app)</span>
+            @if (AppNames.DescriptionOf(app) is { } description)
+            {
+                <span class="app-card-text">@description</span>
+            }
+            <span class="app-card-open" aria-hidden="true">
+                @(IsCurrent(app) ? Texts.Get("shell.launcher.current") : Texts.Get("shell.launcher.open")) <AppIcon Name="arrow-right" Size="16" />
+            </span>
         </a>
     </li>;
 
@@ -228,6 +287,7 @@
     {
         isOpen = false;
         query = "";
+        category = null;
     }
 
     private void Toggle()
@@ -240,6 +300,7 @@
 
         isOpen = true;
         query = "";
+        category = null;
         pendingFocus = FocusTarget.Search;
         Recompute();
     }
