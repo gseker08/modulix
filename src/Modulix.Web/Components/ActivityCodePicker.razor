@@ -1,22 +1,40 @@
-@* Faaliyet ağacından kod seçici (ADR-0029): her düğüm ayrı satırda, girinti "– " ile gösterilir. Yalnızca "Faaliyet" seçilebilsin
-   isteniyorsa sektör/grup satırları başlık olarak görünür ve devre dışıdır. Seçili kod katalogdan düşmüş ya da pasifleşmişse sonda
-   "(pasif)" ile görünür ki kaldırılabilsin. Değişiklik Selected listesine yazılır (tekrarsız, sıralı). *@
+@* Faaliyet seçici (ADR-0029; docs/design-system/component-catalog.md → PickDialog): formda seçilen faaliyetler etiket olarak
+   durur, seçim atama penceresinde (PickDialog) yapılır. Pencerede yalnızca seçilebilir "Faaliyet" düğümleri listelenir ve
+   "Sektör › Grup" yoluna göre gruplanır; arama ve grup süzgeci vardır. Seçili kod katalogdan düşmüş ya da pasifleşmişse formda
+   "(pasif)" ile görünür ki kaldırılabilsin. Değişiklik Selected listesine yazılır (tekrarsız, sıralı). Pencere formun içinde
+   açıldığı için içindeki girdi olayları forma taşınmaz; form "değişti" bilgisini SelectedChanged'den alır. *@
 @inject ActivityOptions Options
 
-<div class="activity-choices" id="@Id">
-    @foreach (var item in Choices)
+<div class="activity-picker" @oninput:stopPropagation="true">
+    @if (Selected.Count > 0)
     {
-        var inputId = $"{Id}-{item.Code}";
-        <div class="form-check">
-            <input id="@inputId" class="form-check-input" type="checkbox" checked="@Selected.Contains(item.Code)"
-                   disabled="@(ActivitiesOnly && item.Active && item.Kind != "Activity")" @onchange="e => Toggle(item.Code, (bool)e.Value!)" />
-            <label class="form-check-label" for="@inputId">@(item.Depth > 0 ? string.Concat(Enumerable.Repeat("– ", item.Depth)) : null)@item.Name@(item.Active ? null : $" ({Texts.Get("common.inactiveLower")})")</label>
+        <div class="assigned-tags">
+            @foreach (var code in Selected)
+            {
+                var name = NameOf(code);
+                <button type="button" class="badge tag pick-chip" title="@PathOf(code)" aria-label="@Texts.Get("pick.remove", name)"
+                        @onclick="() => RemoveAsync(code)">
+                    @name
+                    <AppIcon Name="x" Size="12" />
+                </button>
+            }
         </div>
     }
+    <button type="button" id="@Id" class="btn btn-tonal" @onclick="() => picking = true">
+        <AppIcon Name="plus" Size="16" /> @Texts.Get("pick.activity.choose")
+    </button>
+
+    <PickDialog TKey="string" Open="picking" Title="@(Title ?? Texts.Get("pick.activity.choose"))"
+                SearchPlaceholder="@Texts.Get("pick.activity.search")" GroupLabel="@Texts.Get("pick.activity.group")"
+                Items="Items" Selected="Selected" SaveLabel="@Texts.Get("pick.apply")" OnSave="ApplyAsync" OnClose="() => picking = false" />
 </div>
 
 @code {
+    private const string ActivityKind = "Activity";
+
     private IReadOnlyList<ActivityOptionDto> options = [];
+    private IReadOnlyList<PickItem<string>> items = [];
+    private bool picking;
 
     [Parameter, EditorRequired] public string Id { get; set; } = "activity-codes";
 
@@ -25,47 +43,59 @@
 
     [Parameter] public EventCallback<List<string>> SelectedChanged { get; set; }
 
-    /// <summary>Yalnızca "Faaliyet" düğümleri seçilebilir (hizmet kapsamı, hizmet ihtiyacı).</summary>
+    /// <summary>Pencerenin başlığı (alanın adı); verilmezse "Faaliyet seç".</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Yalnızca "Faaliyet" düğümleri seçilebilir (hizmet kapsamı, hizmet ihtiyacı); değilse sektör ve grup da listelenir.</summary>
     [Parameter] public bool ActivitiesOnly { get; set; }
 
-    protected override async Task OnInitializedAsync() => options = await Options.LoadAsync();
+    private IReadOnlyList<PickItem<string>> Items => items;
 
-    private async Task Toggle(string code, bool on)
+    protected override async Task OnInitializedAsync()
     {
-        var next = new SortedSet<string>(Selected, StringComparer.Ordinal);
-        if (on)
-        {
-            next.Add(code);
-        }
-        else
-        {
-            next.Remove(code);
-        }
+        options = await Options.LoadAsync();
+        items = BuildItems();
+    }
 
-        Selected = [.. next];
+    private Task ApplyAsync(IReadOnlyList<string> result)
+    {
+        picking = false;
+        return SetAsync(result);
+    }
+
+    private Task RemoveAsync(string code) => SetAsync(Selected.Where(c => c != code));
+
+    private async Task SetAsync(IEnumerable<string> codes)
+    {
+        Selected = [.. new SortedSet<string>(codes, StringComparer.Ordinal)];
         await SelectedChanged.InvokeAsync(Selected);
     }
 
-    private IReadOnlyList<Choice> Choices
+    /// <summary>Ağaç sırasıyla seçilebilir düğümler; grup, üst düğümlerin "Sektör › Grup" yoludur (kök düğümde kendi türü yoktur).</summary>
+    private IReadOnlyList<PickItem<string>> BuildItems()
     {
-        get
+        var byParent = options.ToLookup(a => a.ParentCode);
+        var list = new List<PickItem<string>>();
+        void Walk(string? parent, string? path)
         {
-            var byParent = options.ToLookup(a => a.ParentCode);
-            var list = new List<Choice>();
-            void Walk(string? parent, int depth)
+            foreach (var node in byParent[parent])
             {
-                foreach (var node in byParent[parent])
+                if (!ActivitiesOnly || node.Kind == ActivityKind)
                 {
-                    list.Add(new Choice(node.Code, node.Name, depth, node.Kind, Active: true));
-                    Walk(node.Code, depth + 1);
+                    list.Add(new PickItem<string>(node.Code, node.Name, Group: path));
                 }
-            }
 
-            Walk(null, 0);
-            list.AddRange(Selected.Where(c => list.All(i => i.Code != c)).Select(c => new Choice(c, c, 0, "", Active: false)));
-            return list;
+                Walk(node.Code, path is null ? node.Name : $"{path} › {node.Name}");
+            }
         }
+
+        Walk(null, null);
+        return list;
     }
 
-    private sealed record Choice(string Code, string Name, int Depth, string Kind, bool Active);
+    private ActivityOptionDto? Find(string code) => options.FirstOrDefault(a => a.Code == code);
+
+    private string NameOf(string code) => Find(code)?.Name ?? $"{code} ({Texts.Get("common.inactiveLower")})";
+
+    private string PathOf(string code) => Find(code) is { } option ? Options.PathOf(option) : code;
 }

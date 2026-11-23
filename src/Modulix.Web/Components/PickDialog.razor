@@ -2,6 +2,7 @@
    olarak durur. Seçim pencerenin çalışma kopyasında tutulur, "Kaydet" ile sayfaya verilir; "İptal" hiçbir şeyi değiştirmez.
    Satırlar gruplanabilir (izinler modüle göre) ve seçili satır ek alan taşıyabilir (şirket görevinin bitiş tarihi, şubesi). *@
 @typeparam TKey where TKey : notnull
+@inject IJSRuntime Js
 
 <Modal Open="Open" Title="@Title" Subtitle="@Subtitle" OnClose="OnClose" Class="@(Wide ? "pick-dialog wide" : "pick-dialog")">
     <ChildContent>
@@ -37,7 +38,7 @@
 
             <div class="pick-filters">
                 <input class="form-control" type="search" aria-label="@SearchPlaceholder" placeholder="@SearchPlaceholder"
-                       @bind="search" @bind:event="oninput" />
+                       @ref="searchInput" @bind="search" @bind:event="oninput" />
                 @if (Groups.Count > 1)
                 {
                     <select class="form-select" aria-label="@GroupLabel" @bind="group">
@@ -106,6 +107,8 @@
     private string group = string.Empty;
     private bool onlySelected;
     private bool wasOpen;
+    private bool guardPending;
+    private ElementReference searchInput;
 
     [Parameter] public bool Open { get; set; }
 
@@ -157,9 +160,20 @@
         {
             selection = new PickSelection<TKey>(Items, Selected, Linked);
             (search, group, onlySelected) = (null, string.Empty, false);
+            guardPending = true;
         }
 
         wasOpen = Open;
+    }
+
+    /// <summary>Pencere bir formun içinde açılabilir (faaliyet seçici): aramada Enter formu göndermesin.</summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (guardPending && Open && selection is not null)
+        {
+            guardPending = false;
+            await Js.InvokeVoidAsync("modulixLookup.guardEnter", searchInput);
+        }
     }
 
     private Task SaveAsync() => selection is { } current ? OnSave.InvokeAsync(current.Result) : Task.CompletedTask;
