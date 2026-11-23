@@ -195,11 +195,6 @@
                             <input id="city" class="form-control" maxlength="@CrmLimits.CityMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.City" />
                             <FieldError Field="city" Errors="errors" />
                             break;
-                        case "notes":
-                            <label class="@f.LabelClass()" for="notes">@f.Label</label>
-                            <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
-                            <FieldError Field="notes" Errors="errors" />
-                            break;
                     }
                 </Field>
             </LayoutForm>

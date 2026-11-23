@@ -78,11 +78,6 @@
                             <input id="balance-carried" class="form-control" type="number" min="0" max="366" step="0.5" @bind="form.CarriedOverDays" />
                             <FieldError Field="carriedOverDays" Errors="errors" />
                             break;
-                        case "notes":
-                            <label class="@f.LabelClass()" for="balance-notes">@f.Label</label>
-                            <textarea id="balance-notes" class="form-control" rows="3" maxlength="1000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
-                            <FieldError Field="notes" Errors="errors" />
-                            break;
                     }
                 </Field>
             </LayoutForm>

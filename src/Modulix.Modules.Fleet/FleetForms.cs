@@ -14,13 +14,12 @@ public static class FleetForms
     public static IReadOnlyList<FormDefinition> All { get; } =
     [
         new(FleetModule.Entities.Vehicle, "Araç",
-        [new(General, "Genel bilgiler"), new("kapasite", "Kapasite"), new("notlar", "Notlar ve ek bilgiler")],
+        [new(General, "Genel bilgiler"), new("kapasite", "Kapasite"), new("notlar", "Ek bilgiler")],
         [
             new("kimlik", "Araç kimliği", "truck"),
             new("mulkiyet", "Mülkiyet", "building"),
             new("teknik", "Teknik bilgiler", "wrench", Tab: "kapasite"),
             new("yuk", "Yük kapasitesi", "package", Tab: "kapasite"),
-            new("notlar", "Notlar", "message-square", Tab: "notlar"),
             new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
@@ -37,7 +36,6 @@ public static class FleetForms
             new("volumeM3", "Hacim (m³)", "yuk", 3),
             new("loadingMeters", "Yükleme metresi (LDM)", "yuk", 3),
             new("palletCapacity", "Palet kapasitesi", "yuk", 3),
-            new("notes", "Notlar", "notlar", 12),
         ]),
 
         new(FleetModule.Entities.Maintenance, "Bakım kaydı",

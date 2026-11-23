@@ -107,11 +107,6 @@
                         <datalist id="trip-currencies"><option value="TRY"></option><option value="EUR"></option><option value="USD"></option><option value="GBP"></option></datalist>
                         <FieldError Field="settlementCurrency" Errors="errors" />
                         break;
-                    case "notes":
-                        <label class="@f.LabelClass()" for="trip-notes">@f.Label</label>
-                        <textarea id="trip-notes" class="form-control" rows="4" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
-                        <FieldError Field="notes" Errors="errors" />
-                        break;
                 }
             </Field>
         </LayoutForm>

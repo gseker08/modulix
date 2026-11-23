@@ -103,10 +103,6 @@
                         {
                         <FormSection Title="@Texts.Get("crm.company.general")" Icon="info">
                         <dl class="detail-grid">
-                            @if (contact.Notes is { } notes)
-                            {
-                                <div class="span-all"><dt>@Texts.Get("common.field.notes")</dt><dd class="notes">@notes</dd></div>
-                            }
                             @foreach (var field in Lookups.FieldsOf(CrmEntityKeys.Contact))
                             {
                                 var text = CustomFieldText.Format(field, contact.Custom);

@@ -107,11 +107,6 @@
                     <input id="asset-currency" class="form-control" maxlength="3" placeholder="TRY" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Currency" />
                     <FieldError Field="currency" Errors="errors" />
                     break;
-                case "notes":
-                    <label class="@f.LabelClass()" for="asset-notes">@f.Label</label>
-                    <textarea id="asset-notes" class="form-control" rows="3" maxlength="2000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
-                    <FieldError Field="notes" Errors="errors" />
-                    break;
             }
         </Field>
     </LayoutForm>

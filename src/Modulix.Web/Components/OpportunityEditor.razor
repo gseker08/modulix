@@ -219,11 +219,6 @@
                     <textarea id="description" class="form-control" rows="2" maxlength="4000" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Description"></textarea>
                     <FieldError Field="description" Errors="errors" />
                     break;
-                case "notes":
-                    <label class="@f.LabelClass()" for="notes">@f.Label</label>
-                    <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
-                    <FieldError Field="notes" Errors="errors" />
-                    break;
             }
         </Field>
     </LayoutForm>

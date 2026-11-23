@@ -15,14 +15,13 @@ public static class HrForms
     public static IReadOnlyList<FormDefinition> All { get; } =
     [
         new(HrModule.Entities.Employee, "Çalışan",
-        [new(General, "Genel bilgiler"), new("istihdam", "İstihdam"), new("ozluk", "Özlük bilgileri"), new("notlar", "Notlar ve ek bilgiler")],
+        [new(General, "Genel bilgiler"), new("istihdam", "İstihdam"), new("ozluk", "Özlük bilgileri"), new("notlar", "Ek bilgiler")],
         [
             new("kimlik", "Çalışan", "user"),
             new("gorev", "Görev ve organizasyon", "building"),
             new("istihdam", "İstihdam bilgileri", "briefcase", Tab: "istihdam"),
             new("kisisel", "Kimlik ve banka", "shield", Tab: "ozluk"),
             new("acil", "Adres ve acil durum", "home", Tab: "ozluk"),
-            new("notlar", "Notlar", "message-square", Tab: "notlar"),
             new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
@@ -44,7 +43,6 @@ public static class HrForms
             new("homeAddress", "Ev adresi", "acil", 12),
             new("emergencyContactName", "Acil durum kişisi", "acil", 6),
             new("emergencyContactPhone", "Acil durum telefonu", "acil", 6),
-            new("notes", "Notlar", "notlar", 12),
         ]),
 
         new(HrModule.Entities.LeaveRequest, "İzin talebi",
@@ -64,10 +62,9 @@ public static class HrForms
         ]),
 
         new(HrModule.Entities.LeaveBalance, "İzin hakkı",
-        [new(General, "Hak"), new("notlar", "Notlar ve ek bilgiler")],
+        [new(General, "Hak"), new("notlar", "Ek bilgiler")],
         [
             new("hak", "Yıllık izin hakkı", "calendar"),
-            new("notlar", "Notlar", "message-square", Tab: "notlar"),
             new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
@@ -75,7 +72,6 @@ public static class HrForms
             new("year", "Yıl", "hak", 4, Required: true, Fixed: true),
             new("entitledDays", "Hak (gün)", "hak", 6, Required: true, Fixed: true),
             new("carriedOverDays", "Devreden (gün)", "hak", 6),
-            new("notes", "Notlar", "notlar", 12),
         ]),
 
         new(HrModule.Entities.ExpenseClaim, "Masraf beyanı",
@@ -108,12 +104,11 @@ public static class HrForms
         ]),
 
         new(HrModule.Entities.Asset, "Demirbaş",
-        [new(General, "Genel bilgiler"), new("satinalma", "Satın alma"), new("notlar", "Notlar ve ek bilgiler")],
+        [new(General, "Genel bilgiler"), new("satinalma", "Satın alma"), new("notlar", "Ek bilgiler")],
         [
             new("kimlik", "Demirbaş", "package"),
             new("teknik", "Marka ve seri", "wrench"),
             new("satinalma", "Satın alma", "wallet", Tab: "satinalma"),
-            new("notlar", "Notlar", "message-square", Tab: "notlar"),
             new(Extras, "Ek bilgiler", "square-pen", Tab: "notlar"),
         ],
         [
@@ -127,7 +122,6 @@ public static class HrForms
             new("purchaseDate", "Alış tarihi", "satinalma", 4),
             new("purchaseCost", "Alış tutarı", "satinalma", 4),
             new("currency", "Para birimi", "satinalma", 4),
-            new("notes", "Notlar", "notlar", 12),
         ]),
 
         new(HrModule.Entities.AssetAssignment, "Zimmet",

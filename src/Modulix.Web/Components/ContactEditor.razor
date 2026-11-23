@@ -135,11 +135,6 @@
                             <small class="text-muted">@Texts.Get("crm.language.contact-help")</small>
                             <FieldError Field="preferredLanguage" Errors="errors" />
                             break;
-                        case "notes":
-                            <label class="@f.LabelClass()" for="notes">@f.Label</label>
-                            <textarea id="notes" class="form-control" rows="3" maxlength="@CrmLimits.NotesMaxLength" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Notes"></textarea>
-                            <FieldError Field="notes" Errors="errors" />
-                            break;
                     }
                 </Field>
             </LayoutForm>

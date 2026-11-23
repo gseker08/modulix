@@ -144,10 +144,6 @@
                             {
                                 <div class="span-all"><dt>@Texts.Get("crm.company.address")</dt><dd>@address</dd></div>
                             }
-                            @if (company.Notes is { } notes)
-                            {
-                                <div class="span-all"><dt>@Texts.Get("common.field.notes")</dt><dd class="notes">@notes</dd></div>
-                            }
                             @* Özel alanlar (Y9a): boş olanlar gösterilmez. *@
                             @foreach (var field in Lookups.FieldsOf(CrmEntityKeys.Company))
                             {
