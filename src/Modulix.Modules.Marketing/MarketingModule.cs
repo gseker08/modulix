@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Events;
 using Modulix.Core.Hosting;
 using Modulix.Modules.Marketing.Contracts;
@@ -402,8 +403,12 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
     /// <summary>Pazarlama uç noktaları (<c>/api/marketing</c>) modüldedir (ADR-0046); grup host tarafından açılır.</summary>
     public void MapEndpoints(IEndpointRouteBuilder routes) => MarketingEndpoints.MapEndpoints(routes);
 
+    /// <summary>Kural altyapısı yetenekleri (ADR-0027, ADR-0056 dilim 2b): yolculuk kaydı üzerinde kural, "yolculuğa girildi" olayı ve "yolculuk iletisi gönder" aksiyonu.</summary>
+    AutomationCapabilities IModule.Automation => JourneyAutomation.Capabilities;
+
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddScoped<JourneySendAction>();
         services.AddScoped<MarketingSenderAnchor>();
         services.AddScoped<IMarketingPolicyProvider, MarketingPolicyProvider>();
         services.AddScoped<MarketingSendJob>();

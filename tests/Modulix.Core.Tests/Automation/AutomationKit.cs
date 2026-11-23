@@ -178,6 +178,9 @@ internal static class AutomationKit
 
         public AutomationCapabilities Automation => capabilities;
 
+        /// <summary>Modül bağımlılıkları (ADR-0051); varsayılan yok.</summary>
+        public IReadOnlyList<ModuleDependency> Dependencies { get; init; } = [];
+
         /// <summary>Onaya açık kayıt türleri (Dilim 4c); varsayılan yok.</summary>
         public IReadOnlyList<Modulix.Core.Contracts.Approvals.ApprovalTargetDefinition> ApprovalTargets { get; init; } = [];
     }

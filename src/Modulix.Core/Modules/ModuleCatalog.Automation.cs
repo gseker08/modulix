@@ -294,6 +294,11 @@ public sealed partial class ModuleCatalog
         }
     }
 
+    private bool IsDependencyReadPermission(IModule module, string permission) =>
+        permission.EndsWith(".read", StringComparison.Ordinal)
+        && permissions.ContainsKey(permission)
+        && module.Dependencies.Any(d => d.ModuleKey == AccessKeys.ModuleOf(permission));
+
     private void ValidateAutomationAction(IModule module, AutomationActionRegistration registration, Func<string, InvalidOperationException> fail)
     {
         var definition = registration.Definition;
@@ -307,7 +312,12 @@ public sealed partial class ModuleCatalog
             throw fail($"aksiyon '{definition.Key}': anahtar modül önekli, ad ve açıklama dolu, işleyici IAutomationAction uygulamalı");
         }
 
-        var foreign = definition.RequiredPermissions.Where(p => module.Permissions.All(d => d.Key != p)).ToList();
+        // Kuralın kimliği yalnızca aksiyonların istediği izinlerle çalışır (yayın ve çalışma anında denetlenir). Modül kendi izinlerini ister; başka
+        // modülün verisini okuması gereken aksiyon (ör. pazarlama iletisinin CRM kişilerini çözmesi) o modülün yalnızca okuma iznini (".read") ister
+        // ve o modüle bağımlılığını beyan etmiş olmalıdır (ADR-0051). Yazma izni istenemez (iş kimliklerinde "verilmiş izin" kuralıyla aynı ilke).
+        var foreign = definition.RequiredPermissions
+            .Where(p => module.Permissions.All(d => d.Key != p) && !IsDependencyReadPermission(module, p))
+            .ToList();
         if (foreign.Count > 0)
         {
             throw fail($"aksiyon '{definition.Key}' modülün tanımlamadığı izin istiyor: {string.Join(", ", foreign)}");
