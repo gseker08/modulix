@@ -1,5 +1,6 @@
 using System.Net.Mail;
 using System.Text.RegularExpressions;
+using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Modules;
 using Modulix.Core.Modules;
 
@@ -8,49 +9,48 @@ namespace Modulix.Core.Settings;
 /// <summary>Ayar değerinin tanımına uygunluğu (Y6). Hem ayarlar uç noktası hem kayıt deposu bunu kullanır.</summary>
 public static partial class SettingRules
 {
-    /// <summary>Değer geçerliyse <c>null</c>, değilse kullanıcıya gösterilecek hata.</summary>
-    public static string? Validate(SettingDefinition definition, string? value)
+    /// <summary>Değer geçerliyse <c>null</c>, değilse kullanıcıya gösterilecek hata; ileti HTTP sınırında isteğin diline çevrilir (ADR-0034 §6).</summary>
+    public static ServerMessage? Validate(SettingDefinition definition, string? value)
     {
         ArgumentNullException.ThrowIfNull(definition);
         if (value is null)
         {
-            return "Değer metin olmalıdır.";
+            return ServerMessages.Setting.ValueText;
         }
 
         if (value.Length == 0)
         {
-            return definition.Required ? $"{definition.DisplayName} zorunludur." : null;
+            return definition.Required ? ServerMessages.Validation.Required : null;
         }
 
         if (value != value.Trim())
         {
-            return "Değer boşlukla başlayamaz veya bitemez.";
+            return ServerMessages.Setting.ValueTrim;
         }
 
         if (value.Length > Math.Min(definition.MaxLength, TenantSetting.ValueMaxLength))
         {
-            return $"En fazla {definition.MaxLength} karakter olabilir.";
+            return ServerMessages.Validation.MaxLength(definition.MaxLength);
         }
 
         if (definition.Type != SettingType.MultilineText && value.Contains('\n', StringComparison.Ordinal))
         {
-            return "Tek satır olmalıdır.";
+            return ServerMessages.Setting.SingleLine;
         }
 
-        // Vurgu rengi (E8): biçimden sonra açık/koyu temadaki kontrast da sunucuda denetlenir.
-        if (definition.Key is CoreModule.SettingKeys.AccentLight or CoreModule.SettingKeys.AccentDark
-            && Regex.IsMatch(value, AccentColor.Pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)))
+        // Vurgu rengi (E8): biçim ve açık/koyu temadaki kontrast sunucuda denetlenir; ileti sözlük anahtarlıdır.
+        if (definition.Key is CoreModule.SettingKeys.AccentLight or CoreModule.SettingKeys.AccentDark)
         {
             return AccentColor.Validate(value, dark: definition.Key == CoreModule.SettingKeys.AccentDark);
         }
 
         return definition.Type switch
         {
-            SettingType.Choice when definition.Options.All(o => o.Value != value) => "Listedeki seçeneklerden biri olmalıdır.",
-            SettingType.Email when !IsEmail(value) => "Geçerli bir e-posta adresi girin.",
-            SettingType.Phone when !PhonePattern().IsMatch(value) => "Geçerli bir telefon numarası girin.",
+            SettingType.Choice when definition.Options.All(o => o.Value != value) => ServerMessages.Setting.Choice,
+            SettingType.Email when !IsEmail(value) => ServerMessages.Validation.Email,
+            SettingType.Phone when !PhonePattern().IsMatch(value) => ServerMessages.Validation.Phone,
             _ when definition.Pattern is { } pattern && !Regex.IsMatch(value, pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)) =>
-                definition.PatternMessage ?? "Değer beklenen biçimde değil.",
+                definition.PatternMessage is { } custom ? custom : ServerMessages.Setting.Pattern,
             _ => null,
         };
     }

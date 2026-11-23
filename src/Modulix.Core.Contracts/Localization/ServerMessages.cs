@@ -390,6 +390,28 @@ public static class ServerMessages
 
         public static ServerMessage SaveFailed =>
             ServerMessage.Of("server.setting.save-failed", "Ayarlar kaydedilemedi.");
+
+        public static ServerMessage ValueText => ServerMessage.Of("server.setting.value-text", "Değer metin olmalıdır.");
+
+        public static ServerMessage ValueTrim => ServerMessage.Of("server.setting.value-trim", "Değer boşlukla başlayamaz veya bitemez.");
+
+        public static ServerMessage SingleLine => ServerMessage.Of("server.setting.single-line", "Tek satır olmalıdır.");
+
+        public static ServerMessage Choice => ServerMessage.Of("server.setting.choice", "Listedeki seçeneklerden biri olmalıdır.");
+
+        public static ServerMessage Pattern => ServerMessage.Of("server.setting.pattern", "Değer beklenen biçimde değil.");
+
+        /// <summary>Vurgu rengi biçimi (E8); örnek renk koddur, çevrilmez.</summary>
+        public static ServerMessage AccentFormat =>
+            ServerMessage.Of("server.setting.accent-format", "Renk #RRGGBB biçiminde olmalıdır (ör. #087DB8).");
+
+        /// <summary>Vurgu rengi açık temada yeterince okunmuyor; <paramref name="contrast"/> ölçülen, <paramref name="minimum"/> gereken oran ("0.0" biçiminde).</summary>
+        public static ServerMessage AccentLowContrastLight(string contrast, string minimum) =>
+            ServerMessage.Of("server.setting.accent-low-contrast-light", "Bu renk açık temada yeterince okunmuyor (kontrast {0}:1, en az {1}:1 gerekir).", contrast, minimum);
+
+        /// <summary>Vurgu rengi koyu temada yeterince okunmuyor; yer tutucular <see cref="AccentLowContrastLight"/> ile aynıdır.</summary>
+        public static ServerMessage AccentLowContrastDark(string contrast, string minimum) =>
+            ServerMessage.Of("server.setting.accent-low-contrast-dark", "Bu renk koyu temada yeterince okunmuyor (kontrast {0}:1, en az {1}:1 gerekir).", contrast, minimum);
     }
 
     public static class Lookup

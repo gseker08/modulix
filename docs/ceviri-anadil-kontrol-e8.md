@@ -1,6 +1,6 @@
 # Çeviri anadil kontrolü: E8 (çalışma alanı rengi ve rol menüsü)
 
-Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** ve **Azerice (az)** karşılıklarını anadili konuşan bir gözden geçiren için toplar. Türkçe (tr) metinler kaynaktır; en/az metinleri taslaktır ve anadil kontrolünden geçmemiştir (ADR-0034, "taslak" kuralı). Toplam **35 anahtar**.
+Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** ve **Azerice (az)** karşılıklarını anadili konuşan bir gözden geçiren için toplar. Türkçe (tr) metinler kaynaktır; en/az metinleri taslaktır ve anadil kontrolünden geçmemiştir (ADR-0034, "taslak" kuralı). Toplam **43 anahtar**.
 
 ## Nasıl gözden geçirilir
 
@@ -56,8 +56,16 @@ Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** 
 | `meta.setting.core.appearance.accent-light` | Kuruluş ayarları > Görünüm: açık tema vurgu rengi ayarının adı | Vurgu rengi (açık tema) | Accent color (light theme) | Vurğu rəngi (açıq tema) | |
 | `meta.setting.core.appearance.accent-light.group` | Ayar grubunun adı | Görünüm | Appearance | Görünüm | |
 | `meta.setting.core.appearance.accent-light.description` | Ayarın açıklaması | Bağlantı, odak ve etkin sekme rengi; #RRGGBB. Boşsa Modulix rengi kullanılır. Okunabilirlik için açık zeminde en az 4.5:1 kontrast gerekir. | Color of links, focus and the active tab; #RRGGBB. If empty, the Modulix color is used. Needs at least 4.5:1 contrast on a light background. | Keçid, fokus və aktiv sekmə rəngi; #RRGGBB. Boşdursa Modulix rəngi istifadə olunur. Açıq fonda ən azı 4.5:1 kontrast tələb olunur. | |
+| `server.setting.value-text` | Ayar kaydedilirken hata: değer metin değil | Değer metin olmalıdır. | The value must be text. | Dəyər mətn olmalıdır. | |
+| `server.setting.value-trim` | Ayar kaydedilirken hata: değer boşlukla başlıyor/bitiyor | Değer boşlukla başlayamaz veya bitemez. | The value cannot start or end with whitespace. | Dəyər boşluqla başlaya və ya bitə bilməz. | |
+| `server.setting.single-line` | Ayar kaydedilirken hata: tek satırlık alana çok satır girildi | Tek satır olmalıdır. | It must be a single line. | Tək sətir olmalıdır. | |
+| `server.setting.choice` | Ayar kaydedilirken hata: listede olmayan seçenek | Listedeki seçeneklerden biri olmalıdır. | It must be one of the listed options. | Siyahıdakı seçimlərdən biri olmalıdır. | |
+| `server.setting.pattern` | Ayar kaydedilirken hata: biçim uyuşmuyor (ayarın kendi iletisi yoksa) | Değer beklenen biçimde değil. | The value is not in the expected format. | Dəyər gözlənilən formatda deyil. | |
+| `server.setting.accent-format` | Vurgu rengi kaydedilirken hata: biçim yanlış; "#RRGGBB" ve örnek renk kodu olduğu gibi kalır | Renk #RRGGBB biçiminde olmalıdır (ör. #087DB8). | The color must be in #RRGGBB format (e.g. #087DB8). | Rəng #RRGGBB formatında olmalıdır (məs. #087DB8). | |
+| `server.setting.accent-low-contrast-light` | Vurgu rengi kaydedilirken hata: açık temada yetersiz kontrast; {0} ölçülen, {1} gereken | Bu renk açık temada yeterince okunmuyor (kontrast {0}:1, en az {1}:1 gerekir). | This color is not readable enough in the light theme (contrast {0}:1, at least {1}:1 required). | Bu rəng açıq temada kifayət qədər oxunmur (kontrast {0}:1, ən azı {1}:1 tələb olunur). | |
+| `server.setting.accent-low-contrast-dark` | Vurgu rengi kaydedilirken hata: koyu temada yetersiz kontrast; {0} ölçülen, {1} gereken | Bu renk koyu temada yeterince okunmuyor (kontrast {0}:1, en az {1}:1 gerekir). | This color is not readable enough in the dark theme (contrast {0}:1, at least {1}:1 required). | Bu rəng tünd temada kifayət qədər oxunmur (kontrast {0}:1, ən azı {1}:1 tələb olunur). | |
 
 ## Sınırlar
 
 - Bu liste yalnızca E8 ile eklenen anahtarları kapsar; diğer taslak en/az metinleri (ADR-0034 aşama 4 dilimleri) ayrı bir gözden geçirme gerektirir.
-- Sunucudan dönen Türkçe doğrulama hata metni (rengin kaydedilmesi reddedilirse) hâlâ çevrilmemiştir; çeviri hattına bağlandığında bu listeye eklenir.
+- Ayar kaydedilirken dönen doğrulama hataları (son 8 satır, `server.setting.*`) artık sözlükten çevrilir. Ayarın kendi `PatternMessage` metni (ör. vergi numarası biçimi) modüle özgü olduğu için hâlâ Türkçedir.
