@@ -301,6 +301,93 @@ public class JourneyMessageTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         Assert.Contains("gereken izne", await publish.Content.ReadAsStringAsync());
     }
 
+    // ---- Dilim 2c-1: tamamlama ve abonelikten çıkma ----
+
+    [Fact]
+    public async Task A_rule_ending_with_the_complete_step_completes_the_enrollment_once()
+    {
+        var w = await WorldAsync("tamam@a.test");
+        await PublishRuleAsync(w.Preparer, JourneyRuleWith(w.Journey.Id, Send(w.ContentId, "ilk"), Complete("bitir")));
+
+        await DeliverAndRunAsync(w.Tenant.Id);
+        var enrollment = Assert.Single(await EnrollmentsAsync(w.Preparer, w.Journey.Id));
+        Assert.Equal("Completed", enrollment.Status);
+        Assert.Equal("completed", enrollment.ExitReason);
+        Assert.NotNull(enrollment.ExitedAt);
+        Assert.Equal(JourneyMessageOutcomes.Accepted, Assert.Single(await MessagesAsync(w.Tenant.Id, w.Enrollment)).Outcome);
+
+        // Olay yeniden teslim edilse de kayıt ikinci kez tamamlanmaz, ileti tekrar gitmez.
+        await ReplayDeliveriesAsync(w.Tenant.Id);
+        await DeliverAndRunAsync(w.Tenant.Id);
+        Assert.Equal("Completed", Assert.Single(await EnrollmentsAsync(w.Preparer, w.Journey.Id)).Status);
+        Assert.Equal(1, Sent.Count(s => s.Address == "tamam@a.test"));
+    }
+
+    [Fact]
+    public async Task A_recipient_who_withdrew_consent_leaves_the_journey_and_the_remaining_steps_are_skipped()
+    {
+        var w = await WorldAsync("cikan@a.test");
+        await ConsentAsync(w.Preparer, "cikan@a.test", "Denied");
+        await PublishRuleAsync(w.Preparer, JourneyRuleWith(w.Journey.Id, Send(w.ContentId, "ilk"), Send(w.ContentId, "ikinci"), Complete("bitir")));
+
+        await DeliverAndRunAsync(w.Tenant.Id);
+
+        // Çıkış koşulsuzdur: kayıt abonelikten çıkma nedeniyle sona erer, ikinci ileti ve "tamamla" adımı çalışmaz.
+        var enrollment = Assert.Single(await EnrollmentsAsync(w.Preparer, w.Journey.Id));
+        Assert.Equal("Exited", enrollment.Status);
+        Assert.Equal("unsubscribed", enrollment.ExitReason);
+        var row = Assert.Single(await MessagesAsync(w.Tenant.Id, w.Enrollment));
+        Assert.Equal(JourneyMessageOutcomes.Skipped, row.Outcome);
+        Assert.DoesNotContain(Sent, s => s.Address == "cikan@a.test");
+    }
+
+    [Fact]
+    public async Task Completing_an_enrollment_of_another_tenant_is_impossible_and_a_publisher_without_journey_write_cannot_publish_the_steps()
+    {
+        var a = await WorldAsync("a-tamam@a.test");
+        var b = await WorldAsync("b-tamam@b.test");
+
+        // B'nin kuralı A'nın yolculuğuna bağlansa bile A'nın kaydını tamamlayamaz.
+        await PublishRuleAsync(b.Preparer, JourneyRuleWith(a.Journey.Id, Complete("bitir")));
+        await DeliverAndRunAsync(a.Tenant.Id);
+        await DeliverAndRunAsync(b.Tenant.Id);
+        Assert.Equal("Active", Assert.Single(await EnrollmentsAsync(a.Preparer, a.Journey.Id)).Status);
+
+        // Yazma iznine sahip olmayan yayınlayan tamamla adımını yayınlayamaz.
+        var readOnly = await UserClientAsync(a.Tenant, [.. Preparer.Where(p => p != JourneysWrite)]);
+        var create = await readOnly.PostAsJsonAsync("/api/automation/rules", new CreateAutomationRuleRequest(
+            MarketingModule.ModuleKey, MarketingModule.Entities.JourneyEnrollment, $"Yolculuk {Guid.NewGuid():N}"[..20], null, 100, false, null, null,
+            JsonSerializer.SerializeToElement(JourneyRuleWith(a.Journey.Id, Complete("bitir")), AutomationJson.Options)));
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var rule = (await create.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!;
+        Assert.NotEqual(HttpStatusCode.OK, (await readOnly.PostAsJsonAsync($"/api/automation/rules/{rule.Rule.Id}/publish", new PublishAutomationRuleRequest(true, null))).StatusCode);
+    }
+
+    private static AutomationActionStep Send(Guid contentId, string id) =>
+        new(id, JourneyAutomation.SendAction, new JsonObject { ["contentId"] = contentId.ToString() });
+
+    private static AutomationActionStep Complete(string id) => new(id, JourneyAutomation.CompleteAction, new JsonObject());
+
+    private static AutomationDefinition JourneyRuleWith(Guid journeyId, params AutomationActionStep[] steps) => new(
+        new DomainEventTrigger(MarketingModule.Events.JourneyEntered),
+        new ConditionLeaf("marketing.journey-enrollment.journeyId", AutomationOperator.Eq, [journeyId.ToString()]),
+        steps);
+
+    private static async Task<Guid> PublishRuleAsync(HttpClient client, AutomationDefinition definition)
+    {
+        var create = await client.PostAsJsonAsync("/api/automation/rules", new CreateAutomationRuleRequest(
+            MarketingModule.ModuleKey, MarketingModule.Entities.JourneyEnrollment, $"Yolculuk {Guid.NewGuid():N}"[..20], null, 100, false, null, null,
+            JsonSerializer.SerializeToElement(definition, AutomationJson.Options)));
+        Assert.True(create.StatusCode == HttpStatusCode.Created, await create.Content.ReadAsStringAsync());
+        var rule = (await create.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!;
+        var publish = await client.PostAsJsonAsync($"/api/automation/rules/{rule.Rule.Id}/publish", new PublishAutomationRuleRequest(true, null));
+        Assert.True(publish.StatusCode == HttpStatusCode.OK, await publish.Content.ReadAsStringAsync());
+        return rule.Rule.Id;
+    }
+
+    private static async Task<List<JourneyEnrollmentDto>> EnrollmentsAsync(HttpClient client, Guid journeyId) =>
+        [.. (await client.GetFromJsonAsync<PagedResult<JourneyEnrollmentDto>>($"/api/marketing/journey-enrollments?journeyId={journeyId}&pageSize=100"))!.Items];
+
     private static AutomationDefinition JourneyRule(Guid journeyId, Guid contentId, params string[] steps) => new(
         new DomainEventTrigger(MarketingModule.Events.JourneyEntered),
         new ConditionLeaf("marketing.journey-enrollment.journeyId", AutomationOperator.Eq, [journeyId.ToString()]),

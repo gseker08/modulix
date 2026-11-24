@@ -416,6 +416,8 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
         services.AddScoped<MarketingStoreContext>();
         services.AddScoped<SegmentWorkflowGate>();
         services.AddScoped<Journeys.IJourneyService, Journeys.JourneyService>();
+        services.AddScoped<Journeys.IJourneyEnrollments, Journeys.JourneyEnrollmentService>();
+        services.AddScoped<Journeys.JourneyCompleteAction>();
         services.AddScoped<JourneyEntryAnchor>();
         services.AddScoped<JourneyEntryJob>();
         services.AddScoped<Records.JourneyEntryStore>();

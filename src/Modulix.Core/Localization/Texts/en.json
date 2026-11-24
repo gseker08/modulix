@@ -13878,5 +13878,8 @@
   "marketing.server.journey.already-archived": "The journey is already archived.",
   "marketing.server.journey.segment-not-active": "The entry segment is not active; the journey cannot be started.",
   "meta.permission.marketing.journeys.publish": "Publishes, pauses, resumes and archives customer journeys",
-  "meta.permission.marketing.journeys.publish.resource": "Journeys"
+  "meta.permission.marketing.journeys.publish.resource": "Journeys",
+  "marketing.server.journey.exit-reason-required": "An exit reason is required.",
+  "marketing.server.journey.exit-reason-too-long": "The reason can be at most {0} characters.",
+  "marketing.server.journey.enrollment-not-active": "The journey enrollment is not active; only an active enrollment can be exited or completed."
 }

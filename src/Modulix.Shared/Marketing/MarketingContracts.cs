@@ -121,6 +121,9 @@ public sealed record JourneyEnrollmentDto(
 
 public sealed record SaveJourneyEnrollmentRequest(long Version = 0);
 
+/// <summary>Yolculuk kaydını elle çıkarma isteği (ADR-0056): okunan kaydın sürümü ve zorunlu gerekçe.</summary>
+public sealed record ExitJourneyEnrollmentRequest(long? Version = null, string? Reason = null);
+
 public static class MarketingAccess
 {
     public const string ModuleKey = "marketing";

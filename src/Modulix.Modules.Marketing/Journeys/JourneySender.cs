@@ -19,7 +19,8 @@ public sealed record JourneySendRequest(Guid EnrollmentId, Guid ContentId, strin
 /// <param name="Outcome"><see cref="JourneyMessageOutcomes"/> değerlerinden biri.</param>
 /// <param name="Code">Gönderilmeyen ya da başarısız iletinin kararlı neden kodu; kabul edilen iletide boş.</param>
 /// <param name="AlreadyHandled">Bu adım için ileti daha önce işlenmişti; yeniden gönderilmedi.</param>
-public sealed record JourneySendResult(string Outcome, string? Code, bool AlreadyHandled = false);
+/// <param name="EnrollmentEnded">Yolculuk kaydı artık etkin değil (ileti bu yüzden gitmedi ya da alıcı abonelikten çıktığı için kayıt bu çağrıda çıkarıldı); kuralın kalan adımları atlanmalıdır.</param>
+public sealed record JourneySendResult(string Outcome, string? Code, bool AlreadyHandled = false, bool EnrollmentEnded = false);
 
 /// <summary>
 /// Yolculuk iletisi gönderimi (ADR-0056 dilim 2a): bir yolculuk kaydının bir adımında içeriği hedefe gönderir. Kampanya gönderimiyle <b>aynı kurallar</b>
@@ -41,6 +42,7 @@ internal sealed class JourneySender(
     IEnumerable<IRecipientResolver> resolvers,
     IEnumerable<IAddressLookup> lookups,
     ICommunicationPreferences preferences,
+    IJourneyEnrollments enrollments,
     IFrequencyLimiter frequency,
     IUnsubscribeLinks unsubscribe,
     IJournalWriter journal,
@@ -48,6 +50,18 @@ internal sealed class JourneySender(
     TimeProvider time) : IJourneySender
 {
     private static readonly TimeSpan ProviderTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Alıcının pazarlama iletişiminden çıktığını gösteren karar kodları (ADR-0056 §6: abonelikten çıkma koşulsuz çıkıştır): izin geri alındı, konudan çıktı,
+    /// "iletişim istemiyorum" ya da şikâyet engeli. Adres hatası ve sekme gibi teslim edilemezlik çıkış sayılmaz; yalnızca ileti atlanır.
+    /// </summary>
+    private static readonly HashSet<string> UnsubscribeCodes =
+    [
+        CommunicationCodes.Denied,
+        CommunicationCodes.TopicOptOut,
+        CommunicationCodes.Suppressed(SuppressionReason.OptOut),
+        CommunicationCodes.Suppressed(SuppressionReason.Complaint),
+    ];
 
     public async Task<JourneySendResult> SendAsync(JourneySendRequest request, CancellationToken cancellationToken)
     {
@@ -81,7 +95,15 @@ internal sealed class JourneySender(
         message.Channel = channel;
         message.UpdatedAt = time.GetUtcNow();
         await journal.SaveAsync(cancellationToken);
-        return new JourneySendResult(outcome, code);
+
+        // Abonelikten çıkan alıcı yolculuktan çıkarılır (kalan adımlar atlanır); çıkarma yazılamazsa (yetki ya da çakışma) ileti yine de gönderilmemiş kalır.
+        var ended = code == "journey-inactive";
+        if (outcome == JourneyMessageOutcomes.Skipped && code is not null && UnsubscribeCodes.Contains(code))
+        {
+            ended = (await enrollments.ExitBySystemAsync(enrollment.EnrollmentId, EnrollmentReasons.Unsubscribed, cancellationToken)).IsSuccess;
+        }
+
+        return new JourneySendResult(outcome, code, EnrollmentEnded: ended);
     }
 
     private async Task<(string Outcome, string? Code, string? ProviderMessageId, string Channel)> DecideAndSendAsync(

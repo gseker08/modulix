@@ -40,6 +40,10 @@ internal sealed class JourneySendAction(IJourneySender sender) : IAutomationActi
         return result.Outcome switch
         {
             JourneyMessageOutcomes.Accepted => new AutomationActionResult(AutomationActionStatus.Succeeded, "İleti sağlayıcıya iletildi."),
+
+            // Kayıt yolculuktan çıkmış ya da bu adımda çıkarılmışsa kalan adımlar atlanır (akış bilerek biter, hata değildir).
+            JourneyMessageOutcomes.Skipped when result.EnrollmentEnded =>
+                new AutomationActionResult(AutomationActionStatus.Skipped, $"İleti gönderilmedi ({result.Code}); kayıt yolculukta değil, kalan adımlar atlandı.") { StopFlow = true },
             JourneyMessageOutcomes.Skipped => new AutomationActionResult(AutomationActionStatus.Skipped, $"İleti gönderilmedi ({result.Code})."),
             JourneyMessageOutcomes.Failed => new AutomationActionResult(AutomationActionStatus.Failed, $"İleti gönderilemedi ({result.Code})."),
 

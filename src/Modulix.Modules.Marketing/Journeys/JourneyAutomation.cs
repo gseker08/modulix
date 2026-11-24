@@ -13,6 +13,8 @@ public static class JourneyAutomation
 {
     public const string SendAction = "marketing.journey.send";
 
+    public const string CompleteAction = "marketing.journey.complete";
+
     /// <summary>CRM kişi okuma izni: alıcı çözümleyicinin kaynağı (<c>crm.contact</c>). Modül CRM'e başvuramadığı için anahtar burada yazılır; CRM'e bağımlılık beyanlıdır (ADR-0051).</summary>
     public const string CrmContactsRead = "crm.contacts.read";
 
@@ -62,7 +64,16 @@ public static class JourneyAutomation
                         ],
                     },
                 ],
-                [MarketingModule.Permissions.CampaignsRead, MarketingModule.Permissions.JourneysRead, CrmContactsRead],
+                [MarketingModule.Permissions.CampaignsRead, MarketingModule.Permissions.JourneysRead, MarketingModule.Permissions.JourneysWrite, CrmContactsRead],
+                [],
+                AutomationSideEffect.Write,
+                SupportsDryRun: true)),
+            AutomationActionRegistration.For<JourneyCompleteAction>(new AutomationActionDefinition(
+                CompleteAction,
+                "Yolculuğu tamamla",
+                "Yolculuktaki kaydı tamamlandı olarak işaretler; kuralın son adımı olarak kullanılır. Kayıt zaten yolculuktan çıkmışsa adım atlanır.",
+                [],
+                [MarketingModule.Permissions.JourneysRead, MarketingModule.Permissions.JourneysWrite],
                 [],
                 AutomationSideEffect.Write,
                 SupportsDryRun: true)),

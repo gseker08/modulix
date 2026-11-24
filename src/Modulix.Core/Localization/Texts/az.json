@@ -13878,5 +13878,8 @@
   "marketing.server.journey.already-archived": "Səyahət artıq arxivdədir.",
   "marketing.server.journey.segment-not-active": "Giriş seqmenti aktiv deyil; səyahət başladıla bilməz.",
   "meta.permission.marketing.journeys.publish": "Müştəri səyahətini dərc edir, fasilə verir, davam etdirir və arxivləşdirir",
-  "meta.permission.marketing.journeys.publish.resource": "Səyahətlər"
+  "meta.permission.marketing.journeys.publish.resource": "Səyahətlər",
+  "marketing.server.journey.exit-reason-required": "Çıxarma səbəbi məcburidir.",
+  "marketing.server.journey.exit-reason-too-long": "Səbəb ən çox {0} simvol ola bilər.",
+  "marketing.server.journey.enrollment-not-active": "Səyahət qeydi aktiv deyil; yalnız aktiv qeyd çıxarıla və ya tamamlana bilər."
 }
