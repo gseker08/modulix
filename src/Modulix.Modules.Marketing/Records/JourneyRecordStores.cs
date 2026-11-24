@@ -196,6 +196,7 @@ internal sealed class JourneyEnrollmentRecordStore(MarketingStoreContext context
         Field.Time<JourneyEnrollment>("enteredAt", e => e.EnteredAt, (e, v) => e.EnteredAt = v ?? DateTimeOffset.UtcNow).AsSystem(),
         Field.Time<JourneyEnrollment>("exitedAt", e => e.ExitedAt, (e, v) => e.ExitedAt = v).AsSystem(),
         Field.Text<JourneyEnrollment>("exitReason", JourneyEnrollment.ExitReasonMaxLength, e => e.ExitReason, (e, v) => e.ExitReason = v).AsSystem(),
+        Field.Time<JourneyEnrollment>("segmentLeftAt", e => e.SegmentLeftAt, (e, v) => e.SegmentLeftAt = v).AsSystem(),
     ];
 
     protected override IReadOnlyDictionary<string, RecordFilter<JourneyEnrollment>> Filters { get; } = new Dictionary<string, RecordFilter<JourneyEnrollment>>

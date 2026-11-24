@@ -117,7 +117,8 @@ public sealed record JourneyEnrollmentDto(
     string Status,
     DateTimeOffset EnteredAt,
     DateTimeOffset? ExitedAt,
-    string? ExitReason);
+    string? ExitReason,
+    DateTimeOffset? SegmentLeftAt = null);
 
 public sealed record SaveJourneyEnrollmentRequest(long Version = 0);
 

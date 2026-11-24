@@ -6,7 +6,10 @@ using Modulix.Modules.Marketing.Domain;
 namespace Modulix.Modules.Marketing.Records;
 
 /// <summary>Giriş işinin bir yolculuk hakkında bildiği: segment, hedef türü ve etkinleştirenin okuma izinleri.</summary>
-internal sealed record ActiveJourney(Guid Id, string Code, Guid SegmentId, string Target, IReadOnlyList<string> Permissions);
+internal sealed record ActiveJourney(Guid Id, string Code, Guid SegmentId, string Target, string ReentryPolicy, IReadOnlyList<string> Permissions);
+
+/// <summary>Bir hedefin yolculuktaki son kaydı (yeniden giriş kararı için).</summary>
+internal sealed record LatestEnrollment(Guid Id, Guid TargetId, string Status, DateTimeOffset EnteredAt, DateTimeOffset? SegmentLeftAt);
 
 /// <summary>
 /// Yolculuk giriş işinin okuma deposu (ADR-0056 dilim 1b-2). İş kimliği kayıt boru hattından okuyamayacağı alanlara (etkinleştirenin izinleri) ihtiyaç duyar;
@@ -16,19 +19,24 @@ internal sealed class JourneyEntryStore(IModuleData data)
 {
     public async Task<IReadOnlyList<ActiveJourney>> ListActiveAsync(CancellationToken cancellationToken) =>
         [.. (await data.Set<Journey>().AsNoTracking().Where(j => j.Status == JourneyStatuses.Active).OrderBy(j => j.Code)
-            .Select(j => new { j.Id, j.Code, j.SegmentId, j.Target, j.EntryPermissions }).ToListAsync(cancellationToken))
-            .Select(j => new ActiveJourney(j.Id, j.Code, j.SegmentId, j.Target, EntryPermissionSet.Parse(j.EntryPermissions)))];
+            .Select(j => new { j.Id, j.Code, j.SegmentId, j.Target, j.ReentryPolicy, j.EntryPermissions }).ToListAsync(cancellationToken))
+            .Select(j => new ActiveJourney(j.Id, j.Code, j.SegmentId, j.Target, j.ReentryPolicy, EntryPermissionSet.Parse(j.EntryPermissions)))];
 
     public async Task<ActiveJourney?> FindActiveAsync(Guid journeyId, CancellationToken cancellationToken)
     {
         var journey = await data.Set<Journey>().AsNoTracking().Where(j => j.Id == journeyId && j.Status == JourneyStatuses.Active)
-            .Select(j => new { j.Id, j.Code, j.SegmentId, j.Target, j.EntryPermissions }).SingleOrDefaultAsync(cancellationToken);
-        return journey is null ? null : new ActiveJourney(journey.Id, journey.Code, journey.SegmentId, journey.Target, EntryPermissionSet.Parse(journey.EntryPermissions));
+            .Select(j => new { j.Id, j.Code, j.SegmentId, j.Target, j.ReentryPolicy, j.EntryPermissions }).SingleOrDefaultAsync(cancellationToken);
+        return journey is null
+            ? null
+            : new ActiveJourney(journey.Id, journey.Code, journey.SegmentId, journey.Target, journey.ReentryPolicy, EntryPermissionSet.Parse(journey.EntryPermissions));
     }
 
-    /// <summary>Yolculukta daha önce kaydı olan hedefler (durumdan bağımsız): yeniden giriş politikası çıkış ve tamamlanma geldiğinde (dilim 2) uygulanır.</summary>
-    public async Task<HashSet<Guid>> EnrolledTargetIdsAsync(Guid journeyId, CancellationToken cancellationToken) =>
-        [.. await data.Set<JourneyEnrollment>().AsNoTracking().Where(e => e.JourneyId == journeyId).Select(e => e.TargetId).ToListAsync(cancellationToken)];
+    /// <summary>Yolculukta kaydı olan her hedefin <b>son</b> kaydı (durumdan bağımsız): yeni giriş ve yeniden giriş kararı buna bakar.</summary>
+    public async Task<Dictionary<Guid, LatestEnrollment>> LatestEnrollmentsAsync(Guid journeyId, CancellationToken cancellationToken) =>
+        (await data.Set<JourneyEnrollment>().AsNoTracking().Where(e => e.JourneyId == journeyId)
+            .Select(e => new LatestEnrollment(e.Id, e.TargetId, e.Status, e.EnteredAt, e.SegmentLeftAt)).ToListAsync(cancellationToken))
+        .GroupBy(e => e.TargetId)
+        .ToDictionary(g => g.Key, g => g.OrderByDescending(e => e.EnteredAt).First());
 }
 
 /// <summary>Yolculuğun saklanan giriş izinleri: yalnızca okuma izinleri (<c>.read</c>), sıralı JSON dizi.</summary>
