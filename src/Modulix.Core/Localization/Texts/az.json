@@ -13887,5 +13887,13 @@
   "marketing.server.journey.exit-reason-required": "Çıxarma səbəbi məcburidir.",
   "marketing.server.journey.exit-reason-too-long": "Səbəb ən çox {0} simvol ola bilər.",
   "marketing.server.journey.enrollment-not-active": "Səyahət qeydi aktiv deyil; yalnız aktiv qeyd çıxarıla və ya tamamlana bilər.",
-  "meta.field.marketing.journey-enrollment.segmentLeftAt": "Seqmentdən ayrılma vaxtı"
+  "meta.field.marketing.journey-enrollment.segmentLeftAt": "Seqmentdən ayrılma vaxtı",
+  "marketing.server.journey.response-kind-invalid": "Cavab növü yanlışdır; maraqlanır, sual, görüş tələbi, maraqlanmır və ya digər seçilir. Çıxış tələbi ünsiyyət seçimlərindən qeyd olunur.",
+  "meta.field.marketing.journey-enrollment.lastResponseKind": "Son cavab növü",
+  "meta.field.marketing.journey-enrollment.lastResponseAt": "Son cavab vaxtı",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.Interested": "Maraqlanır",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.Question": "Sual",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.MeetingRequest": "Görüş tələbi",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.NotInterested": "Maraqlanmır",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.Other": "Digər"
 }

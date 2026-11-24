@@ -268,6 +268,7 @@ internal sealed class JourneyEnrollmentConfiguration : IEntityTypeConfiguration<
         MarketingTables.ConfigureCommon(builder, "JourneyEnrollments");
         builder.Property(e => e.Status).HasMaxLength(20).IsRequired();
         builder.Property(e => e.ExitReason).HasMaxLength(JourneyEnrollment.ExitReasonMaxLength);
+        builder.Property(e => e.LastResponseKind).HasMaxLength(JourneyEnrollment.ResponseKindMaxLength);
 
         // Aynı hedef aynı yolculukta aynı anda bir kez etkin olabilir (ADR-0056); çıkan ya da tamamlanan kayıt yeniden girişe engel değildir.
         builder.HasIndex(e => new { e.TenantId, e.JourneyId, e.TargetId }).IsUnique()

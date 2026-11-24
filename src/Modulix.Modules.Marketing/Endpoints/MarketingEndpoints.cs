@@ -65,6 +65,12 @@ internal static class MarketingEndpoints
             return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<JourneyEnrollmentDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
         }).RequirePermission(MarketingModule.Permissions.JourneysWrite);
 
+        enrollments.MapPost("/{id:guid}/response", async (Guid id, RegisterJourneyResponseRequest r, IJourneyEnrollments service, CancellationToken ct) =>
+        {
+            var result = await service.RegisterResponseAsync(id, r.Kind, r.Version, ct);
+            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<JourneyEnrollmentDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
+        }).RequirePermission(MarketingModule.Permissions.ResponsesWrite);
+
         var journeys = group.MapGroup("/journeys");
         journeys.MapGet("/{id:guid}/report", async (Guid id, IJourneyReports reports, CancellationToken ct) =>
         {

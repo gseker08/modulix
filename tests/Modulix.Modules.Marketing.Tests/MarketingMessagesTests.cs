@@ -34,7 +34,7 @@ public partial class MarketingMessagesTests
             checkedCount++;
         }
 
-        Assert.True(checkedCount >= 189);
+        Assert.True(checkedCount >= 190);
     }
 
     [Fact]

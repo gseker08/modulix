@@ -186,6 +186,8 @@ internal sealed class JourneyEnrollmentRecordStore(MarketingStoreContext context
         Field.Time<JourneyEnrollment>("exitedAt", e => e.ExitedAt, (e, v) => e.ExitedAt = v).AsSystem(),
         Field.Text<JourneyEnrollment>("exitReason", JourneyEnrollment.ExitReasonMaxLength, e => e.ExitReason, (e, v) => e.ExitReason = v).AsSystem(),
         Field.Time<JourneyEnrollment>("segmentLeftAt", e => e.SegmentLeftAt, (e, v) => e.SegmentLeftAt = v).AsSystem(),
+        Field.Text<JourneyEnrollment>("lastResponseKind", JourneyEnrollment.ResponseKindMaxLength, e => e.LastResponseKind, (e, v) => e.LastResponseKind = v).AsSystem(),
+        Field.Time<JourneyEnrollment>("lastResponseAt", e => e.LastResponseAt, (e, v) => e.LastResponseAt = v).AsSystem(),
     ];
 
     protected override IReadOnlyDictionary<string, RecordFilter<JourneyEnrollment>> Filters { get; } = new Dictionary<string, RecordFilter<JourneyEnrollment>>

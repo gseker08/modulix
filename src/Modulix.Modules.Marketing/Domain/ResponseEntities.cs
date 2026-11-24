@@ -17,6 +17,9 @@ public static class ResponseKinds
     public const string Other = "Other";
 
     public static IReadOnlyList<string> All { get; } = [Interested, Question, MeetingRequest, NotInterested, OptOut, Complaint, Other];
+
+    /// <summary>Yolculuk kaydına işlenebilen türler: çıkış ve şikâyet yanıtı iletişim tercihlerinden uygulanır (adres gerekir), yolculuk işaretiyle kaydedilmez.</summary>
+    public static IReadOnlyList<string> JourneyKinds { get; } = [Interested, Question, MeetingRequest, NotInterested, Other];
 }
 
 public static class ResponseStatuses
