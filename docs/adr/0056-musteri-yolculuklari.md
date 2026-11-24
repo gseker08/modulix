@@ -187,3 +187,13 @@ Dilim sırası: dilim 3 (dallanma) kısmen gerçek sağlayıcıya (E3) bağlı o
 - **Migration:** `MarketingJourneyResponse` (iki null kabul eden sütun; geriye uyumlu, RLS değişmez).
 - **Bilerek yapılmadı:** "açıldı/tıklandı" koşulları (gerçek sağlayıcı webhook'u ister, E3); yanıtın otomatik gelmesi (gelen ileti işleme); yanıt notu ve geçmişi (yalnızca son yanıt tutulur); arayüz (E6).
 - **Testler:** `JourneyMessageTests` (entegrasyon, CI koşar): yanıt işareti ve kuralın iki dala ayrılması; çıkış/şikâyet/bilinmeyen tür reddi ve sona ermiş kayda yanıt verilememesi; başka tenant'ın kaydına işaret konamaması; `marketing.responses.write` ve yolculuğu görme izni gerekliliği.
+
+### E6-1 notu (kuralı salt okunur akış olarak çizme)
+
+- **Karar:** görsel akış ayrı bir model değildir (karar 8): aynı kural sürümü tanımı `EditorDefinition.Parse` ile okunur ve sırayla tetikleyici → koşul → adımlar olarak dizilir. Çizim saf bir modelle (`Web/Services/AutomationFlow.Build`: `FlowNode` listesi) ve ona bakan `FlowView` bileşeniyle ayrıldı; model birim testlenir, çizim yalnızca sınıf ve ikon seçer.
+- **Yer:** `AutomationRuleDetail` sayfasında her kural sürümünün (taslak ve yayınlanmış) ayrıntı bloğunda `VersionView` içinde "Akış" başlığı altında görünür. Yolculuk kuralı da bir otomasyon kuralı olduğundan aynı sayfada çizilir; yolculuk ekranları (liste, ayrıntı) bu dilimin dışındadır.
+- **Gösterim:** tetikleyici (alan/durum/saat/tarih/hareketsizlik/iş olayı ayrıntısıyla), koşul (satırlar ve mantık; iç içe grup ya da ilişki sorgusu "Gelişmiş koşul" olarak, satırsız), her adım (aksiyonun katalogdaki adı, parametreleri; bekle ve bitir adımları ayrı türde). Koşullu adım (dallanma, ADR-0027 4c-5) `is-branch` olur ve "Koşul sağlanmazsa atlanır, akış sürer." notunu taşır. Katalogda bulunamayan alan ya da aksiyon silinmez, teknik anahtarıyla görünür.
+- **Yetki:** yeni uç nokta yoktur; sürüm tanımı zaten `core.automation.read` ile okunur, alan etiketleri kullanıcının görebildiği katalogdandır.
+- **Tasarım:** yeni sınıflar `flow`, `flow-node-*`, `flow-icon`, `flow-body`, `flow-branch` (`modules.css`, yalnızca `--mx-*` tokenları); `docs/design-system/component-catalog.md` güncellendi. Dikey çizgi `step-track` ile aynıdır.
+- **Bilerek yapılmadı:** düzenleme (E6-2), sürükle-bırak, sürüm karşılaştırma ve deneme çalıştırması (E6-3), yolculuk ekranları, dallanmayı yan yana dallar olarak çizme (bugün atlanan adım olarak gösterilir). Açık ve koyu temada ekran görüntüsü alınamadı: yerelde SQL Server olmadığı için uygulama çalıştırılamıyor; renkler yalnızca iki temada da tanımlı ton tokenlarını kullanır.
+- **Testler:** `AutomationFlowTests` (Web birim): sıra ve türler, dallanma işareti, koşulsuz ve adımsız kural, bilinmeyen alan/aksiyonun korunması, iç içe koşul.
