@@ -118,7 +118,9 @@ public sealed record JourneyEnrollmentDto(
     DateTimeOffset EnteredAt,
     DateTimeOffset? ExitedAt,
     string? ExitReason,
-    DateTimeOffset? SegmentLeftAt = null);
+    DateTimeOffset? SegmentLeftAt = null,
+    string? LastResponseKind = null,
+    DateTimeOffset? LastResponseAt = null);
 
 public sealed record SaveJourneyEnrollmentRequest(long Version = 0);
 
@@ -137,6 +139,9 @@ public sealed record JourneyReportDto(
     JourneyMessageTotalsDto Messages, IReadOnlyList<JourneyContentRowDto> Contents, DateTimeOffset GeneratedAt);
 
 public sealed record ExitJourneyEnrollmentRequest(long? Version = null, string? Reason = null);
+
+/// <summary>Yolculuk kaydına yanıt işareti (ADR-0056 dilim 3). Tür: Interested, Question, MeetingRequest, NotInterested, Other.</summary>
+public sealed record RegisterJourneyResponseRequest(string Kind, long? Version = null);
 
 public static class MarketingAccess
 {

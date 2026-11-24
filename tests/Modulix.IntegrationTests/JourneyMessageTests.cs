@@ -51,7 +51,7 @@ public class JourneyMessageTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
 
     private static readonly string[] Preparer =
     [
-        SegmentsRead, SegmentsWrite, SegmentsPublish, RecipientsRead, CampaignsRead, CampaignsWrite, CampaignsAudience, JourneysRead, JourneysWrite, JourneysPublish, ReportsRead,
+        SegmentsRead, SegmentsWrite, SegmentsPublish, RecipientsRead, CampaignsRead, CampaignsWrite, CampaignsAudience, JourneysRead, JourneysWrite, JourneysPublish, ReportsRead, ResponsesWrite,
         CoreModule.Permissions.ManageSettings, CoreModule.Permissions.ReadAutomation, CoreModule.Permissions.ManageAutomation, CoreModule.Permissions.PublishAutomation,
         .. CrmPermissions, .. Communication,
     ];
@@ -522,6 +522,88 @@ public class JourneyMessageTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
 
         var viewer = await UserClientAsync(w.Tenant, [JourneysRead, ReportsRead]);
         Assert.Equal(HttpStatusCode.OK, (await viewer.GetAsync($"/api/marketing/journeys/{w.Journey.Id}/report")).StatusCode);
+    }
+
+    // ---- Dilim 3: yanıta göre dallanma ----
+
+    private static AutomationActionStep SendWhen(Guid contentId, string id, AutomationOperator op) =>
+        new(id, JourneyAutomation.SendAction, new JsonObject { ["contentId"] = contentId.ToString() })
+        {
+            When = new ConditionLeaf("marketing.journey-enrollment.lastResponseKind", op, []),
+        };
+
+    private static async Task<HttpResponseMessage> RespondAsync(HttpClient client, Guid enrollmentId, string kind) =>
+        await client.PostAsJsonAsync($"/api/marketing/journey-enrollments/{enrollmentId}/response", new RegisterJourneyResponseRequest(kind));
+
+    [Fact]
+    public async Task A_registered_response_marks_the_enrollment_and_the_rule_branches_on_it()
+    {
+        var yes = await WorldAsync("yanit-var@a.test");
+        var response = await RespondAsync(yes.Preparer, yes.Enrollment, "Interested");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var marked = (await response.Content.ReadFromJsonAsync<JourneyEnrollmentDto>())!;
+        Assert.Equal("Interested", marked.LastResponseKind);
+        Assert.NotNull(marked.LastResponseAt);
+
+        // Yanıt veren kişi "yanıt verdi" dalına gider, "yanıt vermedi" adımı atlanır.
+        await PublishRuleAsync(yes.Preparer, JourneyRuleWith(yes.Journey.Id,
+            SendWhen(yes.ContentId, "yanit-verdi", AutomationOperator.IsNotEmpty), SendWhen(yes.ContentId, "yanit-yok", AutomationOperator.IsEmpty)));
+        await DeliverAndRunAsync(yes.Tenant.Id);
+        Assert.Equal("yanit-var@a.test", Assert.Single(Sent, s => s.Address == "yanit-var@a.test").Address);
+        Assert.Single(await MessagesAsync(yes.Tenant.Id, yes.Enrollment));
+
+        // Yanıt vermeyen kişi diğer dala gider.
+        var no = await WorldAsync("yanit-yok@a.test");
+        await PublishRuleAsync(no.Preparer, JourneyRuleWith(no.Journey.Id,
+            SendWhen(no.ContentId, "yanit-verdi", AutomationOperator.IsNotEmpty), SendWhen(no.ContentId, "yanit-yok", AutomationOperator.IsEmpty)));
+        await DeliverAndRunAsync(no.Tenant.Id);
+        Assert.Single(Sent, s => s.Address == "yanit-yok@a.test");
+        Assert.Single(await MessagesAsync(no.Tenant.Id, no.Enrollment));
+    }
+
+    [Fact]
+    public async Task An_unknown_or_opt_out_response_kind_is_rejected_and_an_ended_enrollment_takes_no_response()
+    {
+        var w = await WorldAsync("yanit-gecersiz@a.test");
+        foreach (var kind in new[] { "OptOut", "Complaint", "Bilinmeyen", "" })
+        {
+            var rejected = await RespondAsync(w.Preparer, w.Enrollment, kind);
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, rejected.StatusCode);
+        }
+
+        var unchanged = (await EnrollmentsAsync(w.Preparer, w.Journey.Id)).Single();
+        Assert.Null(unchanged.LastResponseKind);
+
+        var exit = await w.Preparer.PostAsJsonAsync($"/api/marketing/journey-enrollments/{w.Enrollment}/exit", new ExitJourneyEnrollmentRequest(Reason: "elle"));
+        Assert.Equal(HttpStatusCode.OK, exit.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await RespondAsync(w.Preparer, w.Enrollment, "Question")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Another_tenant_cannot_mark_a_response_on_a_foreign_enrollment()
+    {
+        var a = await WorldAsync("yanit-a@a.test");
+        var b = await WorldAsync("yanit-b@b.test");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await RespondAsync(b.Preparer, a.Enrollment, "Interested")).StatusCode);
+        Assert.Null((await EnrollmentsAsync(a.Preparer, a.Journey.Id)).Single().LastResponseKind);
+        Assert.Equal(HttpStatusCode.OK, (await RespondAsync(b.Preparer, b.Enrollment, "Interested")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Marking_a_response_needs_the_responses_write_permission_and_visibility_of_the_journey()
+    {
+        var w = await WorldAsync("yanit-yetki@a.test");
+
+        var reader = await UserClientAsync(w.Tenant, [JourneysRead, JourneysWrite]);
+        Assert.Equal(HttpStatusCode.Forbidden, (await RespondAsync(reader, w.Enrollment, "Interested")).StatusCode);
+
+        var blind = await UserClientAsync(w.Tenant, [ResponsesWrite]);
+        Assert.NotEqual(HttpStatusCode.OK, (await RespondAsync(blind, w.Enrollment, "Interested")).StatusCode);
+        Assert.Null((await EnrollmentsAsync(w.Preparer, w.Journey.Id)).Single().LastResponseKind);
+
+        var allowed = await UserClientAsync(w.Tenant, [JourneysRead, ResponsesWrite]);
+        Assert.Equal(HttpStatusCode.OK, (await RespondAsync(allowed, w.Enrollment, "Question")).StatusCode);
     }
 
     private static async Task<JourneyDto> CampaignlessJourneyAsync(World w)

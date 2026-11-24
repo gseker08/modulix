@@ -20,6 +20,12 @@ public interface IJourneyEnrollments
 
     /// <summary>Yolculuğun tamamlanması (kuralın "yolculuğu tamamla" adımı).</summary>
     Task<RecordResult<RecordData>> CompleteAsync(Guid enrollmentId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Etkin kayda yanıt işareti koyar (ADR-0056 dilim 3): kuralın adım koşulu bu alana bakarak dallanır. Yalnızca <see cref="ResponseKinds.JourneyKinds"/> türleri kabul edilir;
+    /// çıkış talebi iletişim tercihlerinden kaydedilir ve yolculuk kendiliğinden sona erer.
+    /// </summary>
+    Task<RecordResult<RecordData>> RegisterResponseAsync(Guid enrollmentId, string? kind, long? expectedVersion, CancellationToken cancellationToken);
 }
 
 /// <summary>Sistem çıkışı ve tamamlanma için kararlı neden kodları.</summary>
@@ -38,6 +44,9 @@ public static class EnrollmentReasons
 internal sealed class JourneyEnrollmentService(IRecordPipeline pipeline, SegmentWorkflowGate gate, TimeProvider time) : IJourneyEnrollments
 {
     private static readonly IReadOnlyList<string> WritePermissions = [MarketingModule.Permissions.JourneysWrite];
+
+    /// <summary>Yanıt işareti yolculuk yazma iznini şart koşmaz: kapı açıkken boru hattı bu izinlerden birini arar, yanıtı kaydeden kullanıcı yanıt iznine sahiptir.</summary>
+    private static readonly IReadOnlyList<string> ResponsePermissions = [MarketingModule.Permissions.JourneysWrite, MarketingModule.Permissions.ResponsesWrite];
 
     public Task<RecordResult<RecordData>> ExitAsync(Guid enrollmentId, string? reason, long? expectedVersion, CancellationToken cancellationToken)
     {
@@ -60,6 +69,35 @@ internal sealed class JourneyEnrollmentService(IRecordPipeline pipeline, Segment
 
     public Task<RecordResult<RecordData>> CompleteAsync(Guid enrollmentId, CancellationToken cancellationToken) =>
         EndAsync(enrollmentId, EnrollmentStatuses.Completed, EnrollmentReasons.Completed, null, cancellationToken);
+
+    public async Task<RecordResult<RecordData>> RegisterResponseAsync(Guid enrollmentId, string? kind, long? expectedVersion, CancellationToken cancellationToken)
+    {
+        if (kind is null || !ResponseKinds.JourneyKinds.Contains(kind))
+        {
+            var message = MarketingMessages.Journey.ResponseKindInvalid;
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, message, [new RecordFieldError("kind", message)]);
+        }
+
+        var loaded = await pipeline.GetAsync(new RecordRef(MarketingModule.Entities.JourneyEnrollment, enrollmentId), cancellationToken);
+        if (!loaded.IsSuccess)
+        {
+            return loaded;
+        }
+
+        if (loaded.Value!.Values["status"]?.GetValue<string>() != EnrollmentStatuses.Active)
+        {
+            return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, MarketingMessages.Journey.EnrollmentNotActive);
+        }
+
+        using var open = gate.Open(ResponsePermissions);
+        return await pipeline.UpdateAsync(
+            new RecordCommand(MarketingModule.Entities.JourneyEnrollment, enrollmentId, new JsonObject
+            {
+                ["lastResponseKind"] = kind,
+                ["lastResponseAt"] = time.GetUtcNow().ToString("O"),
+            }, expectedVersion),
+            cancellationToken);
+    }
 
     private async Task<RecordResult<RecordData>> EndAsync(
         Guid enrollmentId, string status, string reason, long? expectedVersion, CancellationToken cancellationToken)

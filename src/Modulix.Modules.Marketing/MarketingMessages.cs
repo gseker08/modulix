@@ -587,6 +587,9 @@ internal static class MarketingMessages
     /// <summary>Müşteri yolculuğu ve kayıtları.</summary>
     public static class Journey
     {
+        public static ServerMessage ResponseKindInvalid =>
+            ServerMessage.Of("marketing.server.journey.response-kind-invalid", "Yanıt türü geçersiz; ilgileniyor, soru, görüşme talebi, ilgilenmiyor ya da diğer seçilir. Çıkış talebi iletişim tercihlerinden kaydedilir.");
+
         public static ServerMessage EnrollmentNotActive =>
             ServerMessage.Of("marketing.server.journey.enrollment-not-active", "Yolculuk kaydı etkin değil; yalnızca etkin kayıt çıkarılır ya da tamamlanır.");
 

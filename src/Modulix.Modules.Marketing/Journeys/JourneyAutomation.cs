@@ -38,6 +38,15 @@ public static class JourneyAutomation
             {
                 Options = [new("Active", "Etkin"), new("Completed", "Tamamlandı"), new("Exited", "Çıktı")],
             },
+            new(MarketingModule.Entities.JourneyEnrollment, "lastResponseKind", "Son yanıt türü", AutomationFieldType.Choice)
+            {
+                Hint = "Kişi yolculuk iletisine yanıt verdiyse yanıtın türü; dallanmada \"yanıt verdi mi\" (boş değil) ya da tür koşulu olarak kullanılır.",
+                Options =
+                [
+                    new("Interested", "İlgileniyor"), new("Question", "Soru"), new("MeetingRequest", "Görüşme talebi"),
+                    new("NotInterested", "İlgilenmiyor"), new("Other", "Diğer"),
+                ],
+            },
         ],
         Actions =
         [

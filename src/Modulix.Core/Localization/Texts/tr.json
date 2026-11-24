@@ -13887,5 +13887,13 @@
   "marketing.server.journey.exit-reason-required": "Çıkarma gerekçesi zorunludur.",
   "marketing.server.journey.exit-reason-too-long": "Gerekçe en fazla {0} karakter olabilir.",
   "marketing.server.journey.enrollment-not-active": "Yolculuk kaydı etkin değil; yalnızca etkin kayıt çıkarılır ya da tamamlanır.",
-  "meta.field.marketing.journey-enrollment.segmentLeftAt": "Segmentten ayrılma zamanı"
+  "meta.field.marketing.journey-enrollment.segmentLeftAt": "Segmentten ayrılma zamanı",
+  "marketing.server.journey.response-kind-invalid": "Yanıt türü geçersiz; ilgileniyor, soru, görüşme talebi, ilgilenmiyor ya da diğer seçilir. Çıkış talebi iletişim tercihlerinden kaydedilir.",
+  "meta.field.marketing.journey-enrollment.lastResponseKind": "Son yanıt türü",
+  "meta.field.marketing.journey-enrollment.lastResponseAt": "Son yanıt zamanı",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.Interested": "İlgileniyor",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.Question": "Soru",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.MeetingRequest": "Görüşme talebi",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.NotInterested": "İlgilenmiyor",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.Other": "Diğer"
 }

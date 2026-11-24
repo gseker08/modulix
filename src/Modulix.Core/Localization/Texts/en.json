@@ -13887,5 +13887,13 @@
   "marketing.server.journey.exit-reason-required": "An exit reason is required.",
   "marketing.server.journey.exit-reason-too-long": "The reason can be at most {0} characters.",
   "marketing.server.journey.enrollment-not-active": "The journey enrollment is not active; only an active enrollment can be exited or completed.",
-  "meta.field.marketing.journey-enrollment.segmentLeftAt": "Time left the segment"
+  "meta.field.marketing.journey-enrollment.segmentLeftAt": "Time left the segment",
+  "marketing.server.journey.response-kind-invalid": "The response type is invalid; choose interested, question, meeting request, not interested or other. An opt-out request is recorded from communication preferences.",
+  "meta.field.marketing.journey-enrollment.lastResponseKind": "Last response type",
+  "meta.field.marketing.journey-enrollment.lastResponseAt": "Last response time",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.Interested": "Interested",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.Question": "Question",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.MeetingRequest": "Meeting request",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.NotInterested": "Not interested",
+  "meta.option.marketing.journey-enrollment.lastResponseKind.Other": "Other"
 }

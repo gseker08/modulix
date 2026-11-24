@@ -299,12 +299,17 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
         new(Entities.JourneyEnrollment, "Yolculuk kaydı", Permissions.JourneysRead, new Dictionary<string, string>
         {
             ["journeyId"] = "Yolculuk", ["targetId"] = "Hedef", ["status"] = "Durum", ["enteredAt"] = "Giriş zamanı", ["exitedAt"] = "Çıkış zamanı", ["exitReason"] = "Çıkış nedeni", ["segmentLeftAt"] = "Segmentten ayrılma zamanı",
+            ["lastResponseKind"] = "Son yanıt türü", ["lastResponseAt"] = "Son yanıt zamanı",
         })
         {
             References = new Dictionary<string, string> { ["journeyId"] = Entities.Journey },
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
                 ["status"] = new Dictionary<string, string> { ["Active"] = "Etkin", ["Completed"] = "Tamamlandı", ["Exited"] = "Çıktı" },
+                ["lastResponseKind"] = new Dictionary<string, string>
+                {
+                    ["Interested"] = "İlgileniyor", ["Question"] = "Soru", ["MeetingRequest"] = "Görüşme talebi", ["NotInterested"] = "İlgilenmiyor", ["Other"] = "Diğer",
+                },
             },
         },
         new(Entities.CampaignResponse, "Kampanya yanıtı", Permissions.ResponsesRead, new Dictionary<string, string>

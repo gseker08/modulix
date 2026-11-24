@@ -293,6 +293,7 @@ public sealed class JourneyMessage : IJournalEntity, ICompanyShared
 public sealed class JourneyEnrollment : MarketingEntity
 {
     public const int ExitReasonMaxLength = 200;
+    public const int ResponseKindMaxLength = 20;
 
     public Guid JourneyId { get; internal set; }
 
@@ -311,4 +312,12 @@ public sealed class JourneyEnrollment : MarketingEntity
     /// segmentte kalan hedef, kaydı sona erse de sürekli yeniden girmez; "çıkıp yeniden girmek" budur.
     /// </summary>
     public DateTimeOffset? SegmentLeftAt { get; internal set; }
+
+    /// <summary>
+    /// Hedefin yolculuk iletisine verdiği son yanıtın türü (<see cref="ResponseKinds"/>; ADR-0056 dilim 3). Kuralın adım koşulu bu alana bakarak dallanır
+    /// ("yanıt verdi mi", "ilgilendi mi"); yanıt yoksa boştur.
+    /// </summary>
+    public string? LastResponseKind { get; internal set; }
+
+    public DateTimeOffset? LastResponseAt { get; internal set; }
 }
