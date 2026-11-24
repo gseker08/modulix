@@ -22,6 +22,8 @@ public static class MarketingLabels
     public const string DeliveryStatusGroup = "marketing.delivery-status";
     public const string DeliveryCodeGroup = "marketing.delivery-code";
     public const string RecipientStatusGroup = "marketing.recipient-status";
+    public const string JourneyStatusGroup = "marketing.journey-status";
+    public const string JourneyReentryGroup = "marketing.journey-reentry";
 
     public static string KeyOf(string group, string key) => $"{group}.{key.Replace(':', '-').ToLowerInvariant()}";
 
@@ -120,11 +122,23 @@ public static class MarketingLabels
 
     internal static readonly (string Key, string Label)[] RecipientStatusSource = [("Eligible", "Uygun"), ("Excluded", "Elendi"), ("Unresolved", "Alıcı yok")];
 
+    internal static readonly (string Key, string Label)[] JourneyStatusSource =
+        [("Draft", "Taslak"), ("Active", "Etkin"), ("Paused", "Duraklatıldı"), ("Archived", "Arşiv")];
+
+    internal static readonly (string Key, string Label)[] JourneyReentrySource =
+        [("Never", "Hiç"), ("AfterExit", "Çıkıştan sonra"), ("AfterCompletion", "Tamamlandıktan sonra")];
+
     public static IReadOnlyList<(string Key, string Label)> Targets => Translate(TargetGroup, TargetSource);
 
     public static IReadOnlyList<(string Key, string Label)> Kinds => Translate(KindGroup, KindSource);
 
     public static IReadOnlyList<(string Key, string Label)> Statuses => Translate(StatusGroup, StatusSource);
+
+    public static IReadOnlyList<(string Key, string Label)> JourneyStatuses => Translate(JourneyStatusGroup, JourneyStatusSource);
+
+    public static IReadOnlyList<(string Key, string Label)> JourneyReentryPolicies => Translate(JourneyReentryGroup, JourneyReentrySource);
+
+    public static string JourneyBadge(string status) => status switch { "Active" => "won", "Paused" => "onhold", "Archived" => "cancelled", _ => "lead" };
 
     public static IReadOnlyList<(string Key, string Label)> Operators => Translate(OperatorGroup, OperatorSource);
 

@@ -1,0 +1,195 @@
+@page "/pazarlama/yolculuklar/{Id:guid}"
+@inject ApiClient Api
+@inject SessionState Session
+
+<PageTitle>@(journey?.Name ?? Texts.Get("nav.app.marketing.journeys")) · Modulix</PageTitle>
+
+@* Müşteri yolculuğu ayrıntısı (ADR-0056): genel bilgi ve durum geçişleri. Durum sunucuda yazılır; yayın, duraklatma, sürdürme ve arşiv
+   marketing.journeys.publish ister. Düğmeleri gizlemek yetki değildir. Çıkış koşulu bu ekranda yalnızca gösterilir (düzenleyicisi sonraki dilimde). *@
+<AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.JourneysRead">
+    @if (journey is null && loadError is null)
+    {
+        <LoadingState />
+    }
+    else if (journey is null)
+    {
+        <div class="alert alert-danger" role="alert">@loadError <a href="pazarlama/yolculuklar">@Texts.Get("crm.quoteDetail.backToList")</a></div>
+    }
+    else
+    {
+        <div class="page-header">
+            <div>
+                <h1>@journey.Name</h1>
+                <p class="text-muted mb-0">
+                    <span class="badge stage-@MarketingLabels.JourneyBadge(journey.Status)">@MarketingLabels.Label(MarketingLabels.JourneyStatuses, journey.Status)</span>
+                    @MarketingLabels.Label(MarketingLabels.Targets, journey.Target) · <code>@journey.Code</code>
+                </p>
+            </div>
+            <div class="header-actions">
+                <a class="btn btn-outline-secondary" href="pazarlama/yolculuklar">@Texts.Get("crm.quoteDetail.backToList")</a>
+                @if (CanPublish && journey.Status == "Draft")
+                {
+                    <button type="button" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")" @onclick='() => TransitionAsync("publish", "marketing.journeyDetail.published")'>@Texts.Get("marketing.journeyDetail.publish")</button>
+                }
+                @if (CanPublish && journey.Status == "Paused")
+                {
+                    <button type="button" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")" @onclick='() => TransitionAsync("resume", "marketing.journeyDetail.resumed")'>@Texts.Get("marketing.journeyDetail.resume")</button>
+                }
+                @if (CanPublish && journey.Status == "Active")
+                {
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick='() => TransitionAsync("pause", "marketing.journeyDetail.paused")'>@Texts.Get("marketing.journeyDetail.pause")</button>
+                }
+                @if (CanPublish && journey.Status != "Archived")
+                {
+                    <ConfirmAction Disabled="@busy" Question="@Texts.Get("marketing.journeyDetail.archiveConfirm")" OnConfirm='() => TransitionAsync("archive", "marketing.journeyDetail.archived")'>@Texts.Get("marketing.archive")</ConfirmAction>
+                }
+            </div>
+        </div>
+
+        <Notice Text="@message" Failed="@failed" />
+
+        <TabBar Tabs="Tabs" State="tabs" Label="@Texts.Get("marketing.journeyDetail.sections")" />
+
+        <TabPanel State="tabs" Key="genel">
+            <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <fieldset disabled="@(busy || !CanWrite || IsArchived)">
+                    <div class="form-grid">
+                        <div class="span-6">
+                            <label class="form-label" for="g-name">@Texts.Get("common.field.name")</label>
+                            <input id="g-name" class="form-control" maxlength="150" @bind="name" />
+                            <FieldError Field="name" Errors="errors" />
+                        </div>
+                        <div class="span-6">
+                            <label class="form-label" for="g-reentry">@Texts.Get("marketing.journeyNew.reentry")</label>
+                            <select id="g-reentry" class="form-select" @bind="reentry">
+                                @foreach (var r in MarketingLabels.JourneyReentryPolicies) { <option value="@r.Key">@r.Label</option> }
+                            </select>
+                            <FieldError Field="reentryPolicy" Errors="errors" />
+                        </div>
+                        <div class="span-12">
+                            <label class="form-label" for="g-desc">@Texts.Get("common.field.description")</label>
+                            <textarea id="g-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
+                            <FieldError Field="description" Errors="errors" />
+                        </div>
+                    </div>
+                </fieldset>
+                @if (IsArchived)
+                {
+                    <p class="text-muted">@Texts.Get("marketing.journeyDetail.archivedNote")</p>
+                }
+                else if (CanWrite)
+                {
+                    <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button></div>
+                }
+            </form>
+
+            <section class="summary-cards" aria-label="@Texts.Get("marketing.journeyDetail.entrySection")">
+                <dl class="summary-list">
+                    <div>
+                        <dt>@Texts.Get("marketing.journeyNew.segment")</dt>
+                        <dd>@if (segmentName is not null) { <a href="pazarlama/segmentler/@journey.SegmentId">@segmentName</a> } else { <text>—</text> }</dd>
+                    </div>
+                    <div><dt>@Texts.Get("marketing.journeyDetail.exitCondition")</dt><dd>@(string.IsNullOrWhiteSpace(journey.ExitCondition) ? Texts.Get("marketing.journeyDetail.noExitCondition") : Texts.Get("marketing.journeyDetail.hasExitCondition"))</dd></div>
+                </dl>
+                <p class="small text-muted">@Texts.Get("marketing.journeyDetail.exitConditionNote")</p>
+            </section>
+        </TabPanel>
+    }
+</AuthGate>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private JourneyDto? journey;
+    private string? segmentName;
+    private string? loadError;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private string name = string.Empty;
+    private string description = string.Empty;
+    private string reentry = "Never";
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    private readonly TabState tabs = new("genel");
+
+    private IReadOnlyList<TabItem> Tabs => [new("genel", Texts.Get("crm.quoteDetail.tab.general"))];
+
+    private bool CanWrite => Session.Can(MarketingAccess.JourneysWrite);
+
+    private bool CanPublish => Session.Can(MarketingAccess.JourneysPublish);
+
+    private bool IsArchived => journey?.Status == "Archived";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (!Session.Can(MarketingAccess.JourneysRead))
+        {
+            return;
+        }
+
+        var result = await Api.GetAsync<JourneyDto>($"/api/marketing/journeys/{Id}");
+        if (!result.IsSuccess)
+        {
+            loadError = result.Error;
+            return;
+        }
+
+        await ApplyAsync(result.Value!);
+    }
+
+    private async Task ApplyAsync(JourneyDto value)
+    {
+        journey = value;
+        name = value.Name;
+        description = value.Description ?? string.Empty;
+        reentry = value.ReentryPolicy;
+        segmentName = (await Api.GetAsync<SegmentDto>($"/api/marketing/segments/{value.SegmentId}")).Value?.Name;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        errors = null;
+        message = null;
+        var result = await Api.PutAsync<JourneyDto>($"/api/marketing/journeys/{Id}", new SaveJourneyRequest(
+            Version: journey!.Version,
+            Name: name.Trim(),
+            Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+            ReentryPolicy: reentry));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            await ApplyAsync(result.Value!);
+            Report(Texts.Get("marketing.journeyDetail.saved"), false);
+            return;
+        }
+
+        errors = result.FieldErrors.Count == 0 ? null : result.FieldErrors;
+        Report(result.Error, true);
+    }
+
+    // Durum geçişi (yayın, duraklat, sürdür, arşiv): sunucu kuralları denetler; hata iletisi olduğu gibi gösterilir.
+    private async Task TransitionAsync(string action, string doneKey)
+    {
+        busy = true;
+        message = null;
+        var result = await Api.PostAsync<JourneyDto>($"/api/marketing/journeys/{Id}/{action}", new JourneyActionRequest(journey!.Version));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            await ApplyAsync(result.Value!);
+            Report(Texts.Get(doneKey), false);
+            return;
+        }
+
+        Report(result.Error, true);
+    }
+
+    private void Report(string? text, bool isFailure)
+    {
+        message = text;
+        failed = isFailure;
+    }
+}
