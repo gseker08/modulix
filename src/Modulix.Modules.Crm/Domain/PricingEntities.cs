@@ -137,11 +137,12 @@ public static class PricingRules
     public const string ListArchived = "Archived";
     public const string MethodVolume = "Volume";
     public const string MethodGraduated = "Graduated";
+    public const string MethodFlat = "Flat";
     public static IReadOnlyList<string> Scopes { get; } = [ScopeDefault, ScopeCustomer, ScopeSegment];
 
     public static IReadOnlyList<string> ListStatuses { get; } = [ListDraft, ListPublished, ListArchived];
 
-    public static IReadOnlyList<string> TierMethods { get; } = [MethodVolume, MethodGraduated];
+    public static IReadOnlyList<string> TierMethods { get; } = [MethodVolume, MethodGraduated, MethodFlat];
 
 
     /// <summary>Taslak → Yayımlandı → Arşiv; geri dönüş yoktur. Aynı durum geçerlidir (başka alan değişirken).</summary>

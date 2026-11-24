@@ -7,7 +7,7 @@ public static class PricingLabels
         [("Default", "Varsayılan"), ("Customer", "Müşteriye özel"), ("Segment", "Segment / kanal")];
 
     private static readonly (string Key, string Label)[] TierMethodSource =
-        [("Volume", "Hacim (tüm miktar tek kademe fiyatından)"), ("Graduated", "Kademeli (her aralık kendi fiyatından)")];
+        [("Volume", "Hacim (tüm miktar tek kademe fiyatından)"), ("Graduated", "Kademeli (her aralık kendi fiyatından)"), ("Flat", "Sabit tutar (bant başına tek tutar)")];
 
     private static readonly (string Key, string Label)[] ListStatusSource =
         [("Draft", "Taslak"), ("Published", "Yayımlandı"), ("Archived", "Arşiv")];

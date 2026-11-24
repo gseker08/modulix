@@ -94,6 +94,7 @@
                         }
                     </select>
                     <FieldError Field="tierMethod" Errors="errors" />
+                    @if (form.TierMethod == "Flat") { <small class="text-muted">@Texts.Get("crm.priceLists.flatHint")</small> }
                 </div>
                 <div>
                     <label class="form-label" for="from">@Texts.Get("crm.priceLists.field.validFrom")</label>
@@ -133,7 +134,7 @@
             else
             {
                 <table class="table record-table">
-                    <thead><tr><th>@Texts.Get("crm.priceLists.col.product")</th><th>@Texts.Get("crm.priceLists.col.min")</th><th>@Texts.Get("crm.priceLists.col.max")</th><th>@Texts.Get("crm.priceLists.col.unitPrice")</th><th></th></tr></thead>
+                    <thead><tr><th>@Texts.Get("crm.priceLists.col.product")</th><th>@Texts.Get("crm.priceLists.col.min")</th><th>@Texts.Get("crm.priceLists.col.max")</th><th>@Texts.Get(opened.TierMethod == "Flat" ? "crm.priceLists.col.bandAmount" : "crm.priceLists.col.unitPrice")</th><th></th></tr></thead>
                     <tbody>
                         @foreach (var item in items)
                         {
@@ -141,7 +142,7 @@
                                 <td data-label="@Texts.Get("crm.priceLists.col.product")" class="primary">@item.ProductCode — @item.ProductName</td>
                                 <td data-label="@Texts.Get("crm.priceLists.col.min")">@item.MinQuantity.ToString("0.######")</td>
                                 <td data-label="@Texts.Get("crm.priceLists.col.maxShort")">@(item.MaxQuantity?.ToString("0.######") ?? Texts.Get("crm.priceLists.unlimited"))</td>
-                                <td data-label="@Texts.Get("crm.priceLists.col.unitPrice")">@(item.IsFree ? Texts.Get("crm.priceLists.free") : $"{item.UnitPrice.ToString("0.00####")} {opened.Currency}")</td>
+                                <td data-label="@Texts.Get(opened.TierMethod == "Flat" ? "crm.priceLists.col.bandAmount" : "crm.priceLists.col.unitPrice")">@(item.IsFree ? Texts.Get("crm.priceLists.free") : $"{item.UnitPrice.ToString("0.00####")} {opened.Currency}")</td>
                                 <td class="actions">
                                     @if (opened.Status == "Draft" && Session.Can(CrmAccess.PricesWrite))
                                     {
@@ -184,7 +185,7 @@
                         <FieldError Field="maxQuantity" Errors="itemErrors" />
                     </div>
                     <div>
-                        <label class="form-label" for="itemPrice">@Texts.Get("crm.priceLists.item.unitPrice")</label>
+                        <label class="form-label" for="itemPrice">@Texts.Get(opened.TierMethod == "Flat" ? "crm.priceLists.item.bandAmount" : "crm.priceLists.item.unitPrice")</label>
                         <input id="itemPrice" class="form-control" type="number" step="any" min="0" disabled="@itemForm.IsFree" @bind="itemForm.Price" />
                         <FieldError Field="unitPrice" Errors="itemErrors" />
                     </div>

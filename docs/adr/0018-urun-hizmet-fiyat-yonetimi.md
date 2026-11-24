@@ -104,3 +104,13 @@ Yukarıdaki analiz tablosu ve "Yapılmayanlar" bölümü ilk dilim anındaki dur
 - **Katalog yöneticisi rol şablonu**: yok; izinler elle role verilir.
 - **Test boşlukları**: kabul kriterlerinin tamamı arayüzden doğrulanmadı; maliyet yazma kısıtı testi (`ProductCatalogTests`) 200/403/422'yi kabul eden gevşek bir doğrulama yapıyor.
 - **Backfill**: gerekmez (yeni tablolar). Migration `PricingCatalog`; `migrate-tenants` tenant başına uygular.
+
+## Güncel durum notu (24 Kasım 2026): sabit tutarlı kademe (`Flat`)
+
+- **Yeni kademe yöntemi `Flat`** (`TierMethod.Flat`, `PricingRules.MethodFlat`): miktarın düştüğü banttaki tutar miktarla çarpılmaz. Örnek parsiyel ardiye tarifesi: 1–2 palet 100 €, 3–4 palet 125 €; 1 palet de 2 palet de 100 €. Aralıklar mevcut kuralla `[min, max)`'tır (üst sınır hariç), bu yüzden "1–2 palet" `[1, 3)` olarak girilir.
+- **Davranış:** bant dışı miktar (ilk bandın altı, son bandın üstü ya da bantlar arası boşluk) için fiyat uydurulmaz, mevcut `price-not-found` hatası döner; böylece "32 palet ve üzeri teklif ister" gibi durumlar ayrı kural gerektirmez. Çakışan bant, negatif tutar ve ücretsiz bant kuralları `Volume`/`Graduated` ile aynıdır. `Volume` ve `Graduated` davranışı değişmedi.
+- **Yayımlama:** boşluksuzluk denetimi yalnızca `Graduated` içindir; `Flat` listede bantlar arasında boşluk bırakılabilir.
+- **Teklif:** katalog kalemi için satır birim fiyatı `ListTotal / miktar` (6 hane) olarak yazılır; bu yüzden bant tutarı satır toplamına birebir yansır (6 palet, 150 € bandı → birim fiyat 25, satır net 150). Teklif satırı kodunda değişiklik gerekmedi.
+- **Migration:** yok (`PriceList.TierMethod` serbest metin sütunudur; değer kümesi sunucu doğrulamasındadır). Mevcut listeler etkilenmez.
+- **Arayüz:** Fiyat listeleri ekranında yöntem seçeneği ve `Flat` listede "Bant tutarı" başlığı/etiketi; sütun adı dışında ekran akışı aynı. Taslak ekrandaki "dahil" aralık gösterimi (1 – 2) yapılmadı, mevcut "alt miktar / üst miktar (hariç)" gösterimi korundu.
+- **Sıradaki:** ek ücret kuralı motoru (minimum bedel, ADR/ÖTV ek ücretleri, süre aşımı/demuraj, mesai) ayrı dilimdir.

@@ -150,6 +150,75 @@ public class PricingEngineTests
     public void Graduated_tiers_price_each_band_separately(int quantity, int expected) =>
         Assert.Equal(expected, PriceSelector.Select([Tiered(TierMethod.Graduated, 0m)], quantity, "TRY", Now).Total);
 
+    // --- Sabit tutarlı kademe (Flat): bant tutarı miktarla çarpılmaz ---
+
+    // Makaroğlu parsiyel ardiye tarifesi (2026): palet adedi bandına göre tek tutar; bant [alt, üst) aralığıdır.
+    private static PriceListEntry FlatBands(params PriceTier[] tiers) =>
+        new(Guid.NewGuid(), 1, "EUR", PriceListScope.TenantDefault, true, null, null, TierMethod.Flat, tiers);
+
+    private static readonly PriceTier[] WarehouseBands =
+    [
+        new(1m, 3m, 100m), new(3m, 5m, 125m), new(5m, 8m, 150m), new(8m, 11m, 175m), new(11m, 19m, 225m), new(19m, 26m, 275m), new(26m, 32m, 325m),
+    ];
+
+    [Theory]
+    [InlineData(1, 100)]
+    [InlineData(2, 100)] // 1 palet de 2 palet de aynı tutar: miktarla çarpılmaz
+    [InlineData(3, 125)] // üst sınır hariçtir: 3 palet bir sonraki banttadır
+    [InlineData(6, 150)]
+    [InlineData(10, 175)]
+    [InlineData(31, 325)]
+    public void Flat_tiers_charge_the_band_amount_regardless_of_quantity(int pallets, int expected)
+    {
+        var selection = PriceSelector.Select([FlatBands(WarehouseBands)], pallets, "EUR", Now);
+
+        Assert.Equal(expected, selection.Total);
+        Assert.False(selection.IsFree);
+        Assert.Contains(selection.Explanation, line => line.Contains("sabit tutar"));
+    }
+
+    [Theory]
+    [InlineData(0.5)] // ilk bandın altı
+    [InlineData(32)] // son bandın üstü ("32 ve üzeri" bandı tanımlı değil: teklif istenir)
+    [InlineData(100)]
+    public void Flat_quantity_outside_every_band_has_no_price_instead_of_a_guessed_one(double pallets)
+    {
+        var error = Assert.Throws<PricingException>(() => PriceSelector.Select([FlatBands(WarehouseBands)], (decimal)pallets, "EUR", Now));
+
+        Assert.Equal(PricingErrors.PriceNotFound, error.Code);
+    }
+
+    [Fact]
+    public void Flat_bands_may_leave_a_gap_but_the_gap_has_no_price()
+    {
+        var gap = FlatBands(new PriceTier(1m, 3m, 100m), new PriceTier(5m, 8m, 150m));
+
+        Assert.Equal(150m, PriceSelector.Select([gap], 6m, "EUR", Now).Total);
+        Assert.Equal(PricingErrors.PriceNotFound, Assert.Throws<PricingException>(() => PriceSelector.Select([gap], 4m, "EUR", Now)).Code);
+    }
+
+    [Fact]
+    public void Flat_free_band_is_free_not_missing_and_overlapping_bands_are_rejected()
+    {
+        var free = FlatBands(new PriceTier(1m, 3m, 0m, IsFree: true), new PriceTier(3m, null, 40m));
+        var selection = PriceSelector.Select([free], 2m, "EUR", Now);
+        Assert.True(selection.IsFree);
+        Assert.Equal(0m, selection.Total);
+        Assert.Equal(40m, PriceSelector.Select([free], 50m, "EUR", Now).Total);
+
+        var overlap = FlatBands(new PriceTier(1m, 4m, 100m), new PriceTier(3m, 8m, 125m));
+        Assert.Equal(PricingErrors.TierOverlap, Assert.Throws<PricingException>(() => PriceSelector.ValidateTiers(overlap)).Code);
+    }
+
+    [Fact]
+    public void Volume_pricing_still_multiplies_by_quantity()
+    {
+        // Flat eklenince Volume davranışı değişmemelidir (aynı bantlar, miktarla çarpılır).
+        var volume = new PriceListEntry(Guid.NewGuid(), 1, "EUR", PriceListScope.TenantDefault, true, null, null, TierMethod.Volume, WarehouseBands);
+
+        Assert.Equal(200m, PriceSelector.Select([volume], 2m, "EUR", Now).Total);
+    }
+
     [Fact]
     public void Quantity_below_first_tier_has_no_price()
     {
