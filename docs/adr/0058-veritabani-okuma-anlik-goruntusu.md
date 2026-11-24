@@ -25,4 +25,5 @@ Tek paylaşımlı veritabanında (ADR-0002) bütün tenant'lar aynı sayfa ve di
 - `docker/sqlserver/init.sql` ayarı açar; `DatabaseSetupTests.Database_reads_committed_snapshots_so_readers_never_wait_for_writers` kapalıyken kırılır.
 - Yazma–yazma çakışmaları değişmez: `sp_getapplock` (`ITransactionLock`), `rowversion` ve benzersiz dizinler gerekli yerlerde kalır.
 - Doğrulama (yerel, SQL Server 2025): sipariş/devir sınıfları 52 test paralel, kapalıyken ilk turda 3 test kilitlenmeyle kırıldı; açıkken art arda 10 turda kırılma yok. CI'da tek tur kanıt sayılmaz; kırılma yeniden görülürse kilitlenme grafiği `system_health` oturumundan alınır.
+- Unutulmaması için `/health` ayar kapalıysa "Degraded" döner ve günlüğe uyarı yazar (`ReadSnapshotHealthCheck`; 24 Kasım 2026). Trafik almayı engellemez, yanıtta ayrıntı yoktur.
 - Açık: canlı veritabanında açma tarihi ve `tempdb` izleme eşiği işletimin kararıdır.

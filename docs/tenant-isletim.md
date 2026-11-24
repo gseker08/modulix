@@ -113,6 +113,7 @@ ALTER DATABASE [Modulix] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;
 ```
 
 - Uygulama kodu değişmez; geri alma `OFF` ile aynı komuttur.
+- **Unutulursa görünür:** ayar kapalıyken `/health` "Degraded" döner ve uygulama günlüğüne uyarı yazar (`read-snapshot` denetimi). `/health/ready` etkilenmez; örnek trafik almaya devam eder. Açtıktan sonra `/health` yeniden "Healthy" olur.
 - Sürüm deposu `tempdb`'de tutulur: açtıktan sonra `tempdb` boyutunu ve uzun süren işlemleri izleyin.
 - `sp_getapplock` kilitleri (`ITransactionLock`) ve sürüm belirteçleri (`rowversion`) etkilenmez.
 

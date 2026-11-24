@@ -124,10 +124,12 @@ builder.Services.Configure<PublicLinkOptions>(builder.Configuration.GetSection(P
 builder.Services.Configure<AccountOptions>(builder.Configuration.GetSection(AccountOptions.SectionName));
 // Sağlık uçları: /health/live yalnızca sürecin ayakta olduğunu söyler (yeniden başlatma kararı, bağımlılık denetlenmez);
 // /health/ready trafik alabilir mi sorusudur (veritabanı, dosya deposu); /health bütün denetimleri (olay birikimi dahil) gösterir.
+builder.Services.AddSingleton<Modulix.Api.Observability.IReadSnapshotProbe, Modulix.Api.Observability.SqlReadSnapshotProbe>();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ModulixDbContext>("database", tags: [ReadyTag])
     .AddCheck<Modulix.Api.Files.BlobStorageHealthCheck>("storage", tags: [ReadyTag])
-    .AddCheck<EventHealthCheck>("events");
+    .AddCheck<EventHealthCheck>("events")
+    .AddCheck<Modulix.Api.Observability.ReadSnapshotHealthCheck>("read-snapshot");
 
 var app = builder.Build();
 
