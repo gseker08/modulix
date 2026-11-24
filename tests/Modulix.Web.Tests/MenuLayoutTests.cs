@@ -262,4 +262,53 @@ public class MenuLayoutTests
         Assert.Equal(catalog, GroupIds(other));
         Assert.Contains("crm.leads", Ids(other));
     }
+
+    // Uygulama paneli grup sırası (dilim 5): grup.<grup> satırı, uygulamaların grup içindeki sırası ve grubu değişmez.
+    private static IReadOnlyList<AppGroup> PanelGroups() => [.. AppCatalog.Groups.OrderBy(g => g.Order).Where(g => CatalogRoots().Any(a => a.Group == g.Id))];
+
+    [Fact]
+    public void Group_order_rows_reorder_the_panel_groups_and_the_rest_follow_in_catalog_order()
+    {
+        var groups = PanelGroups();
+        Assert.True(groups.Count >= 3);
+        AppGroup last = groups[^1], first = groups[0];
+
+        // Son grup öne alınır; sırasız gruplar arkasından katalog sırasıyla gelir.
+        var moved = MenuLayoutRules.OrderGroups(groups, [new(RoleA, MenuLayoutRules.GroupKey(last.Id), 1, false)]);
+        Assert.Equal([last, .. groups.Where(g => g != last)], moved);
+
+        // Birden çok rolde en küçük sıra geçer: B ilk grubu en öne alır, A en sona atar.
+        var merged = MenuLayoutRules.OrderGroups(groups, [
+            new(RoleA, MenuLayoutRules.GroupKey(first.Id), 900, false), new(RoleB, MenuLayoutRules.GroupKey(first.Id), 1, false),
+            new(RoleA, MenuLayoutRules.GroupKey(last.Id), 50, false)]);
+        Assert.Equal([first, last, .. groups.Where(g => g != first && g != last)], merged);
+
+        // Satır yoksa, başka anahtarlar ve katalogda olmayan grup etkisizdir.
+        Assert.Same(groups, MenuLayoutRules.OrderGroups(groups, null));
+        Assert.Equal(groups, MenuLayoutRules.OrderGroups(groups, [new(RoleA, "group.yok", 1, false), new(RoleA, "crm.leads", 1, false), new(RoleA, MenuLayoutRules.AppKey(last.Id), 1, false)]));
+    }
+
+    [Fact]
+    public void Launcher_groups_follow_the_group_order_while_apps_keep_their_group_and_inner_order()
+    {
+        string[] modules = ["crm", "warehouse", "logistics", "fleet", "hr"];
+        string[] permissions = [.. AppCatalog.All.Where(a => a.ModuleKey is not null && modules.Contains(a.ModuleKey))
+            .SelectMany(a => (a.AnyPermission ?? []).Append(a.Permission)).OfType<string>().Distinct()];
+        var plainNav = Nav(null, permissions, modules);
+        var plain = plainNav.Grouped(plainNav.Roots());
+        var named = plain.Where(g => g.Group is not null).ToList();
+        Assert.True(named.Count >= 2);
+
+        var layout = new RoleMenuRowDto[] { new(RoleA, MenuLayoutRules.GroupKey(named[^1].Group!.Id), 1, false) };
+        var movedNav = Nav(layout, permissions, modules);
+        var moved = movedNav.Grouped(movedNav.Roots());
+
+        Assert.Equal(named[^1].Group, moved[0].Group);
+        // Her grubun uygulamaları ve iç sırası aynıdır; yalnızca grupların sırası değişti.
+        Assert.Equal(plain.Count, moved.Count);
+        foreach (var group in plain)
+        {
+            Assert.Equal(group.Apps, moved.Single(g => g.Group == group.Group).Apps);
+        }
+    }
 }

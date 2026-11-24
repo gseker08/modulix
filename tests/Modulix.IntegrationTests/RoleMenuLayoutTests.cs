@@ -54,14 +54,18 @@ public class RoleMenuLayoutTests(ModulixApiFactory factory) : IClassFixture<Modu
     [Fact]
     public async Task Section_order_rows_are_saved_and_returned_like_item_rows()
     {
-        // E8 dilim 3: bölüm sırası aynı tabloda "section.<uygulama>.<bölüm>" anahtarlı satırdır; sunucu yeni bir kural eklemez.
+        // E8 dilim 3-5: bölüm, uygulama ve uygulama paneli grup sırası aynı tabloda "section.<uygulama>.<bölüm>" anahtarlı satırdır; sunucu yeni bir kural eklemez.
         var (client, _, roleId) = await ManagerWithRoleAsync();
         var saved = await client.PutAsJsonAsync($"/api/roles/{roleId}/menu", new SaveRoleMenuRequest(
-            [new("section.crm.crm.sales", 10, false), new("section.crm.crm.customers", 20, false), new("crm.leads", null, true)]));
+            [new("section.crm.crm.sales", 10, false), new("section.crm.crm.customers", 20, false), new("crm.leads", null, true),
+             new("app.crm", 10, false), new("group.operations", 10, false), new("group.sales", 20, false)]));
         Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
         var items = (await saved.Content.ReadFromJsonAsync<RoleMenuResponse>())!.Items;
         Assert.Equal(10, items.Single(i => i.ItemKey == "section.crm.crm.sales").Order);
         Assert.Equal(20, items.Single(i => i.ItemKey == "section.crm.crm.customers").Order);
+        // Uygulama paneli grup sırası (dilim 5) da aynı tabloda "group.<grup>" satırıdır.
+        Assert.Equal(10, items.Single(i => i.ItemKey == "group.operations").Order);
+        Assert.Equal(20, items.Single(i => i.ItemKey == "group.sales").Order);
     }
 
     [Fact]

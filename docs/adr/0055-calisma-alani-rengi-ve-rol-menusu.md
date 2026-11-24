@@ -44,7 +44,7 @@ kontrast kuralıyla birlikte yazılır (`theme-tokens.md`).
 
 Menü düzeni **rol başınadır** ve yalnızca görünümdür. Kapsam öğe düzeyindedir: rol bir menü satırını (uygulama kataloğundaki öğe) gizleyebilir
 ve satırın bölüm içindeki sırasını değiştirebilir; ayrıca uygulamanın menüsündeki **bölümlerin** sırasını (dilim 3) ve uygulamanın uygulama
-panelindeki **sırasını** (dilim 4) değiştirebilir. Uygulamanın uygulama paneli grubu ve grupların sırası sabittir.
+panelindeki **sırasını** (dilim 4) değiştirebilir. Bir uygulamanın uygulama paneli grubu sabittir (katalog); grupların kendi sırası dilim 5'te değiştirilebilir.
 
 - **Veri (dilim 2a, migration `20261122161620_CoreRoleMenuItems`):** `core.RoleMenuItems` (RoleId, ItemKey, SortOrder, Hidden). Tenant verisidir
   (`ITenantEntity`, `ICompanyShared`): `TenantId` taşır, RLS ile korunur, role bileşik yabancı anahtarla bağlıdır, rol silinince satırlar silinir.
@@ -101,10 +101,11 @@ panelindeki **sırasını** (dilim 4) değiştirebilir. Uygulamanın uygulama pa
 3. **Bölüm sırası (22 Kasım 2026, `d76bbdbc`):** bölüm başlığında yukarı/aşağı, `section.<uygulama>.<bölüm>` satırı, `MenuLayoutRules.OrderSections`; şema ve migration değişmedi.
 4. **Uygulama sırası (23 Kasım 2026, PR #561):** uygulama başlığında yukarı/aşağı, `app.<uygulama>` satırı, `MenuLayoutRules.OrderApps` ve `AppNavigation.Roots`; uygulama
    kendi uygulama paneli grubu içinde yer değiştirir; şema ve migration değişmedi.
+5. **Uygulama paneli grup sırası (24 Kasım 2026):** rol ekranında "Uygulama paneli grupları" listesi, `group.<grup>` satırı, `MenuLayoutRules.OrderGroups` ve `AppNavigation.Grouped`; kural öğeyle aynı (en küçük sıra, sırasızlar açık sıralıların arkasında); şema ve migration değişmedi.
 
 ## Yapılmadı / sınırlar
 
-- **Uygulama paneli grupları** düzenlenemez (grup sırası ve bir uygulamanın grubu katalogdadır); uygulama yalnızca kendi grubu içinde yer değiştirir.
+- **Bir uygulamanın hangi uygulama paneli grubunda olduğu** düzenlenemez (katalogdadır); uygulama yalnızca kendi grubu içinde yer değiştirir. Grupların kendi sırası düzenlenebilir (dilim 5).
   Uygulama gizlenemez. Hiçbir rolün sıra satırı olmayan uygulama (ör. katalog sonradan yeni uygulama eklerse) grubun sonuna gider; öğelerde olduğu
   gibi sırasız öğe arkaya alınır; aynı kural bölümlerde de geçerlidir (kural 4).
 - **Bölüm düzeyinde gizleme:** bölüm gizlenemez; bir bölüm yalnızca bütün öğeleri gizlenince kaybolur.
