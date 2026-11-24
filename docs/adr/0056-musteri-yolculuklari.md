@@ -197,3 +197,13 @@ Dilim sırası: dilim 3 (dallanma) kısmen gerçek sağlayıcıya (E3) bağlı o
 - **Tasarım:** yeni sınıflar `flow`, `flow-node-*`, `flow-icon`, `flow-body`, `flow-branch` (`modules.css`, yalnızca `--mx-*` tokenları); `docs/design-system/component-catalog.md` güncellendi. Dikey çizgi `step-track` ile aynıdır.
 - **Bilerek yapılmadı:** düzenleme (E6-2), sürükle-bırak, sürüm karşılaştırma ve deneme çalıştırması (E6-3), yolculuk ekranları, dallanmayı yan yana dallar olarak çizme (bugün atlanan adım olarak gösterilir). Açık ve koyu temada ekran görüntüsü alınamadı: yerelde SQL Server olmadığı için uygulama çalıştırılamıyor; renkler yalnızca iki temada da tanımlı ton tokenlarını kullanır.
 - **Testler:** `AutomationFlowTests` (Web birim): sıra ve türler, dallanma işareti, koşulsuz ve adımsız kural, bilinmeyen alan/aksiyonun korunması, iç içe koşul.
+
+### Yolculuk ekranları, dilim 1 notu (liste, oluşturma, ayrıntı ve durum geçişleri)
+
+- **Ekranlar:** `Pazarlama/Journeys.razor` (`/pazarlama/yolculuklar`), `JourneyNew.razor` (`/yeni`), `JourneyDetail.razor` (`/{id}`). Menüde Pazarlama altında Segmentler ile Kampanyalar arasında "Yolculuklar" (`marketing.journeys`, `marketing.journeys.read`).
+- **Liste:** Segmentler ekranının şablonu: görünümler `ViewTabs` ("Benim yolculuklarım", "Tüm yolculuklar", durum sekmeleri), arama, hedef süzgeci (`FilterToggle`), sütun seçici, başlık tıklamasıyla sıralama (sunucudaki `sort` anahtarları), `RowMenu`, `Pager`, boş durum `EmptyState`. Durum ve kapsam sunucuda uygulanır.
+- **Oluşturma:** sekmeli form (Genel, Giriş); giriş segmenti seçicisi yalnızca **etkin** ve seçili hedef türündeki segmentleri listeler (sunucu da denetler); hata alanın yanında ve ilgili sekmede işaretlenir.
+- **Ayrıntı:** durum rozeti, yayınla / sürdür / duraklat (`marketing.journeys.publish`) ve arşiv (kalıcı olduğu için `ConfirmAction` ile onaylı); ad, açıklama ve yeniden giriş politikası düzenlenir (arşivde salt okunur); giriş segmenti segment sayfasına bağlanır. Düğmeleri gizlemek yetki değildir, sunucu her geçişi denetler.
+- **Kişisel görünüm kaydı** bu listede yok (ADR-0036 dilimi ayrı); `ViewTabs` "+ Görünüm" düğmesi bu yüzden verilmedi.
+- **Bilerek yapılmadı:** çıkış koşulu düzenleyicisi (ekranda yalnızca "tanımlı/değil" gösterilir; segment koşul düzenleyicisinin yeniden kullanımı ayrı dilim), kayıtlar sekmesi (elle çıkarma, yanıt işareti) ve rapor sekmesi (sonraki dilim), kural bağlantısı ve akış çizimi bağlantısı, sahip değiştirme.
+- **Testler:** `MarketingLabelsTests` yeni etiket tablolarını üç sözlükte denetler. Ekranların davranışı API testleriyle (`JourneyTests`) kapsanır; ekran görüntüsü açık/koyu temada alınamadı (yerelde SQL Server yok, uygulama çalıştırılamıyor).

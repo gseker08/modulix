@@ -28,6 +28,8 @@ public class MarketingLabelsTests
         (MarketingLabels.TargetGroup, MarketingLabels.Targets),
         (MarketingLabels.KindGroup, MarketingLabels.Kinds),
         (MarketingLabels.StatusGroup, MarketingLabels.Statuses),
+        (MarketingLabels.JourneyStatusGroup, MarketingLabels.JourneyStatuses),
+        (MarketingLabels.JourneyReentryGroup, MarketingLabels.JourneyReentryPolicies),
         (MarketingLabels.OperatorGroup, MarketingLabels.Operators),
         (MarketingLabels.ResponseKindGroup, MarketingLabels.ResponseKinds),
         (MarketingLabels.ResponseStatusGroup, MarketingLabels.ResponseStatuses),

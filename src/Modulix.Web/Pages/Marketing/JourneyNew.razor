@@ -1,0 +1,143 @@
+@page "/pazarlama/yolculuklar/yeni"
+@inject ApiClient Api
+@inject SessionState Session
+@inject NavigationManager Navigation
+
+<PageTitle>@Texts.Get("marketing.journeys.new") · Modulix</PageTitle>
+
+@* Yeni müşteri yolculuğu (ADR-0056): taslak olarak açılır; giriş segmenti etkin ve hedef türüyle aynı olmalıdır. Yayın ve adımlar sonradan eklenir. *@
+<AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.JourneysWrite">
+    <div class="page-header">
+        <div>
+            <h1>@Texts.Get("marketing.journeys.new")</h1>
+            <p class="text-muted mb-0">@Texts.Get("marketing.journeyNew.intro")</p>
+        </div>
+        <div class="header-actions"><a class="btn btn-outline-secondary" href="pazarlama/yolculuklar">@Texts.Get("crm.quoteDetail.backToList")</a></div>
+    </div>
+
+    <Notice Text="@message" Failed="true" />
+    <ErrorSummary Errors="@errors" />
+
+    <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <TabBar Tabs="FormTabs" State="tabs" Label="@Texts.Get("marketing.journeyNew.formSections")" />
+        <fieldset disabled="@busy">
+            <TabPanel State="tabs" Key="form-genel">
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label" for="j-name">@Texts.Get("common.field.name")</label>
+                        <input id="j-name" class="form-control" maxlength="150" @bind="name" />
+                        <FieldError Field="name" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="j-code">@Texts.Get("marketing.code")</label>
+                        <input id="j-code" class="form-control" maxlength="40" placeholder="hos-geldin" aria-describedby="j-code-help" @bind="code" />
+                        <small id="j-code-help" class="text-muted">@Texts.Get("marketing.codeHelp")</small>
+                        <FieldError Field="code" Errors="errors" />
+                    </div>
+                    <div class="span-12">
+                        <label class="form-label" for="j-desc">@Texts.Get("common.field.description")</label>
+                        <textarea id="j-desc" class="form-control" rows="3" maxlength="1000" @bind="description"></textarea>
+                        <FieldError Field="description" Errors="errors" />
+                    </div>
+                </div>
+            </TabPanel>
+            <TabPanel State="tabs" Key="form-giris">
+                <div class="form-grid">
+                    <div class="span-6">
+                        <label class="form-label" for="j-target">@Texts.Get("marketing.targetType")</label>
+                        <select id="j-target" class="form-select" value="@target" @onchange="e => ChooseTargetAsync(e.Value?.ToString())">
+                            @foreach (var t in MarketingLabels.Targets) { <option value="@t.Key">@t.Label</option> }
+                        </select>
+                        <FieldError Field="target" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="j-segment">@Texts.Get("marketing.journeyNew.segment")</label>
+                        <select id="j-segment" class="form-select" aria-describedby="j-segment-help" @bind="segmentId">
+                            <option value="">@(segments.Count == 0 ? Texts.Get("marketing.journeyNew.segmentNone") : Texts.Get("common.choose"))</option>
+                            @foreach (var s in segments) { <option value="@s.Id">@s.Name</option> }
+                        </select>
+                        <small id="j-segment-help" class="text-muted">@Texts.Get("marketing.journeyNew.segmentHelp")</small>
+                        <FieldError Field="segmentId" Errors="errors" />
+                    </div>
+                    <div class="span-6">
+                        <label class="form-label" for="j-reentry">@Texts.Get("marketing.journeyNew.reentry")</label>
+                        <select id="j-reentry" class="form-select" aria-describedby="j-reentry-help" @bind="reentry">
+                            @foreach (var r in MarketingLabels.JourneyReentryPolicies) { <option value="@r.Key">@r.Label</option> }
+                        </select>
+                        <small id="j-reentry-help" class="text-muted">@Texts.Get("marketing.journeyNew.reentryHelp")</small>
+                        <FieldError Field="reentryPolicy" Errors="errors" />
+                    </div>
+                </div>
+            </TabPanel>
+        </fieldset>
+        <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("marketing.create")</button></div>
+    </form>
+</AuthGate>
+
+@code {
+    private string name = string.Empty;
+    private string code = string.Empty;
+    private string description = string.Empty;
+    private string target = "Company";
+    private string segmentId = string.Empty;
+    private string reentry = "Never";
+    private IReadOnlyList<SegmentDto> segments = [];
+    private bool busy;
+    private string? message;
+    private IReadOnlyDictionary<string, string[]>? errors;
+
+    // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır ve kayıt denemesinden sonra açılır.
+    private readonly TabState tabs = new("form-genel");
+
+    private int ErrorCount(params string[] fields) => errors is null ? 0 : fields.Count(errors.ContainsKey);
+
+    private IReadOnlyList<TabItem> FormTabs =>
+    [
+        new("form-genel", Texts.Get("crm.quoteDetail.tab.general"), Errors: ErrorCount("name", "code", "description")),
+        new("form-giris", Texts.Get("marketing.journeyNew.tab.entry"), Errors: ErrorCount("target", "segmentId", "reentryPolicy")),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        await LoadSegmentsAsync();
+    }
+
+    private async Task ChooseTargetAsync(string? value)
+    {
+        target = value ?? target;
+        segmentId = string.Empty;
+        await LoadSegmentsAsync();
+    }
+
+    // Yalnızca etkin ve aynı hedef türündeki segmentler seçilebilir (sunucu da denetler).
+    private async Task LoadSegmentsAsync()
+    {
+        var result = await Api.GetAsync<PagedResult<SegmentDto>>($"/api/marketing/segments?status=Active&target={target}&pageSize=100");
+        segments = result.Value?.Items ?? [];
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        message = null;
+        errors = null;
+        var result = await Api.PostAsync<JourneyDto>("/api/marketing/journeys", new SaveJourneyRequest(
+            Code: code.Trim(),
+            Name: name.Trim(),
+            Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+            Target: target,
+            SegmentId: Guid.TryParse(segmentId, out var id) ? id : null,
+            ReentryPolicy: reentry));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo($"pazarlama/yolculuklar/{result.Value!.Id}");
+            return;
+        }
+
+        message = result.FieldErrors.Count == 0 ? result.Error : null;
+        errors = result.FieldErrors.Count == 0 ? null : result.FieldErrors;
+        tabs.RevealFirstFailing(FormTabs);
+    }
+}

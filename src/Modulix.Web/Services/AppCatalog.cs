@@ -266,6 +266,7 @@ public static class AppCatalog
 
         new(Marketing, null, "Pazarlama", "trending-up", null, 28, ModuleKey: MarketingAccess.ModuleKey, Group: SalesGroup, HostId: Crm, Description: "Segmentleri ve kampanyaları yönetin, sonuçları izleyin.", Art: "marketing"),
         new("marketing.segments", Marketing, "Segmentler", "list", "pazarlama/segmentler", 10, MarketingAccess.ModuleKey, MarketingAccess.SegmentsRead, Hosted: new(CrmMarketingGroup, null, 10)),
+        new("marketing.journeys", Marketing, "Yolculuklar", "shuffle", "pazarlama/yolculuklar", 15, MarketingAccess.ModuleKey, MarketingAccess.JourneysRead, Hosted: new(CrmMarketingGroup, null, 15)),
         new("marketing.campaigns", Marketing, "Kampanyalar", "target", "pazarlama/kampanyalar", 20, MarketingAccess.ModuleKey, MarketingAccess.CampaignsRead, Tone: AppTone.Teal, Hosted: new(CrmMarketingGroup, null, 20)),
         new("marketing.report", Marketing, "Kampanya raporu", "dashboard", "pazarlama/rapor", 30, MarketingAccess.ModuleKey, MarketingAccess.ReportsRead, Hosted: new(CrmMarketingGroup, "Kampanya sonuçları", 30)),
         new("marketing.settings", Marketing, "Pazarlama ayarları", "wrench", ModuleSettingsRoute(MarketingAccess.ModuleKey), 90, MarketingAccess.ModuleKey, CoreAccess.ManageSettings, Hosted: new(CrmSettingsGroup, null, 96)),
