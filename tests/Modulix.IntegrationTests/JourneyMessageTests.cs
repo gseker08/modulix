@@ -146,6 +146,11 @@ public class JourneyMessageTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         Assert.Equal(JourneyMessageOutcomes.Skipped, optedOut.Outcome);
         Assert.Equal(1, Sent.Count(s => s.Address == "izinsiz@a.test"));
 
+        // İzni geri alan alıcı yolculuktan çıkar (ADR-0056 dilim 2c-1): kayıt Exited, sonraki ileti "yolculukta değil" nedeniyle atlanır.
+        var exited = (await w.Preparer.GetFromJsonAsync<JourneyEnrollmentDto>($"/api/marketing/journey-enrollments/{w.Enrollment}"))!;
+        Assert.Equal(("Exited", "unsubscribed"), (exited.Status, exited.ExitReason));
+        Assert.Equal("journey-inactive", (await SendAsync(w, w.Enrollment, "cikti-sonrasi")).Code);
+
         // Alıcısı olmayan firma (irtibat kişisi yok) ve olmayan kayıt/içerik hata değil "gönderilmedi"/"başarısız" kodudur.
         var lonely = await CompanyAsync(w.Preparer, "Yalniz Tekstil");
         await RunEntryAsync(w.Tenant.Id);
@@ -156,7 +161,7 @@ public class JourneyMessageTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         Assert.Equal("enrollment-not-found", (await SendAsync(w, Guid.NewGuid(), "yok")).Code);
         using (var scope = OpenScope(w))
         {
-            var result = await scope.ServiceProvider.GetRequiredService<IJourneySender>().SendAsync(new JourneySendRequest(w.Enrollment, Guid.NewGuid(), "icerik-yok"), CancellationToken.None);
+            var result = await scope.ServiceProvider.GetRequiredService<IJourneySender>().SendAsync(new JourneySendRequest(lonelyEnrollment, Guid.NewGuid(), "icerik-yok"), CancellationToken.None);
             Assert.Equal((JourneyMessageOutcomes.Failed, "content-not-found"), (result.Outcome, result.Code));
         }
     }
