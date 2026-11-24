@@ -24,6 +24,8 @@ public static class MarketingLabels
     public const string RecipientStatusGroup = "marketing.recipient-status";
     public const string JourneyStatusGroup = "marketing.journey-status";
     public const string JourneyReentryGroup = "marketing.journey-reentry";
+    public const string EnrollmentStatusGroup = "marketing.enrollment-status";
+    public const string EnrollmentReasonGroup = "marketing.enrollment-reason";
 
     public static string KeyOf(string group, string key) => $"{group}.{key.Replace(':', '-').ToLowerInvariant()}";
 
@@ -128,6 +130,12 @@ public static class MarketingLabels
     internal static readonly (string Key, string Label)[] JourneyReentrySource =
         [("Never", "Hiç"), ("AfterExit", "Çıkıştan sonra"), ("AfterCompletion", "Tamamlandıktan sonra")];
 
+    internal static readonly (string Key, string Label)[] EnrollmentStatusSource = [("Active", "Etkin"), ("Completed", "Tamamlandı"), ("Exited", "Çıktı")];
+
+    /// <summary>Sistemin yazdığı kararlı çıkış nedenleri; elle çıkarmanın gerekçesi serbest metindir ve olduğu gibi gösterilir.</summary>
+    internal static readonly (string Key, string Label)[] EnrollmentReasonSource =
+        [("unsubscribed", "Abonelikten çıktı"), ("exit-condition", "Çıkış koşulu sağlandı"), ("completed", "Yolculuk tamamlandı")];
+
     public static IReadOnlyList<(string Key, string Label)> Targets => Translate(TargetGroup, TargetSource);
 
     public static IReadOnlyList<(string Key, string Label)> Kinds => Translate(KindGroup, KindSource);
@@ -137,6 +145,15 @@ public static class MarketingLabels
     public static IReadOnlyList<(string Key, string Label)> JourneyStatuses => Translate(JourneyStatusGroup, JourneyStatusSource);
 
     public static IReadOnlyList<(string Key, string Label)> JourneyReentryPolicies => Translate(JourneyReentryGroup, JourneyReentrySource);
+
+    public static IReadOnlyList<(string Key, string Label)> EnrollmentStatuses => Translate(EnrollmentStatusGroup, EnrollmentStatusSource);
+
+    public static IReadOnlyList<(string Key, string Label)> EnrollmentReasons => Translate(EnrollmentReasonGroup, EnrollmentReasonSource);
+
+    public static string EnrollmentBadge(string status) => status switch { "Active" => "won", "Completed" => "qualified", _ => "cancelled" };
+
+    /// <summary>Çıkış nedeni: kararlı kod çevrilir, tanınmayan metin (elle çıkarma gerekçesi) olduğu gibi gösterilir.</summary>
+    public static string EnrollmentReason(string reason) => Lookup(EnrollmentReasonGroup, EnrollmentReasonSource, reason);
 
     public static string JourneyBadge(string status) => status switch { "Active" => "won", "Paused" => "onhold", "Archived" => "cancelled", _ => "lead" };
 

@@ -30,6 +30,8 @@ public class MarketingLabelsTests
         (MarketingLabels.StatusGroup, MarketingLabels.Statuses),
         (MarketingLabels.JourneyStatusGroup, MarketingLabels.JourneyStatuses),
         (MarketingLabels.JourneyReentryGroup, MarketingLabels.JourneyReentryPolicies),
+        (MarketingLabels.EnrollmentStatusGroup, MarketingLabels.EnrollmentStatuses),
+        (MarketingLabels.EnrollmentReasonGroup, MarketingLabels.EnrollmentReasons),
         (MarketingLabels.OperatorGroup, MarketingLabels.Operators),
         (MarketingLabels.ResponseKindGroup, MarketingLabels.ResponseKinds),
         (MarketingLabels.ResponseStatusGroup, MarketingLabels.ResponseStatuses),
@@ -97,5 +99,19 @@ public class MarketingLabelsTests
         Assert.Equal("Alıcı yok", MarketingLabels.RecipientStatus("Other"));
         Assert.Equal("marketing.reason.suppressed-hard-bounce", MarketingLabels.KeyOf(MarketingLabels.ReasonGroup, "suppressed:hard-bounce"));
         Assert.Equal("crm.role.purchasing", MarketingLabels.KeyOf(MarketingLabels.RoleGroup, "Purchasing"));
+    }
+
+    [Fact]
+    public void A_stable_exit_reason_code_is_translated_and_a_manual_reason_is_shown_as_typed()
+    {
+        Assert.Equal("Abonelikten çıktı", MarketingLabels.EnrollmentReason("unsubscribed"));
+        Assert.Equal("Çıkış koşulu sağlandı", MarketingLabels.EnrollmentReason("exit-condition"));
+        Assert.Equal("Müşteri aradı, istemiyor", MarketingLabels.EnrollmentReason("Müşteri aradı, istemiyor"));
+    }
+
+    [Fact]
+    public void Enrollment_badges_separate_active_completed_and_exited()
+    {
+        Assert.Equal(3, new[] { "Active", "Completed", "Exited" }.Select(MarketingLabels.EnrollmentBadge).Distinct().Count());
     }
 }
