@@ -947,6 +947,23 @@ code {
     color: var(--mx-text-secondary);
 }
 
+/* Yatay kayan sekme şeritleri (.record-tabs, .side-tabs): taşan ucu soluklaşır ("daha fazlası var" ipucu); sınıfları js/tab-scroll.js
+   şerit taşınca ve kaydırılınca verir, taşmayan şeritte hiç yoktur. Maske yalnızca saydamlık verir, renk değildir. */
+.tabs-fade-end {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+}
+
+.tabs-fade-start {
+    -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent);
+    mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent);
+}
+
+.tabs-fade-start.tabs-fade-end {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+}
+
 /* Sol sekmeli düzen (SideTabs): sekmeler solda yapışık, içerik sağda. Dar ekranda sekmeler üste geçer ve yatay kayar. */
 .side-layout {
     display: grid;
