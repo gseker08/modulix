@@ -170,5 +170,35 @@ public static class CrmForms
             new("logAsDone", "Geçmişte gerçekleşti", "yer", 12, Fixed: true),
             new("notes", "Açıklama", "yer", 12),
         ]),
+
+        // Teklif başlığı (ADR-0019). Satırlar form değil kendi editörüyle düzenlenir; toplamlar ve durumlar sunucudan gelir, formda yer almaz.
+        // Sektör profilleri (ADR-0029/0041) bu forma kendi özel alanlarını ekler; "ek" bölümü varsayılan yerleridir.
+        new(CrmModule.Entities.Quote, "Teklif",
+        [new(General, "Genel bilgiler"), new("fiyat", "Fiyat ve geçerlilik"), new("kosul", "Koşullar ve notlar"), new("ek", "Ek bilgiler")],
+        [
+            new("temel", "Temel bilgiler", "file-text"),
+            new("fiyat", "Fiyat ve geçerlilik", "coins", Tab: "fiyat"),
+            new("indirim", "Belge indirimi", "percent", Tab: "fiyat"),
+            new("kosul", "Ticari koşullar", "clipboard-list", Tab: "kosul"),
+            new("not", "İç notlar", "message-square", Tab: "kosul"),
+            new(Extras, "Ek bilgiler", "square-pen", Tab: "ek"),
+        ],
+        [
+            new("title", "Teklif başlığı", "temel", 12, Required: true, Fixed: true),
+            new("companyId", "Firma", "temel", 6, Required: true, Fixed: true),
+            new("contactId", "Kişi", "temel", 6),
+            new("opportunityId", "Fırsat", "temel", 6),
+            new("ownerId", "Sorumlu", "temel", 6),
+            new("priceListId", "Fiyat listesi", "fiyat", 6),
+            new("currency", "Para birimi", "fiyat", 3, Fixed: true),
+            new("validUntil", "Geçerlilik", "fiyat", 3),
+            new("priceIncludesTax", "Fiyatlandırma", "fiyat", 6, Fixed: true),
+            new("documentDiscountKind", "Belge indirimi", "indirim", 6),
+            new("documentDiscountValue", "İndirim değeri", "indirim", 6),
+            new("paymentTerms", "Ödeme koşulları", "kosul", 12),
+            new("deliveryTerms", "Teslimat koşulları", "kosul", 12),
+            new("commercialTerms", "Ticari koşullar", "kosul", 12),
+            new("internalNotes", "İç notlar", "not", 12),
+        ]),
     ];
 }
