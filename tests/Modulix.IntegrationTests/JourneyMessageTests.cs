@@ -51,7 +51,7 @@ public class JourneyMessageTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
 
     private static readonly string[] Preparer =
     [
-        SegmentsRead, SegmentsWrite, SegmentsPublish, RecipientsRead, CampaignsRead, CampaignsWrite, CampaignsAudience, JourneysRead, JourneysWrite, JourneysPublish,
+        SegmentsRead, SegmentsWrite, SegmentsPublish, RecipientsRead, CampaignsRead, CampaignsWrite, CampaignsAudience, JourneysRead, JourneysWrite, JourneysPublish, ReportsRead,
         CoreModule.Permissions.ManageSettings, CoreModule.Permissions.ReadAutomation, CoreModule.Permissions.ManageAutomation, CoreModule.Permissions.PublishAutomation,
         .. CrmPermissions, .. Communication,
     ];
@@ -452,6 +452,85 @@ public class JourneyMessageTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         var user = await factory.CreateUserAsync(tenant);
         await factory.CreateRoleAsync(tenant.Id, permissions, RecordScope.All, user);
         return await LoginAsync(user);
+    }
+
+    // ---- Dilim 4: yolculuk raporu ----
+
+    [Fact]
+    public async Task The_report_counts_enrollments_exit_reasons_and_messages_per_content_without_personal_data()
+    {
+        var w = await WorldAsync("rapor@a.test");
+        Assert.Equal(JourneyMessageOutcomes.Accepted, (await SendAsync(w, w.Enrollment, "adim-1")).Outcome);
+        await ConsentAsync(w.Preparer, "rapor@a.test", "Denied");
+        Assert.Equal(JourneyMessageOutcomes.Skipped, (await SendAsync(w, w.Enrollment, "adim-2")).Outcome);
+
+        var response = await w.Preparer.GetAsync($"/api/marketing/journeys/{w.Journey.Id}/report");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var raw = await response.Content.ReadAsStringAsync();
+        var report = JsonSerializer.Deserialize<JourneyReportDto>(raw, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+
+        // Kayıtlar: izni geri alan alıcı abonelikten çıkma nedeniyle çıkmıştır.
+        Assert.Equal((1, 0, 0, 1), (report.Enrolled, report.Active, report.Completed, report.Exited));
+        Assert.Equal([("unsubscribed", 1)], report.ExitReasons.Select(r => (r.Reason, r.Count)));
+
+        // İletiler: biri kabul edildi, biri izin nedeniyle atlandı; adım (içerik) bazında da aynı sayılar.
+        Assert.Equal((2, 1, 1, 0, 0), (report.Messages.Total, report.Messages.Accepted, report.Messages.Skipped, report.Messages.Failed, report.Messages.Unknown));
+        Assert.Equal([("denied", 1)], report.Messages.SkipReasons.Select(r => (r.Code, r.Count)));
+        var content = Assert.Single(report.Contents);
+        Assert.Equal((w.ContentId, "Merhaba", 2, 1, 1), (content.ContentId, content.Subject, content.Total, content.Accepted, content.Skipped));
+
+        // Rapor yalnızca sayıdır: adres ya da hedef kimliği taşımaz.
+        Assert.DoesNotContain("rapor@a.test", raw);
+        Assert.DoesNotContain(w.Enrollment.ToString(), raw);
+    }
+
+    [Fact]
+    public async Task A_journey_without_activity_has_an_empty_report_and_an_unknown_journey_is_not_found()
+    {
+        var w = await WorldAsync("bos@a.test");
+        var empty = await CampaignlessJourneyAsync(w);
+        var report = (await w.Preparer.GetFromJsonAsync<JourneyReportDto>($"/api/marketing/journeys/{empty.Id}/report"))!;
+        Assert.Equal((0, 0, 0, 0, 0), (report.Enrolled, report.Active, report.Completed, report.Exited, report.Messages.Total));
+        Assert.Empty(report.ExitReasons);
+        Assert.Empty(report.Contents);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await w.Preparer.GetAsync($"/api/marketing/journeys/{Guid.NewGuid()}/report")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Another_tenant_cannot_read_a_foreign_journey_report_and_each_tenant_counts_only_its_own()
+    {
+        var a = await WorldAsync("a-rapor@a.test");
+        var b = await WorldAsync("b-rapor@b.test");
+        Assert.Equal(JourneyMessageOutcomes.Accepted, (await SendAsync(a, a.Enrollment, "adim-1")).Outcome);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await b.Preparer.GetAsync($"/api/marketing/journeys/{a.Journey.Id}/report")).StatusCode);
+        Assert.Equal(1, (await a.Preparer.GetFromJsonAsync<JourneyReportDto>($"/api/marketing/journeys/{a.Journey.Id}/report"))!.Messages.Total);
+        Assert.Equal(0, (await b.Preparer.GetFromJsonAsync<JourneyReportDto>($"/api/marketing/journeys/{b.Journey.Id}/report"))!.Messages.Total);
+    }
+
+    [Fact]
+    public async Task The_report_needs_the_reports_permission_and_the_journey_must_be_visible_to_the_caller()
+    {
+        var w = await WorldAsync("rapor-yetki@a.test");
+        var withoutReports = await UserClientAsync(w.Tenant, [JourneysRead]);
+        Assert.Equal(HttpStatusCode.Forbidden, (await withoutReports.GetAsync($"/api/marketing/journeys/{w.Journey.Id}/report")).StatusCode);
+
+        // Raporu görme izni olsa da yolculuğu görme izni yoksa yolculuk "bulunamadı"/yetkisizdir; "kendi" kapsamındaki kullanıcı başkasının yolculuğunu göremez.
+        var reportsOnly = await UserClientAsync(w.Tenant, [ReportsRead]);
+        Assert.NotEqual(HttpStatusCode.OK, (await reportsOnly.GetAsync($"/api/marketing/journeys/{w.Journey.Id}/report")).StatusCode);
+
+        var viewer = await UserClientAsync(w.Tenant, [JourneysRead, ReportsRead]);
+        Assert.Equal(HttpStatusCode.OK, (await viewer.GetAsync($"/api/marketing/journeys/{w.Journey.Id}/report")).StatusCode);
+    }
+
+    private static async Task<JourneyDto> CampaignlessJourneyAsync(World w)
+    {
+        var segment = (await w.Preparer.GetFromJsonAsync<PagedResult<SegmentDto>>("/api/marketing/segments"))!.Items.First();
+        var created = await w.Preparer.PostAsJsonAsync("/api/marketing/journeys",
+            new SaveJourneyRequest(Code: "bos-yolculuk", Name: "Boş", Target: "Company", SegmentId: segment.Id));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        return (await created.Content.ReadFromJsonAsync<JourneyDto>())!;
     }
 
     // ---- Yardımcılar ----
