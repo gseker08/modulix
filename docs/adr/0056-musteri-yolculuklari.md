@@ -216,3 +216,12 @@ Dilim sırası: dilim 3 (dallanma) kısmen gerçek sağlayıcıya (E3) bağlı o
 - **Çıkış nedeni:** sistemin yazdığı kararlı kodlar (`unsubscribed`, `exit-condition`, `completed`) çevrilir; elle çıkarmanın gerekçesi serbest metindir ve olduğu gibi gösterilir.
 - **Bilerek yapılmadı:** rapor sekmesi (sonraki dilim), toplu çıkarma, hedefe göre arama, hedef sayfasına bağlantı, kayıt başına ileti geçmişi (günlük tablosu için ayrı uç gerekir).
 - **Testler:** `MarketingLabelsTests` yeni etiket tablolarını üç sözlükte, çıkış nedeni çevirisini ve durum rozetlerini denetler; elle çıkarma, yanıt işareti, tenant izolasyonu ve yetki API düzeyinde `JourneyEntryTests` ve `JourneyMessageTests` ile kapsanır. Ekran görüntüsü açık/koyu temada alınamadı (yerelde SQL Server yok).
+
+### Yolculuk ekranları, dilim 3 notu (rapor sekmesi)
+
+- **Ekran:** yolculuk ayrıntısında "Rapor" sekmesi (`Components/JourneyReportPanel.razor`; ilk açıldığında yüklenir, yalnızca `marketing.reports.read` olana çizilir). Mevcut `GET /api/marketing/journeys/{id}/report` ucunu çizer; yeni uç nokta ve migration yoktur. Sekmeyi gizlemek yetki değildir: ucun kendisi rapor iznini ve yolculuğu görme iznini denetler.
+- **İçerik (yalnızca sayı):** özet kutuları (kayıt: etkin/tamamlanan/çıkan; ileti: kabul/atlanan/başarısız; tamamlanma oranı), çıkış nedenleri, atlanan iletilerin nedenleri ve içeriğe göre sonuç tablosu. Raporda kişi, adres ya da hedef kimliği yoktur; "kabul edildi" teslim edildi demek değildir (metinde belirtilir).
+- **Etiketler:** çıkış nedeni kodları (`unsubscribed`, `exit-condition`, `manual`, `completed`) ve göndericinin atlama/hata kodları üç sözlükte çevrilir; izin kararı kodları (`denied`, `suppressed:*`…) mevcut neden tablosundan, tanınmayan kod olduğu gibi gösterilir. Elle çıkarmanın serbest metin gerekçesi raporda gösterilmez, `manual` altında toplanır.
+- **Bilinen sınır (dilim 4'ten):** dönüşüm satırı içerik bazındadır, kural adımı bazında değil; aynı içerik iki adımda kullanılırsa tek satırda toplanır.
+- **Bilerek yapılmadı:** zaman aralığı süzgeci ve dönem karşılaştırması, grafik, dışa aktarma, "açıldı/tıklandı" (E3).
+- **Testler:** `MarketingLabelsTests` yeni etiket tablolarını üç sözlükte, atlama kodunun izin nedenine ve koda düşmesini denetler; rapor ucunun davranışı, tenant izolasyonu ve yetkisi `JourneyMessageTests` ile kapsanır. Ekran görüntüsü açık/koyu temada alınamadı (yerelde SQL Server yok).

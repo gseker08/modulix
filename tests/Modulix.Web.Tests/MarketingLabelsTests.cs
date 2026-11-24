@@ -32,6 +32,8 @@ public class MarketingLabelsTests
         (MarketingLabels.JourneyReentryGroup, MarketingLabels.JourneyReentryPolicies),
         (MarketingLabels.EnrollmentStatusGroup, MarketingLabels.EnrollmentStatuses),
         (MarketingLabels.EnrollmentReasonGroup, MarketingLabels.EnrollmentReasons),
+        (MarketingLabels.JourneyExitReasonGroup, MarketingLabels.JourneyExitReasons),
+        (MarketingLabels.JourneySkipGroup, MarketingLabels.JourneySkipReasons),
         (MarketingLabels.OperatorGroup, MarketingLabels.Operators),
         (MarketingLabels.ResponseKindGroup, MarketingLabels.ResponseKinds),
         (MarketingLabels.ResponseStatusGroup, MarketingLabels.ResponseStatuses),
@@ -113,5 +115,19 @@ public class MarketingLabelsTests
     public void Enrollment_badges_separate_active_completed_and_exited()
     {
         Assert.Equal(3, new[] { "Active", "Completed", "Exited" }.Select(MarketingLabels.EnrollmentBadge).Distinct().Count());
+    }
+
+    [Fact]
+    public void A_journey_skip_code_falls_back_to_the_consent_reasons_and_then_to_the_code_itself()
+    {
+        Assert.Equal("Günlük ileti sınırı doldu", MarketingLabels.JourneySkipReason("frequency-limit"));
+        Assert.Equal(MarketingLabels.Reason("denied"), MarketingLabels.JourneySkipReason("denied"));
+        Assert.Equal("yeni-kod", MarketingLabels.JourneySkipReason("yeni-kod"));
+    }
+
+    [Fact]
+    public void The_manual_exit_group_in_the_report_is_labelled()
+    {
+        Assert.Equal("Elle çıkarıldı", MarketingLabels.JourneyExitReason("manual"));
     }
 }
