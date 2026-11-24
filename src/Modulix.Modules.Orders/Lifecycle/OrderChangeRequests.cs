@@ -364,15 +364,36 @@ internal sealed class OrderChangeRequests(
 
     private static OrderChangeSet Parse(string json)
     {
-        var stored = JsonSerializer.Deserialize<StoredChanges>(json, Json) ?? new StoredChanges([], []);
+        var stored = TryDeserialize<StoredChanges>(json);
+        var header = stored?.Header ?? [];
+        var lines = stored?.Lines ?? [];
         return new OrderChangeSet(
-            stored.Header,
-            [.. stored.Lines.Select(l => new OrderLineChange(l.LineId, l.Quantity, l.PlannedDate is { } d ? DateOnly.ParseExact(d, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null))]);
+            header,
+            [.. lines.Select(l => new OrderLineChange(l.LineId, l.Quantity, l.PlannedDate is { } d && DateOnly.TryParseExact(d, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : null))]);
+    }
+
+    // Boş ya da bozuk JSON listeyi düşürmez; eksik alanlar boş kabul edilir.
+    private static T? TryDeserialize<T>(string? json) where T : class
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<T>(json, Json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static OrderChangeRequestView ToView(OrderChangeRequest r, bool financials)
     {
-        var impact = JsonSerializer.Deserialize<StoredImpact>(r.Impact, Json) ?? new StoredImpact([], [], []);
+        var stored = TryDeserialize<StoredImpact>(r.Impact);
+        var impact = new StoredImpact(stored?.Operations ?? [], stored?.Deliveries ?? [], stored?.Contracts ?? []);
         return new OrderChangeRequestView(
             r.Id, r.Version, r.OrderId, r.Sequence, r.Status, r.Reason, Parse(r.Changes), impact.Operations, impact.Deliveries, impact.Contracts,
             financials ? r.NetDelta : null, financials ? r.TaxDelta : null, r.RequestedBy, r.DecidedBy, r.DecidedAt, r.DecisionNote, r.CreatedAt);
