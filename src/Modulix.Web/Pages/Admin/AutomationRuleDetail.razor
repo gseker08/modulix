@@ -96,7 +96,7 @@
                             <button type="button" class="btn btn-outline-secondary" @onclick="() => confirming = Confirm.None">@Texts.Get("common.dismiss")</button>
                         </div>
                     }
-                    <VersionView Version="draft" Issues="detail.DraftIssues" />
+                    <VersionView Version="draft" Issues="detail.DraftIssues" Entity="EntityOf(rule.EntityKey)" Actions="actions" />
                 </ChildContent>
             </FormSection>
         }
@@ -105,7 +105,7 @@
         {
             <FormSection Title="@Texts.Get("admin.automationRule.published", published.VersionNo)" Icon="check"
                          Description="@(rule.Status == AutomationLabels.Active ? Texts.Get("admin.automationRule.publishedRunning") : Texts.Get("admin.automationRule.publishedOff"))">
-                <VersionView Version="published" Issues="detail.PublishedIssues" />
+                <VersionView Version="published" Issues="detail.PublishedIssues" Entity="EntityOf(rule.EntityKey)" Actions="actions" />
             </FormSection>
 
             @if (CanRun && rule.Status == AutomationLabels.Active && IsManual(published))
@@ -152,6 +152,7 @@
 
     private AutomationRuleDetailDto? detail;
     private IReadOnlyList<AutomationEntityDto> entities = [];
+    private IReadOnlyList<AutomationActionDto> actions = [];
     private IReadOnlyList<string> problems = [];
     private string? message;
     private string? notice;
@@ -172,6 +173,8 @@
         && trigger.TryGetProperty("type", out var type)
         && type.ValueKind == System.Text.Json.JsonValueKind.String
         && type.GetString() == "manual";
+
+    private AutomationEntityDto? EntityOf(string entityKey) => entities.FirstOrDefault(e => e.EntityKey == entityKey);
 
     private string? LabelFieldOf(string entityKey) => entities.FirstOrDefault(e => e.EntityKey == entityKey)?.LabelField;
 
@@ -207,7 +210,9 @@
             return;
         }
 
-        entities = (await Api.GetAsync<AutomationCatalogDto>("/api/automation/catalog")).Value?.Entities ?? [];
+        var catalog = (await Api.GetAsync<AutomationCatalogDto>("/api/automation/catalog")).Value;
+        entities = catalog?.Entities ?? [];
+        actions = catalog?.Actions ?? [];
         await LoadAsync();
     }
 

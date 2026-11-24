@@ -107,6 +107,10 @@ Durum: **Var** = kullanıma hazır, **Stil** = ayrı Razor bileşeni yok, ortak 
 - `step-dots` / `step-dot`: liste satırında adım ilerlemesi (`aria-label` ile metni verilir).
 - `step-track` / `step-track-item`: ayrıntıda dikey adım izi; durum sınıfları `is-approved`, `is-rejected`, `is-active`, `is-cancelled`.
 
+## Otomasyon akışı (ADR-0056 E6-1)
+
+- `FlowView` (`ol.flow` + `li.flow-node`): kural sürümünü salt okunur akış olarak çizer: tetikleyici → koşul → adımlar. Düğüm türü sınıfı `flow-node-trigger|condition|action|wait|stop` (yuvarlak ikon `flow-icon` ton tokenlarıyla boyanır: marka, uyarı, başarı, bilgi, tehlike); gövde `flow-body` içinde `flow-kind` (küçük tür etiketi), `flow-title` ve `flow-line` ayrıntı satırlarıdır. Koşullu adım (dallanma) `is-branch` olur ve `flow-branch` kutusunda koşul satırları ile "Koşul sağlanmazsa atlanır" notunu taşır. Dikey bağlantı çizgisi `step-track` ile aynıdır (`--mx-border`). Renk, köşe ve boşluk yalnızca `--mx-*` tokenlarından. Örnek: `Admin/AutomationRuleDetail.razor` (`VersionView` içinde).
+
 ## Bildirim kutusu
 
 - `NotificationBell`: üst çubukta zil; `notification-count` okunmamış sayısı, `notification-panel` açılır liste, `notification-item.is-unread` okunmamış satır. Bildirim metni kaydın hassas ayrıntısını taşımaz; bağlantı kaydı açar ve yetki orada denetlenir.

@@ -1,4 +1,4 @@
-@* Otomasyon kural sürümünün salt okunur görünümü (ADR-0027, Dilim 5a): ad, açıklama, okunabilir özet, öncelik, geçerlilik ve
+@* Otomasyon kural sürümünün salt okunur görünümü (ADR-0027, Dilim 5a): ad, açıklama, okunabilir özet, öncelik, geçerlilik, akış (ADR-0056 E6-1) ve
    şu anki katalogla doğrulama sorunları. Özeti sunucu üretir (kullanıcının görebildiği alanlarla); burada yeniden hesaplanmaz. *@
 <dl class="detail-grid">
     <dt>@Texts.Get("common.field.name")</dt>
@@ -21,6 +21,12 @@
     }
 </dl>
 
+@if (flow.Count > 0)
+{
+    <h3 class="h6">@Texts.Get("admin.flow.title")</h3>
+    <FlowView Nodes="flow" />
+}
+
 @if (Issues.Count > 0)
 {
     <div class="alert alert-warning" role="alert">
@@ -38,6 +44,16 @@
     [Parameter, EditorRequired] public AutomationVersionDto Version { get; set; } = null!;
 
     [Parameter] public IReadOnlyList<AutomationIssueDto> Issues { get; set; } = [];
+
+    /// <summary>Akış çizimi için kural türünün kataloğu (alan etiketleri, iş olayı adı) ve aksiyon kataloğu; yoksa teknik anahtarlar gösterilir.</summary>
+    [Parameter] public AutomationEntityDto? Entity { get; set; }
+
+    [Parameter] public IReadOnlyList<AutomationActionDto> Actions { get; set; } = [];
+
+    private IReadOnlyList<FlowNode> flow = [];
+
+    protected override void OnParametersSet() =>
+        flow = Version.Definition.ValueKind == System.Text.Json.JsonValueKind.Object ? AutomationFlow.Build(Version.Definition, Entity, Actions) : [];
 
     private string Validity => (Version.ActiveFrom, Version.ActiveUntil) switch
     {

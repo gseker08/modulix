@@ -537,6 +537,73 @@ button.hero-stat {
 .step-track-item.is-rejected .step-track-dot { background: var(--mx-tone-warning-bg); color: var(--mx-tone-warning-fg); }
 .step-track-item.is-active .step-track-dot { background: var(--mx-tone-brand-bg); color: var(--mx-tone-brand-fg); }
 
+/* Otomasyon akışı (ADR-0056 E6-1; docs/design-system/component-catalog.md → FlowView): tetikleyici → koşul → adımlar, salt okunur */
+.flow {
+    margin: 0 0 var(--mx-space-4);
+    padding: 0;
+    list-style: none;
+}
+
+.flow-node {
+    position: relative;
+    display: flex;
+    gap: var(--mx-space-3);
+    padding-bottom: var(--mx-space-4);
+}
+
+    .flow-node:not(:last-child)::before {
+        content: "";
+        position: absolute;
+        top: 1.75rem;
+        bottom: 0;
+        left: 0.8125rem;
+        width: 2px;
+        background: var(--mx-border);
+    }
+
+.flow-icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    background: var(--mx-surface-muted);
+    color: var(--mx-text-secondary);
+}
+
+.flow-node-trigger .flow-icon { background: var(--mx-tone-brand-bg); color: var(--mx-tone-brand-fg); }
+.flow-node-condition .flow-icon { background: var(--mx-tone-warning-bg); color: var(--mx-tone-warning-fg); }
+.flow-node-action .flow-icon { background: var(--mx-tone-success-bg); color: var(--mx-tone-success-fg); }
+.flow-node-wait .flow-icon { background: var(--mx-tone-info-bg); color: var(--mx-tone-info-fg); }
+.flow-node-stop .flow-icon { background: var(--mx-tone-danger-bg); color: var(--mx-tone-danger-fg); }
+
+.flow-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.flow-kind,
+.flow-skip {
+    color: var(--mx-text-secondary);
+}
+
+.flow-line {
+    overflow-wrap: anywhere;
+}
+
+.flow-branch {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: var(--mx-space-1);
+    padding: var(--mx-space-2) var(--mx-space-3);
+    border-radius: var(--mx-radius-card);
+    background: var(--mx-surface-muted);
+}
+
 .step-editor {
     margin-bottom: var(--mx-space-3);
     padding: var(--mx-space-3);

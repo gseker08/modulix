@@ -1,0 +1,50 @@
+@using Modulix.Web.Services
+
+@* Otomasyon kuralının salt okunur akışı (ADR-0056, E6-1): tetikleyici → koşul → adımlar. Ayrı bir model değildir; aynı kural sürümü tanımı çizilir.
+   Koşullu adım (dallanma) "Koşul sağlanmazsa atlanır" notuyla işaretlenir. Düzenleme sonraki dilimdedir. *@
+@if (Nodes.Count > 0)
+{
+    <ol class="flow" aria-label="@Texts.Get("admin.flow.title")">
+        @foreach (var node in Nodes)
+        {
+            <li class="@NodeClass(node)">
+                <span class="flow-icon" aria-hidden="true"><AppIcon Name="@Icon(node.Kind)" Size="16" /></span>
+                <div class="flow-body">
+                    <small class="flow-kind">@node.KindLabel</small>
+                    <strong class="flow-title">@node.Title</strong>
+                    @foreach (var line in node.Lines)
+                    {
+                        <span class="flow-line">@line</span>
+                    }
+                    @if (node.Branch)
+                    {
+                        <div class="flow-branch">
+                            <span class="badge">@Texts.Get("admin.flow.branch")</span>
+                            @foreach (var line in node.BranchLines)
+                            {
+                                <span class="flow-line">@line</span>
+                            }
+                            <small class="flow-skip">@Texts.Get("admin.flow.skipped")</small>
+                        </div>
+                    }
+                </div>
+            </li>
+        }
+    </ol>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<FlowNode> Nodes { get; set; } = [];
+
+    private static string NodeClass(FlowNode node) =>
+        $"flow-node flow-node-{node.Kind.ToString().ToLowerInvariant()}{(node.Branch ? " is-branch" : string.Empty)}";
+
+    private static string Icon(FlowNodeKind kind) => kind switch
+    {
+        FlowNodeKind.Trigger => "zap",
+        FlowNodeKind.Condition => "filter",
+        FlowNodeKind.Wait => "hourglass",
+        FlowNodeKind.Stop => "x",
+        _ => "check",
+    };
+}
