@@ -45,6 +45,9 @@ internal sealed class JourneyEnrollmentService(IRecordPipeline pipeline, Segment
 {
     private static readonly IReadOnlyList<string> WritePermissions = [MarketingModule.Permissions.JourneysWrite];
 
+    /// <summary>Yanıt işareti yolculuk yazma iznini şart koşmaz: kapı açıkken boru hattı bu izinlerden birini arar, yanıtı kaydeden kullanıcı yanıt iznine sahiptir.</summary>
+    private static readonly IReadOnlyList<string> ResponsePermissions = [MarketingModule.Permissions.JourneysWrite, MarketingModule.Permissions.ResponsesWrite];
+
     public Task<RecordResult<RecordData>> ExitAsync(Guid enrollmentId, string? reason, long? expectedVersion, CancellationToken cancellationToken)
     {
         var text = reason?.Trim();
@@ -86,7 +89,7 @@ internal sealed class JourneyEnrollmentService(IRecordPipeline pipeline, Segment
             return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, MarketingMessages.Journey.EnrollmentNotActive);
         }
 
-        using var open = gate.Open(WritePermissions);
+        using var open = gate.Open(ResponsePermissions);
         return await pipeline.UpdateAsync(
             new RecordCommand(MarketingModule.Entities.JourneyEnrollment, enrollmentId, new JsonObject
             {
