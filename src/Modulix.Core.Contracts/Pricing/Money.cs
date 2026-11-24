@@ -20,6 +20,7 @@ public static class PricingErrors
     public const string DiscountExceedsPrice = "discount-exceeds-price";
     public const string PackageCycle = "package-cycle";
     public const string InvalidRate = "invalid-rate";
+    public const string InvalidRule = "invalid-rule";
 }
 
 /// <summary>
