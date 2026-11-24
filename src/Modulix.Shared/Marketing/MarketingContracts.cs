@@ -123,6 +123,19 @@ public sealed record JourneyEnrollmentDto(
 public sealed record SaveJourneyEnrollmentRequest(long Version = 0);
 
 /// <summary>Yolculuk kaydını elle çıkarma isteği (ADR-0056): okunan kaydın sürümü ve zorunlu gerekçe.</summary>
+public sealed record JourneyExitReasonDto(string Reason, int Count);
+
+public sealed record JourneySkipReasonDto(string Code, int Count);
+
+public sealed record JourneyMessageTotalsDto(int Total, int Accepted, int Skipped, int Failed, int Unknown, IReadOnlyList<JourneySkipReasonDto> SkipReasons);
+
+public sealed record JourneyContentRowDto(Guid ContentId, string? Subject, int Total, int Accepted, int Skipped, int Failed, int Unknown);
+
+/// <summary>Yolculuk raporu (ADR-0056): yalnızca sayılar; kişi, adres ya da hedef kimliği yoktur.</summary>
+public sealed record JourneyReportDto(
+    Guid JourneyId, int Enrolled, int Active, int Completed, int Exited, IReadOnlyList<JourneyExitReasonDto> ExitReasons,
+    JourneyMessageTotalsDto Messages, IReadOnlyList<JourneyContentRowDto> Contents, DateTimeOffset GeneratedAt);
+
 public sealed record ExitJourneyEnrollmentRequest(long? Version = null, string? Reason = null);
 
 public static class MarketingAccess

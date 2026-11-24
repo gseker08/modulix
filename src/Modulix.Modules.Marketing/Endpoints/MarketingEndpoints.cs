@@ -66,6 +66,23 @@ internal static class MarketingEndpoints
         }).RequirePermission(MarketingModule.Permissions.JourneysWrite);
 
         var journeys = group.MapGroup("/journeys");
+        journeys.MapGet("/{id:guid}/report", async (Guid id, IJourneyReports reports, CancellationToken ct) =>
+        {
+            var result = await reports.ReportAsync(id, ct);
+            if (!result.IsSuccess)
+            {
+                return RecordProblems.ToProblem(result.Error!);
+            }
+
+            var r = result.Value!;
+            return Results.Ok(new JourneyReportDto(
+                r.JourneyId, r.Enrolled, r.Active, r.Completed, r.Exited, [.. r.ExitReasons.Select(e => new JourneyExitReasonDto(e.Reason, e.Count))],
+                new JourneyMessageTotalsDto(
+                    r.Messages.Total, r.Messages.Accepted, r.Messages.Skipped, r.Messages.Failed, r.Messages.Unknown,
+                    [.. r.Messages.SkipReasons.Select(s => new JourneySkipReasonDto(s.Code, s.Count))]),
+                [.. r.Contents.Select(c => new JourneyContentRowDto(c.ContentId, c.Subject, c.Total, c.Accepted, c.Skipped, c.Failed, c.Unknown))],
+                r.GeneratedAt));
+        }).RequirePermission(MarketingModule.Permissions.ReportsRead);
         journeys.MapPost("/{id:guid}/publish", async (Guid id, JourneyActionRequest r, IJourneyService service, CancellationToken ct) =>
             JourneyRecord(await service.PublishAsync(id, r.Version, ct))).RequirePermission(MarketingModule.Permissions.JourneysPublish);
         journeys.MapPost("/{id:guid}/pause", async (Guid id, JourneyActionRequest r, IJourneyService service, CancellationToken ct) =>
