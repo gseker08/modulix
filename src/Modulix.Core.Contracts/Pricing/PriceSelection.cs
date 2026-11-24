@@ -10,11 +10,15 @@ public enum PriceListScope
     TenantDefault = 4,
 }
 
-/// <summary>Kademeli fiyatlama yöntemi: <c>Volume</c> tüm miktar tek kademenin fiyatından, <c>Graduated</c> her aralık kendi fiyatından.</summary>
+/// <summary>
+/// Kademeli fiyatlama yöntemi: <c>Volume</c> tüm miktar tek kademenin fiyatından, <c>Graduated</c> her aralık kendi fiyatından,
+/// <c>Flat</c> miktarın düştüğü bant için tek sabit tutar (kademenin "fiyatı" birim fiyat değil, bandın toplam tutarıdır; ör. 1–2 palet 100 €).
+/// </summary>
 public enum TierMethod
 {
     Volume,
     Graduated,
+    Flat,
 }
 
 /// <summary>Miktar aralığı [<see cref="MinQuantity"/>, <see cref="MaxQuantity"/>) (üst sınır hariç; boşsa sınırsız). <see cref="IsFree"/> ücretsiz satıştır, fiyatın eksik olması değildir.</summary>
@@ -143,6 +147,13 @@ public static class PriceSelector
             return tier is null ? null : quantity * tier.UnitPrice;
         }
 
+        // Flat: miktarın düştüğü banttaki tutar, miktarla çarpılmaz. Bantlar arasında boşluk olabilir; boşluktaki miktar için fiyat yoktur.
+        if (entry.Method == TierMethod.Flat)
+        {
+            PriceTier? band = tiers.LastOrDefault(t => quantity >= t.MinQuantity && (t.MaxQuantity is null || quantity < t.MaxQuantity));
+            return band?.UnitPrice;
+        }
+
         // Graduated: her aralık kendi dilimi için; bantlar boşluksuz olmalı ve miktarı tamamen kapsamalı.
         decimal total = 0m;
         decimal covered = tiers[0].MinQuantity;
@@ -174,7 +185,12 @@ public static class PriceSelector
     {
         decimal total = Price(entry, quantity)!.Value;
         bool free = total == 0m && entry.Tiers.Any(t => t.IsFree);
-        string how = entry.Method == TierMethod.Volume ? "tüm miktara tek kademe fiyatı" : "her aralığa ayrı fiyat";
+        string how = entry.Method switch
+        {
+            TierMethod.Volume => "tüm miktara tek kademe fiyatı",
+            TierMethod.Flat => "miktarın düştüğü bant için sabit tutar",
+            _ => "her aralığa ayrı fiyat",
+        };
         return new PriceSelection(entry, quantity, total, free,
         [
             reason,

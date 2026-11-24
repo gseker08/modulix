@@ -293,8 +293,15 @@ internal sealed class PriceListItemRecordStore(CrmStoreContext context) : CrmRec
     /// <summary>Bir ürünün bir listedeki kademelerinden fiyat seçici girişi.</summary>
     internal static PriceListEntry EntryOf(PriceList list, IEnumerable<PriceListItem> tiers) =>
         new(list.Id, (int)Math.Min(list.Version, int.MaxValue), list.Currency, ScopeOf(list), list.Status == PricingRules.ListPublished,
-            list.ValidFrom, list.ValidTo, list.TierMethod == PricingRules.MethodGraduated ? TierMethod.Graduated : TierMethod.Volume,
+            list.ValidFrom, list.ValidTo, MethodOf(list.TierMethod),
             [.. tiers.Select(t => new PriceTier(t.MinQuantity, t.MaxQuantity, t.UnitPrice, t.IsFree))]);
+
+    internal static TierMethod MethodOf(string method) => method switch
+    {
+        PricingRules.MethodGraduated => TierMethod.Graduated,
+        PricingRules.MethodFlat => TierMethod.Flat,
+        _ => TierMethod.Volume,
+    };
 
     internal static PriceListScope ScopeOf(PriceList list) => list.Scope switch
     {

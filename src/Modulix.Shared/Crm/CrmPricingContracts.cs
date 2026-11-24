@@ -1,7 +1,7 @@
 namespace Modulix.Shared.Crm;
 
 // Fiyat listeleri, vergi, kur, paket bileşeni ve indirim politikası (ADR-0018).
-// Fiyat listesi: Scope Default | Customer | Segment; Status Draft | Published | Archived (yayımlanan değişmez); TierMethod Volume | Graduated.
+// Fiyat listesi: Scope Default | Customer | Segment; Status Draft | Published | Archived (yayımlanan değişmez); TierMethod Volume | Graduated | Flat (Flat: kademenin fiyatı bant için sabit tutardır, miktarla çarpılmaz).
 // Birim fiyat ürünün TEMEL BİRİMİ başınadır; kademe aralığı [alt, üst) temel birim miktarıdır.
 
 public sealed record TaxRateDto(Guid Id, long Version, string Code, string Name, decimal RatePercent, DateOnly ValidFrom, DateOnly? ValidTo, bool IsActive);
