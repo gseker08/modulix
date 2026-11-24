@@ -141,13 +141,13 @@ public sealed class AppNavigation(SessionState session)
         root.Route ?? MenuSections(root.Id).SelectMany(s => s.Entries).FirstOrDefault()?.Link;
 
     /// <summary>
-    /// Verilen (görünür, sıralı) uygulamaları grup sırasına göre kümeler; kümeler içinde sıra korunur. Hiç uygulaması
+    /// Verilen (görünür, sıralı) uygulamaları grup sırasına (katalog, rol düzeni varsa o) göre kümeler; kümeler içinde sıra korunur. Hiç uygulaması
     /// olmayan grup yer almaz; grubu tanımsız uygulamalar sonda başlıksız (<c>Group == null</c>) kümede toplanır.
     /// </summary>
     public IReadOnlyList<AppRootGroup> Grouped(IReadOnlyList<AppDefinition> listed)
     {
         List<AppRootGroup> result = [];
-        foreach (AppGroup group in AppCatalog.Groups.OrderBy(g => g.Order))
+        foreach (AppGroup group in MenuLayoutRules.OrderGroups([.. AppCatalog.Groups.OrderBy(g => g.Order)], session.Access?.MenuLayout))
         {
             List<AppDefinition> apps = listed.Where(a => a.Group == group.Id).ToList();
             if (apps.Count > 0)

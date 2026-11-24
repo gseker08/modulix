@@ -75,6 +75,30 @@ public static class MenuLayoutRules
     /// <summary>Uygulamanın uygulama panelindeki sıra anahtarı (ör. <c>app.crm</c>); uygulama kimliği küçük harf, rakam, nokta ve tiredir.</summary>
     public static string AppKey(string rootId) => $"app.{rootId}";
 
+    /// <summary>Uygulama panelindeki grubun sıra anahtarı (ör. <c>group.operations</c>); grup kimliği küçük harf, rakam, nokta ve tiredir.</summary>
+    public static string GroupKey(string groupId) => $"group.{groupId}";
+
+    /// <summary>
+    /// Rolün uygulama paneli grup sırasını uygular (E8 dilim 5). Kural öğeyle aynıdır: sıra veren satırların en küçüğü; açık sıralı
+    /// gruplar sırasıyla, sırası verilmeyenler onların arkasında katalog sırasıyla gelir. Satır yoksa sıra olduğu gibi döner.
+    /// Gruptaki uygulamaların sırası ve bir uygulamanın hangi grupta olduğu değişmez (<see cref="OrderApps"/>, katalog).
+    /// </summary>
+    public static IReadOnlyList<AppGroup> OrderGroups(IReadOnlyList<AppGroup> groups, IReadOnlyList<RoleMenuRowDto>? rows)
+    {
+        if (rows is null || rows.Count == 0)
+        {
+            return groups;
+        }
+
+        int? Explicit(AppGroup group) => rows
+            .Where(r => r.ItemKey == GroupKey(group.Id) && r.Order is not null)
+            .Select(r => r.Order)
+            .Min();
+
+        return [.. groups.Select((group, position) => (group, position))
+            .OrderBy(x => Explicit(x.group) ?? int.MaxValue).ThenBy(x => x.position).Select(x => x.group)];
+    }
+
     /// <summary>
     /// Rolün uygulama sırasını uygular (E8 dilim 4): uygulamalar kendi uygulama paneli grubu içinde yer değiştirir, grupların sırası ve
     /// her uygulamanın grubu sabittir. Kural öğeyle aynıdır: sıra veren satırların en küçüğü; bir grupta en az bir uygulamaya açık sıra

@@ -1,6 +1,6 @@
 # Çeviri anadil kontrolü: E8 (çalışma alanı rengi ve rol menüsü)
 
-Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** ve **Azerice (az)** karşılıklarını anadili konuşan bir gözden geçiren için toplar. Türkçe (tr) metinler kaynaktır; en/az metinleri taslaktır ve anadil kontrolünden geçmemiştir (ADR-0034, "taslak" kuralı). Toplam **44 anahtar**.
+Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** ve **Azerice (az)** karşılıklarını anadili konuşan bir gözden geçiren için toplar. Türkçe (tr) metinler kaynaktır; en/az metinleri taslaktır ve anadil kontrolünden geçmemiştir (ADR-0034, "taslak" kuralı). Toplam **49 anahtar**.
 
 ## Nasıl gözden geçirilir
 
@@ -65,6 +65,11 @@ Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** 
 | `server.setting.accent-low-contrast-light` | Vurgu rengi kaydedilirken hata: açık temada yetersiz kontrast; {0} ölçülen, {1} gereken | Bu renk açık temada yeterince okunmuyor (kontrast {0}:1, en az {1}:1 gerekir). | This color is not readable enough in the light theme (contrast {0}:1, at least {1}:1 required). | Bu rəng açıq temada kifayət qədər oxunmur (kontrast {0}:1, ən azı {1}:1 tələb olunur). | |
 | `server.setting.accent-low-contrast-dark` | Vurgu rengi kaydedilirken hata: koyu temada yetersiz kontrast; {0} ölçülen, {1} gereken | Bu renk koyu temada yeterince okunmuyor (kontrast {0}:1, en az {1}:1 gerekir). | This color is not readable enough in the dark theme (contrast {0}:1, at least {1}:1 required). | Bu rəng tünd temada kifayət qədər oxunmur (kontrast {0}:1, ən azı {1}:1 tələb olunur). | |
 | `admin.roleMenu.sectionOrder` | Telefonda bölüm başlık şeridindeki ok düğmelerinin etiketi ("Bölüm sırası: ↑ ↓") | Bölüm sırası | Section order | Bölmə sırası | |
+| `admin.roleMenu.panelGroups` | Rol menü düzeninde uygulama paneli grup listesinin başlığı | Uygulama paneli grupları | App panel groups | Tətbiq paneli qrupları | |
+| `admin.roleMenu.panelGroupsHelp` | Grup listesinin açıklaması | Uygulama panelinde (logoya dokununca açılan pencere) grupların sırasını belirleyin. Uygulamaların grup içindeki sırası aşağıdaki uygulama başlıklarındaki oklarla ayarlanır. | Set the order of the groups in the app panel (the window that opens from the logo). The order of apps within a group is set with the arrows on the app headings below. | Tətbiq panelində (loqoya toxunanda açılan pəncərə) qrupların sırasını təyin edin. Qrupdakı tətbiqlərin sırası aşağıdakı tətbiq başlıqlarındakı oxlarla tənzimlənir. | |
+| `admin.roleMenu.col.group` | Grup listesinin sütun başlığı | Grup | Group | Qrup | |
+| `admin.roleMenu.groupUp` | Düğme erişilebilirlik etiketi; {0} = grup adı | {0} grubunu yukarı taşı | Move group {0} up | {0} qrupunu yuxarı apar | |
+| `admin.roleMenu.groupDown` | Düğme erişilebilirlik etiketi; {0} = grup adı | {0} grubunu aşağı taşı | Move group {0} down | {0} qrupunu aşağı apar | |
 
 ## Sınırlar
 
