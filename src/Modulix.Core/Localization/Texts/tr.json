@@ -13744,7 +13744,7 @@
   "marketing.server.journey.code-locked": "Kod oluşturulduktan sonra değiştirilemez.",
   "marketing.server.journey.target-locked": "Hedef türü oluşturulduktan sonra değiştirilemez.",
   "marketing.server.journey.segment-locked": "Taslak dışındaki yolculuğun giriş segmenti değiştirilemez.",
-  "marketing.server.journey.exit-condition-invalid": "Çıkış koşulu geçerli bir JSON nesnesi olmalıdır.",
+  "marketing.server.journey.exit-condition-invalid": "Çıkış koşulu geçerli bir koşul olmalıdır (segment koşuluyla aynı biçim).",
   "marketing.server.journey.segment-not-usable": "Giriş segmenti etkin (yayımlanmış) olmalıdır.",
   "marketing.server.journey.segment-target-mismatch": "Segmentin hedef türü yolculuğunkiyle aynı olmalıdır.",
   "marketing.server.journey.code-taken": "Bu kodlu bir yolculuk zaten var.",

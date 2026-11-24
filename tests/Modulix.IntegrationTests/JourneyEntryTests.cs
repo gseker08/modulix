@@ -19,7 +19,7 @@ using static Modulix.Modules.Marketing.MarketingModule.Permissions;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0056 dilim 1b-2, 2c-1 ve 2c-2: yolculuk giriş işi, elle çıkarma ve yeniden giriş. Dört test türü: mutlu yol (segmentin yeni üyeleri kayıt olur, olay yayınlanır, iş tekrarında yeni kayıt açmaz,
+/// ADR-0056 dilim 1b-2, 2c-1, 2c-2 ve 2c-3: yolculuk giriş işi, elle çıkarma, yeniden giriş ve çıkış koşulu. Dört test türü: mutlu yol (segmentin yeni üyeleri kayıt olur, olay yayınlanır, iş tekrarında yeni kayıt açmaz,
 /// sonradan segmente giren de girer), hata/doğrulama (etkin olmayan yolculuk girmez; etkinleştirenin izni olmayan segment alanı okunamaz, girişi
 /// uyarıyla atlanır), tenant izolasyonu (yalnızca kendi tenant'ının hedefleri) ve yetki (CRM'i okuyamayan etkinleştiren segmenti çalıştıramaz; iş,
 /// yazma izni verilmiş küme olmadan çalışmaz).
@@ -329,6 +329,109 @@ public class JourneyEntryTests(ModulixApiFactory factory) : IClassFixture<Moduli
     private static async Task<CompanyDto> SetCityAsync(HttpClient client, CompanyDto company, string city)
     {
         var response = await client.PutAsJsonAsync($"/api/crm/companies/{company.Id}", new SaveCompanyRequest(company.Name, City: city, Version: company.Version));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<CompanyDto>())!;
+    }
+
+    // ---- Dilim 2c-3: çıkış koşulu ----
+
+    [Fact]
+    public async Task A_target_that_meets_the_exit_condition_leaves_the_journey_and_one_that_already_meets_it_never_enters()
+    {
+        var (client, tenantId) = await ManagerAsync();
+        var a = await CompanyAsync(client, "Kosul A", "Bursa");
+        await CompanyAsync(client, "Kosul B", "Bursa");
+        var segment = await ActiveSegmentAsync(client, "kosul-segment", "Bursa");
+        var journey = await PublishedWithExitAsync(client, "kosullu", segment.Id, ExitWhenIndustry("Gıda ve içecek"));
+        Assert.Equal(2, (await RunAsync(tenantId)).Sum(o => o.Entered));
+
+        // A "Gıda ve içecek" olunca bir sonraki turda çıkar (neden: exit-condition); B etkin kalır.
+        await SetIndustryAsync(client, a, "Gıda ve içecek");
+        await RunAsync(tenantId);
+        var enrollments = await EnrollmentsAsync(client, journey.Id);
+        var exited = Assert.Single(enrollments, e => e.Status == "Exited");
+        Assert.Equal(("exit-condition", a.PartyId), (exited.ExitReason, exited.TargetId));
+        Assert.Single(enrollments, e => e.Status == "Active");
+
+        // Koşulu zaten sağlayan yeni hedef yolculuğa hiç girmez.
+        await SetIndustryAsync(client, await CompanyAsync(client, "Kosul C", "Bursa"), "Gıda ve içecek");
+        Assert.Equal(0, (await RunAsync(tenantId)).Sum(o => o.Entered));
+        Assert.Equal(2, (await EnrollmentsAsync(client, journey.Id)).Count);
+    }
+
+    [Fact]
+    public async Task An_exit_condition_with_an_unknown_field_is_saved_but_cannot_be_published_until_fixed()
+    {
+        var (client, _) = await ManagerAsync();
+        var segment = await ActiveSegmentAsync(client, "kosul-hata-segment", "Bursa");
+        var created = await client.PostAsJsonAsync("/api/marketing/journeys",
+            new SaveJourneyRequest(Code: "kosul-hata", Name: "Koşul hatası", Target: "Company", SegmentId: segment.Id, ExitCondition: Condition("crm.company.yok", "x")));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var journey = (await created.Content.ReadFromJsonAsync<JourneyDto>())!;
+
+        // Biçim doğru olduğundan kaydedilir; alan kataloğunda olmadığından yayında alan hatasıyla reddedilir.
+        var publish = await client.PostAsJsonAsync($"/api/marketing/journeys/{journey.Id}/publish", new JourneyActionRequest(journey.Version));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, publish.StatusCode);
+        Assert.Contains("exitCondition", (await publish.Content.ReadFromJsonAsync<JsonObject>())!["errors"]!.AsObject().Select(e => e.Key));
+        Assert.Equal("Draft", (await client.GetFromJsonAsync<JourneyDto>($"/api/marketing/journeys/{journey.Id}"))!.Status);
+
+        var fixedUp = await client.PutAsJsonAsync($"/api/marketing/journeys/{journey.Id}",
+            new SaveJourneyRequest(journey.Version, journey.Code, journey.Name, journey.Description, journey.Target, journey.SegmentId, journey.ReentryPolicy, ExitWhenIndustry("Gıda ve içecek"), journey.OwnerId));
+        Assert.Equal(HttpStatusCode.OK, fixedUp.StatusCode);
+        journey = (await fixedUp.Content.ReadFromJsonAsync<JourneyDto>())!;
+        Assert.Equal("Active", (await Transition(client, journey, "publish")).Status);
+    }
+
+    [Fact]
+    public async Task Another_tenants_run_does_not_exit_this_tenants_enrollments()
+    {
+        var (clientA, tenantA) = await ManagerAsync();
+        var (_, tenantB) = await ManagerAsync();
+        var company = await CompanyAsync(clientA, "A Kosul", "Bursa");
+        var segment = await ActiveSegmentAsync(clientA, "a-kosul-segment", "Bursa");
+        var journey = await PublishedWithExitAsync(clientA, "a-kosul", segment.Id, ExitWhenIndustry("Gıda ve içecek"));
+        await RunAsync(tenantA);
+        await SetIndustryAsync(clientA, company, "Gıda ve içecek");
+
+        await RunAsync(tenantB);
+        Assert.Equal("Active", Assert.Single(await EnrollmentsAsync(clientA, journey.Id)).Status);
+        await RunAsync(tenantA);
+        Assert.Equal("Exited", Assert.Single(await EnrollmentsAsync(clientA, journey.Id)).Status);
+    }
+
+    [Fact]
+    public async Task A_publisher_who_cannot_read_the_exit_field_cannot_publish_the_journey()
+    {
+        var tenant = await TenantAsync();
+        var manager = await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions]);
+        var segment = await ActiveSegmentAsync(manager, "kosul-yetki-segment", "Bursa");
+        var created = await manager.PostAsJsonAsync("/api/marketing/journeys",
+            new SaveJourneyRequest(Code: "kosul-yetki", Name: "Koşul yetki", Target: "Company", SegmentId: segment.Id, ExitCondition: ExitWhenIndustry("Gıda ve içecek")));
+        var journey = (await created.Content.ReadFromJsonAsync<JourneyDto>())!;
+
+        // CRM firma alanını okuyamayan yayıncı koşulu doğrulayamaz: alan onun için "yok" sayılır (varlığı sızdırılmaz).
+        var marketingOnly = await UserClientAsync(tenant, AllMarketing);
+        var refused = await marketingOnly.PostAsJsonAsync($"/api/marketing/journeys/{journey.Id}/publish", new JourneyActionRequest(journey.Version));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+        Assert.Equal("Active", (await Transition(manager, journey, "publish")).Status);
+    }
+
+    private static string Condition(string field, string value) =>
+        new JsonObject { ["field"] = field, ["operator"] = "eq", ["values"] = new JsonArray(JsonValue.Create(value)) }.ToJsonString();
+
+    private static string ExitWhenIndustry(string industry) => Condition("crm.company.industry", industry);
+
+    private static async Task<JourneyDto> PublishedWithExitAsync(HttpClient client, string code, Guid segmentId, string exitCondition)
+    {
+        var created = await client.PostAsJsonAsync("/api/marketing/journeys",
+            new SaveJourneyRequest(Code: code, Name: $"Yolculuk {code}", Target: "Company", SegmentId: segmentId, ExitCondition: exitCondition));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        return await Transition(client, (await created.Content.ReadFromJsonAsync<JourneyDto>())!, "publish");
+    }
+
+    private static async Task<CompanyDto> SetIndustryAsync(HttpClient client, CompanyDto company, string industry)
+    {
+        var response = await client.PutAsJsonAsync($"/api/crm/companies/{company.Id}", new SaveCompanyRequest(company.Name, City: company.City, Industry: industry, Version: company.Version));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<CompanyDto>())!;
     }

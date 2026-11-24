@@ -13744,7 +13744,7 @@
   "marketing.server.journey.code-locked": "Kod yaradıldıqdan sonra dəyişdirilə bilməz.",
   "marketing.server.journey.target-locked": "Hədəf növü yaradıldıqdan sonra dəyişdirilə bilməz.",
   "marketing.server.journey.segment-locked": "Layihə olmayan səyahətin giriş seqmenti dəyişdirilə bilməz.",
-  "marketing.server.journey.exit-condition-invalid": "Çıxış şərti düzgün JSON obyekti olmalıdır.",
+  "marketing.server.journey.exit-condition-invalid": "Çıxış şərti etibarlı şərt olmalıdır (seqment şərti ilə eyni format).",
   "marketing.server.journey.segment-not-usable": "Giriş seqmenti aktiv (dərc edilmiş) olmalıdır.",
   "marketing.server.journey.segment-target-mismatch": "Seqmentin hədəf növü səyahətinki ilə eyni olmalıdır.",
   "marketing.server.journey.code-taken": "Bu kodlu səyahət artıq var.",

@@ -55,6 +55,12 @@ public interface ISegmentEngine
     /// <summary>Geçersiz koşulda <see cref="SegmentConditionException"/>, süre aşımında <see cref="SegmentTimeoutException"/>.</summary>
     Task<SegmentEvaluation> EvaluateAsync(SegmentEvaluationRequest request, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Verilen hedef kimliklerinden koşulu sağlayanlar (yalnızca bu kimlikler taranır; tüm kitle değil). Çağıranın alan yetkisi ve veri kapsamı uygulanır;
+    /// geçersiz ya da yetkisiz alanda <see cref="SegmentConditionException"/>, süre aşımında <see cref="SegmentTimeoutException"/>.
+    /// </summary>
+    Task<IReadOnlySet<Guid>> MatchingAsync(SegmentTarget target, SegmentCondition condition, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+
     /// <summary>Hedef kimliklerinin tamamı (sıralı). <paramref name="limit"/> aşılırsa <see cref="SegmentTooLargeException"/>; diğer hatalar <see cref="EvaluateAsync"/> gibidir.</summary>
     Task<IReadOnlyList<Guid>> ResolveIdsAsync(SegmentEvaluationRequest request, int limit, CancellationToken cancellationToken);
 }

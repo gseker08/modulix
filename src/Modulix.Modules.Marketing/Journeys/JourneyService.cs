@@ -1,7 +1,10 @@
 using System.Text.Json.Nodes;
 using Modulix.Core.Contracts.Records;
+using Modulix.Core.Contracts.Localization;
+using Modulix.Modules.Marketing.Contracts;
 using Modulix.Modules.Marketing.Domain;
 using Modulix.Modules.Marketing.Records;
+using Modulix.Modules.Marketing.Segments;
 
 namespace Modulix.Modules.Marketing.Journeys;
 
@@ -24,7 +27,7 @@ public interface IJourneyService
     Task<RecordResult<RecordData>> ArchiveAsync(Guid journeyId, long? expectedVersion, CancellationToken cancellationToken);
 }
 
-internal sealed class JourneyService(IRecordPipeline pipeline, SegmentWorkflowGate gate) : IJourneyService
+internal sealed class JourneyService(IRecordPipeline pipeline, ISegmentEngine engine, SegmentWorkflowGate gate) : IJourneyService
 {
     private static readonly IReadOnlyList<string> PublishPermissions = [MarketingModule.Permissions.JourneysPublish];
 
@@ -59,8 +62,34 @@ internal sealed class JourneyService(IRecordPipeline pipeline, SegmentWorkflowGa
             return RecordResult<RecordData>.Fail(RecordErrorCode.Conflict, notAllowed);
         }
 
+        // Yolculuğu etkinleştiren geçiş (yayın, sürdürme): çıkış koşulu etkinleştirenin görebildiği alanlara karşı doğrulanır (giriş işi koşulu onun izinleriyle çalıştırır).
+        if (target == JourneyStatuses.Active && await ExitConditionProblemsAsync(loaded.Value, cancellationToken) is { Count: > 0 } problems)
+        {
+            return RecordResult<RecordData>.Fail(RecordErrorCode.ValidationFailed, ServerMessages.Record.ValidationFailed, problems);
+        }
+
         using var open = gate.Open(PublishPermissions);
         return await pipeline.UpdateAsync(
             new RecordCommand(MarketingModule.Entities.Journey, journeyId, new JsonObject { ["status"] = target }, expectedVersion), cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<RecordFieldError>> ExitConditionProblemsAsync(RecordData journey, CancellationToken cancellationToken)
+    {
+        var text = journey.Values["exitCondition"]?.GetValue<string>();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return [];
+        }
+
+        var (condition, parseErrors) = SegmentConditions.Parse(text);
+        if (condition is null)
+        {
+            return [.. parseErrors.Select(e => new RecordFieldError("exitCondition", e.Message))];
+        }
+
+        var segmentTarget = Enum.Parse<SegmentTarget>(journey.Values["target"]!.GetValue<string>(), ignoreCase: true);
+        var catalog = await engine.CatalogAsync(segmentTarget, cancellationToken);
+        var errors = SegmentConditions.Validate(condition, catalog.Fields.ToDictionary(f => f.Key, StringComparer.Ordinal), segmentTarget);
+        return [.. errors.Select(e => new RecordFieldError("exitCondition", e.Message))];
     }
 }

@@ -54,15 +54,17 @@ internal sealed class SegmentWorkflowGate
 
     public bool IsOpen => Permissions is not null;
 
+    /// <summary>Kapıyı açar; iç içe açılışlarda kapanış, bir önceki duruma döner (iç iş akışı dışarıdakini kapatmaz).</summary>
     public IDisposable Open(IReadOnlyList<string> permissions)
     {
+        var previous = Permissions;
         Permissions = permissions;
-        return new Closer(this);
+        return new Closer(this, previous);
     }
 
-    private sealed class Closer(SegmentWorkflowGate gate) : IDisposable
+    private sealed class Closer(SegmentWorkflowGate gate, IReadOnlyList<string>? previous) : IDisposable
     {
-        public void Dispose() => gate.Permissions = null;
+        public void Dispose() => gate.Permissions = previous;
     }
 }
 

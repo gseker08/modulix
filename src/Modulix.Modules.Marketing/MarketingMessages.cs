@@ -624,7 +624,7 @@ internal static class MarketingMessages
             ServerMessage.Of("marketing.server.journey.segment-locked", "Taslak dışındaki yolculuğun giriş segmenti değiştirilemez.");
 
         public static ServerMessage ExitConditionInvalid =>
-            ServerMessage.Of("marketing.server.journey.exit-condition-invalid", "Çıkış koşulu geçerli bir JSON nesnesi olmalıdır.");
+            ServerMessage.Of("marketing.server.journey.exit-condition-invalid", "Çıkış koşulu geçerli bir koşul olmalıdır (segment koşuluyla aynı biçim).");
 
         public static ServerMessage SegmentNotUsable =>
             ServerMessage.Of("marketing.server.journey.segment-not-usable", "Giriş segmenti etkin (yayımlanmış) olmalıdır.");
