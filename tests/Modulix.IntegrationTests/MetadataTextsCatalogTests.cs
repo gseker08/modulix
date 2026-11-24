@@ -49,6 +49,7 @@ public class MetadataTextsCatalogTests
         Catalog.Settings.SelectMany(s =>
             new[] { (MetadataTexts.SettingKey(s.Definition.Key), s.Definition.DisplayName), (MetadataTexts.SettingGroupKey(s.Definition.Key), s.Definition.Group) }
                 .Concat(s.Definition.Description is { } description ? [(MetadataTexts.SettingDescriptionKey(s.Definition.Key), description)] : [])
+                .Concat(s.Definition.PatternMessage is { } pattern ? [(MetadataTexts.SettingPatternMessageKey(s.Definition.Key), pattern)] : [])
                 .Concat(s.Definition.Options.Select(o => (MetadataTexts.SettingOptionKey(s.Definition.Key, o.Value), o.Label))));
 
     private static IEnumerable<(string Key, string Source)> AuditedNames() =>

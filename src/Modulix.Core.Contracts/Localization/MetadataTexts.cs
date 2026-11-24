@@ -55,6 +55,9 @@ public static class MetadataTexts
     /// <summary>Firma ayarının açıklaması.</summary>
     public static string SettingDescriptionKey(string settingKey) => $"meta.setting.{settingKey}.description";
 
+    /// <summary>Ayarın biçim hatası iletisi (<see cref="SettingDefinition.PatternMessage"/>); yalnızca bu alanı dolu olan ayarlar için.</summary>
+    public static string SettingPatternMessageKey(string settingKey) => $"meta.setting.{settingKey}.pattern-message";
+
     /// <summary>Seçenekli firma ayarında seçeneğin adı.</summary>
     public static string SettingOptionKey(string settingKey, string value) => $"meta.setting.{settingKey}.option.{KeySegment(value)}";
 

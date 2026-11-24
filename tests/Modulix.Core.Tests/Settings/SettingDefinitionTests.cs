@@ -1,4 +1,5 @@
 using Modulix.Core.Contracts.Modules;
+using Modulix.Core.Localization;
 using Modulix.Core.Modules;
 using Modulix.Core.Settings;
 
@@ -63,6 +64,26 @@ public class SettingDefinitionTests
         var definition = ModuleCatalog.Create().FindSetting(key)!.Value.Definition;
 
         Assert.Equal(valid, SettingRules.Validate(definition, value) is null);
+    }
+
+    [Fact]
+    public void Pattern_message_is_a_translatable_message_with_the_turkish_source_text()
+    {
+        // Ayarın kendi biçim iletisi (PatternMessage) de sözlükten çevrilir: anahtar meta.setting.<anahtar>.pattern-message.
+        var definition = ModuleCatalog.Create().FindSetting(CoreModule.SettingKeys.TaxNumber)!.Value.Definition;
+
+        var error = SettingRules.Validate(definition, "12345")!;
+
+        Assert.Equal("meta.setting.core.profile.tax-number.pattern-message", error.Key);
+        Assert.Equal("Vergi numarası 10, T.C. kimlik numarası 11 rakamdır.", error.Text);
+        var catalog = new TextCatalog();
+        Assert.Equal("A tax number has 10 digits, a Turkish ID number has 11.", catalog.Translate("en", error));
+        Assert.Equal("Vergi nömrəsi 10, T.C. şəxsiyyət nömrəsi 11 rəqəmdir.", catalog.Translate("az", error));
+        Assert.Equal(error.Text, catalog.Translate("tr", error));
+
+        // PatternMessage'ı olmayan ayarda ortak ileti kullanılır.
+        var plain = ModuleCatalog.Create().FindSetting(CoreModule.SettingKeys.Email)!.Value.Definition;
+        Assert.Equal("server.validation.email", SettingRules.Validate(plain, "bozuk")!.Key);
     }
 
     [Fact]
