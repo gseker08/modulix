@@ -50,7 +50,9 @@ public static partial class SettingRules
             SettingType.Email when !IsEmail(value) => ServerMessages.Validation.Email,
             SettingType.Phone when !PhonePattern().IsMatch(value) => ServerMessages.Validation.Phone,
             _ when definition.Pattern is { } pattern && !Regex.IsMatch(value, pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)) =>
-                definition.PatternMessage is { } custom ? custom : ServerMessages.Setting.Pattern,
+                definition.PatternMessage is { } custom
+                ? ServerMessage.Of(MetadataTexts.SettingPatternMessageKey(definition.Key), custom)
+                : ServerMessages.Setting.Pattern,
             _ => null,
         };
     }

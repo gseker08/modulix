@@ -1,6 +1,6 @@
 # Çeviri anadil kontrolü: E8 (çalışma alanı rengi ve rol menüsü)
 
-Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** ve **Azerice (az)** karşılıklarını anadili konuşan bir gözden geçiren için toplar. Türkçe (tr) metinler kaynaktır; en/az metinleri taslaktır ve anadil kontrolünden geçmemiştir (ADR-0034, "taslak" kuralı). Toplam **55 anahtar**.
+Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** ve **Azerice (az)** karşılıklarını anadili konuşan bir gözden geçiren için toplar. Türkçe (tr) metinler kaynaktır; en/az metinleri taslaktır ve anadil kontrolünden geçmemiştir (ADR-0034, "taslak" kuralı). Toplam **55 anahtar** (aşağıdaki ilk tablo) ve ayrıca ayarların biçim hatası iletileri (28 anahtar, 16 farklı metin; son bölüm).
 
 ## Nasıl gözden geçirilir
 
@@ -77,7 +77,30 @@ Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** 
 | `admin.roleMenu.sectionCount` | Bölüm başlığında satır sayısı; {0} = sayı | {0} satır | {0} rows | {0} sətir | |
 | `admin.roleMenu.sectionCountHidden` | Bölüm başlığında satır ve gizli satır sayısı; {0}, {1} = sayılar | {0} satır, {1} gizli | {0} rows, {1} hidden | {0} sətir, {1} gizli | |
 
+## Ayarların biçim hatası iletileri (PatternMessage)
+
+Ayar kaydedilirken değer biçime uymazsa dönen ileti. 28 ayar anahtarı (16 farklı metin; aynı metinli ayarlar aynı çeviriyi taşır). Her ayar kendi anahtarına sahiptir (`meta.setting.<ayar anahtarı>.pattern-message`); aşağıda her metnin ilk anahtarı örnek olarak verilmiştir. Çeviriyi düzeltirken aynı Türkçe metne sahip bütün anahtarların en/az metni birlikte değişmelidir.
+
+| Ayar sayısı | Örnek anahtar | tr (kaynak) | en | az | Gözden geçirenin notu / öneri |
+|---|---|---|---|---|---|
+| 1 | `meta.setting.crm.quote.approval-discount-percent.pattern-message` | 0-100 arası bir yüzde girin. | Enter a percentage between 0 and 100. | 0-100 arasında faiz daxil edin. | |
+| 1 | `meta.setting.support.survey.reminder-days.pattern-message` | 0-30 arası tam sayı girin. | Enter a whole number between 0 and 30. | 0-30 arasında tam ədəd daxil edin. | |
+| 6 | `meta.setting.crm.quote.follow-up-days.pattern-message` (ve 5 ayar daha) | 0-999 arası tam sayı girin. | Enter a whole number between 0 and 999. | 0-999 arasında tam ədəd daxil edin. | |
+| 3 | `meta.setting.contracts.approval.due-hours.pattern-message` (ve 2 ayar daha) | 0-9999 arası tam sayı girin. | Enter a whole number between 0 and 9999. | 0-9999 arasında tam ədəd daxil edin. | |
+| 2 | `meta.setting.crm.forecast.commit-min-probability.pattern-message` (ve 1 ayar daha) | 1-100 arası tam sayı girin. | Enter a whole number between 1 and 100. | 1-100 arasında tam ədəd daxil edin. | |
+| 1 | `meta.setting.crm.reporting.fiscal-year-start-month.pattern-message` | 1-12 arası ay numarası girin. | Enter a month number between 1 and 12. | 1-12 arasında ay nömrəsi daxil edin. | |
+| 1 | `meta.setting.orders.handover.accept-due-days.pattern-message` | 1-30 arası tam sayı girin. | Enter a whole number between 1 and 30. | 1-30 arasında tam ədəd daxil edin. | |
+| 3 | `meta.setting.contracts.signature.validity-days.pattern-message` (ve 2 ayar daha) | 1-90 arası tam sayı girin. | Enter a whole number between 1 and 90. | 1-90 arasında tam ədəd daxil edin. | |
+| 3 | `meta.setting.crm.lead.first-contact-target-hours.pattern-message` (ve 2 ayar daha) | 1-9999 arası tam sayı girin. | Enter a whole number between 1 and 9999. | 1-9999 arasında tam ədəd daxil edin. | |
+| 1 | `meta.setting.crm.opportunity.stage-requirements.pattern-message` | Biçim: Aşama=alan\|alan;Aşama=alan | Format: Stage=field\|field;Stage=field | Format: Mərhələ=sahə\|sahə;Mərhələ=sahə | |
+| 1 | `meta.setting.crm.opportunity.stage-probabilities.pattern-message` | Biçim: Aşama=yüzde;Aşama=yüzde (0-100) | Format: Stage=percent;Stage=percent (0-100) | Format: Mərhələ=faiz;Mərhələ=faiz (0-100) | |
+| 1 | `meta.setting.crm.quote.approval-gross-above.pattern-message` | Negatif olmayan bir tutar girin. | Enter a non-negative amount. | Mənfi olmayan məbləğ daxil edin. | |
+| 1 | `meta.setting.core.appearance.accent-light.pattern-message` | Renk #RRGGBB biçiminde olmalıdır (ör. #087DB8). | The color must be in #RRGGBB format (e.g. #087DB8). | Rəng #RRGGBB formatında olmalıdır (məs. #087DB8). | |
+| 1 | `meta.setting.core.appearance.accent-dark.pattern-message` | Renk #RRGGBB biçiminde olmalıdır (ör. #3BAEE6). | The color must be in #RRGGBB format (e.g. #3BAEE6). | Rəng #RRGGBB formatında olmalıdır (məs. #3BAEE6). | |
+| 1 | `meta.setting.core.profile.tax-number.pattern-message` | Vergi numarası 10, T.C. kimlik numarası 11 rakamdır. | A tax number has 10 digits, a Turkish ID number has 11. | Vergi nömrəsi 10, T.C. şəxsiyyət nömrəsi 11 rəqəmdir. | |
+| 1 | `meta.setting.contracts.renewal.reminder-days.pattern-message` | Virgülle ayrılmış gün sayıları girin (ör. 90,60,30,7). | Enter comma-separated day counts (e.g. 90,60,30,7). | Vergüllə ayrılmış gün sayları daxil edin (məs. 90,60,30,7). | |
+
 ## Sınırlar
 
 - Bu liste yalnızca E8 ile eklenen anahtarları kapsar; diğer taslak en/az metinleri (ADR-0034 aşama 4 dilimleri) ayrı bir gözden geçirme gerektirir.
-- Ayar kaydedilirken dönen doğrulama hataları (son 8 satır, `server.setting.*`) artık sözlükten çevrilir. Ayarın kendi `PatternMessage` metni (ör. vergi numarası biçimi) modüle özgü olduğu için hâlâ Türkçedir.
+- Ayar kaydedilirken dönen doğrulama hataları (`server.setting.*` ve ayarların kendi biçim iletileri) sözlükten çevrilir; "Aşama=alan|alan" gibi biçim örneklerinde Türkçe sözcükler kullanıcının gireceği değerlerin yer tutucusudur, en/az'de de yer tutucu olarak çevrilmiştir.
