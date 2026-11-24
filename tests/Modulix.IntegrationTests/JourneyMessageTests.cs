@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -7,9 +8,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Modulix.Api.Jobs;
 using Modulix.Api.Tenancy;
 using Modulix.Core.Contracts.Authorization;
+using Modulix.Core.Contracts.Automation;
 using Modulix.Core.Contracts.Communication;
 using Modulix.Core.Contracts.Tenancy;
 using Modulix.Core.Modules;
+using Modulix.Infrastructure.Automation;
+using Modulix.Infrastructure.Events;
 using Modulix.Infrastructure.Identity;
 using Modulix.Infrastructure.Persistence;
 using Modulix.Modules.Crm;
@@ -18,6 +22,7 @@ using Modulix.Modules.Marketing.Contracts;
 using Modulix.Modules.Marketing.Domain;
 using Modulix.Modules.Marketing.Journeys;
 using Modulix.Shared.Auth;
+using Modulix.Shared.Automation;
 using Modulix.Shared.Communication;
 using Modulix.Shared.Crm;
 using Modulix.Shared.Marketing;
@@ -28,7 +33,7 @@ using static Modulix.Modules.Marketing.MarketingModule.Permissions;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0056 dilim 2a: yolculuk iletisi göndericisi. Dört test türü: mutlu yol (iletinin kabulü, abonelik bağlantısı, aynı adımın ikinci kez gitmemesi, ayrı adımın
+/// ADR-0056 dilim 2a ve 2b: yolculuk iletisi göndericisi ve onun kural motoruna bağlanması (<c>marketing.journey.send</c> aksiyonu, "yolculuğa girildi" olayı). Dört test türü: mutlu yol (iletinin kabulü, abonelik bağlantısı, aynı adımın ikinci kez gitmemesi, ayrı adımın
 /// gitmesi), hata/doğrulama (izin yok, alıcı yok, sağlayıcı yok, etkin olmayan yolculuk: hepsi hata değil "gönderilmedi" + neden kodu), tenant izolasyonu ve yetki
 /// (alıcı kaynağını okuyamayan kimlik gönderemez). Test sağlayıcısı iletiyi hiçbir yere göndermez.
 /// </summary>
@@ -47,7 +52,8 @@ public class JourneyMessageTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
     private static readonly string[] Preparer =
     [
         SegmentsRead, SegmentsWrite, SegmentsPublish, RecipientsRead, CampaignsRead, CampaignsWrite, CampaignsAudience, JourneysRead, JourneysWrite, JourneysPublish,
-        CoreModule.Permissions.ManageSettings, .. CrmPermissions, .. Communication,
+        CoreModule.Permissions.ManageSettings, CoreModule.Permissions.ReadAutomation, CoreModule.Permissions.ManageAutomation, CoreModule.Permissions.PublishAutomation,
+        .. CrmPermissions, .. Communication,
     ];
 
     private readonly ModulixApiFactory factory;
@@ -221,6 +227,139 @@ public class JourneyMessageTests : IClassFixture<ModulixApiFactory>, IAsyncLifet
         var hidden = await SendAsync(w, w.Enrollment, "yetki-2", as_: noContent);
         Assert.Equal((JourneyMessageOutcomes.Failed, "content-not-found"), (hidden.Outcome, hidden.Code));
         Assert.DoesNotContain(Sent, s => s.Address == "yetki@a.test");
+    }
+
+    // ---- Dilim 2b: kural motoruna bağlama ----
+
+    [Fact]
+    public async Task A_published_journey_rule_sends_each_step_once_when_the_target_enters_the_journey()
+    {
+        var w = await WorldAsync("kural@a.test");
+        var rule = await PublishJourneyRuleAsync(w.Preparer, w.Journey.Id, w.ContentId, "ilk", "ikinci");
+
+        await DeliverAndRunAsync(w.Tenant.Id);
+        var rows = await MessagesAsync(w.Tenant.Id, w.Enrollment);
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, m => Assert.Equal(JourneyMessageOutcomes.Accepted, m.Outcome));
+        Assert.Equal(2, rows.Select(m => m.StepKey).Distinct().Count());
+        Assert.Equal(2, Sent.Count(s => s.Address == "kural@a.test"));
+        Assert.NotEqual(Guid.Empty, rule);
+
+        // Olaylar yeniden teslim edilse de (en az bir kez teslim) ve kural turu tekrar çalışsa da ileti ikinci kez gitmez.
+        await ReplayDeliveriesAsync(w.Tenant.Id);
+        await DeliverAndRunAsync(w.Tenant.Id);
+        Assert.Equal(2, (await MessagesAsync(w.Tenant.Id, w.Enrollment)).Count);
+        Assert.Equal(2, Sent.Count(s => s.Address == "kural@a.test"));
+    }
+
+    [Fact]
+    public async Task A_rule_bound_to_another_journey_does_not_run_and_a_denied_recipient_skips_the_step_without_failing_the_run()
+    {
+        var w = await WorldAsync("baska@a.test", consent: false);
+
+        // Koşulu başka bir yolculuğa bağlı kural bu girişte çalışmaz.
+        await PublishJourneyRuleAsync(w.Preparer, Guid.NewGuid(), w.ContentId, "yabanci");
+        await DeliverAndRunAsync(w.Tenant.Id);
+        Assert.Empty(await MessagesAsync(w.Tenant.Id, w.Enrollment));
+
+        // İzni olmayan alıcıda adım atlanır (hata değil): günlükte Skipped, sağlayıcıya ileti gitmez.
+        await PublishJourneyRuleAsync(w.Preparer, w.Journey.Id, w.ContentId, "izinsiz");
+        await ReplayDeliveriesAsync(w.Tenant.Id);
+        await DeliverAndRunAsync(w.Tenant.Id);
+        var row = Assert.Single(await MessagesAsync(w.Tenant.Id, w.Enrollment));
+        Assert.Equal(JourneyMessageOutcomes.Skipped, row.Outcome);
+        Assert.DoesNotContain(Sent, s => s.Address == "baska@a.test");
+    }
+
+    [Fact]
+    public async Task Another_tenants_rule_never_sends_for_this_tenants_enrollment()
+    {
+        var a = await WorldAsync("a-kural@a.test");
+        var b = await WorldAsync("b-kural@b.test");
+        await PublishJourneyRuleAsync(b.Preparer, a.Journey.Id, b.ContentId, "yabanci-kural");
+
+        await DeliverAndRunAsync(a.Tenant.Id);
+        await DeliverAndRunAsync(b.Tenant.Id);
+        Assert.Empty(await MessagesAsync(a.Tenant.Id, a.Enrollment));
+        Assert.Empty(await MessagesAsync(b.Tenant.Id, b.Enrollment));
+        Assert.DoesNotContain(Sent, s => s.Address is "a-kural@a.test" or "b-kural@b.test");
+    }
+
+    [Fact]
+    public async Task A_publisher_who_cannot_read_crm_contacts_cannot_publish_the_send_step()
+    {
+        var w = await WorldAsync("yayin@a.test");
+        var publisher = await UserClientAsync(w.Tenant, [.. Preparer.Where(p => p != CrmModule.Permissions.ContactsRead)]);
+        var definition = JourneyRule(w.Journey.Id, w.ContentId, "yetkisiz");
+        var create = await publisher.PostAsJsonAsync("/api/automation/rules", new CreateAutomationRuleRequest(
+            MarketingModule.ModuleKey, MarketingModule.Entities.JourneyEnrollment, $"Yolculuk {Guid.NewGuid():N}"[..20], null, 100, false, null, null,
+            JsonSerializer.SerializeToElement(definition, AutomationJson.Options)));
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var rule = (await create.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!;
+        var publish = await publisher.PostAsJsonAsync($"/api/automation/rules/{rule.Rule.Id}/publish", new PublishAutomationRuleRequest(true, null));
+        Assert.NotEqual(HttpStatusCode.OK, publish.StatusCode);
+        Assert.Contains("gereken izne", await publish.Content.ReadAsStringAsync());
+    }
+
+    private static AutomationDefinition JourneyRule(Guid journeyId, Guid contentId, params string[] steps) => new(
+        new DomainEventTrigger(MarketingModule.Events.JourneyEntered),
+        new ConditionLeaf("marketing.journey-enrollment.journeyId", AutomationOperator.Eq, [journeyId.ToString()]),
+        [.. steps.Select(id => new AutomationActionStep(id, JourneyAutomation.SendAction, new JsonObject { ["contentId"] = contentId.ToString() }))]);
+
+    private static async Task<Guid> PublishJourneyRuleAsync(HttpClient client, Guid journeyId, Guid contentId, params string[] steps)
+    {
+        var create = await client.PostAsJsonAsync("/api/automation/rules", new CreateAutomationRuleRequest(
+            MarketingModule.ModuleKey, MarketingModule.Entities.JourneyEnrollment, $"Yolculuk {Guid.NewGuid():N}"[..20], null, 100, false, null, null,
+            JsonSerializer.SerializeToElement(JourneyRule(journeyId, contentId, steps), AutomationJson.Options)));
+        Assert.True(create.StatusCode == HttpStatusCode.Created, await create.Content.ReadAsStringAsync());
+        var rule = (await create.Content.ReadFromJsonAsync<AutomationRuleDetailDto>())!;
+        var publish = await client.PostAsJsonAsync($"/api/automation/rules/{rule.Rule.Id}/publish", new PublishAutomationRuleRequest(true, null));
+        Assert.True(publish.StatusCode == HttpStatusCode.OK, await publish.Content.ReadAsStringAsync());
+        return rule.Rule.Id;
+    }
+
+    /// <summary>Olayları dağıtır (olay tetikleyicili kurallar çalışma açar), sonra kural turu bekleyen çalışmaları yürütür.</summary>
+    private async Task DeliverAndRunAsync(Guid tenantId)
+    {
+        await DrainAsync(tenantId);
+        var (_, skipped) = await host.Services.GetRequiredService<AutomationRunner>().RunTenantAsync(tenantId, CancellationToken.None);
+        Assert.False(skipped);
+        await DrainAsync(tenantId);
+    }
+
+    private async Task DrainAsync(Guid tenantId)
+    {
+        for (var i = 0; i < 20; i++)
+        {
+            using var scope = TenantScope(tenantId);
+            var round = await scope.ServiceProvider.GetRequiredService<EventDispatcher>().RunOnceAsync(CancellationToken.None);
+            if (round.Dispatched == 0 && round.Delivered == 0)
+            {
+                return;
+            }
+        }
+    }
+
+    /// <summary>Tüm teslimleri yeniden "bekliyor" yapar: en az bir kez teslim garantisinin tekrarını taklit eder.</summary>
+    private async Task ReplayDeliveriesAsync(Guid tenantId)
+    {
+        using var scope = TenantScope(tenantId);
+        await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().Database
+            .ExecuteSqlRawAsync("DELETE FROM platform.EventDeliveries; UPDATE platform.OutboxMessages SET DispatchedAt = NULL");
+    }
+
+    private IServiceScope TenantScope(Guid tenantId)
+    {
+        var scope = host.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<HttpTenantContextAccessor>().Current = new TenantContext(tenantId, Guid.Empty, Guid.Empty);
+        return scope;
+    }
+
+    private async Task<HttpClient> UserClientAsync(Modulix.Core.Platform.Tenant tenant, string[] permissions)
+    {
+        var user = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, permissions, RecordScope.All, user);
+        return await LoginAsync(user);
     }
 
     // ---- Yardımcılar ----
