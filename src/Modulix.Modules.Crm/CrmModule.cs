@@ -462,6 +462,8 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         new(Entities.Opportunity, "Fırsat"),
         new(Entities.Activity, "Aktivite"),
         new(Entities.Lead, "Lead"),
+        new(Entities.Quote, "Teklif"),
+        new(Entities.QuoteLine, "Teklif satırı"),
     ];
 
     /// <summary>Lookup alanları (ADR-0016); tanımlar <see cref="CrmLookupDefinitions"/>'tadır.</summary>

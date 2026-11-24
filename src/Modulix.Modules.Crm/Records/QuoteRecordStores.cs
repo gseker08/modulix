@@ -432,7 +432,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
                 ProductCode = l.ProductCode, Name = l.Name, Description = l.Description, Quantity = l.Quantity, UnitId = l.UnitId, UnitName = l.UnitName,
                 UnitPrice = l.UnitPrice, DiscountKind = l.DiscountKind, DiscountValue = l.DiscountValue, TaxRatePercent = l.TaxRatePercent, TaxCode = l.TaxCode,
                 Role = l.Role, IsSelected = l.IsSelected, ParentStableKey = l.ParentStableKey is { } p ? keys[p] : null, RecurringPeriod = l.RecurringPeriod,
-                UnitCost = l.UnitCost,
+                UnitCost = l.UnitCost, CustomFields = l.CustomFields,
             };
             Context.Data.Set<QuoteLine>().Add(copy);
             copies.Add(copy);

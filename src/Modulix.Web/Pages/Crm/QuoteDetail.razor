@@ -1,9 +1,11 @@
 @page "/crm/teklifler/yeni"
 @page "/crm/teklifler/{Id:guid}"
 @using System.Text.Json
+@using System.Text.Json.Nodes
 @inject ApiClient Api
 @inject SessionState Session
 @inject CrmLookups Lookups
+@inject FormLayouts Layouts
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
 
@@ -53,7 +55,6 @@
         }
 
         <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
-            <TabBar Tabs="HeaderTabs" State="headerTabs" Label="@Texts.Get("crm.quoteDetail.formSections")" />
             <fieldset disabled="@(!CanEditHeader || busy)">
                 <legend class="visually-hidden">@Texts.Get("crm.quoteDetail.generalInfo")</legend>
                 @if (errors is { Count: > 0 })
@@ -68,106 +69,100 @@
                         </ul>
                     </div>
                 }
-                <TabPanel State="headerTabs" Key="form-genel">
-                <div class="form-grid" @oninput="() => dirty = true">
-                    <div class="span-all">
-                        <label class="form-label" for="q-title">@Texts.Get("crm.quoteDetail.field.title")</label>
-                        <input id="q-title" class="form-control" maxlength="200" @bind="form.Title" aria-invalid="@(errors?.ContainsKey("title") == true)" />
-                        <FieldError Field="title" Errors="errors" />
-                    </div>
-                    <div>
-                        <label class="form-label" for="companyId">@Texts.Get("crm.quoteDetail.field.company")</label>
-                        <LookupPicker Id="companyId" LookupKey="crm.quote.company" @bind-Value="form.CompanyId" Required="true"
-                                      Invalid="@(errors?.ContainsKey("companyId") == true)" ReadOnly="@(!CanEditHeader)" />
-                        <FieldError Field="companyId" Errors="errors" />
-                    </div>
-                    <div>
-                        <label class="form-label" for="contactId">@Texts.Get("crm.quoteDetail.field.contact")</label>
-                        <LookupPicker Id="contactId" LookupKey="crm.quote.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Placeholder="—"
-                                      Invalid="@(errors?.ContainsKey("contactId") == true)" ReadOnly="@(!CanEditHeader)" />
-                        <FieldError Field="contactId" Errors="errors" />
-                    </div>
-                    <div>
-                        <label class="form-label" for="opportunityId">@Texts.Get("crm.quoteDetail.field.opportunity")</label>
-                        <LookupPicker Id="opportunityId" LookupKey="crm.quote.opportunity" @bind-Value="form.OpportunityId" ParentId="form.CompanyId" Placeholder="—"
-                                      Invalid="@(errors?.ContainsKey("opportunityId") == true)" ReadOnly="@(!CanEditHeader)" />
-                        <FieldError Field="opportunityId" Errors="errors" />
-                    </div>
-                    <div>
-                        <label class="form-label" for="ownerId">@Texts.Get("common.field.owner")</label>
-                        <LookupPicker Id="ownerId" LookupKey="crm.quote.owner" @bind-Value="form.OwnerId" Placeholder="@(quote is null ? Texts.Get("common.me") : "—")" ReadOnly="@(!CanEditHeader)" />
-                    </div>
+                <div @oninput="() => dirty = true" @onchange="() => dirty = true">
+                    <LayoutForm Layout="layout" CustomFields="HeaderCustomFields" CustomValues="form.Custom" Errors="errors" Shows="ShowsField" TabsLabel="@Texts.Get("crm.quoteDetail.formSections")">
+                        <Field Context="f">
+                            @switch (f.Key)
+                            {
+                                case "title":
+                                    <label class="@f.LabelClass()" for="q-title">@f.Label</label>
+                                    <input id="q-title" class="form-control" maxlength="200" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.Title" aria-invalid="@(errors?.ContainsKey("title") == true)" />
+                                    <FieldError Field="title" Errors="errors" />
+                                    break;
+                                case "companyId":
+                                    <label class="@f.LabelClass()" for="companyId">@f.Label</label>
+                                    <LookupPicker Id="companyId" LookupKey="crm.quote.company" @bind-Value="form.CompanyId" Required="true"
+                                                  Invalid="@(errors?.ContainsKey("companyId") == true)" ReadOnly="@(!CanEditHeader)" />
+                                    <FieldError Field="companyId" Errors="errors" />
+                                    break;
+                                case "contactId":
+                                    <label class="@f.LabelClass()" for="contactId">@f.Label</label>
+                                    <LookupPicker Id="contactId" LookupKey="crm.quote.contact" @bind-Value="form.ContactId" ParentId="form.CompanyId" Placeholder="—" Required="f.Required"
+                                                  Invalid="@(errors?.ContainsKey("contactId") == true)" ReadOnly="@(!CanEditHeader)" />
+                                    <FieldError Field="contactId" Errors="errors" />
+                                    break;
+                                case "opportunityId":
+                                    <label class="@f.LabelClass()" for="opportunityId">@f.Label</label>
+                                    <LookupPicker Id="opportunityId" LookupKey="crm.quote.opportunity" @bind-Value="form.OpportunityId" ParentId="form.CompanyId" Placeholder="—" Required="f.Required"
+                                                  Invalid="@(errors?.ContainsKey("opportunityId") == true)" ReadOnly="@(!CanEditHeader)" />
+                                    <FieldError Field="opportunityId" Errors="errors" />
+                                    break;
+                                case "ownerId":
+                                    <label class="@f.LabelClass()" for="ownerId">@f.Label</label>
+                                    <LookupPicker Id="ownerId" LookupKey="crm.quote.owner" @bind-Value="form.OwnerId" Placeholder="@(quote is null ? Texts.Get("common.me") : "—")" Required="f.Required" ReadOnly="@(!CanEditHeader)" />
+                                    break;
+                                case "priceListId":
+                                    <label class="@f.LabelClass()" for="priceListId">@f.Label</label>
+                                    <LookupPicker Id="priceListId" LookupKey="crm.quote.price-list" @bind-Value="form.PriceListId" Placeholder="@Texts.Get("crm.quoteDetail.field.priceListPlaceholder")" Required="f.Required"
+                                                  Invalid="@(errors?.ContainsKey("priceListId") == true)" ReadOnly="@(!CanEditHeader)" />
+                                    <FieldError Field="priceListId" Errors="errors" />
+                                    break;
+                                case "currency":
+                                    <label class="@f.LabelClass()" for="q-currency">@f.Label</label>
+                                    <input id="q-currency" class="form-control" maxlength="3" @bind="form.Currency" />
+                                    <FieldError Field="currency" Errors="errors" />
+                                    break;
+                                case "validUntil":
+                                    <label class="@f.LabelClass()" for="q-valid">@f.Label</label>
+                                    <input id="q-valid" type="datetime-local" class="form-control" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ValidUntil" />
+                                    <FieldError Field="validUntil" Errors="errors" />
+                                    @if (quote is null && defaultValidityDays > 0) { <small class="text-muted">@Texts.Get("crm.quoteDetail.validityHint", defaultValidityDays)</small> }
+                                    break;
+                                case "priceIncludesTax":
+                                    <label class="@f.LabelClass()" for="q-tax">@f.Label</label>
+                                    <select id="q-tax" class="form-select" @bind="form.PriceIncludesTax">
+                                        <option value="@false">@Texts.Get("crm.quoteDetail.taxExcluded")</option>
+                                        <option value="@true">@Texts.Get("crm.quoteDetail.taxIncluded")</option>
+                                    </select>
+                                    <FieldError Field="priceIncludesTax" Errors="errors" />
+                                    break;
+                                case "documentDiscountKind":
+                                    <label class="@f.LabelClass()" for="q-dk">@f.Label</label>
+                                    <select id="q-dk" class="form-select" @bind="form.DocumentDiscountKind" disabled="@(!Session.Can(CrmAccess.QuotesDiscount))">
+                                        @foreach (var kind in QuoteLabels.DiscountKinds) { <option value="@kind.Key">@kind.Label</option> }
+                                    </select>
+                                    break;
+                                case "documentDiscountValue":
+                                    <label class="@f.LabelClass()" for="q-dv">@f.Label</label>
+                                    <input id="q-dv" type="number" step="0.01" min="0" class="form-control" @bind="form.DocumentDiscountValue"
+                                           disabled="@(!Session.Can(CrmAccess.QuotesDiscount) || form.DocumentDiscountKind == "None")" />
+                                    <FieldError Field="documentDiscountValue" Errors="errors" />
+                                    break;
+                                case "paymentTerms":
+                                    <label class="@f.LabelClass()" for="q-pay">@f.Label</label>
+                                    <textarea id="q-pay" class="form-control" rows="2" maxlength="4000" @bind="form.PaymentTerms"></textarea>
+                                    break;
+                                case "deliveryTerms":
+                                    <label class="@f.LabelClass()" for="q-del">@f.Label</label>
+                                    <textarea id="q-del" class="form-control" rows="2" maxlength="4000" @bind="form.DeliveryTerms"></textarea>
+                                    break;
+                                case "commercialTerms":
+                                    <label class="@f.LabelClass()" for="q-com">@f.Label</label>
+                                    <textarea id="q-com" class="form-control" rows="3" maxlength="4000" @bind="form.CommercialTerms"></textarea>
+                                    break;
+                                case "internalNotes":
+                                    <label class="@f.LabelClass()" for="q-int">@f.Label <small class="text-muted">@Texts.Get("crm.quoteDetail.field.internalNotesHint")</small></label>
+                                    <textarea id="q-int" class="form-control" rows="2" maxlength="4000" @bind="form.InternalNotes"></textarea>
+                                    break;
+                            }
+                        </Field>
+                    </LayoutForm>
                 </div>
-                </TabPanel>
-                <TabPanel State="headerTabs" Key="form-fiyat">
-                <div class="form-grid" @oninput="() => dirty = true">
-                    <div>
-                        <label class="form-label" for="priceListId">@Texts.Get("crm.quoteDetail.field.priceList")</label>
-                        <LookupPicker Id="priceListId" LookupKey="crm.quote.price-list" @bind-Value="form.PriceListId" Placeholder="@Texts.Get("crm.quoteDetail.field.priceListPlaceholder")"
-                                      Invalid="@(errors?.ContainsKey("priceListId") == true)" ReadOnly="@(!CanEditHeader)" />
-                        <FieldError Field="priceListId" Errors="errors" />
-                    </div>
-                    <div>
-                        <label class="form-label" for="q-currency">@Texts.Get("crm.quoteDetail.field.currency")</label>
-                        <input id="q-currency" class="form-control" maxlength="3" @bind="form.Currency" />
-                        <FieldError Field="currency" Errors="errors" />
-                    </div>
-                    <div>
-                        <label class="form-label" for="q-valid">@Texts.Get("crm.quoteDetail.field.validUntil")</label>
-                        <input id="q-valid" type="datetime-local" class="form-control" @bind="form.ValidUntil" />
-                        <FieldError Field="validUntil" Errors="errors" />
-                        @if (quote is null && defaultValidityDays > 0) { <small class="text-muted">@Texts.Get("crm.quoteDetail.validityHint", defaultValidityDays)</small> }
-                    </div>
-                    <div>
-                        <label class="form-label" for="q-tax">@Texts.Get("crm.quoteDetail.field.pricing")</label>
-                        <select id="q-tax" class="form-select" @bind="form.PriceIncludesTax">
-                            <option value="@false">@Texts.Get("crm.quoteDetail.taxExcluded")</option>
-                            <option value="@true">@Texts.Get("crm.quoteDetail.taxIncluded")</option>
-                        </select>
-                        <FieldError Field="priceIncludesTax" Errors="errors" />
-                    </div>
-                    @if (Session.Can(CrmAccess.QuotesDiscount) || (quote?.DocumentDiscountKind ?? "None") != "None")
-                    {
-                        <div>
-                            <label class="form-label" for="q-dk">@Texts.Get("crm.quoteDetail.field.documentDiscount")</label>
-                            <select id="q-dk" class="form-select" @bind="form.DocumentDiscountKind" disabled="@(!Session.Can(CrmAccess.QuotesDiscount))">
-                                @foreach (var kind in QuoteLabels.DiscountKinds) { <option value="@kind.Key">@kind.Label</option> }
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label" for="q-dv">@Texts.Get("crm.quoteDetail.field.documentDiscountValue")</label>
-                            <input id="q-dv" type="number" step="0.01" min="0" class="form-control" @bind="form.DocumentDiscountValue"
-                                   disabled="@(!Session.Can(CrmAccess.QuotesDiscount) || form.DocumentDiscountKind == "None")" />
-                            <FieldError Field="documentDiscountValue" Errors="errors" />
-                        </div>
-                    }
-                </div>
-                </TabPanel>
-                <TabPanel State="headerTabs" Key="form-kosul">
-                <div class="form-grid" @oninput="() => dirty = true">
-                    <div class="span-all">
-                        <label class="form-label" for="q-pay">@Texts.Get("crm.quoteDetail.field.paymentTerms")</label>
-                        <textarea id="q-pay" class="form-control" rows="2" maxlength="4000" @bind="form.PaymentTerms"></textarea>
-                    </div>
-                    <div class="span-all">
-                        <label class="form-label" for="q-del">@Texts.Get("crm.quoteDetail.field.deliveryTerms")</label>
-                        <textarea id="q-del" class="form-control" rows="2" maxlength="4000" @bind="form.DeliveryTerms"></textarea>
-                    </div>
-                    <div class="span-all">
-                        <label class="form-label" for="q-com">@Texts.Get("crm.quoteDetail.field.commercialTerms")</label>
-                        <textarea id="q-com" class="form-control" rows="3" maxlength="4000" @bind="form.CommercialTerms"></textarea>
-                    </div>
-                    <div class="span-all">
-                        <label class="form-label" for="q-int">@Texts.Get("crm.quoteDetail.field.internalNotes") <small class="text-muted">@Texts.Get("crm.quoteDetail.field.internalNotesHint")</small></label>
-                        <textarea id="q-int" class="form-control" rows="2" maxlength="4000" @bind="form.InternalNotes"></textarea>
-                    </div>
-                </div>
-                </TabPanel>
             </fieldset>
             @if (CanEditHeader)
             {
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@busy">@(quote is null ? Texts.Get("crm.quoteDetail.createDraft") : Texts.Get("common.save"))</button>
+                    <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@(quote is null ? Texts.Get("crm.quoteDetail.createDraft") : Texts.Get("common.save"))</button>
                     @if (dirty) { <span class="text-muted" role="status">@Texts.Get("crm.quoteDetail.unsaved")</span> }
                 </div>
             }
@@ -300,6 +295,14 @@
                             }
                         </div>
                         </TabPanel>
+                        @if (LineCustomFields.Count > 0)
+                        {
+                            <TabPanel State="lineTabs" Key="line-ek">
+                            <div class="form-grid" @oninput="() => lineDirty = true" @onchange="() => lineDirty = true">
+                                <CustomFieldInputs Fields="LineCustomFields" Values="lineForm.Custom" Errors="lineErrors" />
+                            </div>
+                            </TabPanel>
+                        }
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.quoteDetail.line.save")</button>
                             <button type="button" class="btn btn-outline-secondary" @onclick="CancelLine">@Texts.Get("common.dismiss")</button>
@@ -536,23 +539,27 @@
     private LineForm? lineForm;
 
     // Her kayıt formu sekmelidir; hatalı alan içeren sekme "!" rozeti taşır, kayıt denemesinden sonra hatalı ilk sekme açılır.
-    private readonly TabState headerTabs = new("form-genel");
+    private FormLayoutDto? layout;
     private readonly TabState lineTabs = new("line-kalem");
 
     private static int ErrorCount(IReadOnlyDictionary<string, string[]>? source, params string[] fields) => source is null ? 0 : fields.Count(source.ContainsKey);
 
-    private IReadOnlyList<TabItem> HeaderTabs =>
-    [
-        new("form-genel", Texts.Get("crm.quoteDetail.tab.general"), Errors: ErrorCount(errors, "title", "companyId", "contactId", "opportunityId")),
-        new("form-fiyat", Texts.Get("crm.quoteDetail.tab.pricing"), Errors: ErrorCount(errors, "priceListId", "currency", "validUntil", "priceIncludesTax", "documentDiscountValue")),
-        new("form-kosul", Texts.Get("crm.quoteDetail.tab.terms"), Errors: ErrorCount(errors, "paymentTerms", "deliveryTerms", "commercialTerms", "internalNotes")),
-    ];
+    /// <summary>Teklif başlığı ve satırı için firmanın özel alanları (Y9a); sektör profili alanları da buradan gelir.</summary>
+    private IReadOnlyList<CustomFieldDto> HeaderCustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.Quote)];
+
+    private IReadOnlyList<CustomFieldDto> LineCustomFields => [.. Lookups.FieldsOf(CrmEntityKeys.QuoteLine)];
+
+    /// <summary>Belge indirimi alanları yalnızca indirim iznine sahip olana ya da teklifte indirim varsa görünür (sunucu yine denetler).</summary>
+    private bool ShowsField(FormFieldDto field) =>
+        field.Key is not ("documentDiscountKind" or "documentDiscountValue")
+        || Session.Can(CrmAccess.QuotesDiscount) || (quote?.DocumentDiscountKind ?? "None") != "None";
 
     private IReadOnlyList<TabItem> LineTabs =>
     [
         new("line-kalem", Texts.Get("crm.quoteDetail.col.line"), Errors: ErrorCount(lineErrors, "kind", "productId", "name", "quantity", "unitPrice", "description")),
         new("line-vergi", Texts.Get("crm.quoteDetail.tab.lineTax"), Errors: ErrorCount(lineErrors, "taxRatePercent", "discountValue", "recurringPeriod")),
         new("line-rol", Texts.Get("crm.quoteDetail.tab.lineRole"), Errors: ErrorCount(lineErrors, "parentStableKey")),
+        .. (LineCustomFields.Count > 0 ? [new TabItem("line-ek", Texts.Get("custom-fields.section"), Errors: LineCustomFields.Count(f => lineErrors?.ContainsKey("custom." + f.Key) == true))] : Array.Empty<TabItem>()),
     ];
     private IReadOnlyDictionary<string, string[]>? errors;
     private IReadOnlyDictionary<string, string[]>? lineErrors;
@@ -584,6 +591,7 @@
         }
 
         await Lookups.LoadAsync();
+        layout ??= await Layouts.ForAsync(CrmEntityKeys.Quote);
         if (Id is null)
         {
             quote = null;
@@ -634,7 +642,7 @@
             form.Title, form.CompanyId ?? Guid.Empty, Blank(form.Description), form.ContactId, form.OpportunityId, form.PriceListId, form.OwnerId, null,
             form.ValidUntil is { } until ? new DateTimeOffset(until) : null, form.Currency, null, null, null, form.PriceIncludesTax,
             form.DocumentDiscountKind, form.DocumentDiscountValue, Blank(form.PaymentTerms), Blank(form.DeliveryTerms), Blank(form.CommercialTerms),
-            Blank(form.InternalNotes), quote?.Version);
+            Blank(form.InternalNotes), quote?.Version, CustomFieldText.ForSave(HeaderCustomFields, form.Custom));
         var result = quote is { } current
             ? await Api.PutAsync<QuoteDto>($"/api/crm/quotes/{current.Id}", request)
             : await Api.PostAsync<QuoteDto>("/api/crm/quotes", request);
@@ -643,7 +651,6 @@
         if (!result.IsSuccess)
         {
             errors = result.FieldErrors;
-            headerTabs.RevealFirstFailing(HeaderTabs);
             Notify(result.Status == System.Net.HttpStatusCode.Conflict ? Texts.Get("crm.quoteDetail.conflictRetry", result.Error) : result.Error, failed: true);
             return;
         }
@@ -692,7 +699,7 @@
         var request = new SaveQuoteLineRequest(
             quote.Id, Blank(f.Name), f.Kind, f.ProductId, f.Quantity, f.UnitPrice, null, f.DiscountKind, f.DiscountValue, f.TaxRatePercent, null, f.Role,
             f.IsSelected, f.Role == "PackageChild" ? f.ParentStableKey : null, Blank(f.RecurringPeriod), Blank(f.Description), null, f.Position,
-            Session.Can(CrmAccess.QuoteCostsRead) ? f.UnitCost : null, f.Version);
+            Session.Can(CrmAccess.QuoteCostsRead) ? f.UnitCost : null, f.Version, CustomFieldText.ForSave(LineCustomFields, f.Custom));
         var result = f.Id is { } id
             ? await Api.PutAsync<QuoteLineDto>($"/api/crm/quote-lines/{id}", request)
             : await Api.PostAsync<QuoteLineDto>("/api/crm/quote-lines", request);
@@ -847,13 +854,14 @@
         public string? DeliveryTerms { get; set; }
         public string? CommercialTerms { get; set; }
         public string? InternalNotes { get; set; }
+        public JsonObject Custom { get; set; } = [];
 
         public static QuoteForm From(QuoteDto q) => new()
         {
             Title = q.Title, CompanyId = q.CompanyId, ContactId = q.ContactId, OpportunityId = q.OpportunityId, OwnerId = q.OwnerId, PriceListId = q.PriceListId,
             Currency = q.Currency, ValidUntil = q.ValidUntil?.LocalDateTime, PriceIncludesTax = q.PriceIncludesTax, DocumentDiscountKind = q.DocumentDiscountKind,
             DocumentDiscountValue = q.DocumentDiscountValue, Description = q.Description, PaymentTerms = q.PaymentTerms, DeliveryTerms = q.DeliveryTerms,
-            CommercialTerms = q.CommercialTerms, InternalNotes = q.InternalNotes,
+            CommercialTerms = q.CommercialTerms, InternalNotes = q.InternalNotes, Custom = q.Custom?.DeepClone().AsObject() ?? [],
         };
     }
 
@@ -876,13 +884,14 @@
         public string? RecurringPeriod { get; set; }
         public decimal? UnitCost { get; set; }
         public string? Description { get; set; }
+        public JsonObject Custom { get; set; } = [];
 
         public static LineForm From(QuoteLineDto l) => new()
         {
             Id = l.Id, Version = l.Version, Position = l.Position, Kind = l.Kind, ProductId = l.ProductId, Name = l.Name, Quantity = l.Quantity,
             UnitPrice = l.UnitPrice, TaxRatePercent = l.TaxRatePercent, DiscountKind = l.DiscountKind, DiscountValue = l.DiscountValue, Role = l.Role,
             IsSelected = l.IsSelected, ParentStableKey = l.ParentStableKey, RecurringPeriod = l.RecurringPeriod ?? string.Empty, UnitCost = l.UnitCost,
-            Description = l.Description,
+            Description = l.Description, Custom = l.Custom?.DeepClone().AsObject() ?? [],
         };
     }
 }

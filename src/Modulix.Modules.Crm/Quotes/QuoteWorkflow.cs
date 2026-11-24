@@ -506,6 +506,12 @@ internal sealed class QuoteWorkflow(
             }
         }
 
+        // Özel alan değerleri de taşınır; görünmeyen (alan seviyesi yetkiyle gizlenen) değerler kaynakta zaten yoktur.
+        if (source.Values[RecordFields.Custom] is JsonObject { Count: > 0 } custom)
+        {
+            values[RecordFields.Custom] = custom.DeepClone();
+        }
+
         return values;
     }
 

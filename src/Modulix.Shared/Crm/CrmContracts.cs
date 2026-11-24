@@ -92,6 +92,7 @@ public static class CrmEntityKeys
     public const string Activity = "crm.activity";
     public const string Lead = "crm.lead";
     public const string Quote = "crm.quote";
+    public const string QuoteLine = "crm.quote-line";
 }
 
 /// <summary>

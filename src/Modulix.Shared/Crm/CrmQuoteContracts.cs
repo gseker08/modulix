@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace Modulix.Shared.Crm;
 
 // Teklif yönetimi (ADR-0019).
@@ -46,7 +48,8 @@ public sealed record QuoteDto(
     DateTimeOffset? PresentedAt,
     DateTimeOffset? DecidedAt,
     string? CustomerNameSnapshot,
-    List<QuoteScopeItemDto>? ServiceScopeSnapshot = null);
+    List<QuoteScopeItemDto>? ServiceScopeSnapshot = null,
+    JsonObject? Custom = null);
 
 /// <summary>Teklifin sunum anında sabitlenen hizmet kapsamı öğesi: faaliyet kodu ve o andaki adı (ADR-0029 Dilim F3).</summary>
 public sealed record QuoteScopeItemDto(string Code, string Name);
@@ -72,7 +75,8 @@ public sealed record SaveQuoteRequest(
     string? DeliveryTerms = null,
     string? CommercialTerms = null,
     string? InternalNotes = null,
-    long? Version = null);
+    long? Version = null,
+    JsonObject? Custom = null);
 
 public sealed record QuoteLineDto(
     Guid Id,
@@ -105,7 +109,8 @@ public sealed record QuoteLineDto(
     decimal DocumentDiscountShare,
     decimal Net,
     decimal Tax,
-    decimal Gross);
+    decimal Gross,
+    JsonObject? Custom = null);
 
 /// <summary>UnitPrice boşsa ürün satırında fiyat listeden sunucuca hesaplanır; dolu ve listeden farklıysa elle fiyat izni gerekir.</summary>
 public sealed record SaveQuoteLineRequest(
@@ -128,7 +133,8 @@ public sealed record SaveQuoteLineRequest(
     string? GroupName = null,
     int Position = 0,
     decimal? UnitCost = null,
-    long? Version = null);
+    long? Version = null,
+    JsonObject? Custom = null);
 
 /// <summary>Durum geçişi isteği; <see cref="Version"/> eşzamanlılık için zorunludur, <see cref="Reason"/> reddetme/iptal/değişiklik isteğinde zorunludur.</summary>
 public sealed record QuoteTransitionRequest(long Version, string? Reason = null);
