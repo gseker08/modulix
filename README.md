@@ -904,7 +904,7 @@ dotnet test tests/Modulix.ArchitectureTests
 dotnet test tests/Modulix.Core.Tests
 dotnet test tests/Modulix.IntegrationTests
 
-# API'yi çalıştır; sağlık kontrolü: /health ("Healthy" dönmeli; olaylar 15 dakikadan uzun bekliyorsa "Degraded").
+# API'yi çalıştır; sağlık kontrolü: /health ("Healthy" dönmeli; olaylar 15 dakikadan uzun bekliyorsa ya da veritabanında READ_COMMITTED_SNAPSHOT kapalıysa "Degraded", ADR-0058).
 # Orkestratör için: /health/live (yalnızca süreç; yeniden başlatma kararı) ve /health/ready (veritabanı ve dosya deposu; trafik alma kararı).
 dotnet run --project src/Modulix.Api
 ```
