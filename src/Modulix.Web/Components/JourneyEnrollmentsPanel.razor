@@ -1,0 +1,266 @@
+@inject ApiClient Api
+@inject SessionState Session
+
+@* Yolculuk kayıtları (ADR-0056): hedeflerin yolculuktaki durumu, çıkış nedeni ve son yanıtı. Etkin kayıt elle çıkarılır (gerekçe zorunlu,
+   marketing.journeys.write) ya da yanıt işaretlenir (marketing.responses.write; kural adım koşulu bu işarete bakarak dallanır). Hedef adı kayıt
+   boru hattından (GET /api/records) tek tek okunur: izin ve veri kapsamı orada uygulanır, okunamayan hedef kısa kimlikle görünür.
+   Düğmeleri gizlemek yetki değildir; sunucu her işlemi denetler. *@
+<section aria-labelledby="enrollments-title">
+    <h2 id="enrollments-title" class="h5">@Texts.Get("marketing.journeyEnrollments.title")</h2>
+    <p class="text-muted">@Texts.Get("marketing.journeyEnrollments.intro")</p>
+
+    <Notice Text="@message" Failed="@failed" />
+
+    @if (acting is { } row)
+    {
+        <form class="record-form" novalidate @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@busy">
+                <legend class="h6">@(action == Act.Exit ? Texts.Get("marketing.journeyEnrollments.exitTitle", LabelOf(row)) : Texts.Get("marketing.journeyEnrollments.respondTitle", LabelOf(row)))</legend>
+                <div class="form-grid">
+                    @if (action == Act.Exit)
+                    {
+                        <div class="span-12">
+                            <label class="form-label" for="enr-reason">@Texts.Get("marketing.journeyEnrollments.reason")</label>
+                            <textarea id="enr-reason" class="form-control" rows="2" maxlength="200" @bind="reason"></textarea>
+                            <FieldError Field="reason" Errors="errors" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="span-6">
+                            <label class="form-label" for="enr-kind">@Texts.Get("marketing.journeyEnrollments.responseKind")</label>
+                            <select id="enr-kind" class="form-select" @bind="kind">
+                                @foreach (var k in ResponseChoices) { <option value="@k.Key">@k.Label</option> }
+                            </select>
+                            <FieldError Field="kind" Errors="errors" />
+                        </div>
+                    }
+                </div>
+            </fieldset>
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">@Texts.Get("common.confirm.cancel")</button>
+                @if (action == Act.Exit)
+                {
+                    <button type="submit" class="btn btn-danger" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("marketing.journeyEnrollments.exit")</button>
+                }
+                else
+                {
+                    <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("marketing.journeyEnrollments.respond")</button>
+                }
+            </div>
+        </form>
+    }
+
+    <div class="list-toolbar">
+        <label class="visually-hidden" for="enr-status">@Texts.Get("common.field.status")</label>
+        <select id="enr-status" class="form-select form-select-sm filter-select" @bind="status" @bind:after="() => LoadAsync(1)">
+            <option value="">@Texts.Get("common.allStatuses")</option>
+            @foreach (var s in MarketingLabels.EnrollmentStatuses) { <option value="@s.Key">@s.Label</option> }
+        </select>
+    </div>
+
+    @if (list is null && loadError is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (loadError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@loadError <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => LoadAsync(1)">@Texts.Get("crm.sales.retry")</button></div>
+    }
+    else if (list is not null && list.Items.Count == 0)
+    {
+        <EmptyState Icon="users" Title="@Texts.Get("marketing.journeyEnrollments.emptyTitle")" Text="@Texts.Get("marketing.journeyEnrollments.empty")" />
+    }
+    else if (list is not null)
+    {
+        <p class="visually-hidden" role="status" aria-live="polite">@Texts.Get("marketing.journeyEnrollments.listed", list.TotalCount)</p>
+        <table class="table record-table">
+            <caption class="visually-hidden">@Texts.Get("marketing.journeyEnrollments.caption")</caption>
+            <thead>
+                <tr>
+                    <th scope="col">@Texts.Get("marketing.col.target")</th>
+                    <th scope="col">@Texts.Get("common.field.status")</th>
+                    <th scope="col">@Texts.Get("marketing.journeyEnrollments.col.entered")</th>
+                    <th scope="col">@Texts.Get("marketing.journeyEnrollments.col.exited")</th>
+                    <th scope="col">@Texts.Get("marketing.journeyEnrollments.col.reason")</th>
+                    <th scope="col">@Texts.Get("marketing.journeyEnrollments.col.response")</th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">@Texts.Get("common.actions")</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in list.Items)
+                {
+                    <tr>
+                        <td data-label="@Texts.Get("marketing.col.target")" class="primary">@LabelOf(e)</td>
+                        <td data-label="@Texts.Get("common.field.status")"><span class="badge stage-@MarketingLabels.EnrollmentBadge(e.Status)">@MarketingLabels.Label(MarketingLabels.EnrollmentStatuses, e.Status)</span></td>
+                        <td data-label="@Texts.Get("marketing.journeyEnrollments.col.entered")">@CrmLabels.Time(e.EnteredAt)</td>
+                        <td data-label="@Texts.Get("marketing.journeyEnrollments.col.exited")">@(e.ExitedAt is { } at ? CrmLabels.Time(at) : "—")</td>
+                        <td data-label="@Texts.Get("marketing.journeyEnrollments.col.reason")">@(e.ExitReason is { } why ? MarketingLabels.EnrollmentReason(why) : "—")</td>
+                        <td data-label="@Texts.Get("marketing.journeyEnrollments.col.response")">@(e.LastResponseKind is { } last ? MarketingLabels.Label(MarketingLabels.ResponseKinds, last) : "—")</td>
+                        <td class="row-menu-cell">
+                            @if (e.Status == "Active" && (CanExit || CanRespond))
+                            {
+                                <RowMenu Label="@Texts.Get("common.rowActionsOf", LabelOf(e))">
+                                    @if (CanRespond)
+                                    {
+                                        <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Begin(e, Act.Respond)"><AppIcon Name="message-square" Size="16" /> <span>@Texts.Get("marketing.journeyEnrollments.respond")</span></button>
+                                    }
+                                    @if (CanExit)
+                                    {
+                                        <button type="button" class="view-menu-item" role="menuitem" @onclick="() => Begin(e, Act.Exit)"><AppIcon Name="log-out" Size="16" /> <span>@Texts.Get("marketing.journeyEnrollments.exit")</span></button>
+                                    }
+                                </RowMenu>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager PageSizeChoice="true" Page="list.Page" PageSize="list.PageSize" TotalCount="list.TotalCount" PageChanged="LoadAsync" />
+    }
+</section>
+
+@code {
+    private enum Act
+    {
+        Exit,
+        Respond,
+    }
+
+    [Parameter, EditorRequired] public JourneyDto Journey { get; set; } = null!;
+
+    private PagedResult<JourneyEnrollmentDto>? list;
+    private readonly Dictionary<Guid, string> labels = [];
+    private string? loadError;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private string status = string.Empty;
+    private JourneyEnrollmentDto? acting;
+    private Act action;
+    private string reason = string.Empty;
+    private string kind = "Interested";
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private int currentPage = 1;
+
+    private bool CanExit => Session.Can(MarketingAccess.JourneysWrite);
+
+    private bool CanRespond => Session.Can(MarketingAccess.ResponsesWrite);
+
+    private static readonly string[] ResponseKeys = ["Interested", "Question", "MeetingRequest", "NotInterested", "Other"];
+
+    private static IEnumerable<(string Key, string Label)> ResponseChoices => MarketingLabels.ResponseKinds.Where(k => ResponseKeys.Contains(k.Key));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        await LoadAsync(1);
+    }
+
+    private string LabelOf(JourneyEnrollmentDto e) => labels.GetValueOrDefault(e.TargetId) ?? RecordPickerLabels.ShortId(e.TargetId);
+
+    // Hedef türüne göre ortak kayıt: firma (core.party), kişi (core.person), müşteri adayı (crm.lead).
+    private string? TargetEntity => Journey.Target switch
+    {
+        "Company" => "core.party",
+        "Person" => "core.person",
+        "Lead" => "crm.lead",
+        _ => null,
+    };
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        currentPage = pageNumber;
+        var url = $"/api/marketing/journey-enrollments?journeyId={Journey.Id}&page={pageNumber}&pageSize={ListPaging.Size}";
+        if (status.Length > 0)
+        {
+            url += $"&status={status}";
+        }
+
+        var result = await Api.GetAsync<PagedResult<JourneyEnrollmentDto>>(url);
+        list = result.Value;
+        loadError = result.IsSuccess ? null : result.Error;
+        if (list is not null)
+        {
+            await LoadLabelsAsync(list.Items);
+        }
+    }
+
+    // Okunamayan hedef (izin ya da veri kapsamı) kısa kimlikle kalır; ad sızdırılmaz.
+    private async Task LoadLabelsAsync(IReadOnlyList<JourneyEnrollmentDto> rows)
+    {
+        if (TargetEntity is not { } entity)
+        {
+            return;
+        }
+
+        var missing = rows.Select(r => r.TargetId).Distinct().Where(id => !labels.ContainsKey(id)).ToList();
+        var results = await Task.WhenAll(missing.Select(async id => (Id: id, Result: await Api.GetAsync<RecordResponse>($"/api/records/{Uri.EscapeDataString(entity)}/{id}"))));
+        foreach (var (id, result) in results)
+        {
+            if (result.Value is { } record && TargetName(record) is { } name)
+            {
+                labels[id] = name;
+            }
+        }
+    }
+
+    private static string? TargetName(RecordResponse record)
+    {
+        var name = RecordPickerLabels.TextOf(record.Values, "name");
+        if (name is not null)
+        {
+            return name;
+        }
+
+        var full = $"{RecordPickerLabels.TextOf(record.Values, "firstName")} {RecordPickerLabels.TextOf(record.Values, "lastName")}".Trim();
+        return full.Length == 0 ? null : full;
+    }
+
+    private void Begin(JourneyEnrollmentDto row, Act what)
+    {
+        acting = row;
+        action = what;
+        reason = string.Empty;
+        kind = "Interested";
+        errors = null;
+        message = null;
+    }
+
+    private void Cancel()
+    {
+        acting = null;
+        errors = null;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (acting is not { } row)
+        {
+            return;
+        }
+
+        busy = true;
+        errors = null;
+        var url = $"/api/marketing/journey-enrollments/{row.Id}/{(action == Act.Exit ? "exit" : "response")}";
+        object body = action == Act.Exit ? new ExitJourneyEnrollmentRequest(row.Version, reason.Trim()) : new RegisterJourneyResponseRequest(kind, row.Version);
+        var result = await Api.PostAsync<JourneyEnrollmentDto>(url, body);
+        busy = false;
+        if (result.IsSuccess)
+        {
+            acting = null;
+            message = action == Act.Exit ? Texts.Get("marketing.journeyEnrollments.exited") : Texts.Get("marketing.journeyEnrollments.responded");
+            failed = false;
+            await LoadAsync(currentPage);
+            return;
+        }
+
+        // Alan hatası alanın yanında kalır; başka hatalar (çakışma, kayıt artık etkin değil) iletiyle gösterilir.
+        errors = result.FieldErrors.Count == 0 ? null : result.FieldErrors;
+        if (errors is null)
+        {
+            message = result.Error;
+            failed = true;
+        }
+    }
+}

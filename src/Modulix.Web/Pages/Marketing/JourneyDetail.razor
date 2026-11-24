@@ -5,7 +5,7 @@
 <PageTitle>@(journey?.Name ?? Texts.Get("nav.app.marketing.journeys")) · Modulix</PageTitle>
 
 @* Müşteri yolculuğu ayrıntısı (ADR-0056): genel bilgi ve durum geçişleri. Durum sunucuda yazılır; yayın, duraklatma, sürdürme ve arşiv
-   marketing.journeys.publish ister. Düğmeleri gizlemek yetki değildir. Çıkış koşulu bu ekranda yalnızca gösterilir (düzenleyicisi sonraki dilimde). *@
+   marketing.journeys.publish ister. Düğmeleri gizlemek yetki değildir. Çıkış koşulu bu ekranda yalnızca gösterilir (düzenleyicisi sonraki dilimde). Kayıtlar sekmesi tembel yüklenir. *@
 <AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.JourneysRead">
     @if (journey is null && loadError is null)
     {
@@ -94,6 +94,13 @@
                 <p class="small text-muted">@Texts.Get("marketing.journeyDetail.exitConditionNote")</p>
             </section>
         </TabPanel>
+
+        <TabPanel State="tabs" Key="kayitlar">
+            @if (tabs.Rendered("kayitlar"))
+            {
+                <JourneyEnrollmentsPanel Journey="journey" />
+            }
+        </TabPanel>
     }
 </AuthGate>
 
@@ -113,7 +120,11 @@
 
     private readonly TabState tabs = new("genel");
 
-    private IReadOnlyList<TabItem> Tabs => [new("genel", Texts.Get("crm.quoteDetail.tab.general"))];
+    private IReadOnlyList<TabItem> Tabs =>
+    [
+        new("genel", Texts.Get("crm.quoteDetail.tab.general")),
+        new("kayitlar", Texts.Get("marketing.journeyDetail.tab.enrollments")),
+    ];
 
     private bool CanWrite => Session.Can(MarketingAccess.JourneysWrite);
 
