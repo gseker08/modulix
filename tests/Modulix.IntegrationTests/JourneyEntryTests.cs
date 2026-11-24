@@ -342,11 +342,11 @@ public class JourneyEntryTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var a = await CompanyAsync(client, "Kosul A", "Bursa");
         await CompanyAsync(client, "Kosul B", "Bursa");
         var segment = await ActiveSegmentAsync(client, "kosul-segment", "Bursa");
-        var journey = await PublishedWithExitAsync(client, "kosullu", segment.Id, ExitWhenIndustry("Lojistik"));
+        var journey = await PublishedWithExitAsync(client, "kosullu", segment.Id, ExitWhenIndustry("Gıda ve içecek"));
         Assert.Equal(2, (await RunAsync(tenantId)).Sum(o => o.Entered));
 
-        // A "Lojistik" olunca bir sonraki turda çıkar (neden: exit-condition); B etkin kalır.
-        await SetIndustryAsync(client, a, "Lojistik");
+        // A "Gıda ve içecek" olunca bir sonraki turda çıkar (neden: exit-condition); B etkin kalır.
+        await SetIndustryAsync(client, a, "Gıda ve içecek");
         await RunAsync(tenantId);
         var enrollments = await EnrollmentsAsync(client, journey.Id);
         var exited = Assert.Single(enrollments, e => e.Status == "Exited");
@@ -354,7 +354,7 @@ public class JourneyEntryTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.Single(enrollments, e => e.Status == "Active");
 
         // Koşulu zaten sağlayan yeni hedef yolculuğa hiç girmez.
-        await SetIndustryAsync(client, await CompanyAsync(client, "Kosul C", "Bursa"), "Lojistik");
+        await SetIndustryAsync(client, await CompanyAsync(client, "Kosul C", "Bursa"), "Gıda ve içecek");
         Assert.Equal(0, (await RunAsync(tenantId)).Sum(o => o.Entered));
         Assert.Equal(2, (await EnrollmentsAsync(client, journey.Id)).Count);
     }
@@ -376,7 +376,7 @@ public class JourneyEntryTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.Equal("Draft", (await client.GetFromJsonAsync<JourneyDto>($"/api/marketing/journeys/{journey.Id}"))!.Status);
 
         var fixedUp = await client.PutAsJsonAsync($"/api/marketing/journeys/{journey.Id}",
-            new SaveJourneyRequest(journey.Version, journey.Code, journey.Name, journey.Description, journey.Target, journey.SegmentId, journey.ReentryPolicy, ExitWhenIndustry("Lojistik"), journey.OwnerId));
+            new SaveJourneyRequest(journey.Version, journey.Code, journey.Name, journey.Description, journey.Target, journey.SegmentId, journey.ReentryPolicy, ExitWhenIndustry("Gıda ve içecek"), journey.OwnerId));
         Assert.Equal(HttpStatusCode.OK, fixedUp.StatusCode);
         journey = (await fixedUp.Content.ReadFromJsonAsync<JourneyDto>())!;
         Assert.Equal("Active", (await Transition(client, journey, "publish")).Status);
@@ -389,9 +389,9 @@ public class JourneyEntryTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var (_, tenantB) = await ManagerAsync();
         var company = await CompanyAsync(clientA, "A Kosul", "Bursa");
         var segment = await ActiveSegmentAsync(clientA, "a-kosul-segment", "Bursa");
-        var journey = await PublishedWithExitAsync(clientA, "a-kosul", segment.Id, ExitWhenIndustry("Lojistik"));
+        var journey = await PublishedWithExitAsync(clientA, "a-kosul", segment.Id, ExitWhenIndustry("Gıda ve içecek"));
         await RunAsync(tenantA);
-        await SetIndustryAsync(clientA, company, "Lojistik");
+        await SetIndustryAsync(clientA, company, "Gıda ve içecek");
 
         await RunAsync(tenantB);
         Assert.Equal("Active", Assert.Single(await EnrollmentsAsync(clientA, journey.Id)).Status);
@@ -406,7 +406,7 @@ public class JourneyEntryTests(ModulixApiFactory factory) : IClassFixture<Moduli
         var manager = await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions]);
         var segment = await ActiveSegmentAsync(manager, "kosul-yetki-segment", "Bursa");
         var created = await manager.PostAsJsonAsync("/api/marketing/journeys",
-            new SaveJourneyRequest(Code: "kosul-yetki", Name: "Koşul yetki", Target: "Company", SegmentId: segment.Id, ExitCondition: ExitWhenIndustry("Lojistik")));
+            new SaveJourneyRequest(Code: "kosul-yetki", Name: "Koşul yetki", Target: "Company", SegmentId: segment.Id, ExitCondition: ExitWhenIndustry("Gıda ve içecek")));
         var journey = (await created.Content.ReadFromJsonAsync<JourneyDto>())!;
 
         // CRM firma alanını okuyamayan yayıncı koşulu doğrulayamaz: alan onun için "yok" sayılır (varlığı sızdırılmaz).
