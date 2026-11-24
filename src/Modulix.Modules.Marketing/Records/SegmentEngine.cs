@@ -106,6 +106,27 @@ internal sealed class SegmentEngine(
         }
     }
 
+    public async Task<IReadOnlySet<Guid>> MatchingAsync(SegmentTarget target, SegmentCondition condition, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
+    {
+        if (ids.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var query = await PrepareAsync(new SegmentEvaluationRequest(target, condition, null, false, 1, 1, false), cancellationToken);
+        var wanted = ids.ToList();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Limit);
+        try
+        {
+            return (await query.Where(id => wanted.Contains(id)).ToListAsync(timeout.Token)).ToHashSet();
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new SegmentTimeoutException(Limit);
+        }
+    }
+
     /// <summary>Koşulu doğrular, çağıranın alan yetkisi ve veri kapsamıyla kimlik sorgusunu kurar (çalıştırmaz).</summary>
     private async Task<IQueryable<Guid>> PrepareAsync(SegmentEvaluationRequest request, CancellationToken cancellationToken)
     {

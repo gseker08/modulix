@@ -25,8 +25,14 @@ internal interface IJourneyEntry
 }
 
 internal sealed class JourneyEntry(
-    JourneyEntryStore store, ISegmentService segments, IRecordPipeline pipeline, SegmentWorkflowGate gate, IBusinessEventPublisher events, TimeProvider time) : IJourneyEntry
+    JourneyEntryStore store, ISegmentService segments, ISegmentEngine engine, IJourneyEnrollments enrollments, IRecordPipeline pipeline, SegmentWorkflowGate gate,
+    IBusinessEventPublisher events, TimeProvider time) : IJourneyEntry
 {
+    /// <summary>Bir turda çıkış koşuluyla süpürülen etkin kayıt sayısı sınırı; fazlası sonraki turlarda (en eski giriş önce) sürer.</summary>
+    private const int MaxExitSweep = 2000;
+
+    private const int ExitBatch = 500;
+
     /// <summary>Bir yolculuğun girişinde işlenebilecek en büyük segment (hedef kitle sınırıyla aynı).</summary>
     public const int MaxTargets = 20000;
 
@@ -59,6 +65,17 @@ internal sealed class JourneyEntry(
             return new JourneyEntryOutcome(journeyId, 0, 0, members.Error!.Message);
         }
 
+        SegmentCondition? exit = null;
+        if (!string.IsNullOrWhiteSpace(journey.ExitCondition))
+        {
+            // Çıkış koşulu okunamıyorsa giriş durur (kapalı güvenli: çıkması gerekenlere ileti gitmesin).
+            exit = SegmentConditions.Parse(journey.ExitCondition).Condition;
+            if (exit is null)
+            {
+                return new JourneyEntryOutcome(journeyId, 0, 0, "Çıkış koşulu okunamadı.");
+            }
+        }
+
         var latest = await store.LatestEnrollmentsAsync(journeyId, cancellationToken);
         var present = members.Value!.ToHashSet();
         using var open = gate.Open(EntryPermissions);
@@ -73,6 +90,39 @@ internal sealed class JourneyEntry(
 
         // Yeni girenler: hiç kaydı olmayanlar ve politikaya göre yeniden girenler (kaydı sona ermiş, sonra segmentten ayrılmış ve yeniden segmentte olanlar).
         var fresh = members.Value!.Where(id => !latest.TryGetValue(id, out var last) || CanReenter(journey.ReentryPolicy, last)).ToList();
+
+        // Çıkış koşulu (ADR-0056 §6): etkin kayıtlardan koşulu sağlayan hedefler çıkarılır; koşulu zaten sağlayan hedef yolculuğa hiç girmez.
+        if (exit is not null)
+        {
+            try
+            {
+                foreach (var batch in (await store.ActiveEnrollmentsAsync(journeyId, MaxExitSweep, cancellationToken)).Chunk(ExitBatch))
+                {
+                    var matched = await engine.MatchingAsync(target, exit, [.. batch.Select(a => a.TargetId)], cancellationToken);
+                    foreach (var enrollment in batch.Where(a => matched.Contains(a.TargetId)))
+                    {
+                        await enrollments.ExitBySystemAsync(enrollment.Id, EnrollmentReasons.ExitCondition, cancellationToken);
+                    }
+                }
+
+                var blocked = new HashSet<Guid>();
+                foreach (var batch in fresh.Chunk(ExitBatch))
+                {
+                    blocked.UnionWith(await engine.MatchingAsync(target, exit, batch, cancellationToken));
+                }
+
+                fresh = [.. fresh.Where(id => !blocked.Contains(id))];
+            }
+            catch (SegmentConditionException ex)
+            {
+                return new JourneyEntryOutcome(journeyId, 0, 0, $"Çıkış koşulu değerlendirilemedi: {ex.Errors.FirstOrDefault()?.Message.Text ?? "geçersiz koşul"}");
+            }
+            catch (SegmentTimeoutException ex)
+            {
+                return new JourneyEntryOutcome(journeyId, 0, 0, ex.Message);
+            }
+        }
+
         var entered = 0;
         foreach (var targetId in fresh.Take(maxEntries))
         {

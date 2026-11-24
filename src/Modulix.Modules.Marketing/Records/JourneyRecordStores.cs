@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Localization;
 using Modulix.Core.Contracts.Records;
 using Modulix.Modules.Marketing.Domain;
+using Modulix.Modules.Marketing.Segments;
 
 namespace Modulix.Modules.Marketing.Records;
 
@@ -109,7 +110,7 @@ internal sealed partial class JourneyRecordStore(MarketingStoreContext context) 
             entity.EntryPermissions = EntryPermissionSet.Serialize(await Context.Permissions.GetPermissionsAsync(cancellationToken));
         }
 
-        if (!string.IsNullOrWhiteSpace(entity.ExitCondition) && !IsJsonObject(entity.ExitCondition))
+        if (!string.IsNullOrWhiteSpace(entity.ExitCondition) && SegmentConditions.Parse(entity.ExitCondition).Condition is null)
         {
             errors.Add(new RecordFieldError("exitCondition", MarketingMessages.Journey.ExitConditionInvalid));
         }
@@ -151,18 +152,6 @@ internal sealed partial class JourneyRecordStore(MarketingStoreContext context) 
             || await Context.Data.Set<JourneyEnrollment>().AnyAsync(e => e.JourneyId == entity.Id, cancellationToken))
         {
             throw new RecordConflictException(MarketingMessages.Journey.NoDelete);
-        }
-    }
-
-    private static bool IsJsonObject(string text)
-    {
-        try
-        {
-            return JsonNode.Parse(text) is JsonObject;
-        }
-        catch (JsonException)
-        {
-            return false;
         }
     }
 

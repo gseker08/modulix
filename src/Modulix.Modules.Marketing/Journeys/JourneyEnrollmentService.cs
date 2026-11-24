@@ -28,6 +28,9 @@ public static class EnrollmentReasons
     /// <summary>Alıcı pazarlama iletişiminden çıktı (izin geri alındı, konudan ya da tüm pazarlamadan çıktı, şikâyet).</summary>
     public const string Unsubscribed = "unsubscribed";
 
+    /// <summary>Yolculuğun çıkış koşulu sağlandı (ör. hedef fırsata dönüştü).</summary>
+    public const string ExitCondition = "exit-condition";
+
     /// <summary>Kural akışının sonunda tamamlandı.</summary>
     public const string Completed = "completed";
 }

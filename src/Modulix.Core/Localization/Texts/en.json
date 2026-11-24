@@ -13744,7 +13744,7 @@
   "marketing.server.journey.code-locked": "The code cannot be changed after creation.",
   "marketing.server.journey.target-locked": "The target type cannot be changed after creation.",
   "marketing.server.journey.segment-locked": "The entry segment of a journey that is not a draft cannot be changed.",
-  "marketing.server.journey.exit-condition-invalid": "The exit condition must be a valid JSON object.",
+  "marketing.server.journey.exit-condition-invalid": "The exit condition must be a valid condition (same format as a segment condition).",
   "marketing.server.journey.segment-not-usable": "The entry segment must be active (published).",
   "marketing.server.journey.segment-target-mismatch": "The segment target type must match the journey target type.",
   "marketing.server.journey.code-taken": "A journey with this code already exists.",
