@@ -305,4 +305,10 @@ public sealed class JourneyEnrollment : MarketingEntity
     public DateTimeOffset? ExitedAt { get; internal set; }
 
     public string? ExitReason { get; internal set; }
+
+    /// <summary>
+    /// Kayıt sona erdikten sonra hedefin giriş segmentinde <b>bulunmadığının</b> görüldüğü ilk an (ADR-0056 dilim 2c-2). Yeniden giriş yalnızca bu işaret doluysa olur:
+    /// segmentte kalan hedef, kaydı sona erse de sürekli yeniden girmez; "çıkıp yeniden girmek" budur.
+    /// </summary>
+    public DateTimeOffset? SegmentLeftAt { get; internal set; }
 }

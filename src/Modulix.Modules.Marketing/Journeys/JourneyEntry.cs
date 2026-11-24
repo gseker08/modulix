@@ -15,8 +15,8 @@ public sealed record JourneyEntryOutcome(Guid JourneyId, int Entered, int Remain
 
 /// <summary>
 /// Yolculuk girişi (ADR-0056 dilim 1b-2): etkin yolculuğun giriş segmentinin güncel üyelerinden kaydı olmayanlar için yolculuk kaydı açar ve
-/// <c>marketing.journey.entered</c> olayını kayıtla aynı işlemde yayınlar. Aynı hedef yolculuğa bir kez girer (yeniden giriş politikası çıkış ve
-/// tamamlanma geldiğinde, dilim 2); iş tekrar çalışsa yeni kayıt açmaz. Çağıran, segmenti değerlendirecek izinlerle (etkinleştirenin okuma izinleri)
+/// <c>marketing.journey.entered</c> olayını kayıtla aynı işlemde yayınlar. Aynı hedef aynı anda bir kez girer; kaydı sona erdiyse yalnızca yeniden giriş
+/// politikası (<c>AfterExit</c>, <c>AfterCompletion</c>) izin veriyorsa ve hedef bu arada segmentten ayrılıp dönmüşse yeniden girer. İş tekrar çalışsa yeni kayıt açmaz. Çağıran, segmenti değerlendirecek izinlerle (etkinleştirenin okuma izinleri)
 /// çalışmalıdır.
 /// </summary>
 internal interface IJourneyEntry
@@ -31,6 +31,15 @@ internal sealed class JourneyEntry(
     public const int MaxTargets = 20000;
 
     private static readonly IReadOnlyList<string> EntryPermissions = [MarketingModule.Permissions.JourneysWrite];
+
+    /// <summary>
+    /// Yeniden giriş kararı (ADR-0056 §3): <c>Never</c> hiç; <c>AfterExit</c> son kayıt çıkışla bittiyse; <c>AfterCompletion</c> son kayıt tamamlanarak bittiyse.
+    /// Her iki durumda da hedef, kaydın bitişinden sonra segmentte bulunmadığı görülmüş olmalıdır (<see cref="LatestEnrollment.SegmentLeftAt"/>).
+    /// </summary>
+    private static bool CanReenter(string policy, LatestEnrollment last) =>
+        last.SegmentLeftAt is not null
+        && ((policy == JourneyReentryPolicies.AfterExit && last.Status == EnrollmentStatuses.Exited)
+            || (policy == JourneyReentryPolicies.AfterCompletion && last.Status == EnrollmentStatuses.Completed));
 
     public async Task<JourneyEntryOutcome> EnterAsync(Guid journeyId, int maxEntries, CancellationToken cancellationToken)
     {
@@ -50,10 +59,21 @@ internal sealed class JourneyEntry(
             return new JourneyEntryOutcome(journeyId, 0, 0, members.Error!.Message);
         }
 
-        var enrolled = await store.EnrolledTargetIdsAsync(journeyId, cancellationToken);
-        var fresh = members.Value!.Where(id => !enrolled.Contains(id)).ToList();
-        var entered = 0;
+        var latest = await store.LatestEnrollmentsAsync(journeyId, cancellationToken);
+        var present = members.Value!.ToHashSet();
         using var open = gate.Open(EntryPermissions);
+
+        // Sona ermiş kaydın hedefi segmentte artık bulunmuyorsa bu an işaretlenir: yeniden giriş "çıkıp yeniden girmek"tir, segmentte kalmak değil.
+        foreach (var leaver in latest.Values.Where(e => e.Status != EnrollmentStatuses.Active && e.SegmentLeftAt is null && !present.Contains(e.TargetId)).Take(maxEntries))
+        {
+            await pipeline.UpdateAsync(
+                new RecordCommand(MarketingModule.Entities.JourneyEnrollment, leaver.Id, new JsonObject { ["segmentLeftAt"] = time.GetUtcNow().ToString("O") }),
+                cancellationToken);
+        }
+
+        // Yeni girenler: hiç kaydı olmayanlar ve politikaya göre yeniden girenler (kaydı sona ermiş, sonra segmentten ayrılmış ve yeniden segmentte olanlar).
+        var fresh = members.Value!.Where(id => !latest.TryGetValue(id, out var last) || CanReenter(journey.ReentryPolicy, last)).ToList();
+        var entered = 0;
         foreach (var targetId in fresh.Take(maxEntries))
         {
             var enteredAt = time.GetUtcNow();

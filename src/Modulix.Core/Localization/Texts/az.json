@@ -13881,5 +13881,6 @@
   "meta.permission.marketing.journeys.publish.resource": "Səyahətlər",
   "marketing.server.journey.exit-reason-required": "Çıxarma səbəbi məcburidir.",
   "marketing.server.journey.exit-reason-too-long": "Səbəb ən çox {0} simvol ola bilər.",
-  "marketing.server.journey.enrollment-not-active": "Səyahət qeydi aktiv deyil; yalnız aktiv qeyd çıxarıla və ya tamamlana bilər."
+  "marketing.server.journey.enrollment-not-active": "Səyahət qeydi aktiv deyil; yalnız aktiv qeyd çıxarıla və ya tamamlana bilər.",
+  "meta.field.marketing.journey-enrollment.segmentLeftAt": "Seqmentdən ayrılma vaxtı"
 }

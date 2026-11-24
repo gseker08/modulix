@@ -13881,5 +13881,6 @@
   "meta.permission.marketing.journeys.publish.resource": "Journeys",
   "marketing.server.journey.exit-reason-required": "An exit reason is required.",
   "marketing.server.journey.exit-reason-too-long": "The reason can be at most {0} characters.",
-  "marketing.server.journey.enrollment-not-active": "The journey enrollment is not active; only an active enrollment can be exited or completed."
+  "marketing.server.journey.enrollment-not-active": "The journey enrollment is not active; only an active enrollment can be exited or completed.",
+  "meta.field.marketing.journey-enrollment.segmentLeftAt": "Time left the segment"
 }

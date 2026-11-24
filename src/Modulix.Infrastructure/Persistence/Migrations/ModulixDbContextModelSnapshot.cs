@@ -12712,6 +12712,9 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("JourneyId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("SegmentLeftAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)

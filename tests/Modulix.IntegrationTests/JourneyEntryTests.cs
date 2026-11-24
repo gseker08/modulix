@@ -19,7 +19,7 @@ using static Modulix.Modules.Marketing.MarketingModule.Permissions;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0056 dilim 1b-2 ve 2c-1: yolculuk giriş işi ve elle çıkarma. Dört test türü: mutlu yol (segmentin yeni üyeleri kayıt olur, olay yayınlanır, iş tekrarında yeni kayıt açmaz,
+/// ADR-0056 dilim 1b-2, 2c-1 ve 2c-2: yolculuk giriş işi, elle çıkarma ve yeniden giriş. Dört test türü: mutlu yol (segmentin yeni üyeleri kayıt olur, olay yayınlanır, iş tekrarında yeni kayıt açmaz,
 /// sonradan segmente giren de girer), hata/doğrulama (etkin olmayan yolculuk girmez; etkinleştirenin izni olmayan segment alanı okunamaz, girişi
 /// uyarıyla atlanır), tenant izolasyonu (yalnızca kendi tenant'ının hedefleri) ve yetki (CRM'i okuyamayan etkinleştiren segmenti çalıştıramaz; iş,
 /// yazma izni verilmiş küme olmadan çalışmaz).
@@ -240,6 +240,98 @@ public class JourneyEntryTests(ModulixApiFactory factory) : IClassFixture<Moduli
 
     private static Task<HttpResponseMessage> ExitAsync(HttpClient client, JourneyEnrollmentDto enrollment, string? reason) =>
         client.PostAsJsonAsync($"/api/marketing/journey-enrollments/{enrollment.Id}/exit", new ExitJourneyEnrollmentRequest(enrollment.Version, reason));
+
+    // ---- Dilim 2c-2: yeniden giriş ----
+
+    [Fact]
+    public async Task After_an_exit_a_target_enters_again_only_after_it_left_the_segment_and_returned()
+    {
+        var (client, tenantId) = await ManagerAsync();
+        var company = await CompanyAsync(client, "Donen Firma", "Bursa");
+        var segment = await ActiveSegmentAsync(client, "donen-segment", "Bursa");
+        var journey = await PublishedWithPolicyAsync(client, "donen", segment.Id, "AfterExit");
+        Assert.Equal(1, (await RunAsync(tenantId)).Sum(o => o.Entered));
+        var first = Assert.Single(await EnrollmentsAsync(client, journey.Id));
+        Assert.Equal(HttpStatusCode.OK, (await ExitAsync(client, first, "Pause")).StatusCode);
+
+        // Hedef segmentte kalıyor: kayıt sona erse de yeniden girmez (sürekli döngü yok); ayrılma işareti yok.
+        Assert.Equal(0, (await RunAsync(tenantId)).Sum(o => o.Entered));
+        var stayed = Assert.Single(await EnrollmentsAsync(client, journey.Id));
+        Assert.Equal(("Exited", null), (stayed.Status, stayed.SegmentLeftAt));
+
+        // Segmentten ayrılır: yeni kayıt açılmaz, ancak ayrılma işaretlenir.
+        company = await SetCityAsync(client, company, "Izmir");
+        Assert.Equal(0, (await RunAsync(tenantId)).Sum(o => o.Entered));
+        var left = Assert.Single(await EnrollmentsAsync(client, journey.Id));
+        Assert.NotNull(left.SegmentLeftAt);
+
+        // Segmente döner: eski kayıt (Exited) korunur, yeni etkin kayıt açılır ve olay yayınlanır.
+        await SetCityAsync(client, company, "Bursa");
+        Assert.Equal(1, (await RunAsync(tenantId)).Sum(o => o.Entered));
+        var all = await EnrollmentsAsync(client, journey.Id);
+        Assert.Equal(2, all.Count);
+        Assert.Equal(["Active", "Exited"], all.Select(e => e.Status).Order().ToArray());
+        using var scope = factory.OpenScope(tenantId);
+        Assert.Equal(2, await scope.ServiceProvider.GetRequiredService<ModulixDbContext>().OutboxMessages.AsNoTracking()
+            .CountAsync(o => o.EventType == MarketingModule.Events.JourneyEntered));
+    }
+
+    [Fact]
+    public async Task Never_and_after_completion_policies_do_not_re_enter_after_a_manual_exit_even_when_the_target_returns()
+    {
+        var (client, tenantId) = await ManagerAsync();
+        var company = await CompanyAsync(client, "Politika Firma", "Bursa");
+        var segment = await ActiveSegmentAsync(client, "politika-segment", "Bursa");
+        var never = await PublishedWithPolicyAsync(client, "hic", segment.Id, "Never");
+        var afterCompletion = await PublishedWithPolicyAsync(client, "tamamlaninca", segment.Id, "AfterCompletion");
+        Assert.Equal(2, (await RunAsync(tenantId)).Sum(o => o.Entered));
+        foreach (var journey in new[] { never, afterCompletion })
+        {
+            Assert.Equal(HttpStatusCode.OK, (await ExitAsync(client, Assert.Single(await EnrollmentsAsync(client, journey.Id)), "Pause")).StatusCode);
+        }
+
+        // Ayrılıp dönmek, çıkışla biten kaydın hedefini bu iki politikada yeniden sokmaz (biri hiç, biri yalnızca tamamlanınca).
+        company = await SetCityAsync(client, company, "Izmir");
+        await RunAsync(tenantId);
+        await SetCityAsync(client, company, "Bursa");
+        Assert.Equal(0, (await RunAsync(tenantId)).Sum(o => o.Entered));
+        Assert.Single(await EnrollmentsAsync(client, never.Id));
+        Assert.Single(await EnrollmentsAsync(client, afterCompletion.Id));
+    }
+
+    [Fact]
+    public async Task A_run_for_another_tenant_never_marks_this_tenants_enrollments_as_left()
+    {
+        var (clientA, tenantA) = await ManagerAsync();
+        var (_, tenantB) = await ManagerAsync();
+        var company = await CompanyAsync(clientA, "A Ayrilan", "Bursa");
+        var segment = await ActiveSegmentAsync(clientA, "a-ayrilan", "Bursa");
+        var journey = await PublishedWithPolicyAsync(clientA, "a-ayril", segment.Id, "AfterExit");
+        await RunAsync(tenantA);
+        Assert.Equal(HttpStatusCode.OK, (await ExitAsync(clientA, Assert.Single(await EnrollmentsAsync(clientA, journey.Id)), "Pause")).StatusCode);
+        await SetCityAsync(clientA, company, "Izmir");
+
+        // B'nin turu A'nın kaydına dokunmaz; A'nın turu ayrılmayı işaretler.
+        await RunAsync(tenantB);
+        Assert.Null(Assert.Single(await EnrollmentsAsync(clientA, journey.Id)).SegmentLeftAt);
+        await RunAsync(tenantA);
+        Assert.NotNull(Assert.Single(await EnrollmentsAsync(clientA, journey.Id)).SegmentLeftAt);
+    }
+
+    private static async Task<JourneyDto> PublishedWithPolicyAsync(HttpClient client, string code, Guid segmentId, string policy)
+    {
+        var created = await client.PostAsJsonAsync("/api/marketing/journeys",
+            new SaveJourneyRequest(Code: code, Name: $"Yolculuk {code}", Target: "Company", SegmentId: segmentId, ReentryPolicy: policy));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        return await Transition(client, (await created.Content.ReadFromJsonAsync<JourneyDto>())!, "publish");
+    }
+
+    private static async Task<CompanyDto> SetCityAsync(HttpClient client, CompanyDto company, string city)
+    {
+        var response = await client.PutAsJsonAsync($"/api/crm/companies/{company.Id}", new SaveCompanyRequest(company.Name, City: city, Version: company.Version));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<CompanyDto>())!;
+    }
 
     // ---- Yardımcılar ----
 

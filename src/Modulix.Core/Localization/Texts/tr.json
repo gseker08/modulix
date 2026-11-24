@@ -13881,5 +13881,6 @@
   "meta.permission.marketing.journeys.publish.resource": "Yolculuklar",
   "marketing.server.journey.exit-reason-required": "Çıkarma gerekçesi zorunludur.",
   "marketing.server.journey.exit-reason-too-long": "Gerekçe en fazla {0} karakter olabilir.",
-  "marketing.server.journey.enrollment-not-active": "Yolculuk kaydı etkin değil; yalnızca etkin kayıt çıkarılır ya da tamamlanır."
+  "marketing.server.journey.enrollment-not-active": "Yolculuk kaydı etkin değil; yalnızca etkin kayıt çıkarılır ya da tamamlanır.",
+  "meta.field.marketing.journey-enrollment.segmentLeftAt": "Segmentten ayrılma zamanı"
 }

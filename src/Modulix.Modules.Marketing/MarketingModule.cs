@@ -298,7 +298,7 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
         },
         new(Entities.JourneyEnrollment, "Yolculuk kaydı", Permissions.JourneysRead, new Dictionary<string, string>
         {
-            ["journeyId"] = "Yolculuk", ["targetId"] = "Hedef", ["status"] = "Durum", ["enteredAt"] = "Giriş zamanı", ["exitedAt"] = "Çıkış zamanı", ["exitReason"] = "Çıkış nedeni",
+            ["journeyId"] = "Yolculuk", ["targetId"] = "Hedef", ["status"] = "Durum", ["enteredAt"] = "Giriş zamanı", ["exitedAt"] = "Çıkış zamanı", ["exitReason"] = "Çıkış nedeni", ["segmentLeftAt"] = "Segmentten ayrılma zamanı",
         })
         {
             References = new Dictionary<string, string> { ["journeyId"] = Entities.Journey },
