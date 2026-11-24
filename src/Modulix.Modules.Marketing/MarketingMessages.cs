@@ -587,6 +587,15 @@ internal static class MarketingMessages
     /// <summary>Müşteri yolculuğu ve kayıtları.</summary>
     public static class Journey
     {
+        public static ServerMessage EnrollmentNotActive =>
+            ServerMessage.Of("marketing.server.journey.enrollment-not-active", "Yolculuk kaydı etkin değil; yalnızca etkin kayıt çıkarılır ya da tamamlanır.");
+
+        public static ServerMessage ExitReasonTooLong(int max) =>
+            ServerMessage.Of("marketing.server.journey.exit-reason-too-long", "Gerekçe en fazla {0} karakter olabilir.", max);
+
+        public static ServerMessage ExitReasonRequired =>
+            ServerMessage.Of("marketing.server.journey.exit-reason-required", "Çıkarma gerekçesi zorunludur.");
+
         public static ServerMessage SegmentNotActive =>
             ServerMessage.Of("marketing.server.journey.segment-not-active", "Giriş segmenti etkin değil; yolculuk başlatılamaz.");
 

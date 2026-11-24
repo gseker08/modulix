@@ -58,6 +58,13 @@ internal static class MarketingEndpoints
         CampaignEndpoints.MapCampaignEndpoints(group);
 
         // Yolculuk durum geçişleri (ADR-0056): durum genel PUT ile yazılamaz; geçişler yayın iznine bağlıdır.
+        var enrollments = group.MapGroup("/journey-enrollments");
+        enrollments.MapPost("/{id:guid}/exit", async (Guid id, ExitJourneyEnrollmentRequest r, IJourneyEnrollments service, CancellationToken ct) =>
+        {
+            var result = await service.ExitAsync(id, r.Reason, r.Version, ct);
+            return result.IsSuccess ? Results.Ok(ResourceEndpoints.ToDto<JourneyEnrollmentDto>(result.Value!)) : RecordProblems.ToProblem(result.Error!);
+        }).RequirePermission(MarketingModule.Permissions.JourneysWrite);
+
         var journeys = group.MapGroup("/journeys");
         journeys.MapPost("/{id:guid}/publish", async (Guid id, JourneyActionRequest r, IJourneyService service, CancellationToken ct) =>
             JourneyRecord(await service.PublishAsync(id, r.Version, ct))).RequirePermission(MarketingModule.Permissions.JourneysPublish);

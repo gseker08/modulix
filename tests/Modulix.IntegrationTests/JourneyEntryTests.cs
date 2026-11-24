@@ -19,7 +19,7 @@ using static Modulix.Modules.Marketing.MarketingModule.Permissions;
 namespace Modulix.IntegrationTests;
 
 /// <summary>
-/// ADR-0056 dilim 1b-2: yolculuk giriş işi. Dört test türü: mutlu yol (segmentin yeni üyeleri kayıt olur, olay yayınlanır, iş tekrarında yeni kayıt açmaz,
+/// ADR-0056 dilim 1b-2 ve 2c-1: yolculuk giriş işi ve elle çıkarma. Dört test türü: mutlu yol (segmentin yeni üyeleri kayıt olur, olay yayınlanır, iş tekrarında yeni kayıt açmaz,
 /// sonradan segmente giren de girer), hata/doğrulama (etkin olmayan yolculuk girmez; etkinleştirenin izni olmayan segment alanı okunamaz, girişi
 /// uyarıyla atlanır), tenant izolasyonu (yalnızca kendi tenant'ının hedefleri) ve yetki (CRM'i okuyamayan etkinleştiren segmenti çalıştıramaz; iş,
 /// yazma izni verilmiş küme olmadan çalışmaz).
@@ -175,6 +175,72 @@ public class JourneyEntryTests(ModulixApiFactory factory) : IClassFixture<Moduli
         Assert.Throws<ArgumentException>(() => Modulix.Core.Events.GrantedPermissionRules.Validate([CrmModule.Permissions.CompaniesWrite], ["marketing.segments.read"]));
     }
 
+    // ---- Dilim 2c-1: elle çıkarma ----
+
+    [Fact]
+    public async Task A_manual_exit_ends_an_active_enrollment_with_a_reason_and_it_does_not_enter_again()
+    {
+        var (client, tenantId) = await ManagerAsync();
+        var company = await CompanyAsync(client, "Cikis Firma", "Bursa");
+        var journey = await PublishedJourneyAsync(client, "cikis", "bursa-cikis");
+        Assert.Equal(1, (await RunAsync(tenantId)).Sum(o => o.Entered));
+        var enrollment = Assert.Single(await EnrollmentsAsync(client, journey.Id));
+
+        // Gerekçe zorunlu ve sınırlıdır (alan hatası); kayıt etkin kalır.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ExitAsync(client, enrollment, null)).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await ExitAsync(client, enrollment, new string('x', 201))).StatusCode);
+        Assert.Equal("Active", Assert.Single(await EnrollmentsAsync(client, journey.Id)).Status);
+
+        var exit = await ExitAsync(client, enrollment, "Müşteri aradı, yolculuk istemiyor");
+        Assert.Equal(HttpStatusCode.OK, exit.StatusCode);
+        var exited = (await exit.Content.ReadFromJsonAsync<JourneyEnrollmentDto>())!;
+        Assert.Equal("Exited", exited.Status);
+        Assert.NotNull(exited.ExitedAt);
+        Assert.Equal("Müşteri aradı, yolculuk istemiyor", exited.ExitReason);
+
+        // Sona eren kayıt yeniden etkinleşmez ve ikinci çıkarma çakışmadır; hedef (yeniden giriş yok) aynı yolculuğa tekrar girmez.
+        Assert.Equal(HttpStatusCode.Conflict, (await ExitAsync(client, exited, "Tekrar")).StatusCode);
+        Assert.Equal(0, (await RunAsync(tenantId)).Sum(o => o.Entered));
+        Assert.Single(await EnrollmentsAsync(client, journey.Id));
+        Assert.Equal(company.PartyId, exited.TargetId);
+    }
+
+    [Fact]
+    public async Task Another_tenant_cannot_exit_a_foreign_enrollment()
+    {
+        var (clientA, tenantA) = await ManagerAsync();
+        var (clientB, _) = await ManagerAsync();
+        await CompanyAsync(clientA, "A Cikis", "Bursa");
+        var journey = await PublishedJourneyAsync(clientA, "ortak-cikis", "bursa-ortak");
+        await RunAsync(tenantA);
+        var enrollment = Assert.Single(await EnrollmentsAsync(clientA, journey.Id));
+
+        Assert.Equal(HttpStatusCode.NotFound, (await ExitAsync(clientB, enrollment, "Yabancı")).StatusCode);
+        Assert.Equal("Active", Assert.Single(await EnrollmentsAsync(clientA, journey.Id)).Status);
+    }
+
+    [Fact]
+    public async Task Exiting_an_enrollment_needs_the_journey_write_permission_and_record_scope_applies()
+    {
+        var tenant = await TenantAsync();
+        var manager = await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions]);
+        await CompanyAsync(manager, "Yetki Cikis", "Bursa");
+        var journey = await PublishedJourneyAsync(manager, "yetki-cikis", "bursa-yetki");
+        await RunAsync(tenant.Id);
+        var enrollment = Assert.Single(await EnrollmentsAsync(manager, journey.Id));
+
+        var viewer = await UserClientAsync(tenant, [JourneysRead]);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ExitAsync(viewer, enrollment, "İzleyici")).StatusCode);
+
+        // Kapsamı "kendi" olan kullanıcı başkasının yolculuk kaydını göremez, çıkaramaz.
+        var own = await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions], RecordScope.Own);
+        Assert.Equal(HttpStatusCode.NotFound, (await ExitAsync(own, enrollment, "Başkası")).StatusCode);
+        Assert.Equal("Active", Assert.Single(await EnrollmentsAsync(manager, journey.Id)).Status);
+    }
+
+    private static Task<HttpResponseMessage> ExitAsync(HttpClient client, JourneyEnrollmentDto enrollment, string? reason) =>
+        client.PostAsJsonAsync($"/api/marketing/journey-enrollments/{enrollment.Id}/exit", new ExitJourneyEnrollmentRequest(enrollment.Version, reason));
+
     // ---- Yardımcılar ----
 
     private async Task<IReadOnlyList<JourneyEntryOutcome>> RunAsync(Guid tenantId)
@@ -246,10 +312,10 @@ public class JourneyEntryTests(ModulixApiFactory factory) : IClassFixture<Moduli
         return (await UserClientAsync(tenant, [.. AllMarketing, .. CrmPermissions]), tenant.Id);
     }
 
-    private async Task<HttpClient> UserClientAsync(Modulix.Core.Platform.Tenant tenant, string[] permissions)
+    private async Task<HttpClient> UserClientAsync(Modulix.Core.Platform.Tenant tenant, string[] permissions, RecordScope scope = RecordScope.All)
     {
         var user = await factory.CreateUserAsync(tenant);
-        await factory.CreateRoleAsync(tenant.Id, permissions, RecordScope.All, user);
+        await factory.CreateRoleAsync(tenant.Id, permissions, scope, user);
         var client = factory.CreateBrowserClient();
         var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(user.Email!, ModulixApiFactory.Password));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
