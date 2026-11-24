@@ -1,6 +1,6 @@
 # Çeviri anadil kontrolü: E8 (çalışma alanı rengi ve rol menüsü)
 
-Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** ve **Azerice (az)** karşılıklarını anadili konuşan bir gözden geçiren için toplar. Türkçe (tr) metinler kaynaktır; en/az metinleri taslaktır ve anadil kontrolünden geçmemiştir (ADR-0034, "taslak" kuralı). Toplam **49 anahtar**.
+Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** ve **Azerice (az)** karşılıklarını anadili konuşan bir gözden geçiren için toplar. Türkçe (tr) metinler kaynaktır; en/az metinleri taslaktır ve anadil kontrolünden geçmemiştir (ADR-0034, "taslak" kuralı). Toplam **55 anahtar**.
 
 ## Nasıl gözden geçirilir
 
@@ -70,6 +70,12 @@ Bu belge, E8 (R4) dilimlerinde eklenen arayüz metinlerinin **İngilizce (en)** 
 | `admin.roleMenu.col.group` | Grup listesinin sütun başlığı | Grup | Group | Qrup | |
 | `admin.roleMenu.groupUp` | Düğme erişilebilirlik etiketi; {0} = grup adı | {0} grubunu yukarı taşı | Move group {0} up | {0} qrupunu yuxarı apar | |
 | `admin.roleMenu.groupDown` | Düğme erişilebilirlik etiketi; {0} = grup adı | {0} grubunu aşağı taşı | Move group {0} down | {0} qrupunu aşağı apar | |
+| `admin.roleMenu.expand` | Bölüm başlığındaki aç düğmesinin erişilebilirlik etiketi; {0} = bölüm adı | {0} bölümünü aç | Expand section {0} | {0} bölməsini aç | |
+| `admin.roleMenu.collapse` | Bölüm başlığındaki kapat düğmesinin erişilebilirlik etiketi; {0} = bölüm adı | {0} bölümünü kapat | Collapse section {0} | {0} bölməsini bağla | |
+| `admin.roleMenu.expandAll` | Listenin üstündeki düğme | Tüm bölümleri aç | Expand all sections | Bütün bölmələri aç | |
+| `admin.roleMenu.collapseAll` | Listenin üstündeki düğme (hepsi açıkken) | Tüm bölümleri kapat | Collapse all sections | Bütün bölmələri bağla | |
+| `admin.roleMenu.sectionCount` | Bölüm başlığında satır sayısı; {0} = sayı | {0} satır | {0} rows | {0} sətir | |
+| `admin.roleMenu.sectionCountHidden` | Bölüm başlığında satır ve gizli satır sayısı; {0}, {1} = sayılar | {0} satır, {1} gizli | {0} rows, {1} hidden | {0} sətir, {1} gizli | |
 
 ## Sınırlar
 

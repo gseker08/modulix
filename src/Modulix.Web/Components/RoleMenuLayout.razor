@@ -61,6 +61,12 @@
             </table>
         }
 
+        <div class="form-actions justify-content-start">
+            <button type="button" class="btn btn-ghost" @onclick="ToggleAll">
+                @Texts.Get(AllOpen ? "admin.roleMenu.collapseAll" : "admin.roleMenu.expandAll")
+            </button>
+        </div>
+
         @foreach (MenuEditor menu in menus)
         {
             <div class="section-header">
@@ -89,7 +95,25 @@
                     @foreach (SectionEditor section in menu.Sections)
                     {
                         <tr class="group-row">
-                            <th colspan="@(section.Movable ? 2 : 3)" scope="colgroup">@(section.Group is { } group ? AppNames.Of(group) : Texts.Get("admin.roleMenu.ungrouped"))</th>
+                            @{
+                                string title = section.Group is { } group ? AppNames.Of(group) : Texts.Get("admin.roleMenu.ungrouped");
+                                bool isOpen = open.Contains(section.Key);
+                                int hiddenCount = section.Items.Count(i => i.Hidden);
+                            }
+                            <th colspan="@(section.Movable ? 2 : 3)" scope="colgroup">
+                                <div class="d-flex align-items-center gap-2">
+                                    <IconAction Icon="@(isOpen ? "chevron-down" : "chevron-right")"
+                                                Label="@Texts.Get(isOpen ? "admin.roleMenu.collapse" : "admin.roleMenu.expand", title)"
+                                                OnClick="() => Toggle(section)" aria-expanded="@(isOpen ? "true" : "false")" />
+                                    @* Telefonda ad ve satır sayısı alt alta (dar yerde bölünmez), geniş ekranda yan yana. *@
+                                    <div class="d-flex flex-column flex-md-row align-items-md-baseline gap-md-2">
+                                        <span>@title</span>
+                                        <span class="text-muted fw-normal small">@(hiddenCount > 0
+                                            ? Texts.Get("admin.roleMenu.sectionCountHidden", section.Items.Count, hiddenCount)
+                                            : Texts.Get("admin.roleMenu.sectionCount", section.Items.Count))</span>
+                                    </div>
+                                </div>
+                            </th>
                             @if (section.Movable)
                             {
                                 string sectionName = AppNames.Of(section.Group!);
@@ -105,7 +129,7 @@
                                 </td>
                             }
                         </tr>
-                        @for (int i = 0; i < section.Items.Count; i++)
+                        @for (int i = 0; open.Contains(section.Key) && i < section.Items.Count; i++)
                         {
                             ItemEditor item = section.Items[i];
                             int index = i;
@@ -147,6 +171,9 @@
 
     private List<MenuEditor>? menus;
 
+    /// <summary>Açık bölümler (yalnızca görünüm; kayda girmez). Bölümler varsayılan olarak kapalıdır, sayfa kısa kalır.</summary>
+    private readonly HashSet<string> open = [];
+
     /// <summary>Uygulama paneli grupları (listelenen uygulamaların grupları), kayıtlı ya da katalog sırasıyla; <see cref="defaultGroupOrder"/> katalog sırasıdır.</summary>
     private List<AppGroup> panelGroups = [];
     private IReadOnlyList<string> defaultGroupOrder = [];
@@ -170,6 +197,9 @@
     private sealed class SectionEditor(AppGroup? group, List<ItemEditor> items)
     {
         public AppGroup? Group { get; } = group;
+
+        /// <summary>Açık/kapalı durumunun anahtarı (uygulama kimliği ve bölüm); düzen yeniden kurulunca da korunur.</summary>
+        public string Key { get; init; } = string.Empty;
 
         /// <summary>Başlıklı, alt sabitli olmayan bölüm yer değiştirebilir (MenuLayoutRules.OrderSections ile aynı kural).</summary>
         public bool Movable => Group is { Footer: false };
@@ -221,7 +251,7 @@
                     .ThenBy(e => e.Order)
                     .Select(e => new ItemEditor(e) { Hidden = byKey.TryGetValue(e.App.Id, out RoleMenuItemDto? row) && row.Hidden })
                     .ToList();
-                sections.Add(new SectionEditor(section.Group, items));
+                sections.Add(new SectionEditor(section.Group, items) { Key = $"{menu.Root.Id}|{section.Group?.Id}" });
             }
 
             // Kayıtlı bölüm sırası varsa o, yoksa katalog sırası (bölüm satırları aynı tabloda, MenuLayoutRules.SectionKey).
@@ -321,6 +351,32 @@
         }
 
         (panelGroups[index], panelGroups[target]) = (panelGroups[target], panelGroups[index]);
+    }
+
+    private bool AllOpen => menus is { Count: > 0 } && menus.SelectMany(m => m.Sections).All(sec => open.Contains(sec.Key));
+
+    private void Toggle(SectionEditor section)
+    {
+        if (!open.Remove(section.Key))
+        {
+            open.Add(section.Key);
+        }
+    }
+
+    private void ToggleAll()
+    {
+        bool openAll = !AllOpen;
+        foreach (SectionEditor section in menus!.SelectMany(m => m.Sections))
+        {
+            if (openAll)
+            {
+                open.Add(section.Key);
+            }
+            else
+            {
+                open.Remove(section.Key);
+            }
+        }
     }
 
     private void Reset() => Build([]);
