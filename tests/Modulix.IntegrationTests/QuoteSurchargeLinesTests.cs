@@ -21,7 +21,8 @@ namespace Modulix.IntegrationTests;
 public class QuoteSurchargeLinesTests(ModulixApiFactory factory) : IClassFixture<ModulixApiFactory>
 {
     private const string Rules = "/api/crm/surcharge-rules";
-    private static readonly string[] RepPermissions = [QuotesRead, QuotesWrite, CompaniesRead]; // fiyat izni yok: üretim sunucu kararıdır
+    // Serbest kalem için elle fiyat izni vardır; fiyat yönetimi (crm.prices.*) izni yoktur: üretim sunucu kararıdır, kural yönetimi izni gerekmez.
+    private static readonly string[] RepPermissions = [QuotesRead, QuotesWrite, QuotesManualPrice, CompaniesRead];
 
     [Fact]
     public async Task Rule_results_become_lines_that_enter_the_total_but_do_not_take_the_document_discount()
@@ -54,7 +55,9 @@ public class QuoteSurchargeLinesTests(ModulixApiFactory factory) : IClassFixture
         Assert.Equal(["IncludedInGroup", "BreakdownOnly"], generated.Select(l => l.SurchargePresentation));
         Assert.All(generated, l => Assert.True(l.Position > lines.Single(m => m.SourceRuleId is null).Position));
         var totals = await GetQuoteAsync(admin, quote.Id);
-        Assert.Equal((295m, 59m, 354m), (totals.NetTotal, totals.TaxTotal, totals.GrossTotal)); // (150 + 100 + 45) × %20 vergi
+        // Elle girilen serbest kalemin vergisi %0'dır (istekte oran yok); ek ücret satırları kuralın %20 oranını taşır: (100 + 45) × %20 = 29.
+        Assert.Equal((295m, 29m, 324m), (totals.NetTotal, totals.TaxTotal, totals.GrossTotal));
+        Assert.All(generated, l => Assert.Equal(20m, l.TaxRatePercent));
 
         // %10 genel indirim yalnızca elle kaleme uygulanır (15 €); ek ücret satırları indirim almaz.
         var discounted = await admin.PutAsJsonAsync($"/api/crm/quotes/{quote.Id}", Save(totals) with { DocumentDiscountKind = "Percent", DocumentDiscountValue = 10m });
