@@ -14166,5 +14166,10 @@
   "admin.flow.change.added": "Əlavə edildi",
   "admin.flow.change.removed": "Silindi",
   "admin.flow.change.changed": "Dəyişdi",
-  "admin.flow.change.moved": "Aparıldı"
+  "admin.flow.change.moved": "Aparıldı",
+  "admin.flow.outcome.wouldrun": "İşləyərdi",
+  "admin.flow.outcome.skippedbystepcondition": "Addım şərti ödənmir, atlanardı",
+  "admin.flow.outcome.notpermitted": "İstifadə oluna bilmir",
+  "admin.flow.outcome.rulenotmatched": "Qayda şərti ödənmir, işləməz",
+  "admin.flow.outcomeStale": "Nişanlar son yoxlamanın nümunə qeyddəki nəticəsidir; qaydanı dəyişmisinizsə yenidən yoxlayın. Heç nə işlədilmədi."
 }

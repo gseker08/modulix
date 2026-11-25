@@ -68,6 +68,26 @@ public class AutomationPreviewTests
     }
 
     [Fact]
+    public void A_step_condition_is_reported_as_a_field_and_a_step_without_one_reports_none()
+    {
+        var (service, _) = Create();
+        var definition = new AutomationDefinition(
+            new RecordCreatedTrigger(),
+            null,
+            [
+                new AutomationActionStep("her-zaman", FollowUp.Key, new JsonObject { ["subject"] = "Ara", ["dueInDays"] = 1, ["ownerId"] = new JsonObject { ["$field"] = Owner.Key } }),
+                new AutomationActionStep("saglanir", FollowUp.Key, new JsonObject { ["subject"] = "Ara", ["dueInDays"] = 1, ["ownerId"] = new JsonObject { ["$field"] = Owner.Key } })
+                    { When = Leaf(Score, AutomationOperator.Gte, "50") },
+                new AutomationActionStep("saglanmaz", FollowUp.Key, new JsonObject { ["subject"] = "Ara", ["dueInDays"] = 1, ["ownerId"] = new JsonObject { ["$field"] = Owner.Key } })
+                    { When = Leaf(Score, AutomationOperator.Gte, "95") },
+            ]);
+
+        var preview = Preview(service, definition, RecordId);
+
+        Assert.Equal([null, true, false], preview.PlannedActions.Select(a => a.StepConditionPassed));
+    }
+
+    [Fact]
     public void Failing_conditions_plan_nothing_and_explain_why()
     {
         var (service, _) = Create();

@@ -14166,5 +14166,10 @@
   "admin.flow.change.added": "Eklendi",
   "admin.flow.change.removed": "Kaldırıldı",
   "admin.flow.change.changed": "Değişti",
-  "admin.flow.change.moved": "Taşındı"
+  "admin.flow.change.moved": "Taşındı",
+  "admin.flow.outcome.wouldrun": "Çalışırdı",
+  "admin.flow.outcome.skippedbystepcondition": "Adım koşulu sağlanmıyor, atlanırdı",
+  "admin.flow.outcome.notpermitted": "Kullanılamıyor",
+  "admin.flow.outcome.rulenotmatched": "Kural koşulu sağlanmıyor, çalışmaz",
+  "admin.flow.outcomeStale": "Rozetler son doğrulamanın örnek kayıttaki sonucudur; kuralı değiştirdiyseniz yeniden doğrulayın. Hiçbir şey çalıştırılmadı."
 }

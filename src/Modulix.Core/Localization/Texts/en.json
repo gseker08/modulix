@@ -14166,5 +14166,10 @@
   "admin.flow.change.added": "Added",
   "admin.flow.change.removed": "Removed",
   "admin.flow.change.changed": "Changed",
-  "admin.flow.change.moved": "Moved"
+  "admin.flow.change.moved": "Moved",
+  "admin.flow.outcome.wouldrun": "Would run",
+  "admin.flow.outcome.skippedbystepcondition": "Step condition not met, would be skipped",
+  "admin.flow.outcome.notpermitted": "Unavailable",
+  "admin.flow.outcome.rulenotmatched": "Rule condition not met, would not run",
+  "admin.flow.outcomeStale": "The badges are the result of the last validation on the sample record; validate again if you changed the rule. Nothing was run."
 }

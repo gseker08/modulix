@@ -77,7 +77,7 @@ public sealed record PreviewAutomationRequest(string ModuleKey, string EntityKey
 public sealed record ConditionExplanationDto(bool Passed, string Text, IReadOnlyList<ConditionExplanationDto> Children);
 
 public sealed record PlannedActionDto(
-    string StepId, string Action, string DisplayName, string SideEffect, JsonElement Parameters, bool Permitted, string? Note);
+    string StepId, string Action, string DisplayName, string SideEffect, JsonElement Parameters, bool Permitted, string? Note, bool? StepConditionPassed = null);
 
 public sealed record AutomationPreviewDto(
     IReadOnlyList<AutomationIssueDto> Issues,

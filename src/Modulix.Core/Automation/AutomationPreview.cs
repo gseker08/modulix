@@ -8,7 +8,10 @@ using Modulix.Core.Contracts.Localization;
 
 namespace Modulix.Core.Automation;
 
-/// <summary>Önizlemede planlanan aksiyon: çalıştırılmaz, yalnızca parametreleri çözülür ve izin durumu gösterilir.</summary>
+/// <summary>
+/// Önizlemede planlanan aksiyon: çalıştırılmaz, yalnızca parametreleri çözülür ve izin durumu gösterilir. <paramref name="StepConditionPassed"/> adım koşulunun (dallanma, 4c-5)
+/// örnek kayıtta sağlanıp sağlanmadığıdır; adımın koşulu yoksa <c>null</c>. Sağlanmıyorsa gerçek çalışmada adım atlanır (akış sürer). Not metninden ayrıca verilir: arayüz metin ayrıştırmaz.
+/// </summary>
 public sealed record PlannedAction(
     string StepId,
     string Action,
@@ -16,7 +19,8 @@ public sealed record PlannedAction(
     AutomationSideEffect SideEffect,
     JsonObject Parameters,
     bool Permitted,
-    string? Note);
+    string? Note,
+    bool? StepConditionPassed = null);
 
 /// <summary>
 /// Yan etkisiz önizleme sonucu (ADR-0027). <see cref="Issues"/> doluysa tanım geçersizdir ve değerlendirme yapılmaz.
@@ -133,9 +137,11 @@ public sealed class AutomationPreviewService(
                 _ => "kayıt değiştirir ya da dış etki üretir",
             };
             // Adım koşulu (Dilim 4c-5): örnek kaydın bugünkü değerleriyle; gerçek çalışmada adıma sıra gelince yeniden sorulur.
+            bool? stepPassed = null;
             if (step.When is { } when)
             {
                 var check = await ConditionEvaluator.EvaluateAsync(when, fields, facts, day, cancellationToken);
+                stepPassed = check.Passed;
                 notes.Add(check.Passed
                     ? $"Adım koşulu bu kayıtta sağlanıyor ({ConditionText.Describe(when, fields)})."
                     : $"Adım koşulu bu kayıtta sağlanmıyor, adım atlanırdı ({ConditionText.Describe(when, fields)}).");
@@ -144,7 +150,7 @@ public sealed class AutomationPreviewService(
             notes.Add($"Planlandı, çalıştırılmadı ({effect}).");
             planned.Add(new PlannedAction(
                 step.Id, step.Action, view.Definition.DisplayName, view.Definition.SideEffect, parameters, view.Available,
-                string.Join(" ", view.Available ? notes : notes.Prepend(view.UnavailableReason!))));
+                string.Join(" ", view.Available ? notes : notes.Prepend(view.UnavailableReason!)), stepPassed));
         }
 
         return planned;
