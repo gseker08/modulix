@@ -42,6 +42,10 @@ internal sealed class QuoteReader(IModuleData data)
         await data.Set<QuoteEvent>().AsNoTracking().Where(e => e.QuoteId == quoteId && e.Kind == "SubmittedForApproval")
             .OrderByDescending(e => e.CreatedAt).Select(e => e.ActorId).FirstOrDefaultAsync(cancellationToken);
 
+    /// <summary>Teklif para birimindeki etkin ek ücret kuralları (değerlendirme sunucu kararıdır; kural yönetimi izni gerekmez).</summary>
+    public async Task<List<SurchargeRule>> ActiveSurchargeRulesAsync(string currency, CancellationToken cancellationToken) =>
+        await data.Set<SurchargeRule>().AsNoTracking().Where(r => r.IsActive && r.Currency == currency).ToListAsync(cancellationToken);
+
     /// <summary>Etkin onay kuralları (değerlendirme sunucu kararıdır; kural yönetimi izni gerekmez).</summary>
     public async Task<List<QuoteApprovalRuleInfo>> ActiveRulesAsync(CancellationToken cancellationToken) =>
         await data.Set<QuoteApprovalRule>().AsNoTracking().Where(r => r.IsActive)

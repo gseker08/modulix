@@ -61,6 +61,15 @@ public class SurchargeEngineTests
     }
 
     [Fact]
+    public void Minimum_does_not_charge_the_full_floor_when_the_group_has_no_lines()
+    {
+        var result = SurchargeEngine.Evaluate([Rule("Asgari", SurchargeKind.Minimum, amount: 125m)], Context(new() { ["group.baska"] = 500m }));
+
+        Assert.Empty(result.Applied);
+        Assert.Contains("kalem yok", Assert.Single(result.Skipped).Reason);
+    }
+
+    [Fact]
     public void Minimum_sees_surcharges_that_were_added_to_the_same_group()
     {
         // Bant 100, ADR +100 → grup 200 ≥ 125: asgari bedel çalışmaz.

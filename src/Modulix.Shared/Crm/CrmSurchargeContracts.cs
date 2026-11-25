@@ -45,3 +45,18 @@ public sealed record SaveSurchargeRuleRequest(
     string Presentation = "SeparateLine",
     bool Stackable = true,
     long? Version = null);
+
+// Teklifin ek ücret hesap dökümü (GET /api/crm/quotes/{id}/surcharges; ADR-0018 devamı, Dilim 2c ilk aşama): etkin kuralların bu teklife uygulanmış hâli.
+// Salt okunur önizlemedir; teklifin toplamlarına henüz yazılmaz. Applied: uygulanan kurallar, Skipped: uygulanmayan kurallar ve nedeni (satışçı
+// "kural neden çalışmadı" sorusunu buradan görür), GroupTotals: ek ücretler dahil grup toplamları. Teklif okuma izni yeter; kural yönetimi izni gerekmez.
+
+public sealed record QuoteSurchargeLineDto(Guid RuleId, string Name, string Kind, string? Group, string Presentation, decimal Amount, string Explanation);
+
+public sealed record QuoteSurchargeSkipDto(Guid RuleId, string Name, string Reason);
+
+public sealed record QuoteSurchargeBreakdownDto(
+    string Currency,
+    decimal Total,
+    IReadOnlyList<QuoteSurchargeLineDto> Applied,
+    IReadOnlyList<QuoteSurchargeSkipDto> Skipped,
+    IReadOnlyDictionary<string, decimal> GroupTotals);

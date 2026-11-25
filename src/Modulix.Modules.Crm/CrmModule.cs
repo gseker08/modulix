@@ -1210,6 +1210,7 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         services.AddScoped<IQuoteWorkflow, QuoteWorkflow>();
         services.AddScoped<IQuoteSharing, QuoteSharing>();
         services.AddScoped<IQuoteComparison, QuoteComparisonService>();
+        services.AddScoped<IQuoteSurcharges, QuoteSurchargeService>();
         services.AddScoped<IQuoteReport, QuoteReport>();
         services.AddScoped<QuoteMarkers>();
         services.AddScoped<IQuoteExpiry, QuoteExpiry>();
