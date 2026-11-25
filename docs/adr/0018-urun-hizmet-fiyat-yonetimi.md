@@ -114,3 +114,10 @@ Yukarıdaki analiz tablosu ve "Yapılmayanlar" bölümü ilk dilim anındaki dur
 - **Migration:** yok (`PriceList.TierMethod` serbest metin sütunudur; değer kümesi sunucu doğrulamasındadır). Mevcut listeler etkilenmez.
 - **Arayüz:** Fiyat listeleri ekranında yöntem seçeneği ve `Flat` listede "Bant tutarı" başlığı/etiketi; sütun adı dışında ekran akışı aynı. Taslak ekrandaki "dahil" aralık gösterimi (1 – 2) yapılmadı, mevcut "alt miktar / üst miktar (hariç)" gösterimi korundu.
 - **Sıradaki:** ek ücret kuralı motoru (minimum bedel, ADR/ÖTV ek ücretleri, süre aşımı/demuraj, mesai) ayrı dilimdir.
+
+## Güncel durum notu (25 Kasım 2026): ek ücret kuralı kaydı (Dilim 2b)
+
+- **Kayıt:** `crm.SurchargeRules` (tenant tablosu: `TenantId`, `ICompanyShared`, RLS `TenantIsolationSql.AddTable`; migration `CrmSurchargeRules`, yalnızca yeni tablo ekler, geriye uyumlu). Alanlar `SurchargeEngine` girdisinin birebir karşılığıdır: tür, para birimi, tutar ya da yüzde, grup (`GroupKey`; `Group` T-SQL ayrılmış sözcüğü olduğu için sütun adı değildir, API alanı `group`), taban/süre anahtarı, serbest süre, çarpan anahtarları ve koşullar (metin sütununda JSON dizisi), teklifte görünüm, birleşirlik, öncelik, etkinlik.
+- **Yetki:** yeni izin eklenmedi; okuma `crm.prices.read`, yazma `crm.prices.write`. Kural fiyatı etkilediği için fiyat izniyle aynı kapıdadır. Denetim kaydı kayıt boru hattından gelir (`crm.surcharge-rule`).
+- **Doğrulama:** tür başına zorunlu alanlar ve tutar/yüzde karşılıklı dışlaması `SurchargeRules.Validate` ile (alan adıyla 422); anahtar biçimi (harf, rakam, `.`, `_`, `-`), çarpan anahtarlarının tekrarsızlığı ve koşul öğeleri (`key`, bilinen `operator`, boş olmayan `value`) alan çözümlemesinde. Türle ilgisiz alanlar (ör. sabit tutarda süre anahtarı) kayıtta boşaltılır.
+- **Henüz yok:** teklif hesabına bağlama (kuralların satır/hesap dökümü olarak yazılması), ekranlar, özel alan başına "ticari içerik" işareti ve ticari kilit kararı (Dilim 2c–2e). Bu yüzden kural kaydetmek bugün bir teklifin tutarını değiştirmez.

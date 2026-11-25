@@ -642,6 +642,33 @@ internal static class CrmMessages
     {
         public static ServerMessage CategoryCycle => ServerMessage.Of("crm.server.pricing.category-cycle", "Kategori kendi altına taşınamaz (döngü).");
 
+        public static ServerMessage SurchargeAmountRequired =>
+            ServerMessage.Of("crm.server.pricing.surcharge-amount-required", "Bu kural türü için sıfırdan büyük bir tutar girin.");
+
+        public static ServerMessage SurchargePercentRequired =>
+            ServerMessage.Of("crm.server.pricing.surcharge-percent-required", "Bu kural türü için sıfırdan büyük bir yüzde girin.");
+
+        public static ServerMessage SurchargeAmountOrPercent =>
+            ServerMessage.Of("crm.server.pricing.surcharge-amount-or-percent", "Bu kural türü için yalnızca tutar ya da yalnızca yüzde girilir, ikisi birlikte olmaz.");
+
+        public static ServerMessage SurchargeBaseRequired =>
+            ServerMessage.Of("crm.server.pricing.surcharge-base-required", "Yüzde için taban anahtarı girin.");
+
+        public static ServerMessage SurchargeGroupRequired =>
+            ServerMessage.Of("crm.server.pricing.surcharge-group-required", "Asgari bedel kuralı için grup girin.");
+
+        public static ServerMessage SurchargeDurationRequired =>
+            ServerMessage.Of("crm.server.pricing.surcharge-duration-required", "Süre aşımı kuralı için süre anahtarı girin.");
+
+        public static ServerMessage SurchargeMinimumNoMultiplier =>
+            ServerMessage.Of("crm.server.pricing.surcharge-minimum-no-multiplier", "Asgari bedel kuralı çarpan anahtarı alamaz.");
+
+        public static ServerMessage SurchargeKeyInvalid =>
+            ServerMessage.Of("crm.server.pricing.surcharge-key-invalid", "Anahtar yalnızca harf, rakam, nokta, alt çizgi ve tire içerebilir (en çok 100 karakter).");
+
+        public static ServerMessage SurchargeListInvalid =>
+            ServerMessage.Of("crm.server.pricing.surcharge-list-invalid", "Liste geçersiz: çarpan anahtarları geçerli ve tekrarsız, koşullar anahtar, işleç ve değer içermelidir.");
+
         public static ServerMessage CategoryInUse =>
             ServerMessage.Of("crm.server.pricing.category-in-use", "Alt kategorisi ya da ürünü olan kategori silinemez; pasifleştirin.");
 
