@@ -14130,5 +14130,18 @@
   "marketing.journeyDetail.exit.save": "Şərti yadda saxla",
   "marketing.journeyDetail.exit.saved": "Çıxış şərti yadda saxlandı. Dərc və ya davam etdirmədə dərc edənin görə bildiyi sahələrə qarşı yoxlanılır.",
   "marketing.journeyDetail.exit.removed": "Çıxış şərti silindi.",
-  "marketing.journeyDetail.exit.catalogDenied": "Sahə siyahısı seqment sahə kataloqundandır; şərti redaktə etmək üçün seqmentlərə baxmaq icazəsi lazımdır."
+  "marketing.journeyDetail.exit.catalogDenied": "Sahə siyahısı seqment sahə kataloqundandır; şərti redaktə etmək üçün seqmentlərə baxmaq icazəsi lazımdır.",
+  "marketing.journeyDetail.tab.rules": "Qaydalar",
+  "marketing.journeyRules.title": "Səyahətə bağlı qaydalar",
+  "marketing.journeyRules.intro": "Səyahətin addımları avtomatlaşdırma qaydalarıdır. Bağ qayda şərtindəki \"Səyahət identifikatoru\" sətri ilə qurulur; şərtində bu səyahətin identifikatorunu göstərən qaydalar burada siyahıya alınır.",
+  "marketing.journeyRules.emptyTitle": "Bağlı qayda yoxdur",
+  "marketing.journeyRules.empty": "Səyahət addım atmır: mesaj göndərmək və gözləmək üçün bu səyahətə bağlı qayda qurun.",
+  "marketing.journeyRules.truncated": "Yalnız ilk {0} qayda yoxlandı; bağlı qayda görünmürsə qayda siyahısında axtarın.",
+  "marketing.journeyRules.caption": "Səyahətə bağlı qaydalar",
+  "marketing.journeyRules.col.rule": "Qayda",
+  "marketing.journeyRules.col.binding": "Bağ",
+  "marketing.journeyRules.bound": "Dərc olunmuş versiya bağlıdır",
+  "marketing.journeyRules.draftOnly": "Yalnız layihə bağlıdır (dərc olunanda işləyəcək)",
+  "marketing.journeyRules.create": "Qayda qur",
+  "marketing.journeyRules.createHelp": "Qaydanın tətikləyicisini \"Səyahətə daxil olundu\" edin, şərtə \"Səyahət identifikatoru\" = bu identifikatoru yazın:"
 }
