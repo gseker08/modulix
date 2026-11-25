@@ -32,6 +32,7 @@ public sealed record QuotePolicy(bool PriceIncludesTax, int PolicyVersion = 1);
 /// <param name="ParentLineId">Yalnızca <see cref="QuoteLineRole.PackageChild"/> için paket ana satırı.</param>
 /// <param name="IsSelected">Opsiyonel/alternatif satırın seçili olup olmadığı; standart satırda yok sayılır.</param>
 /// <param name="RecurringPeriod">Boşsa tek seferlik; doluysa dönem anahtarı (ör. "Monthly", "Yearly").</param>
+/// <param name="ExcludedFromDocumentDiscount">True ise satır ana toplama girer ama teklif geneli indirimin tabanına ve dağıtımına katılmaz (ör. kuraldan üretilen ek ücret).</param>
 public sealed record QuoteLineInput(
     Guid Id,
     decimal Quantity,
@@ -42,7 +43,8 @@ public sealed record QuoteLineInput(
     decimal DiscountValue = 0m,
     bool IsSelected = false,
     Guid? ParentLineId = null,
-    string? RecurringPeriod = null);
+    string? RecurringPeriod = null,
+    bool ExcludedFromDocumentDiscount = false);
 
 public sealed record QuoteLineResult(
     Guid Id,
@@ -109,9 +111,11 @@ public static class QuoteCalculator
 
         // Ana toplama giren satırlar.
         var included = lines.Where(IsIncluded).ToList();
-        decimal eligible = included.Sum(l => afterLine[l.Id].After);
+        // Genel indirim yalnızca indirime konu satırlara dağıtılır; hariç tutulan satır (ek ücret) toplama girer ama indirim almaz.
+        var discountable = included.Where(l => !l.ExcludedFromDocumentDiscount).ToList();
+        decimal eligible = discountable.Sum(l => afterLine[l.Id].After);
         decimal docDiscount = DocumentDiscountAmount(documentDiscountKind, documentDiscountValue, eligible);
-        var shares = Allocate(included, afterLine, eligible, docDiscount);
+        var shares = Allocate(discountable, afterLine, eligible, docDiscount);
 
         var results = new List<QuoteLineResult>();
         foreach (QuoteLineInput line in lines)
@@ -127,7 +131,7 @@ public static class QuoteCalculator
                 continue;
             }
 
-            decimal share = shares[line.Id];
+            decimal share = shares.GetValueOrDefault(line.Id);
             LineAmounts amounts = LineTotals.Calculate(after - share, line.TaxRatePercent, policy.PriceIncludesTax);
             results.Add(new QuoteLineResult(line.Id, true, list, discount, share, amounts.Net, amounts.Tax, amounts.Gross, line.RecurringPeriod));
         }

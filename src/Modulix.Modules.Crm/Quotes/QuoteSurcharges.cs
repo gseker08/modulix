@@ -41,8 +41,9 @@ internal sealed class QuoteSurchargeService(IRecordPipeline pipeline, QuoteReade
 
         try
         {
-            return RecordResult<QuoteSurchargePreview>.Ok(
-                new QuoteSurchargePreview(quote.Currency, SurchargeEngine.Evaluate(rules.Select(SurchargeRules.ToEngineRule), context)));
+            // Satır üretimiyle aynı değerlendirme: vergi oranı olmayan kural ve kalemsiz teklif orada da uygulanmaz.
+            var result = QuoteSurchargeGenerator.Evaluate(rules, context, lines.Any(l => l.Included && l.SourceRuleId is null));
+            return RecordResult<QuoteSurchargePreview>.Ok(new QuoteSurchargePreview(quote.Currency, result));
         }
         catch (PricingException ex)
         {

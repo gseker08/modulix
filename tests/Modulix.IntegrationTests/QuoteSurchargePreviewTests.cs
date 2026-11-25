@@ -43,6 +43,7 @@ public class QuoteSurchargePreviewTests(ModulixApiFactory factory) : IClassFixtu
         var quote = await NewQuoteAsync(admin, s.CompanyId, new JsonObject { [cargo.Key] = adr, [days.Key] = 10, [declarations.Key] = 1 });
         await AddLineAsync(admin, quote.Id, "Parsiyel ardiye", 150m, "Ardiye Bedeli");
 
+        var before = (await admin.GetFromJsonAsync<QuoteDto>($"/api/crm/quotes/{quote.Id}"))!;
         var breakdown = await GetBreakdownAsync(admin, quote.Id);
 
         Assert.Equal("EUR", breakdown.Currency);
@@ -57,9 +58,9 @@ public class QuoteSurchargePreviewTests(ModulixApiFactory factory) : IClassFixtu
         Assert.DoesNotContain(breakdown.Skipped, x => x.Name is "Dolar kuralı" or "Pasif kural");
         Assert.NotEqual(Guid.Empty, passive.Id);
 
-        // Salt okunurdur: teklifin toplamları değişmez.
+        // Salt okunurdur: dökümü okumak teklifin toplamını ve sürümünü değiştirmez (teklif zaten kuraldan üretilmiş satırlarla hesaplanmıştır).
         var after = (await admin.GetFromJsonAsync<QuoteDto>($"/api/crm/quotes/{quote.Id}"))!;
-        Assert.Equal(quote.NetTotal + 150m, after.NetTotal);
+        Assert.Equal((before.NetTotal, before.Version), (after.NetTotal, after.Version));
 
         // Değeri girilmemiş teklifte kurallar nedeniyle uygulanmaz; fiyat uydurulmaz.
         var empty = await NewQuoteAsync(admin, s.CompanyId, null);
@@ -115,7 +116,7 @@ public class QuoteSurchargePreviewTests(ModulixApiFactory factory) : IClassFixtu
         await PostAsync<QuoteLineDto>(client, "/api/crm/quote-lines", new SaveQuoteLineRequest(quoteId, name, "Free", null, 1m, price, GroupName: group));
 
     private static async Task<SurchargeRuleDto> PostRuleAsync(HttpClient client, SaveSurchargeRuleRequest body) =>
-        await PostAsync<SurchargeRuleDto>(client, Rules, body);
+        await PostAsync<SurchargeRuleDto>(client, Rules, body with { TaxRatePercent = body.TaxRatePercent ?? 20m });
 
     private static async Task<CustomFieldDto> CreateFieldAsync(HttpClient client, SaveCustomFieldRequest request) =>
         await PostAsync<CustomFieldDto>(client, "/api/customization/fields", request);

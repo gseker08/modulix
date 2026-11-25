@@ -79,6 +79,8 @@ internal static class QuoteTotals
         QuoteCalculation calc;
         try
         {
+            // Taslak teklifte ek ücret kurallarının sonuçları satır olarak eşitlenir (ADR-0018 devamı, Dilim 2c); toplam bu satırlarla hesaplanır.
+            lines = [.. (await QuoteSurchargeGenerator.SyncAsync(data, quote, lines, cancellationToken)).OrderBy(l => l.Position).ThenBy(l => l.CreatedAt).ThenBy(l => l.Id)];
             calc = QuoteCalculator.Calculate(
                 [.. lines.Select(ToInput)], new QuotePolicy(quote.PriceIncludesTax, quote.CalculationPolicyVersion), kind, quote.DocumentDiscountValue);
         }
@@ -112,11 +114,11 @@ internal static class QuoteTotals
         quote.CalculatedAt = DateTimeOffset.UtcNow;
     }
 
-    private static QuoteLineInput ToInput(QuoteLine l) => new(
+    internal static QuoteLineInput ToInput(QuoteLine l) => new(
         l.StableKey, l.Quantity, l.UnitPrice, l.TaxRatePercent,
         Enum.TryParse<QuoteLineRole>(l.Role, out var role) ? role : QuoteLineRole.Standard,
         Enum.TryParse<QuoteDiscountKind>(l.DiscountKind, out var kind) ? kind : QuoteDiscountKind.None,
-        l.DiscountValue, l.IsSelected, l.ParentStableKey, l.RecurringPeriod);
+        l.DiscountValue, l.IsSelected, l.ParentStableKey, l.RecurringPeriod, ExcludedFromDocumentDiscount: l.SourceRuleId is not null);
 
     private static string FieldFor(string code, string fallback) => code switch
     {

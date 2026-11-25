@@ -78,6 +78,7 @@ internal sealed class QuoteLineConfiguration : IEntityTypeConfiguration<QuoteLin
         builder.Property(l => l.Role).HasMaxLength(20).IsRequired();
         builder.Property(l => l.RecurringPeriod).HasMaxLength(20);
         builder.Property(l => l.UnitCost).HasPrecision(28, 10);
+        builder.Property(l => l.SurchargePresentation).HasMaxLength(20);
         builder.Property(l => l.ListAmount).HasPrecision(18, 2);
         builder.Property(l => l.LineDiscount).HasPrecision(18, 2);
         builder.Property(l => l.DocumentDiscountShare).HasPrecision(18, 2);
@@ -88,6 +89,9 @@ internal sealed class QuoteLineConfiguration : IEntityTypeConfiguration<QuoteLin
         builder.HasIndex(l => new { l.TenantId, l.QuoteId, l.StableKey }).IsUnique().HasDatabaseName("UX_QuoteLines_QuoteKey");
         builder.HasIndex(l => new { l.TenantId, l.QuoteId, l.Position });
         builder.HasIndex(l => new { l.TenantId, l.ProductId });
+
+        // Teklif başına kural başına en çok bir üretilmiş satır: eşzamanlı yeniden hesapta çift satır oluşmaz.
+        builder.HasIndex(l => new { l.TenantId, l.QuoteId, l.SourceRuleId }).IsUnique().HasFilter("[SourceRuleId] IS NOT NULL").HasDatabaseName("UX_QuoteLines_SurchargeRule");
         builder.ToTable(t => t.HasCheckConstraint("CK_QuoteLines_Amounts", "[Quantity] > 0 AND [UnitPrice] >= 0 AND [DiscountValue] >= 0"));
         builder.ToTable(t => t.HasCheckConstraint("CK_QuoteLines_Tax", "[TaxRatePercent] >= 0 AND [TaxRatePercent] <= 100"));
 

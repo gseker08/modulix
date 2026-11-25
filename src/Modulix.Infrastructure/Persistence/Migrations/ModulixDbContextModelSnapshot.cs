@@ -9236,8 +9236,18 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<Guid?>("SourceRuleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long?>("SourceRuleVersion")
+                        .HasColumnType("bigint");
+
                     b.Property<Guid>("StableKey")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SurchargePresentation")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<decimal>("Tax")
                         .HasPrecision(18, 2)
@@ -9283,6 +9293,11 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "ProductId");
 
                     b.HasIndex("TenantId", "QuoteId", "Position");
+
+                    b.HasIndex("TenantId", "QuoteId", "SourceRuleId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_QuoteLines_SurchargeRule")
+                        .HasFilter("[SourceRuleId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "QuoteId", "StableKey")
                         .IsUnique()
@@ -9588,6 +9603,10 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Stackable")
                         .HasColumnType("bit");
 
+                    b.Property<decimal?>("TaxRatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("decimal(9,4)");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
@@ -9611,6 +9630,8 @@ namespace Modulix.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_SurchargeRules_FreeUnits", "[FreeUnits] >= 0");
 
                             t.HasCheckConstraint("CK_SurchargeRules_Percent", "[Percent] IS NULL OR ([Percent] >= 0 AND [Percent] <= 100)");
+
+                            t.HasCheckConstraint("CK_SurchargeRules_TaxRate", "[TaxRatePercent] IS NULL OR ([TaxRatePercent] >= 0 AND [TaxRatePercent] <= 100)");
                         });
                 });
 

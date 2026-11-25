@@ -10,6 +10,7 @@ namespace Modulix.Modules.Crm.Quotes;
 /// <c>quote.subtotal</c> (ana toplama giren kalemlerin belge indirimi öncesi net tutarı), <c>group.&lt;grup&gt;</c> (kalem <c>GroupName</c>'i),
 /// <c>line.&lt;ürün kodu&gt;</c> (o koddaki kalemlerin tutarı), <c>quantity.&lt;ürün kodu&gt;</c> (miktar) ve teklifin özel alanları (kendi anahtarıyla).
 /// Kalem tutarı <c>ListAmount − LineDiscount</c>'tır; seçilmemiş isteğe bağlı/alternatif kalem (<c>Included=false</c>) hiçbir toplama girmez.
+/// Kuraldan üretilmiş satırlar (<c>SourceRuleId</c> dolu) bağlama girmez: ek ücret kendi tabanını beslemez.
 /// </summary>
 public static class QuoteSurchargeContextBuilder
 {
@@ -45,7 +46,7 @@ public static class QuoteSurchargeContextBuilder
         void Add(string key, decimal amount) => numbers[key] = numbers.GetValueOrDefault(key) + amount;
 
         decimal subtotal = 0m;
-        foreach (QuoteLine line in lines.Where(l => l.Included))
+        foreach (QuoteLine line in lines.Where(l => l.Included && l.SourceRuleId is null))
         {
             decimal amount = line.ListAmount - line.LineDiscount;
             subtotal += amount;

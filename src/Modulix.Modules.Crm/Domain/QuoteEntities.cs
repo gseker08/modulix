@@ -187,6 +187,20 @@ public sealed class QuoteLine : CrmEntity
     /// <summary>Yetkili kullanıcıya özel maliyet bilgisi; yetkisiz yanıtlara hiç konmaz.</summary>
     public decimal? UnitCost { get; internal set; }
 
+    // ---- Ek ücret kuralından üretim (ADR-0018 devamı, Dilim 2c)
+
+    /// <summary>
+    /// Doluysa satır bir ek ücret kuralından sunucuca üretilmiştir (<see cref="SurchargeRule"/>): kalem değildir, elle düzenlenemez ve silinemez,
+    /// teklif taslakken her yeniden hesapta kural sonuçlarından yeniden kurulur. Teklif başına kural başına en çok bir satır vardır.
+    /// </summary>
+    public Guid? SourceRuleId { get; internal set; }
+
+    /// <summary>Satırı üreten kuralın o andaki sürümü (sunum sonrası tarihsel izleme için).</summary>
+    public long? SourceRuleVersion { get; internal set; }
+
+    /// <summary>Kuralın teklifte görünüm seçimi (<c>SurchargeRules.Presentations</c>); yalnızca üretilmiş satırda dolu. Müşteri belgesinin satırı nasıl göstereceğini belirler.</summary>
+    public string? SurchargePresentation { get; internal set; }
+
     // ---- Sunucu hesabı
 
     public bool Included { get; internal set; } = true;

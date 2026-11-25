@@ -12,6 +12,44 @@ public class QuoteCalculatorTests
         new(Guid.NewGuid(), qty, price, tax, role, kind, discount, selected, parent, period);
 
     [Fact]
+    public void A_line_excluded_from_the_document_discount_is_totalled_but_neither_discounted_nor_part_of_the_discount_base()
+    {
+        // 200 € indirime konu satır + 100 € ek ücret; %10 genel indirim yalnızca 200 €'ya uygulanır (20 €).
+        var charge = new QuoteLineInput(Guid.NewGuid(), 1, 100m, 20m, ExcludedFromDocumentDiscount: true);
+        var result = QuoteCalculator.Calculate([Line(1, 200m), charge], Exclusive, QuoteDiscountKind.Percent, 10m);
+
+        Assert.Equal(20m, result.DocumentDiscountTotal);
+        var chargeResult = result.Lines.Single(l => l.Id == charge.Id);
+        Assert.Equal(0m, chargeResult.DocumentDiscountShare);
+        Assert.Equal(100m, chargeResult.Net);
+        Assert.Equal(280m, result.OneTime.Net); // 180 + 100
+        Assert.Equal(336m, result.OneTime.Gross); // %20 vergi
+    }
+
+    [Fact]
+    public void A_fixed_document_discount_is_limited_by_the_discountable_base_only()
+    {
+        var charge = new QuoteLineInput(Guid.NewGuid(), 1, 500m, 0m, ExcludedFromDocumentDiscount: true);
+
+        // 100 € satır için 150 € sabit indirim, ek ücret tabanı büyütse de aşılamaz.
+        var error = Assert.Throws<PricingException>(() =>
+            QuoteCalculator.Calculate([Line(1, 100m, 0m), charge], Exclusive, QuoteDiscountKind.Amount, 150m));
+
+        Assert.Equal(QuoteErrors.DiscountExceedsAmount, error.Code);
+    }
+
+    [Fact]
+    public void Without_excluded_lines_the_document_discount_allocation_is_unchanged()
+    {
+        var lines = new[] { Line(1, 100m, 10m), Line(1, 100m, 20m), Line(1, 100m, 0m) };
+
+        var result = QuoteCalculator.Calculate(lines, Exclusive, QuoteDiscountKind.Amount, 10m);
+
+        Assert.Equal(10m, result.Lines.Sum(l => l.DocumentDiscountShare));
+        Assert.All(lines, l => Assert.False(l.ExcludedFromDocumentDiscount));
+    }
+
+    [Fact]
     public void Line_discount_then_tax_gives_1800_net_and_2160_total()
     {
         var result = QuoteCalculator.Calculate([Line(2, 1000m, 20m, kind: QuoteDiscountKind.Percent, discount: 10m)], Exclusive);

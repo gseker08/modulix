@@ -110,7 +110,9 @@ public sealed record QuoteLineDto(
     decimal Net,
     decimal Tax,
     decimal Gross,
-    JsonObject? Custom = null);
+    JsonObject? Custom = null,
+    Guid? SourceRuleId = null,
+    string? SurchargePresentation = null);
 
 /// <summary>UnitPrice boşsa ürün satırında fiyat listeden sunucuca hesaplanır; dolu ve listeden farklıysa elle fiyat izni gerekir.</summary>
 public sealed record SaveQuoteLineRequest(
