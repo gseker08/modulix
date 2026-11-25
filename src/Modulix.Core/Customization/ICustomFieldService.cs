@@ -11,7 +11,8 @@ public sealed record CustomFieldInput(
     CustomFieldType Type,
     bool Required,
     bool ShowInList,
-    IReadOnlyList<CustomFieldOptionInput>? Options = null);
+    IReadOnlyList<CustomFieldOptionInput>? Options = null,
+    bool IsCommercial = false);
 
 /// <summary>
 /// Aktif tenant'ın özel alan tanımları (Y9a). Yazma işlemleri <c>core.customization.manage</c> ister (API denetler).

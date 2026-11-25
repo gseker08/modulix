@@ -49,7 +49,8 @@ public sealed record CustomFieldDto(
     bool Required,
     bool ShowInList,
     bool Archived,
-    IReadOnlyList<CustomFieldOptionDto> Options);
+    IReadOnlyList<CustomFieldOptionDto> Options,
+    bool IsCommercial = false);
 
 /// <summary>Seçenek; <see cref="Key"/> boşsa yeni seçenektir. Listede verilmeyen eski seçenek pasif kalır.</summary>
 public sealed record SaveCustomFieldOption(string? Key, string Label, bool Active = true);
@@ -61,7 +62,8 @@ public sealed record SaveCustomFieldRequest(
     CustomFieldType Type,
     bool Required = false,
     bool ShowInList = false,
-    IReadOnlyList<SaveCustomFieldOption>? Options = null);
+    IReadOnlyList<SaveCustomFieldOption>? Options = null,
+    bool IsCommercial = false);
 
 public sealed record ReorderCustomFieldsRequest(string EntityKey, IReadOnlyList<Guid> Ids);
 

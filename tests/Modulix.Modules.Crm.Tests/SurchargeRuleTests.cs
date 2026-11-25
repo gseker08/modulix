@@ -96,4 +96,16 @@ public class SurchargeRuleTests
         string[] all = [.. SurchargeRules.Kinds, .. SurchargeRules.Presentations, .. SurchargeRules.Operators];
         Assert.DoesNotContain(all, v => v.Contains("antrepo", StringComparison.OrdinalIgnoreCase) || v.Contains("lojistik", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public void UsedKeys_collects_condition_base_duration_and_quantity_keys_without_blanks()
+    {
+        var rule = Rule(SurchargeRules.Duration, percent: 10m, baseKey: "quote.subtotal", durationKey: "sure", quantityKeys: "[\"beyan\",\"arac\"]");
+        rule.Conditions = "[{\"key\":\"yuk\",\"operator\":\"Equals\",\"value\":\"ADR\"}]";
+        var plain = Rule(SurchargeRules.Fixed, amount: 5m);
+
+        Assert.True(SurchargeRules.UsedKeys([rule, plain]).SetEquals(["quote.subtotal", "sure", "beyan", "arac", "yuk"]));
+        Assert.Empty(SurchargeRules.UsedKeys([plain]));
+        Assert.Empty(SurchargeRules.UsedKeys([]));
+    }
 }

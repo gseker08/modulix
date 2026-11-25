@@ -266,11 +266,18 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
         var original = isNew
             ? null
             : await Context.Data.Set<Quote>().AsNoTracking().Where(q => q.Id == entity.Id)
-                .Select(q => new { q.Status, q.ApprovalStatus, q.DocumentDiscountKind, q.DocumentDiscountValue }).SingleOrDefaultAsync(cancellationToken);
+                .Select(q => new { q.Status, q.ApprovalStatus, q.DocumentDiscountKind, q.DocumentDiscountValue, q.CustomFields }).SingleOrDefaultAsync(cancellationToken);
         var commercialTouched = values.Any(kv => CommercialFields.Contains(kv.Key));
 
         // Sunulmuş ya da sonuçlanmış sürümün ticari içeriği yerinde değişmez; değişiklik için yeni revizyon açılır.
         if (!workflow && !isNew && entity.Status != QuoteStatus.Draft && values.Any(kv => !IsNonCommercial(kv.Key)))
+        {
+            throw new RecordValidationException([new RecordFieldError("status", CrmMessages.Quote.NotDraftLocked)]);
+        }
+
+        // Ticari işaretli ya da ek ücret kuralında kullanılan özel alan da sunulmuş teklifte yerinde değişmez (ADR-0019 kilit kararı, 2e).
+        if (!workflow && !isNew && entity.Status != QuoteStatus.Draft && values.ContainsKey(RecordFields.Custom)
+            && ChangedKeys(original?.CustomFields, entity.CustomFields).Overlaps(await Context.CommercialQuoteFieldsAsync(cancellationToken)))
         {
             throw new RecordValidationException([new RecordFieldError("status", CrmMessages.Quote.NotDraftLocked)]);
         }
@@ -357,6 +364,15 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
                 QuoteHistory.Add(Context, old, "Superseded", QuoteStatus.Presented, QuoteStatus.Superseded, old.StatusReason);
             }
         }
+    }
+
+    // İki özel alan JSON'u arasında değeri değişen (eklenen, silinen ya da farklı) anahtarlar.
+    private static HashSet<string> ChangedKeys(string? before, string? after)
+    {
+        var old = before is null ? new JsonObject() : JsonNode.Parse(before)!.AsObject();
+        var current = after is null ? new JsonObject() : JsonNode.Parse(after)!.AsObject();
+        return [.. old.Select(kv => kv.Key).Union(current.Select(kv => kv.Key))
+            .Where(k => old[k]?.ToJsonString() != current[k]?.ToJsonString())];
     }
 
     private static bool IsNonCommercial(string field) => field is "internalNotes" or "ownerId" or "opportunityId" or "contact" or RecordFields.Custom;

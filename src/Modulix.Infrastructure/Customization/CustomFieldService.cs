@@ -21,7 +21,7 @@ internal sealed class CustomFieldService(
     ModuleCatalog catalog,
     IModuleEntitlements entitlements,
     IAuditWriter audit,
-    CustomizationLimits limits) : ICustomFieldService, ICustomFieldProvider
+    CustomizationLimits limits) : ICustomFieldService, ICustomFieldProvider, Modulix.Core.Contracts.Customization.ICommercialCustomFields
 {
     private readonly Dictionary<(Guid TenantId, string EntityKey), IReadOnlyList<CustomFieldInfo>> cache = [];
 
@@ -41,6 +41,9 @@ internal sealed class CustomFieldService(
         cache[(tenant.TenantId, entityKey)] = fields;
         return fields;
     }
+
+    public async Task<IReadOnlySet<string>> GetKeysAsync(string entityKey, CancellationToken cancellationToken) =>
+        (await GetFieldsAsync(RequireTenant(), entityKey, cancellationToken)).Where(f => f.IsCommercial).Select(f => f.Key).ToHashSet(StringComparer.Ordinal);
 
     public async Task<IReadOnlyList<CustomizableEntity>> ListEntitiesAsync(CancellationToken cancellationToken)
     {
@@ -190,6 +193,7 @@ internal sealed class CustomFieldService(
 
         field.Required = input.Required;
         field.ShowInList = input.ShowInList;
+        field.IsCommercial = input.IsCommercial;
         if (!field.HasOptions)
         {
             return;
@@ -286,6 +290,7 @@ internal sealed class CustomFieldService(
         ["type"] = field.Type.ToString(),
         ["required"] = field.Required,
         ["showInList"] = field.ShowInList,
+        ["commercial"] = field.IsCommercial,
         ["options"] = field.HasOptions
             ? new JsonArray([.. field.Options.Select(o => JsonValue.Create(o.Active ? o.Label : $"{o.Label} (pasif)"))])
             : null,
