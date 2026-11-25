@@ -14,8 +14,9 @@ public enum FlowNodeKind
 }
 
 /// <summary>Akıştaki bir düğüm: tür etiketi, başlık ve ayrıntı satırları. <see cref="Branch"/> adımın koşula bağlı olduğunu gösterir.</summary>
+/// <param name="StepId">Adım düğümünün kural içindeki kimliği; sürüm karşılaştırmasında düğüm bununla eşlenir.</param>
 /// <param name="StepIndex">Adım düğümünün kuraldaki sırası (0'dan); tetikleyici ve koşul düğümünde <c>null</c>. Akış tuvalinde taşıma ve kaldırma bununla yapılır.</param>
-public sealed record FlowNode(FlowNodeKind Kind, string KindLabel, string Title, IReadOnlyList<string> Lines, IReadOnlyList<string> BranchLines, int? StepIndex = null)
+public sealed record FlowNode(FlowNodeKind Kind, string KindLabel, string Title, IReadOnlyList<string> Lines, IReadOnlyList<string> BranchLines, int? StepIndex = null, string? StepId = null)
 {
     /// <summary>Adım koşulu varsa (dallanma, ADR-0027 4c-5) koşul satırları; yoksa boş.</summary>
     public bool Branch => BranchLines.Count > 0;
@@ -64,7 +65,7 @@ public static class AutomationFlow
             nodes.Add(new FlowNode(
                 kind, Texts.Get("admin.flow.step", i + 1),
                 string.IsNullOrWhiteSpace(step.Action) ? Texts.Get("admin.flow.noAction") : definitionOfAction?.DisplayName ?? step.Action,
-                ParameterLines(step, definitionOfAction, entity), ConditionLines(step.When, entity), i));
+                ParameterLines(step, definitionOfAction, entity), ConditionLines(step.When, entity), i, step.Id));
         }
 
         return nodes;

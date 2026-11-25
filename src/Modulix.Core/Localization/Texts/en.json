@@ -14149,5 +14149,19 @@
   "admin.flow.moveUp": "Move step {0} up",
   "admin.flow.moveDown": "Move step {0} down",
   "admin.flow.remove": "Remove step {0}",
-  "admin.automationEditor.flowHelp": "The current flow of the rule. You can add a step between steps, move or remove a step; fill in the step's fields in the form below. The draft does not change until you save."
+  "admin.automationEditor.flowHelp": "The current flow of the rule. You can add a step between steps, move or remove a step; fill in the step's fields in the form below. The draft does not change until you save.",
+  "admin.versionDiff.title": "Difference from published version {0}",
+  "admin.versionDiff.none": "The draft is the same as the published version; nothing changed.",
+  "admin.versionDiff.trigger": "The trigger changed",
+  "admin.versionDiff.condition": "The condition changed",
+  "admin.versionDiff.meta.name": "The name changed",
+  "admin.versionDiff.meta.priority": "The priority changed",
+  "admin.versionDiff.meta.stopProcessing": "The \"stop other rules\" setting changed",
+  "admin.versionDiff.meta.validity": "The validity range changed",
+  "admin.versionDiff.published": "Published version {0}",
+  "admin.versionDiff.draft": "Draft",
+  "admin.flow.change.added": "Added",
+  "admin.flow.change.removed": "Removed",
+  "admin.flow.change.changed": "Changed",
+  "admin.flow.change.moved": "Moved"
 }
