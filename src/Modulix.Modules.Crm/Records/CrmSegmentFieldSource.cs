@@ -64,13 +64,13 @@ internal sealed class CrmSegmentFieldSource(IModuleData data) : ISegmentFieldSou
         new("crm.contact.companyIndustry", "Firmasının sektörü", "Kişi", SegmentTarget.Person, SegmentFieldType.Text, CrmModule.Entities.Contact),
         new("crm.contact.createdAt", "Oluşturma tarihi", "Kişi", SegmentTarget.Person, SegmentFieldType.Date, CrmModule.Entities.Contact),
 
-        new("crm.lead.status", "Durum", "Lead", SegmentTarget.Lead, SegmentFieldType.Choice, CrmModule.Entities.Lead) { Options = LeadStatuses },
-        new("crm.lead.source", "Kaynak", "Lead", SegmentTarget.Lead, SegmentFieldType.Text, CrmModule.Entities.Lead),
-        new("crm.lead.country", "Ülke", "Lead", SegmentTarget.Lead, SegmentFieldType.Text, CrmModule.Entities.Lead),
-        new("crm.lead.city", "Şehir", "Lead", SegmentTarget.Lead, SegmentFieldType.Text, CrmModule.Entities.Lead),
-        new("crm.lead.industry", "Sektör", "Lead", SegmentTarget.Lead, SegmentFieldType.Text, CrmModule.Entities.Lead),
-        new("crm.lead.utmCampaign", "UTM kampanyası", "Lead", SegmentTarget.Lead, SegmentFieldType.Text, CrmModule.Entities.Lead),
-        new("crm.lead.createdAt", "Oluşturma tarihi", "Lead", SegmentTarget.Lead, SegmentFieldType.Date, CrmModule.Entities.Lead)
+        new("crm.lead.status", "Durum", "Müşteri adayı", SegmentTarget.Lead, SegmentFieldType.Choice, CrmModule.Entities.Lead) { Options = LeadStatuses },
+        new("crm.lead.source", "Kaynak", "Müşteri adayı", SegmentTarget.Lead, SegmentFieldType.Text, CrmModule.Entities.Lead),
+        new("crm.lead.country", "Ülke", "Müşteri adayı", SegmentTarget.Lead, SegmentFieldType.Text, CrmModule.Entities.Lead),
+        new("crm.lead.city", "Şehir", "Müşteri adayı", SegmentTarget.Lead, SegmentFieldType.Text, CrmModule.Entities.Lead),
+        new("crm.lead.industry", "Sektör", "Müşteri adayı", SegmentTarget.Lead, SegmentFieldType.Text, CrmModule.Entities.Lead),
+        new("crm.lead.utmCampaign", "UTM kampanyası", "Müşteri adayı", SegmentTarget.Lead, SegmentFieldType.Text, CrmModule.Entities.Lead),
+        new("crm.lead.createdAt", "Oluşturma tarihi", "Müşteri adayı", SegmentTarget.Lead, SegmentFieldType.Date, CrmModule.Entities.Lead)
         {
             Hint = "Gün sınırları firmanın saat dilimine göredir.",
         },

@@ -187,7 +187,7 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
             UserFields = ["ownerId", "createdBy", "updatedBy"],
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
-                ["target"] = new Dictionary<string, string> { ["Company"] = "Firma", ["Person"] = "Kişi", ["Lead"] = "Lead" },
+                ["target"] = new Dictionary<string, string> { ["Company"] = "Firma", ["Person"] = "Kişi", ["Lead"] = "Müşteri adayı" },
                 ["kind"] = new Dictionary<string, string> { ["Static"] = "Statik", ["Dynamic"] = "Dinamik" },
                 ["status"] = new Dictionary<string, string> { ["Draft"] = "Taslak", ["Active"] = "Etkin", ["Archived"] = "Arşiv" },
             },
@@ -222,7 +222,7 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
             UserFields = ["ownerId", "createdBy", "updatedBy"],
             Options = new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
-                ["target"] = new Dictionary<string, string> { ["Company"] = "Firma", ["Person"] = "Kişi", ["Lead"] = "Lead" },
+                ["target"] = new Dictionary<string, string> { ["Company"] = "Firma", ["Person"] = "Kişi", ["Lead"] = "Müşteri adayı" },
                 ["channel"] = new Dictionary<string, string> { ["Email"] = "E-posta", ["Phone"] = "Telefon", ["Sms"] = "SMS", ["WhatsApp"] = "WhatsApp" },
                 ["recipientRule"] = new Dictionary<string, string>
                 {
@@ -315,7 +315,7 @@ public sealed class MarketingModule : IModule, IModuleEndpoints
         new(Entities.CampaignResponse, "Kampanya yanıtı", Permissions.ResponsesRead, new Dictionary<string, string>
         {
             ["campaignId"] = "Kampanya", ["runId"] = "Çalıştırma", ["deliveryId"] = "İleti", ["targetId"] = "Hedef", ["personId"] = "Kişi", ["kind"] = "Tür", ["note"] = "Not",
-            ["receivedAt"] = "Alındığı zaman", ["status"] = "Durum", ["ownerId"] = "Sorumlu", ["leadId"] = "Lead", ["activityId"] = "Aktivite",
+            ["receivedAt"] = "Alındığı zaman", ["status"] = "Durum", ["ownerId"] = "Sorumlu", ["leadId"] = "Müşteri adayı", ["activityId"] = "Aktivite",
             ["optOutAppliedAt"] = "Çıkış uygulama zamanı", ["closedReason"] = "Kapanış gerekçesi",
         })
         {

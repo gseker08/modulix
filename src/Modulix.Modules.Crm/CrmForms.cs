@@ -104,7 +104,7 @@ public static class CrmForms
             new("description", "Açıklama", "aciklama", 12),
         ]),
 
-        new(CrmModule.Entities.Lead, "Lead",
+        new(CrmModule.Entities.Lead, "Müşteri adayı",
         [new(General, "Talep ve sahip"), new("eslestirme", "Eşleştirme ve bütçe"), new("ihtiyac", "İhtiyaç ve ek bilgiler")],
         [
             new("talep", "Talep", "inbox"),
