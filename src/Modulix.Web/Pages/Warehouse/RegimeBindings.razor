@@ -93,7 +93,7 @@
                 </div>
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(profileId))">@Texts.Get("common.save")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(profileId))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="Close">@Texts.Get("common.cancel")</button>
                 @if (editingBinding is not null)
                 {
