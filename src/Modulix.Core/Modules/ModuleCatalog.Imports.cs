@@ -22,6 +22,17 @@ public sealed partial class ModuleCatalog
             {
                 throw new InvalidOperationException($"İçe aktarma tanımı iki kez kayıtlı: '{definition.EntityKey}'.");
             }
+
+            // Kayıt türü seçicide görünen ad: iki tanım aynı adı taşırsa kullanıcı hangisini seçtiğini bilemez ("Kişi" ve "Kişi" gibi).
+            // Ayırt etmek için ad parantezle genişletilir ("Kişi (ortak kayıt)", "Kişi (CRM)").
+            var sameName = imports.Values.FirstOrDefault(i =>
+                i.Definition.EntityKey != definition.EntityKey
+                && string.Equals(i.Definition.DisplayName.Trim(), definition.DisplayName.Trim(), StringComparison.CurrentCultureIgnoreCase));
+            if (sameName.Definition is not null)
+            {
+                throw new InvalidOperationException(
+                    $"İçe aktarma tanımlarının görünen adı benzersiz olmalıdır: '{definition.DisplayName}' hem '{sameName.Definition.EntityKey}' hem '{definition.EntityKey}' için kullanılıyor.");
+            }
         }
     }
 
