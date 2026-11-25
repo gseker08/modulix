@@ -268,4 +268,35 @@ public class AutomationEditorModelTests
         Assert.Empty(parsed.Actions[1].When.Leaves);
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse(Branch), parsed.Build()));
     }
+
+    [Fact]
+    public void A_step_is_inserted_at_the_given_position_and_gets_a_unique_id()
+    {
+        var definition = new EditorDefinition();
+        var first = definition.InsertAction(0);
+        var last = definition.InsertAction(99);
+        var middle = definition.InsertAction(1);
+
+        Assert.Equal([first, middle, last], definition.Actions);
+        Assert.Equal(3, definition.Actions.Select(a => a.Id).Distinct().Count());
+        var clamped = definition.InsertAction(-5);
+        Assert.Same(clamped, definition.Actions[0]);
+    }
+
+    [Fact]
+    public void A_step_moves_within_bounds_only_and_removal_ignores_a_missing_position()
+    {
+        var definition = new EditorDefinition();
+        var a = definition.InsertAction(0);
+        var b = definition.InsertAction(1);
+
+        Assert.False(definition.MoveAction(a, -1));
+        Assert.False(definition.MoveAction(b, 1));
+        Assert.True(definition.MoveAction(a, 1));
+        Assert.Equal([b, a], definition.Actions);
+
+        Assert.False(definition.RemoveActionAt(5));
+        Assert.True(definition.RemoveActionAt(0));
+        Assert.Equal([a], definition.Actions);
+    }
 }

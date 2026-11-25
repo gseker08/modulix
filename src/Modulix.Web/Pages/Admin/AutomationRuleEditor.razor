@@ -79,6 +79,10 @@
 
         @if (entity is not null)
         {
+            <FormSection Title="@Texts.Get("admin.flow.title")" Icon="shuffle" Description="@Texts.Get("admin.automationEditor.flowHelp")">
+                <FlowView Nodes="LiveFlow()" Editable="true" OnInsert="InsertActionAt" OnMove="MoveActionAt" OnRemove="RemoveActionAt" />
+            </FormSection>
+
             <FormSection Title="@Texts.Get("admin.automationEditor.when")" Icon="zap" Description="@Texts.Get("admin.automationEditor.whenHelp")">
                 @if (definition.Trigger.IsLocked)
                 {
@@ -857,18 +861,24 @@
 
     private void RemoveAction(EditorAction step) => definition.Actions.Remove(step);
 
-    private void MoveAction(EditorAction step, int direction)
-    {
-        var index = definition.Actions.IndexOf(step);
-        var target = index + direction;
-        if (index < 0 || target < 0 || target >= definition.Actions.Count)
-        {
-            return;
-        }
+    private void MoveAction(EditorAction step, int direction) => definition.MoveAction(step, direction);
 
-        definition.Actions.RemoveAt(index);
-        definition.Actions.Insert(target, step);
+    // Akış tuvalinden (FlowView): sıraya göre ekleme, taşıma ve kaldırma; adımın alanları aşağıdaki formda doldurulur.
+    private void InsertActionAt(int index) => definition.InsertAction(index);
+
+    private void MoveActionAt(FlowMove move)
+    {
+        if (move.Index >= 0 && move.Index < definition.Actions.Count)
+        {
+            definition.MoveAction(definition.Actions[move.Index], move.Direction);
+        }
     }
+
+    private void RemoveActionAt(int index) => definition.RemoveActionAt(index);
+
+    // Tuval, formun o anki (kaydedilmemiş) halini çizer: taslağı sunucuya göndermeden yerel olarak okunur.
+    private IReadOnlyList<FlowNode> LiveFlow() =>
+        AutomationFlow.Build(JsonSerializer.SerializeToElement(definition.Build()), entity, catalog?.Actions ?? []);
 
     private const string ApprovalRequestAction = "core.approval.request";
 

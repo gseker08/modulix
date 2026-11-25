@@ -14143,5 +14143,11 @@
   "marketing.journeyRules.bound": "Yayınlanmış sürüm bağlı",
   "marketing.journeyRules.draftOnly": "Yalnızca taslak bağlı (yayınlanınca çalışır)",
   "marketing.journeyRules.create": "Kural kur",
-  "marketing.journeyRules.createHelp": "Kuralın tetikleyicisini \"Yolculuğa girildi\" yapın, koşula \"Yolculuk kimliği\" = şu kimliği yazın:"
+  "marketing.journeyRules.createHelp": "Kuralın tetikleyicisini \"Yolculuğa girildi\" yapın, koşula \"Yolculuk kimliği\" = şu kimliği yazın:",
+  "admin.flow.noAction": "(eylem seçilmedi)",
+  "admin.flow.insert": "Buraya adım ekle",
+  "admin.flow.moveUp": "{0}. adımı yukarı taşı",
+  "admin.flow.moveDown": "{0}. adımı aşağı taşı",
+  "admin.flow.remove": "{0}. adımı kaldır",
+  "admin.automationEditor.flowHelp": "Kuralın o anki akışı. Adımlar arasına yeni adım ekleyebilir, adımı taşıyabilir ya da kaldırabilirsiniz; adımın alanlarını aşağıdaki formda doldurun. Kaydedene kadar taslak değişmez."
 }

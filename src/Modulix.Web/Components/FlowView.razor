@@ -1,12 +1,21 @@
 @using Modulix.Web.Services
 
-@* Otomasyon kuralının salt okunur akışı (ADR-0056, E6-1): tetikleyici → koşul → adımlar. Ayrı bir model değildir; aynı kural sürümü tanımı çizilir.
-   Koşullu adım (dallanma) "Koşul sağlanmazsa atlanır" notuyla işaretlenir. Düzenleme sonraki dilimdedir. *@
-@if (Nodes.Count > 0)
+@* Otomasyon kuralının akışı (ADR-0056, E6-1 ve E6-2): tetikleyici → koşul → adımlar. Ayrı bir model değildir; aynı kural sürümü tanımı çizilir. Koşullu adım
+   (dallanma) "Koşul sağlanmazsa atlanır" notuyla işaretlenir. Editable=true iken (kural düzenleyicisi) adımlar arasına "adım ekle" noktaları ve adım başına taşı/kaldır
+   düğmeleri konur; yalnızca sırayı değiştirir, adımın alanları düzenleyici formunda doldurulur. Salt okunur kullanımda (kural ayrıntısı) hiçbiri çizilmez. *@
+@if (Nodes.Count > 0 || Editable)
 {
     <ol class="flow" aria-label="@Texts.Get("admin.flow.title")">
+        @{
+            var steps = Nodes.Count(n => n.StepIndex is not null);
+        }
         @foreach (var node in Nodes)
         {
+            @if (Editable && node.StepIndex is { } at)
+            {
+                @InsertPoint(at)
+            }
+
             <li class="@NodeClass(node)">
                 <span class="flow-icon" aria-hidden="true"><AppIcon Name="@Icon(node.Kind)" Size="16" /></span>
                 <div class="flow-body">
@@ -28,13 +37,40 @@
                         </div>
                     }
                 </div>
+                @if (Editable && node.StepIndex is { } index)
+                {
+                    <div class="flow-actions">
+                        <IconAction Icon="arrow-up" Label="@Texts.Get("admin.flow.moveUp", index + 1)" Disabled="@(index == 0)" OnClick="() => OnMove.InvokeAsync(new FlowMove(index, -1))" />
+                        <IconAction Icon="arrow-down" Label="@Texts.Get("admin.flow.moveDown", index + 1)" Disabled="@(index == steps - 1)" OnClick="() => OnMove.InvokeAsync(new FlowMove(index, 1))" />
+                        <IconAction Icon="trash" Label="@Texts.Get("admin.flow.remove", index + 1)" OnClick="() => OnRemove.InvokeAsync(index)" />
+                    </div>
+                }
             </li>
+        }
+
+        @if (Editable)
+        {
+            @InsertPoint(steps)
         }
     </ol>
 }
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<FlowNode> Nodes { get; set; } = [];
+
+    /// <summary>Kural düzenleyicisinde true: adım ekleme, taşıma ve kaldırma kontrolleri çizilir.</summary>
+    [Parameter] public bool Editable { get; set; }
+
+    /// <summary>Verilen sıraya yeni adım ekler (0 = ilk adımın önüne; adım sayısı = sona).</summary>
+    [Parameter] public EventCallback<int> OnInsert { get; set; }
+
+    [Parameter] public EventCallback<FlowMove> OnMove { get; set; }
+
+    [Parameter] public EventCallback<int> OnRemove { get; set; }
+
+    private RenderFragment InsertPoint(int index) => @<li class="flow-insert">
+        <button type="button" class="btn btn-ghost btn-sm" @onclick="() => OnInsert.InvokeAsync(index)"><AppIcon Name="plus" Size="14" /> @Texts.Get("admin.flow.insert")</button>
+    </li>;
 
     private static string NodeClass(FlowNode node) =>
         $"flow-node flow-node-{node.Kind.ToString().ToLowerInvariant()}{(node.Branch ? " is-branch" : string.Empty)}";

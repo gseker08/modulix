@@ -14143,5 +14143,11 @@
   "marketing.journeyRules.bound": "Dərc olunmuş versiya bağlıdır",
   "marketing.journeyRules.draftOnly": "Yalnız layihə bağlıdır (dərc olunanda işləyəcək)",
   "marketing.journeyRules.create": "Qayda qur",
-  "marketing.journeyRules.createHelp": "Qaydanın tətikləyicisini \"Səyahətə daxil olundu\" edin, şərtə \"Səyahət identifikatoru\" = bu identifikatoru yazın:"
+  "marketing.journeyRules.createHelp": "Qaydanın tətikləyicisini \"Səyahətə daxil olundu\" edin, şərtə \"Səyahət identifikatoru\" = bu identifikatoru yazın:",
+  "admin.flow.noAction": "(əməliyyat seçilməyib)",
+  "admin.flow.insert": "Bura addım əlavə et",
+  "admin.flow.moveUp": "{0}. addımı yuxarı apar",
+  "admin.flow.moveDown": "{0}. addımı aşağı apar",
+  "admin.flow.remove": "{0}. addımı sil",
+  "admin.automationEditor.flowHelp": "Qaydanın cari axını. Addımlar arasına yeni addım əlavə edə, addımı apara və ya silə bilərsiniz; addımın sahələrini aşağıdakı formada doldurun. Yadda saxlayana qədər layihə dəyişmir."
 }

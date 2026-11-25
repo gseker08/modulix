@@ -97,4 +97,18 @@ public class AutomationFlowTests
         var condition = Assert.Single(nodes, n => n.Kind == FlowNodeKind.Condition);
         Assert.Empty(condition.Lines);
     }
+
+    [Fact]
+    public void Step_nodes_carry_their_position_and_a_step_without_an_action_is_still_drawn()
+    {
+        var nodes = AutomationFlow.Build(Json("""
+            { "trigger": { "type": "manual" }, "actions": [
+              { "id": "a", "action": "core.flow.wait", "parameters": {} },
+              { "id": "b", "action": "", "parameters": {} } ] }
+            """), Entity, Actions);
+
+        Assert.Null(nodes[0].StepIndex);
+        Assert.Equal([0, 1], nodes.Where(n => n.StepIndex is not null).Select(n => n.StepIndex!.Value));
+        Assert.Equal(FlowNodeKind.Action, nodes[^1].Kind);
+    }
 }
