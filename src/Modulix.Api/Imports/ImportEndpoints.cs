@@ -147,7 +147,7 @@ public static class ImportEndpoints
         }
 
         var detail = await context.Log.GetAsync(id, new ImportIssueQuery(), context.Tenant.Current!.UserId, ct);
-        return Results.Accepted($"/api/imports/{id}", ToDto(detail!));
+        return Results.Accepted($"/api/imports/{id}", ToDto(detail!, await ColumnLabelsAsync(context, detail!.Run.EntityKey, ct)));
     }
 
     /// <summary>Rapor yükleyenin dosyasından üretilir ve hassas değer taşıyabilir: firmanın günlüğünü görenlere değil, yalnızca yükleyene verilir.</summary>
@@ -238,7 +238,7 @@ public static class ImportEndpoints
 
     private static async Task<IResult> GetAsync(
         Guid runId, string? severity, string? code, int? page, int? pageSize,
-        IImportLog log, ICurrentAccess access, ITenantContextAccessor tenant, CancellationToken ct)
+        IImportLog log, ICurrentAccess access, ITenantContextAccessor tenant, ImportContext context, CancellationToken ct)
     {
         ImportIssueSeverity? parsed = null;
         if (!string.IsNullOrWhiteSpace(severity))
@@ -265,7 +265,22 @@ public static class ImportEndpoints
             await OnlyUserAsync(access, tenant, ct), ct);
         return detail is null
             ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "İçe aktarma bulunamadı.")
-            : Results.Ok(ToDto(detail));
+            : Results.Ok(ToDto(detail, await ColumnLabelsAsync(context, detail.Run.EntityKey, ct)));
+    }
+
+    /// <summary>
+    /// Kayıt türünün sütun anahtarı → okurun dilindeki ad. Tasarımda kapatılmış sütunlar da dahildir (eski koşunun sorunu kapalı sütunu anabilir);
+    /// okurun göremediği (alan yetkisi) sütun listede yoktur. Tür artık katalogda yoksa boş döner, arayüz anahtarı gösterir.
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<string, string>> ColumnLabelsAsync(ImportContext context, string entityKey, CancellationToken ct)
+    {
+        if (context.Catalog.FindImport(entityKey) is not { } found)
+        {
+            return new Dictionary<string, string>();
+        }
+
+        var fields = await context.Schema.AllFieldsAsync(context.Tenant.Current!, found.Definition, ct);
+        return fields.GroupBy(f => f.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First().Label, StringComparer.Ordinal);
     }
 
     private static async Task<IResult> RollBackAsync(
@@ -309,11 +324,12 @@ public static class ImportEndpoints
         run.CompletedAt,
         run.Note);
 
-    private static ImportRunDetailDto ToDto(ImportRunDetail detail) => new(
+    private static ImportRunDetailDto ToDto(ImportRunDetail detail, IReadOnlyDictionary<string, string> columnLabels) => new(
         ToDto(detail.Run),
         [.. detail.IssueCodes.Select(c => new ImportIssueCodeCountDto(c.Code, c.Count))],
         new ImportIssuePageDto(
-            [.. detail.Issues.Items.Select(i => new ImportIssueDto(i.RowNo, i.ColumnKey, i.Code, i.Severity.ToString(), i.Message))],
+            [.. detail.Issues.Items.Select(i => new ImportIssueDto(
+                i.RowNo, i.ColumnKey, i.Code, i.Severity.ToString(), i.Message, i.ColumnKey is { } key ? columnLabels.GetValueOrDefault(key) : null))],
             detail.Issues.Page,
             detail.Issues.PageSize,
             detail.Issues.TotalCount));
