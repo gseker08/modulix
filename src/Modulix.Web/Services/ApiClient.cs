@@ -85,7 +85,11 @@ public sealed class ApiClient(HttpClient http, SessionExpiry? expiry = null)
                 HttpStatusCode.Forbidden => problem?.Detail ?? problem?.Title ?? "Bu işlem için yetkiniz yok.",
                 HttpStatusCode.NotFound => problem?.Title ?? "Kayıt bulunamadı.",
                 HttpStatusCode.Conflict => problem?.Title ?? "Kayıt başka biri tarafından değiştirildi.",
-                HttpStatusCode.UnprocessableEntity => problem?.Message ?? (problem?.Issues is not null ? problem.Title : null) ?? "Lütfen işaretli alanları düzeltin.",
+                // Alan hatası (errors) varsa sayfa üstü genel metindir, somut ileti alanın altında kalır. Alan hatası yoksa iş kuralı reddidir
+                // ("Ret için gerekçe yazın.", "adımda talep sahibinden başka etkin onaycı yok"): somut ileti başlıktadır, kullanıcıya gösterilir.
+                HttpStatusCode.UnprocessableEntity => problem?.Message
+                    ?? (problem?.Issues is not null || problem?.Errors is not { Count: > 0 } ? problem?.Title : null)
+                    ?? "Lütfen işaretli alanları düzeltin.",
                 HttpStatusCode.TooManyRequests => "Çok fazla istek gönderdiniz. Lütfen biraz bekleyip tekrar deneyin.",
                 HttpStatusCode.BadRequest when problem?.Errors is { Count: > 0 } errors => errors.Values.SelectMany(e => e).First(),
                 _ => problem?.Title ?? "Beklenmeyen bir hata oluştu.",
