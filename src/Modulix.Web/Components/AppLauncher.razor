@@ -14,13 +14,13 @@
         <button type="button" class="navbar-brand brand-button" @ref="brandButton" @onclick="Toggle"
                 aria-haspopup="dialog" aria-expanded="@(isOpen ? "true" : "false")" aria-controls="app-launcher-panel"
                 aria-label="@Texts.Get("shell.launcher.aria")">
-            <BrandLogo Size="36" />
+            <BrandLogo Size="28" />
         </button>
     }
     else
     {
         <a class="navbar-brand" href="" aria-label="@Texts.Get("shell.launcher.home")">
-            <BrandLogo Size="36" />
+            <BrandLogo Size="28" />
         </a>
     }
 
@@ -30,7 +30,7 @@
         <div class="mx-modal-backdrop" aria-hidden="true"></div>
         <div id="app-launcher-panel" class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="app-panel-title" tabindex="-1" @ref="panel">
             <div class="app-dialog-head">
-                <BrandLogo Size="32" />
+                <BrandLogo Size="24" />
                 <button type="button" class="btn btn-ghost btn-icon" title="@Texts.Get("common.close")" aria-label="@Texts.Get("common.close")"
                         @onclick="() => Close(true)">
                     <AppIcon Name="x" Size="18" />
@@ -40,16 +40,6 @@
             <div class="app-dialog-hero">
                 <h2 id="app-panel-title" class="app-dialog-title">@Texts.Get("shell.launcher.title")</h2>
                 <p class="app-dialog-subtitle">@Texts.Get("shell.launcher.subtitle")</p>
-
-                @if (showSearch)
-                {
-                    <div class="app-search">
-                        <label class="visually-hidden" for="app-search-input">@Texts.Get("shell.launcher.search")</label>
-                        <AppIcon Name="search" Size="18" />
-                        <input id="app-search-input" type="search" class="form-control" autocomplete="off"
-                               placeholder="@Texts.Get("shell.launcher.searchPlaceholder")" @ref="searchInput" @bind="Query" @bind:event="oninput" />
-                    </div>
-                }
             </div>
 
             <div class="app-dialog-body @(groups.Count > 0 ? "has-categories" : null) @(shortcuts.Count > 0 || suggested.Count > 0 ? "has-rail" : null)">
@@ -89,17 +79,13 @@
                             <button type="button" class="btn btn-outline-primary btn-sm" @onclick="RetryAsync">@Texts.Get("shell.launcher.retry")</button>
                         </div>
                     }
-                    else if (listed.Count == 0 && string.IsNullOrWhiteSpace(Query))
+                    else if (listed.Count == 0)
                     {
                         <p class="app-state" role="status">@Texts.Get("shell.launcher.empty")</p>
                     }
-                    else if (visible.Count == 0 && plannedVisible.Count == 0)
-                    {
-                        <p class="app-state" role="status">@Texts.Get("common.noResultFor", Query)</p>
-                    }
 
-                    @* Sık kullanılanlar: yıldızlanan uygulamalar; arama sırasında gizlenir. *@
-                    @if (Session.IsLoaded && !loadFailed && listed.Count > 0 && string.IsNullOrWhiteSpace(Query))
+                    @* Sık kullanılanlar: yıldızlanan uygulamalar. *@
+                    @if (Session.IsLoaded && !loadFailed && listed.Count > 0)
                     {
                         <section class="app-group app-favorites" aria-labelledby="app-group-favorites">
                             <h3 id="app-group-favorites" class="app-group-title"><AppIcon Name="star" Size="18" /> @Texts.Get("shell.launcher.favorites")</h3>
@@ -234,39 +220,21 @@
     {
         None,
         Brand,
-        Search,
+        Panel,
     }
 
     private ElementReference brandButton;
     private ElementReference panel;
-    private ElementReference searchInput;
     private DotNetObjectReference<AppLauncher>? self;
     private bool attached;
     private bool isOpen;
-    private string query = "";
     private Guid? lastTenant;
     private FocusTarget pendingFocus;
-
-    private string Query
-    {
-        get => query;
-        set
-        {
-            query = value ?? "";
-            if (!string.IsNullOrWhiteSpace(query))
-            {
-                category = null;
-            }
-
-            Recompute();
-        }
-    }
 
     // Panelde yalnızca mevcut, etkin, lisans kapsamında ve kullanıcının erişebildiği uygulamalar listelenir (AppNavigation.Roots).
     private IReadOnlyList<AppDefinition> listed = [];
     private IReadOnlyList<AppDefinition> visible = [];
     private IReadOnlyList<PlannedApp> plannedVisible = [];
-    private bool showSearch;
 
     // Sık kullanılanlar (yıldızlanan uygulama kimlikleri; tarayıcıdan okunur) ve kullanıcının kullanabildiği kısayollar.
     private IReadOnlyList<string> favorites = [];
@@ -284,7 +252,7 @@
     // Kategori menüsü yalnızca birden çok grup görünürken çıkar; aksi halde kartlar tam genişlikte düz listedir.
     private IReadOnlyList<AppRootGroup> groups = [];
 
-    // Seçili kategori (AppGroup.Id); null ise bütün uygulamalar. Arama kategoriden bağımsız bütün uygulamalarda yapılır.
+    // Seçili kategori (AppGroup.Id); null ise bütün uygulamalar.
     private string? category;
     private string heading = "";
 
@@ -317,19 +285,13 @@
         }
 
         heading = selected?.Group is { } group ? AppNames.Of(group) : Texts.Get("shell.launcher.apps");
-        visible = string.IsNullOrWhiteSpace(query)
-            ? selected?.Apps ?? listed
-            : listed.Where(a => Matches(AppNames.Of(a), query.Trim()) || (AppNames.DescriptionOf(a) is { } text && Matches(text, query.Trim()))).ToList();
-        plannedVisible = string.IsNullOrWhiteSpace(query)
-            ? AppCatalog.Planned
-            : AppCatalog.Planned.Where(p => Matches(AppNames.Of(p), query.Trim())).ToList();
-        showSearch = Session.IsLoaded && !loadFailed && (listed.Count > 0 || AppCatalog.Planned.Count > 0);
+        visible = selected?.Apps ?? listed;
+        plannedVisible = AppCatalog.Planned;
     }
 
     private void SelectCategory(string? id)
     {
         category = id;
-        query = "";
         Recompute();
     }
 
@@ -398,17 +360,13 @@
         }
     }
 
-    private static bool Matches(string name, string text) =>
-        System.Globalization.CultureInfo.GetCultureInfo("tr-TR").CompareInfo
-            .IndexOf(name, text, System.Globalization.CompareOptions.IgnoreCase) >= 0;
-
     private bool IsCurrent(AppDefinition app) => Apps.Context(Navigation.ToBaseRelativePath(Navigation.Uri))?.Root.Id == app.Id;
 
     private static string ToneClass(AppDefinition app) => app.Tone == AppTone.Teal ? "teal" : "indigo";
 
     private void OnSessionChanged()
     {
-        // Tenant değişince panel kapanır ve önceki tenant'ın araması kalmaz.
+        // Tenant değişince panel kapanır.
         Guid? tenant = Session.User?.ActiveTenantId;
         if (tenant != lastTenant)
         {
@@ -438,7 +396,6 @@
     private void ResetPanel()
     {
         isOpen = false;
-        query = "";
         category = null;
         favorites = [];
         waitingApprovals = 0;
@@ -456,10 +413,9 @@
         }
 
         isOpen = true;
-        query = "";
         category = null;
         favoritesPending = true;
-        pendingFocus = FocusTarget.Search;
+        pendingFocus = FocusTarget.Panel;
         Recompute();
     }
 
@@ -519,10 +475,7 @@
             case FocusTarget.Brand:
                 await brandButton.FocusAsync();
                 break;
-            case FocusTarget.Search when showSearch:
-                await searchInput.FocusAsync();
-                break;
-            case FocusTarget.Search:
+            case FocusTarget.Panel:
                 await panel.FocusAsync();
                 break;
         }

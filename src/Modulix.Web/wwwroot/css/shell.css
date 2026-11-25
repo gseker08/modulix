@@ -183,28 +183,6 @@ html.app-launcher-open {
     font-size: var(--mx-fs-body);
 }
 
-.app-search {
-    position: relative;
-}
-
-    .app-search .app-icon {
-        position: absolute;
-        left: 1.1rem;
-        top: 50%;
-        transform: translateY(-50%);
-        color: var(--mx-brand-primary);
-        pointer-events: none;
-    }
-
-    .app-search .form-control {
-        min-height: 3rem;
-        padding-left: 3rem;
-        background: var(--mx-surface);
-        border-color: var(--mx-brand-primary);
-        border-radius: 999px;
-        font-size: var(--mx-fs-body);
-    }
-
 /* Kategori menüsü solda, kartlar sağda; çok sayıda uygulamada diyalog taşmaz, gövde içeride kayar. */
 .app-dialog-body {
     display: grid;
