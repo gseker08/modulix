@@ -153,7 +153,7 @@ public sealed class CoreModule : IModule
     /// </summary>
     IReadOnlyList<ImportDefinition> IModule.Imports { get; } =
     [
-        new(SharedEntities.Person, "Kişi", Permissions.ImportPeople,
+        new(SharedEntities.Person, "Kişi (ortak kayıt)", Permissions.ImportPeople,
         [
             new("firstName", "Ad", Required: true),
             new("lastName", "Soyad", Required: true),

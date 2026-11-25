@@ -44,7 +44,7 @@ internal static class CrmImports
                 new("phone", "contactValue"),
             ],
         },
-        new(CrmModule.Entities.Contact, "Kişi", CrmModule.Permissions.ContactsWrite,
+        new(CrmModule.Entities.Contact, "Kişi (CRM)", CrmModule.Permissions.ContactsWrite,
         [
             new("firstName", "Ad", Required: true),
             new("lastName", "Soyad", Required: true),
