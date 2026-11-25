@@ -322,6 +322,11 @@ html.app-launcher-open {
     margin-top: var(--mx-space-6);
 }
 
+/* Orta sütun başlığı, yan kartların (kategoriler, kısayollar) başlığıyla aynı hizadan başlar. */
+.app-dialog-main > .app-group:first-of-type {
+    padding-top: calc(var(--mx-space-4) + 1px);
+}
+
 .app-group-title {
     display: flex;
     align-items: center;
@@ -334,62 +339,6 @@ html.app-launcher-open {
     .app-group-title .app-icon {
         color: var(--mx-brand-primary);
     }
-
-/* Sık kullanılanlar: yıldızlanan uygulamalar hap biçimli bağlantılardır. */
-.app-favorites-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--mx-space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-.app-favorite {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--mx-space-2);
-    min-height: 2.75rem;
-    padding: var(--mx-space-1) var(--mx-space-4) var(--mx-space-1) var(--mx-space-2);
-    background: var(--mx-surface);
-    border: 1px solid var(--mx-panel-border);
-    border-radius: var(--mx-radius-button);
-    box-shadow: var(--mx-shadow-control);
-    color: var(--mx-text-primary);
-    font-size: var(--mx-fs-body);
-    font-weight: 700;
-    text-decoration: none;
-    transition: border-color 0.15s;
-}
-
-    .app-favorite:hover {
-        border-color: var(--mx-brand-primary);
-        color: var(--mx-text-primary);
-    }
-
-.app-favorite-icon {
-    display: inline-grid;
-    place-items: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 0.6rem;
-}
-
-.tone-indigo .app-favorite-icon {
-    background: var(--mx-tone-brand-bg);
-    color: var(--mx-tone-brand-fg);
-}
-
-.tone-teal .app-favorite-icon {
-    background: var(--mx-tone-teal-bg);
-    color: var(--mx-tone-teal-fg);
-}
-
-.app-favorites-empty {
-    margin: 0;
-    color: var(--mx-text-secondary);
-    font-size: var(--mx-fs-helper);
-}
 
 /* Sağ sütun: Kısayollar ve Önerilenler kartları alt alta. */
 .app-rail {
@@ -560,21 +509,6 @@ html.app-launcher-open {
     position: relative;
 }
 
-.app-card-star {
-    position: absolute;
-    top: var(--mx-space-3);
-    right: var(--mx-space-3);
-    color: var(--mx-text-secondary);
-}
-
-    .app-card-star.is-on {
-        color: var(--mx-brand-primary);
-    }
-
-        .app-card-star.is-on .app-icon {
-            fill: currentColor;
-        }
-
 /* Uygulama kartı: tamamı bağlantıdır. Sağdaki büyük ikon süs amaçlıdır (ton zemininde, tokenlardan). */
 .app-card {
     position: relative;
@@ -724,7 +658,6 @@ html.app-launcher-open {
     }
 
 .app-card:focus-visible,
-.app-favorite:focus-visible,
 .app-shortcut:focus-visible,
 .app-category:focus-visible {
     outline: 2px solid var(--mx-brand-primary);
