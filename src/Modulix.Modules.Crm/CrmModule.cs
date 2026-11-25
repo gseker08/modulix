@@ -168,6 +168,7 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         public const string TaxRate = "crm.tax-rate";
         public const string PriceList = "crm.price-list";
         public const string PriceListItem = "crm.price-list-item";
+        public const string SurchargeRule = "crm.surcharge-rule";
         public const string ProductComponent = "crm.product-component";
         public const string DiscountPolicy = "crm.discount-policy";
         public const string Quote = "crm.quote";
@@ -916,6 +917,13 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         {
             References = new Dictionary<string, string> { ["companyId"] = Entities.Company },
         },
+        new(Entities.SurchargeRule, "Ek ücret kuralı (CRM)", Permissions.PricesRead, new Dictionary<string, string>
+        {
+            ["name"] = "Ad", ["description"] = "Açıklama", ["priority"] = "Öncelik", ["isActive"] = "Etkin", ["kind"] = "Tür", ["currency"] = "Para birimi",
+            ["amount"] = "Tutar", ["percent"] = "Yüzde", ["group"] = "Grup", ["baseKey"] = "Taban anahtarı", ["durationKey"] = "Süre anahtarı",
+            ["freeUnits"] = "Serbest süre", ["quantityKeys"] = "Çarpan anahtarları", ["conditions"] = "Koşullar", ["presentation"] = "Teklifte görünüm",
+            ["stackable"] = "Birleşir",
+        }, "name"),
         new(Entities.PriceListItem, "Fiyat listesi satırı (CRM)", Permissions.PricesRead, new Dictionary<string, string>
         {
             ["priceListId"] = "Fiyat listesi", ["productId"] = "Ürün", ["minQuantity"] = "Alt miktar", ["maxQuantity"] = "Üst miktar", ["unitPrice"] = "Birim fiyat", ["isFree"] = "Ücretsiz",
@@ -1190,6 +1198,7 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         services.AddScoped<IRecordStore, TaxRateRecordStore>();
         services.AddScoped<IRecordStore, PriceListRecordStore>();
         services.AddScoped<IRecordStore, PriceListItemRecordStore>();
+        services.AddScoped<IRecordStore, SurchargeRuleRecordStore>();
         services.AddScoped<IRecordStore, ProductComponentRecordStore>();
         services.AddScoped<IRecordStore, DiscountPolicyRecordStore>();
         services.AddScoped<IRecordStore, QuoteRecordStore>();

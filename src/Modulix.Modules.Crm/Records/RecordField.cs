@@ -160,6 +160,25 @@ internal static class Field
             e => get(e) is { Length: > 0 } stored ? JsonNode.Parse(stored) : null,
             (e, v) => set(e, (string?)v));
 
+    /// <summary>
+    /// Metin sütununda JSON dizisi olarak saklanan liste alanı (ör. ek ücret kuralının çarpan anahtarları ve koşulları). Öğe doğrulaması çağıranın
+    /// <paramref name="valid"/> işlevindedir; boş dizi null olur, okunurken dizi olarak döner.
+    /// </summary>
+    public static RecordField<T> JsonList<T>(
+        string name, int maxLength, Func<JsonArray, bool> valid, ServerMessage invalid, Func<T, string?> get, Action<T, string?> set) =>
+        new(name, required: false, nullable: true, node =>
+            {
+                if (node is not JsonArray array || !valid(array))
+                {
+                    return ParsedValue.Fail(invalid);
+                }
+
+                var json = array.ToJsonString();
+                return json.Length > maxLength ? ParsedValue.Fail(ServerMessages.Validation.MaxLength(maxLength)) : ParsedValue.Of(array.Count == 0 ? null : json);
+            },
+            e => get(e) is { Length: > 0 } stored ? JsonNode.Parse(stored) : null,
+            (e, v) => set(e, (string?)v));
+
     public static RecordField<T> Email<T>(string name, int maxLength, Func<T, string?> get, Action<T, string?> set) =>
         new(name, required: false, nullable: true, node =>
             {

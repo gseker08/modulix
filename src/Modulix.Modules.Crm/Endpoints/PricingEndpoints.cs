@@ -26,6 +26,8 @@ internal static class PricingEndpoints
             CrmModule.Permissions.PricesRead, CrmModule.Permissions.PricesWrite);
         ResourceEndpoints.MapResource<PriceListItemDto, SavePriceListItemRequest>(crm, "/api/crm", "price-list-items", CrmModule.Entities.PriceListItem,
             CrmModule.Permissions.PricesRead, CrmModule.Permissions.PricesWrite);
+        ResourceEndpoints.MapResource<SurchargeRuleDto, SaveSurchargeRuleRequest>(crm, "/api/crm", "surcharge-rules", CrmModule.Entities.SurchargeRule,
+            CrmModule.Permissions.PricesRead, CrmModule.Permissions.PricesWrite);
         ResourceEndpoints.MapResource<ProductComponentDto, SaveProductComponentRequest>(crm, "/api/crm", "product-components", CrmModule.Entities.ProductComponent,
             CrmModule.Permissions.ProductsRead, CrmModule.Permissions.ProductsWrite);
         ResourceEndpoints.MapResource<DiscountPolicyDto, SaveDiscountPolicyRequest>(crm, "/api/crm", "discount-policies", CrmModule.Entities.DiscountPolicy,
