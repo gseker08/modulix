@@ -97,6 +97,10 @@
                         </div>
                     }
                     <VersionView Version="draft" Issues="detail.DraftIssues" Entity="EntityOf(rule.EntityKey)" Actions="actions" />
+                    @if (detail.Published is { } current)
+                    {
+                        <VersionDiff Published="current" Draft="draft" Entity="EntityOf(rule.EntityKey)" Actions="actions" />
+                    }
                 </ChildContent>
             </FormSection>
         }

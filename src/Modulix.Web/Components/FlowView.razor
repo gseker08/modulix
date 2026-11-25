@@ -20,7 +20,7 @@
                 <span class="flow-icon" aria-hidden="true"><AppIcon Name="@Icon(node.Kind)" Size="16" /></span>
                 <div class="flow-body">
                     <small class="flow-kind">@node.KindLabel</small>
-                    <strong class="flow-title">@node.Title</strong>
+                    <strong class="flow-title">@node.Title@if (MarkOf(node) is { } mark) { <text> </text><span class="badge stage-@MarkBadge(mark)">@MarkLabel(mark)</span> }</strong>
                     @foreach (var line in node.Lines)
                     {
                         <span class="flow-line">@line</span>
@@ -67,6 +67,22 @@
     [Parameter] public EventCallback<FlowMove> OnMove { get; set; }
 
     [Parameter] public EventCallback<int> OnRemove { get; set; }
+
+    /// <summary>Sürüm karşılaştırmasında (E6-3) adım kimliğine göre değişiklik işareti: eklendi, kaldırıldı, değişti, taşındı. Rozet metinle de yazılır; renk tek başına anlam taşımaz.</summary>
+    [Parameter] public IReadOnlyDictionary<string, FlowChangeKind>? Marks { get; set; }
+
+    private FlowChangeKind? MarkOf(FlowNode node) =>
+        node.StepId is { } id && Marks is not null && Marks.TryGetValue(id, out var kind) ? kind : null;
+
+    private static string MarkBadge(FlowChangeKind kind) => kind switch
+    {
+        FlowChangeKind.Added => "won",
+        FlowChangeKind.Removed => "cancelled",
+        FlowChangeKind.Changed => "onhold",
+        _ => "lead",
+    };
+
+    private static string MarkLabel(FlowChangeKind kind) => Texts.Get($"admin.flow.change.{kind.ToString().ToLowerInvariant()}");
 
     private RenderFragment InsertPoint(int index) => @<li class="flow-insert">
         <button type="button" class="btn btn-ghost btn-sm" @onclick="() => OnInsert.InvokeAsync(index)"><AppIcon Name="plus" Size="14" /> @Texts.Get("admin.flow.insert")</button>

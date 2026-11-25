@@ -1,0 +1,82 @@
+@using Modulix.Web.Services
+
+@* Taslak ile yayınlanmış sürümün farkı (ADR-0056, E6-3): neyin değiştiğini özetler ve iki sürümün akışını yan yana çizer; değişen adımlar rozetle işaretlenir.
+   Adımlar kimlikle eşlenir. Yayınlanmış sürüm değişmez; çalışan örnekler başlatıldığı sürümle biter, taslak yayınlanınca yeni örnekler yeni sürümle başlar. *@
+<section aria-labelledby="version-diff-title">
+    <h3 id="version-diff-title" class="h6">@Texts.Get("admin.versionDiff.title", Published.VersionNo)</h3>
+    @if (diff.IsEmpty)
+    {
+        <p class="text-muted" role="status">@Texts.Get("admin.versionDiff.none")</p>
+    }
+    else
+    {
+        <ul>
+            @if (diff.TriggerChanged)
+            {
+                <li>@Texts.Get("admin.versionDiff.trigger")</li>
+            }
+            @if (diff.ConditionChanged)
+            {
+                <li>@Texts.Get("admin.versionDiff.condition")</li>
+            }
+            @foreach (var key in diff.MetaChanges)
+            {
+                <li>@Texts.Get($"admin.versionDiff.meta.{key}")</li>
+            }
+            @foreach (var change in diff.Steps)
+            {
+                <li><span class="badge stage-@Badge(change.Kind)">@Texts.Get($"admin.flow.change.{change.Kind.ToString().ToLowerInvariant()}")</span> @StepTitle(change)</li>
+            }
+        </ul>
+
+        <div class="form-grid">
+            <div class="span-6">
+                <h4 class="h6">@Texts.Get("admin.versionDiff.published", Published.VersionNo)</h4>
+                <FlowView Nodes="publishedFlow" Marks="removedMarks" />
+            </div>
+            <div class="span-6">
+                <h4 class="h6">@Texts.Get("admin.versionDiff.draft")</h4>
+                <FlowView Nodes="draftFlow" Marks="draftMarks" />
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public AutomationVersionDto Published { get; set; } = null!;
+
+    [Parameter, EditorRequired] public AutomationVersionDto Draft { get; set; } = null!;
+
+    [Parameter] public AutomationEntityDto? Entity { get; set; }
+
+    [Parameter] public IReadOnlyList<AutomationActionDto> Actions { get; set; } = [];
+
+    private FlowDiff diff = new(false, false, [], []);
+    private IReadOnlyList<FlowNode> publishedFlow = [];
+    private IReadOnlyList<FlowNode> draftFlow = [];
+    private IReadOnlyDictionary<string, FlowChangeKind> draftMarks = new Dictionary<string, FlowChangeKind>();
+    private IReadOnlyDictionary<string, FlowChangeKind> removedMarks = new Dictionary<string, FlowChangeKind>();
+
+    protected override void OnParametersSet()
+    {
+        diff = AutomationFlowDiff.Compare(Published, Draft);
+        publishedFlow = AutomationFlow.Build(Published.Definition, Entity, Actions);
+        draftFlow = AutomationFlow.Build(Draft.Definition, Entity, Actions);
+
+        // Taslak akışta eklenen, değişen ve taşınan adımlar; yayınlanmış akışta kaldırılan (ve değişen) adımlar işaretlenir.
+        draftMarks = diff.Steps.Where(c => c.Kind != FlowChangeKind.Removed).GroupBy(c => c.StepId).ToDictionary(g => g.Key, g => g.First().Kind);
+        removedMarks = diff.Steps.Where(c => c.Kind is FlowChangeKind.Removed or FlowChangeKind.Changed).GroupBy(c => c.StepId).ToDictionary(g => g.Key, g => g.First().Kind);
+    }
+
+    // Kaldırılan adımın adı yayınlanmış akıştan, diğerleri taslaktan okunur.
+    private string StepTitle(FlowChange change) =>
+        (change.Kind == FlowChangeKind.Removed ? publishedFlow : draftFlow).FirstOrDefault(n => n.StepId == change.StepId)?.Title ?? change.StepId;
+
+    private static string Badge(FlowChangeKind kind) => kind switch
+    {
+        FlowChangeKind.Added => "won",
+        FlowChangeKind.Removed => "cancelled",
+        FlowChangeKind.Changed => "onhold",
+        _ => "lead",
+    };
+}

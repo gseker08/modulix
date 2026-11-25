@@ -14149,5 +14149,19 @@
   "admin.flow.moveUp": "{0}. addımı yuxarı apar",
   "admin.flow.moveDown": "{0}. addımı aşağı apar",
   "admin.flow.remove": "{0}. addımı sil",
-  "admin.automationEditor.flowHelp": "Qaydanın cari axını. Addımlar arasına yeni addım əlavə edə, addımı apara və ya silə bilərsiniz; addımın sahələrini aşağıdakı formada doldurun. Yadda saxlayana qədər layihə dəyişmir."
+  "admin.automationEditor.flowHelp": "Qaydanın cari axını. Addımlar arasına yeni addım əlavə edə, addımı apara və ya silə bilərsiniz; addımın sahələrini aşağıdakı formada doldurun. Yadda saxlayana qədər layihə dəyişmir.",
+  "admin.versionDiff.title": "Dərc olunmuş {0}. versiya ilə fərq",
+  "admin.versionDiff.none": "Layihə dərc olunmuş versiya ilə eynidir; dəyişiklik yoxdur.",
+  "admin.versionDiff.trigger": "Tətikləyici dəyişdi",
+  "admin.versionDiff.condition": "Şərt dəyişdi",
+  "admin.versionDiff.meta.name": "Ad dəyişdi",
+  "admin.versionDiff.meta.priority": "Prioritet dəyişdi",
+  "admin.versionDiff.meta.stopProcessing": "\"Digər qaydaları dayandır\" ayarı dəyişdi",
+  "admin.versionDiff.meta.validity": "Etibarlılıq aralığı dəyişdi",
+  "admin.versionDiff.published": "Dərc olunmuş {0}. versiya",
+  "admin.versionDiff.draft": "Layihə",
+  "admin.flow.change.added": "Əlavə edildi",
+  "admin.flow.change.removed": "Silindi",
+  "admin.flow.change.changed": "Dəyişdi",
+  "admin.flow.change.moved": "Aparıldı"
 }

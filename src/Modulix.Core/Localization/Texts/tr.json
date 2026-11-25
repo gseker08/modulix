@@ -14149,5 +14149,19 @@
   "admin.flow.moveUp": "{0}. adımı yukarı taşı",
   "admin.flow.moveDown": "{0}. adımı aşağı taşı",
   "admin.flow.remove": "{0}. adımı kaldır",
-  "admin.automationEditor.flowHelp": "Kuralın o anki akışı. Adımlar arasına yeni adım ekleyebilir, adımı taşıyabilir ya da kaldırabilirsiniz; adımın alanlarını aşağıdaki formda doldurun. Kaydedene kadar taslak değişmez."
+  "admin.automationEditor.flowHelp": "Kuralın o anki akışı. Adımlar arasına yeni adım ekleyebilir, adımı taşıyabilir ya da kaldırabilirsiniz; adımın alanlarını aşağıdaki formda doldurun. Kaydedene kadar taslak değişmez.",
+  "admin.versionDiff.title": "Yayınlanmış sürüm {0} ile fark",
+  "admin.versionDiff.none": "Taslak, yayınlanmış sürümle aynı; değişen bir şey yok.",
+  "admin.versionDiff.trigger": "Tetikleyici değişti",
+  "admin.versionDiff.condition": "Koşul değişti",
+  "admin.versionDiff.meta.name": "Ad değişti",
+  "admin.versionDiff.meta.priority": "Öncelik değişti",
+  "admin.versionDiff.meta.stopProcessing": "\"Diğer kuralları durdur\" ayarı değişti",
+  "admin.versionDiff.meta.validity": "Geçerlilik aralığı değişti",
+  "admin.versionDiff.published": "Yayınlanmış sürüm {0}",
+  "admin.versionDiff.draft": "Taslak",
+  "admin.flow.change.added": "Eklendi",
+  "admin.flow.change.removed": "Kaldırıldı",
+  "admin.flow.change.changed": "Değişti",
+  "admin.flow.change.moved": "Taşındı"
 }
