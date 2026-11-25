@@ -14,11 +14,15 @@ public enum FlowNodeKind
 }
 
 /// <summary>Akıştaki bir düğüm: tür etiketi, başlık ve ayrıntı satırları. <see cref="Branch"/> adımın koşula bağlı olduğunu gösterir.</summary>
-public sealed record FlowNode(FlowNodeKind Kind, string KindLabel, string Title, IReadOnlyList<string> Lines, IReadOnlyList<string> BranchLines)
+/// <param name="StepIndex">Adım düğümünün kuraldaki sırası (0'dan); tetikleyici ve koşul düğümünde <c>null</c>. Akış tuvalinde taşıma ve kaldırma bununla yapılır.</param>
+public sealed record FlowNode(FlowNodeKind Kind, string KindLabel, string Title, IReadOnlyList<string> Lines, IReadOnlyList<string> BranchLines, int? StepIndex = null)
 {
     /// <summary>Adım koşulu varsa (dallanma, ADR-0027 4c-5) koşul satırları; yoksa boş.</summary>
     public bool Branch => BranchLines.Count > 0;
 }
+
+/// <summary>Akış tuvalinde bir adımın taşınması: <see cref="Index"/> adımın sırası, <see cref="Direction"/> −1 yukarı, +1 aşağı.</summary>
+public readonly record struct FlowMove(int Index, int Direction);
 
 /// <summary>
 /// Otomasyon kural sürümünü (ya da yolculuğun kural sürümünü) salt okunur akışa çevirir (ADR-0056, E6-1). Yeni bir model değildir: aynı tanım
@@ -58,8 +62,9 @@ public static class AutomationFlow
             };
 
             nodes.Add(new FlowNode(
-                kind, Texts.Get("admin.flow.step", i + 1), definitionOfAction?.DisplayName ?? step.Action,
-                ParameterLines(step, definitionOfAction, entity), ConditionLines(step.When, entity)));
+                kind, Texts.Get("admin.flow.step", i + 1),
+                string.IsNullOrWhiteSpace(step.Action) ? Texts.Get("admin.flow.noAction") : definitionOfAction?.DisplayName ?? step.Action,
+                ParameterLines(step, definitionOfAction, entity), ConditionLines(step.When, entity), i));
         }
 
         return nodes;

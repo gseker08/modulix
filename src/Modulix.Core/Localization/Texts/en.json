@@ -14143,5 +14143,11 @@
   "marketing.journeyRules.bound": "Published version is bound",
   "marketing.journeyRules.draftOnly": "Only the draft is bound (runs once published)",
   "marketing.journeyRules.create": "Create rule",
-  "marketing.journeyRules.createHelp": "Set the rule trigger to \"Entered the journey\" and the condition \"Journey id\" = this id:"
+  "marketing.journeyRules.createHelp": "Set the rule trigger to \"Entered the journey\" and the condition \"Journey id\" = this id:",
+  "admin.flow.noAction": "(no action chosen)",
+  "admin.flow.insert": "Add a step here",
+  "admin.flow.moveUp": "Move step {0} up",
+  "admin.flow.moveDown": "Move step {0} down",
+  "admin.flow.remove": "Remove step {0}",
+  "admin.automationEditor.flowHelp": "The current flow of the rule. You can add a step between steps, move or remove a step; fill in the step's fields in the form below. The draft does not change until you save."
 }

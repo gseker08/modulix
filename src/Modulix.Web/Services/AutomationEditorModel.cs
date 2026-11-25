@@ -43,6 +43,41 @@ public sealed class EditorDefinition
         };
     }
 
+    /// <summary>Adımı verilen sıraya ekler (akış tuvalinde "buraya adım ekle"); sıra sınır dışıysa uca kırpılır. Eklenen adımın aksiyonu henüz seçilmemiştir.</summary>
+    public EditorAction InsertAction(int index)
+    {
+        var step = new EditorAction { Id = NextStepId() };
+        Actions.Insert(Math.Clamp(index, 0, Actions.Count), step);
+        return step;
+    }
+
+    /// <summary>Adımı yukarı (negatif) ya da aşağı (pozitif) taşır; sınırı aşan taşıma yapılmaz. Taşındıysa <c>true</c>.</summary>
+    public bool MoveAction(EditorAction step, int direction)
+    {
+        var index = Actions.IndexOf(step);
+        var target = index + direction;
+        if (index < 0 || target < 0 || target >= Actions.Count)
+        {
+            return false;
+        }
+
+        Actions.RemoveAt(index);
+        Actions.Insert(target, step);
+        return true;
+    }
+
+    /// <summary>Verilen sıradaki adımı kaldırır; sıra yoksa bir şey yapmaz.</summary>
+    public bool RemoveActionAt(int index)
+    {
+        if (index < 0 || index >= Actions.Count)
+        {
+            return false;
+        }
+
+        Actions.RemoveAt(index);
+        return true;
+    }
+
     /// <summary>Yeni adım için sürüm içinde tekil kimlik (<c>adim1</c>, <c>adim2</c>…).</summary>
     public string NextStepId()
     {

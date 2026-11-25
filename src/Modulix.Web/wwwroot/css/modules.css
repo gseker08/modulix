@@ -594,6 +594,19 @@ button.hero-stat {
     overflow-wrap: anywhere;
 }
 
+.flow-actions {
+    display: flex;
+    flex: none;
+    gap: var(--mx-space-1);
+    margin-left: auto;
+}
+
+.flow-insert {
+    margin-left: 0.8125rem;
+    padding: 0 0 var(--mx-space-2) var(--mx-space-4);
+    border-left: 2px solid var(--mx-border);
+}
+
 .flow-branch {
     display: flex;
     flex-direction: column;
