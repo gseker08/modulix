@@ -14130,5 +14130,18 @@
   "marketing.journeyDetail.exit.save": "Save condition",
   "marketing.journeyDetail.exit.saved": "The exit condition was saved. It is validated on publish or resume against the fields the publisher can see.",
   "marketing.journeyDetail.exit.removed": "The exit condition was removed.",
-  "marketing.journeyDetail.exit.catalogDenied": "The field list comes from the segment field catalog; permission to view segments is needed to edit the condition."
+  "marketing.journeyDetail.exit.catalogDenied": "The field list comes from the segment field catalog; permission to view segments is needed to edit the condition.",
+  "marketing.journeyDetail.tab.rules": "Rules",
+  "marketing.journeyRules.title": "Rules bound to the journey",
+  "marketing.journeyRules.intro": "The steps of a journey are automation rules. The link is the \"Journey id\" row in the rule condition; rules that name this journey's id in their condition are listed here.",
+  "marketing.journeyRules.emptyTitle": "No bound rule",
+  "marketing.journeyRules.empty": "The journey takes no steps: set up a rule bound to this journey to send messages and wait.",
+  "marketing.journeyRules.truncated": "Only the first {0} rules were scanned; if a bound rule is not shown, look in the rule list.",
+  "marketing.journeyRules.caption": "Rules bound to the journey",
+  "marketing.journeyRules.col.rule": "Rule",
+  "marketing.journeyRules.col.binding": "Link",
+  "marketing.journeyRules.bound": "Published version is bound",
+  "marketing.journeyRules.draftOnly": "Only the draft is bound (runs once published)",
+  "marketing.journeyRules.create": "Create rule",
+  "marketing.journeyRules.createHelp": "Set the rule trigger to \"Entered the journey\" and the condition \"Journey id\" = this id:"
 }

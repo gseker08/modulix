@@ -1,0 +1,96 @@
+@inject ApiClient Api
+@inject SessionState Session
+
+@* Yolculuğa bağlı kurallar (ADR-0056): yolculuğun adımları otomasyon kuralıdır ve bağ, kural koşulundaki "Yolculuk kimliği" satırıyla kurulur (yolculuk
+   kaydında kural alanı yoktur). Bu ekran, bu yolculuğun kimliğini koşulunda anan kuralları bulur. Kural listesi ve ayrıntısı core.automation.read ile okunur;
+   yeni kural kurmak core.automation.manage ister. Düğmeleri gizlemek yetki değildir. *@
+<section aria-labelledby="journey-rules-title">
+    <h2 id="journey-rules-title" class="h5">@Texts.Get("marketing.journeyRules.title")</h2>
+    <p class="text-muted">@Texts.Get("marketing.journeyRules.intro")</p>
+
+    @if (rows is null && error is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@error <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="LoadAsync">@Texts.Get("crm.sales.retry")</button></div>
+    }
+    else if (rows is { Count: 0 })
+    {
+        <EmptyState Icon="zap" Title="@Texts.Get("marketing.journeyRules.emptyTitle")" Text="@Texts.Get("marketing.journeyRules.empty")" />
+    }
+    else if (rows is not null)
+    {
+        @if (truncated)
+        {
+            <div class="alert alert-warning" role="status">@Texts.Get("marketing.journeyRules.truncated", MaxRules)</div>
+        }
+
+        <table class="table record-table">
+            <caption class="visually-hidden">@Texts.Get("marketing.journeyRules.caption")</caption>
+            <thead>
+                <tr>
+                    <th scope="col">@Texts.Get("marketing.journeyRules.col.rule")</th>
+                    <th scope="col">@Texts.Get("common.field.status")</th>
+                    <th scope="col">@Texts.Get("marketing.journeyRules.col.binding")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var (rule, binding) in rows)
+                {
+                    <tr>
+                        <td data-label="@Texts.Get("marketing.journeyRules.col.rule")" class="primary"><a href="yonetim/otomasyon/@rule.Id">@rule.Name</a></td>
+                        <td data-label="@Texts.Get("common.field.status")">
+                            <span class="badge stage-@AutomationLabels.StatusBadge(rule.Status)">@AutomationLabels.Status(rule.Status)</span>
+                            <small class="text-muted d-block">@AutomationLabels.Behaviour(rule)</small>
+                        </td>
+                        <td data-label="@Texts.Get("marketing.journeyRules.col.binding")">@(binding == JourneyRuleBinding.Published ? Texts.Get("marketing.journeyRules.bound") : Texts.Get("marketing.journeyRules.draftOnly"))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (Session.Can(CoreAccess.ManageAutomation))
+    {
+        <div class="form-actions">
+            <a class="btn btn-outline-secondary" href="yonetim/otomasyon/sablonlar">@Texts.Get("admin.automationRules.fromTemplate")</a>
+            <a class="btn btn-primary" href="yonetim/otomasyon/yeni"><AppIcon Name="plus" Size="16" /> @Texts.Get("marketing.journeyRules.create")</a>
+        </div>
+        <p class="small text-muted">@Texts.Get("marketing.journeyRules.createHelp") <code>@JourneyId</code></p>
+    }
+</section>
+
+@code {
+    // Kural başına ayrıntı okunduğu için tek turda en çok bu kadar yolculuk kuralına bakılır.
+    private const int MaxRules = 100;
+
+    [Parameter, EditorRequired] public Guid JourneyId { get; set; }
+
+    private List<(AutomationRuleSummaryDto Rule, JourneyRuleBinding Binding)>? rows;
+    private string? error;
+    private bool truncated;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        var list = await Api.GetAsync<AutomationRulePageDto>($"/api/automation/rules?moduleKey={MarketingAccess.ModuleKey}&pageSize={MaxRules}");
+        if (list.Value is not { } page)
+        {
+            error = list.Error;
+            return;
+        }
+
+        // Yalnızca yolculuk kaydı üzerindeki kuralların tanımı okunur; koşulu bu yolculuğa bağlı olanlar listelenir.
+        var candidates = page.Items.Where(JourneyRuleLinks.IsJourneyRule).ToList();
+        truncated = page.TotalCount > page.Items.Count;
+        var details = await Task.WhenAll(candidates.Select(async r => (Rule: r, Detail: (await Api.GetAsync<AutomationRuleDetailDto>($"/api/automation/rules/{r.Id}")).Value)));
+        rows = [.. details
+            .Where(d => d.Detail is not null)
+            .Select(d => (d.Rule, Binding: JourneyRuleLinks.BindingOf(d.Detail!, JourneyId)))
+            .Where(d => d.Binding != JourneyRuleBinding.None)];
+    }
+}

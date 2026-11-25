@@ -5,7 +5,7 @@
 <PageTitle>@(journey?.Name ?? Texts.Get("nav.app.marketing.journeys")) · Modulix</PageTitle>
 
 @* Müşteri yolculuğu ayrıntısı (ADR-0056): genel bilgi ve durum geçişleri. Durum sunucuda yazılır; yayın, duraklatma, sürdürme ve arşiv
-   marketing.journeys.publish ister. Düğmeleri gizlemek yetki değildir. Çıkış koşulu bu ekranda yalnızca gösterilir (düzenleyicisi sonraki dilimde). Kayıtlar, çıkış koşulu ve rapor sekmeleri tembel yüklenir; rapor sekmesi marketing.reports.read ister. PUT kaydın tamamını yazar: kaydetme her alanı gönderir. *@
+   marketing.journeys.publish ister. Düğmeleri gizlemek yetki değildir. Çıkış koşulu bu ekranda yalnızca gösterilir (düzenleyicisi sonraki dilimde). Kayıtlar, kurallar, çıkış koşulu ve rapor sekmeleri tembel yüklenir (kurallar core.automation.read ister); rapor sekmesi marketing.reports.read ister. PUT kaydın tamamını yazar: kaydetme her alanı gönderir. *@
 <AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.JourneysRead">
     @if (journey is null && loadError is null)
     {
@@ -149,6 +149,16 @@
             }
         </TabPanel>
 
+        @if (CanSeeRules)
+        {
+            <TabPanel State="tabs" Key="kurallar">
+                @if (tabs.Rendered("kurallar"))
+                {
+                    <JourneyRulesPanel JourneyId="journey.Id" />
+                }
+            </TabPanel>
+        }
+
         <TabPanel State="tabs" Key="kayitlar">
             @if (tabs.Rendered("kayitlar"))
             {
@@ -193,11 +203,14 @@
     [
         new("genel", Texts.Get("crm.quoteDetail.tab.general")),
         new("cikis", Texts.Get("marketing.journeyDetail.tab.exit")),
+        .. CanSeeRules ? new[] { new TabItem("kurallar", Texts.Get("marketing.journeyDetail.tab.rules")) } : [],
         new("kayitlar", Texts.Get("marketing.journeyDetail.tab.enrollments")),
         .. CanReport ? new[] { new TabItem("rapor", Texts.Get("marketing.journeyDetail.tab.report")) } : [],
     ];
 
     private bool CanWrite => Session.Can(MarketingAccess.JourneysWrite);
+
+    private bool CanSeeRules => Session.Can(CoreAccess.ReadAutomation);
 
     private bool CanReport => Session.Can(MarketingAccess.ReportsRead);
 

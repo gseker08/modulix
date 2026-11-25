@@ -14130,5 +14130,18 @@
   "marketing.journeyDetail.exit.save": "Koşulu kaydet",
   "marketing.journeyDetail.exit.saved": "Çıkış koşulu kaydedildi. Yayın ya da sürdürmede yayınlayanın görebildiği alanlara karşı doğrulanır.",
   "marketing.journeyDetail.exit.removed": "Çıkış koşulu kaldırıldı.",
-  "marketing.journeyDetail.exit.catalogDenied": "Alan listesi segment alan kataloğundandır; koşulu düzenlemek için segmentleri görüntüleme izni gerekir."
+  "marketing.journeyDetail.exit.catalogDenied": "Alan listesi segment alan kataloğundandır; koşulu düzenlemek için segmentleri görüntüleme izni gerekir.",
+  "marketing.journeyDetail.tab.rules": "Kurallar",
+  "marketing.journeyRules.title": "Yolculuğa bağlı kurallar",
+  "marketing.journeyRules.intro": "Yolculuğun adımları otomasyon kuralıdır. Bağ, kural koşulundaki \"Yolculuk kimliği\" satırıyla kurulur; bu yolculuğun kimliğini koşulunda anan kurallar burada listelenir.",
+  "marketing.journeyRules.emptyTitle": "Bağlı kural yok",
+  "marketing.journeyRules.empty": "Yolculuk adım atmaz: ileti göndermek ve beklemek için bu yolculuğa bağlı bir kural kurun.",
+  "marketing.journeyRules.truncated": "Yalnızca ilk {0} kural tarandı; bağlı bir kural görünmüyorsa kural listesinden arayın.",
+  "marketing.journeyRules.caption": "Yolculuğa bağlı kurallar",
+  "marketing.journeyRules.col.rule": "Kural",
+  "marketing.journeyRules.col.binding": "Bağ",
+  "marketing.journeyRules.bound": "Yayınlanmış sürüm bağlı",
+  "marketing.journeyRules.draftOnly": "Yalnızca taslak bağlı (yayınlanınca çalışır)",
+  "marketing.journeyRules.create": "Kural kur",
+  "marketing.journeyRules.createHelp": "Kuralın tetikleyicisini \"Yolculuğa girildi\" yapın, koşula \"Yolculuk kimliği\" = şu kimliği yazın:"
 }
