@@ -75,7 +75,7 @@ internal static class CrmReportDatasets
                 "Gerçekleşen, açık pipeline, ağırlıklı tahmin ve hedefe göre durum; kart toplamları detay listesiyle eşleşir.", "crm/satis-gorunumu", CrmModule.Permissions.SalesReportsRead),
             new("crm.reports.sales-targets", "Satış hedefleri", "Dönem, metrik ve kapsama göre hedefler, sürümler ve gerçekleşme.", "crm/satis-hedefleri", CrmModule.Permissions.SalesTargetsRead),
             new("crm.reports.sales-forecasts", "Satış tahmini", "Sürümlü tahmin çalışma alanı: kategori, düzeltme, sunma, kilit ve karşılaştırma.", "crm/satis-tahmini", CrmModule.Permissions.ForecastsRead),
-            new("crm.reports.sales-analysis", "Satış analizi", "Teklif ve lead kohortları, aşama dönüşümü.", "crm/satis-analizi", CrmModule.Permissions.SalesReportsRead),
+            new("crm.reports.sales-analysis", "Satış analizi", "Teklif ve müşteri adayı kohortları, aşama dönüşümü.", "crm/satis-analizi", CrmModule.Permissions.SalesReportsRead),
             new("crm.reports.sales-team", "Ekip performansı", "Kullanıcı bazında satış, kazanma oranı, iş yükü ve döngü süresi.", "crm/ekip-performansi", CrmModule.Permissions.SalesReportsRead),
             new("crm.reports.sales-data-quality", "Veri kalitesi", "Eksik tutar, kur, olasılık ve kapanış tarihi; geciken ve hareketsiz açık fırsatlar.", "crm/veri-kalitesi", CrmModule.Permissions.SalesReportsRead),
         ]);
@@ -138,9 +138,9 @@ internal static class CrmReportDatasets
     };
 
     private static DatasetDefinition LeadDataset() => new(
-        Leads, "Lead'ler", CrmModule.Entities.Lead, 2,
+        Leads, "Müşteri adayları", CrmModule.Entities.Lead, 2,
         [
-            new("leadNumber", "Lead no", DatasetColumnKind.Text, FilterShow),
+            new("leadNumber", "Müşteri adayı no", DatasetColumnKind.Text, FilterShow),
             new("subject", "Konu", DatasetColumnKind.Text, FilterShow),
             new("status", "Durum", DatasetColumnKind.Choice, All) { Options = LeadStatuses, StoreFilter = "status" },
             new("priority", "Öncelik", DatasetColumnKind.Choice, All) { Options = Priorities, StoreFilter = "priority" },
@@ -165,11 +165,11 @@ internal static class CrmReportDatasets
         RecordPath = "crm/leadler/{id}",
         ReadyReports =
         [
-            new("crm.leads.by-source", "Kaynağa göre lead'ler", "Lead sayısı kaynak bazında.",
+            new("crm.leads.by-source", "Kaynağa göre müşteri adayları", "Müşteri adayı sayısı kaynak bazında.",
                 new(Leads, [], [], [new("source")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Bar)),
-            new("crm.leads.by-status", "Duruma göre lead'ler", "Lead sayısı durum bazında.",
+            new("crm.leads.by-status", "Duruma göre müşteri adayları", "Müşteri adayı sayısı durum bazında.",
                 new(Leads, [], [], [new("status")], [new(null, Aggregation.Count)], new("count", SortDirection.Descending), ChartKind.Pie)),
-            new("crm.leads.received-by-month", "Aylık gelen lead'ler", "Alınma ayına göre lead sayısı.",
+            new("crm.leads.received-by-month", "Aylık gelen müşteri adayları", "Alınma ayına göre müşteri adayı sayısı.",
                 new(Leads, [], [], [new("firstReceivedAt", DateGrain.Month)], [new(null, Aggregation.Count)], new("firstReceivedAt"), ChartKind.Line)),
         ],
     };
