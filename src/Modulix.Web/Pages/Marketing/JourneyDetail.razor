@@ -5,7 +5,7 @@
 <PageTitle>@(journey?.Name ?? Texts.Get("nav.app.marketing.journeys")) · Modulix</PageTitle>
 
 @* Müşteri yolculuğu ayrıntısı (ADR-0056): genel bilgi ve durum geçişleri. Durum sunucuda yazılır; yayın, duraklatma, sürdürme ve arşiv
-   marketing.journeys.publish ister. Düğmeleri gizlemek yetki değildir. Çıkış koşulu bu ekranda yalnızca gösterilir (düzenleyicisi sonraki dilimde). Kayıtlar ve rapor sekmeleri tembel yüklenir; rapor sekmesi marketing.reports.read ister. *@
+   marketing.journeys.publish ister. Düğmeleri gizlemek yetki değildir. Çıkış koşulu bu ekranda yalnızca gösterilir (düzenleyicisi sonraki dilimde). Kayıtlar, çıkış koşulu ve rapor sekmeleri tembel yüklenir; rapor sekmesi marketing.reports.read ister. PUT kaydın tamamını yazar: kaydetme her alanı gönderir. *@
 <AuthGate Module="@MarketingAccess.ModuleKey" Permission="@MarketingAccess.JourneysRead">
     @if (journey is null && loadError is null)
     {
@@ -48,7 +48,7 @@
 
         <Notice Text="@message" Failed="@failed" />
 
-        <TabBar Tabs="Tabs" State="tabs" Label="@Texts.Get("marketing.journeyDetail.sections")" />
+        <TabBar Tabs="Tabs" State="tabs" Label="@Texts.Get("marketing.journeyDetail.sections")" Changed="OnTabChangedAsync" />
 
         <TabPanel State="tabs" Key="genel">
             <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
@@ -95,6 +95,60 @@
             </section>
         </TabPanel>
 
+        <TabPanel State="tabs" Key="cikis">
+            @if (tabs.Rendered("cikis"))
+            {
+                <p class="text-muted">@Texts.Get("marketing.journeyDetail.exit.intro")</p>
+                @if (exitCatalogError is not null)
+                {
+                    <div class="alert alert-warning" role="alert">@exitCatalogError</div>
+                }
+
+                @if (exitCatalog is not null && exitCatalog.Unavailable.Count > 0)
+                {
+                    <details class="mb-2">
+                        <summary>@Texts.Get("marketing.segmentDetail.unavailable", exitCatalog.Unavailable.Count)</summary>
+                        <ul>
+                            @foreach (var u in exitCatalog.Unavailable) { <li>@u.Label — @u.Reason</li> }
+                        </ul>
+                    </details>
+                }
+
+                @if (exitRoot is null)
+                {
+                    <EmptyState Compact="true" Title="@Texts.Get("marketing.journeyDetail.exit.none")" Text="@Texts.Get("marketing.journeyDetail.exit.noneHelp")">
+                        @if (CanWrite && !IsArchived && exitCatalog is { Fields.Count: > 0 })
+                        {
+                            <button type="button" class="btn btn-outline-secondary" @onclick="AddExitCondition">@Texts.Get("marketing.journeyDetail.exit.add")</button>
+                        }
+                    </EmptyState>
+                }
+                else if (exitCatalog is null)
+                {
+                    <LoadingState />
+                }
+                else if (exitCatalog.Fields.Count == 0)
+                {
+                    <div class="alert alert-warning">@Texts.Get("marketing.segmentDetail.noFields")</div>
+                }
+                else
+                {
+                    <fieldset disabled="@(busy || !CanWrite || IsArchived)">
+                        <SegmentConditionEditor Node="exitRoot" Fields="exitCatalog.Fields" Changed="OnExitChanged" />
+                    </fieldset>
+                    <ErrorSummary Errors="exitErrors" />
+                    @if (CanWrite && !IsArchived)
+                    {
+                        <div class="form-actions">
+                            <ConfirmAction Disabled="@busy" Question="@Texts.Get("marketing.journeyDetail.exit.removeQuestion")" OnConfirm="RemoveExitConditionAsync">@Texts.Get("marketing.journeyDetail.exit.remove")</ConfirmAction>
+                            <button type="button" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")" @onclick="SaveExitConditionAsync">@Texts.Get("marketing.journeyDetail.exit.save")</button>
+                            @if (exitDirty) { <span class="text-muted" role="status">@Texts.Get("marketing.segmentDetail.unsaved")</span> }
+                        </div>
+                    }
+                }
+            }
+        </TabPanel>
+
         <TabPanel State="tabs" Key="kayitlar">
             @if (tabs.Rendered("kayitlar"))
             {
@@ -129,10 +183,16 @@
     private IReadOnlyDictionary<string, string[]>? errors;
 
     private readonly TabState tabs = new("genel");
+    private SegmentFieldsResponse? exitCatalog;
+    private string? exitCatalogError;
+    private ConditionNode? exitRoot;
+    private IReadOnlyDictionary<string, string[]>? exitErrors;
+    private bool exitDirty;
 
     private IReadOnlyList<TabItem> Tabs =>
     [
         new("genel", Texts.Get("crm.quoteDetail.tab.general")),
+        new("cikis", Texts.Get("marketing.journeyDetail.tab.exit")),
         new("kayitlar", Texts.Get("marketing.journeyDetail.tab.enrollments")),
         .. CanReport ? new[] { new TabItem("rapor", Texts.Get("marketing.journeyDetail.tab.report")) } : [],
     ];
@@ -169,6 +229,8 @@
         name = value.Name;
         description = value.Description ?? string.Empty;
         reentry = value.ReentryPolicy;
+        exitRoot = ConditionNode.FromJson(value.ExitCondition);
+        exitDirty = false;
         segmentName = (await Api.GetAsync<SegmentDto>($"/api/marketing/segments/{value.SegmentId}")).Value?.Name;
     }
 
@@ -177,11 +239,7 @@
         busy = true;
         errors = null;
         message = null;
-        var result = await Api.PutAsync<JourneyDto>($"/api/marketing/journeys/{Id}", new SaveJourneyRequest(
-            Version: journey!.Version,
-            Name: name.Trim(),
-            Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
-            ReentryPolicy: reentry));
+        var result = await Api.PutAsync<JourneyDto>($"/api/marketing/journeys/{Id}", Save(journey!.ExitCondition));
         busy = false;
         if (result.IsSuccess)
         {
@@ -192,6 +250,72 @@
 
         errors = result.FieldErrors.Count == 0 ? null : result.FieldErrors;
         Report(result.Error, true);
+    }
+
+    // PUT kaydın tamamını yazar (açık null zorunlu alanı reddettirir, boş bırakılabilir alanı siler): her çağrı kaydın bütün alanlarını gönderir.
+    private SaveJourneyRequest Save(string? exitCondition) => new(
+        Version: journey!.Version,
+        Code: journey.Code,
+        Name: name.Trim(),
+        Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+        Target: journey.Target,
+        SegmentId: journey.SegmentId,
+        ReentryPolicy: reentry,
+        ExitCondition: exitCondition,
+        OwnerId: journey.OwnerId);
+
+    private async Task OnTabChangedAsync(string key)
+    {
+        if (key != "cikis" || exitCatalog is not null || journey is null)
+        {
+            return;
+        }
+
+        // Alan listesi segment alan kataloğundandır (marketing.segments.read); yetkisi olmayan kullanıcı koşulu düzenleyemez ama durumunu görür.
+        var result = await Api.GetAsync<SegmentFieldsResponse>($"/api/marketing/segment-fields?target={journey.Target}");
+        exitCatalog = result.Value;
+        exitCatalogError = result.IsSuccess ? null : Texts.Get("marketing.journeyDetail.exit.catalogDenied");
+    }
+
+    private void AddExitCondition()
+    {
+        var group = ConditionNode.NewGroup();
+        group.Items.Add(ConditionNode.NewLeaf());
+        exitRoot = group;
+        exitDirty = true;
+    }
+
+    private void OnExitChanged() => exitDirty = true;
+
+    private async Task SaveExitConditionAsync()
+    {
+        if (exitRoot is null)
+        {
+            return;
+        }
+
+        await WriteExitConditionAsync(exitRoot.ToJson().ToJsonString(), Texts.Get("marketing.journeyDetail.exit.saved"));
+    }
+
+    private Task RemoveExitConditionAsync() => WriteExitConditionAsync(null, Texts.Get("marketing.journeyDetail.exit.removed"));
+
+    // Koşul yayın ve sürdürmede etkinleştirenin görebildiği alanlara karşı doğrulanır; burada yalnızca biçim ve boyut denetlenir.
+    private async Task WriteExitConditionAsync(string? exitCondition, string done)
+    {
+        busy = true;
+        exitErrors = null;
+        message = null;
+        var result = await Api.PutAsync<JourneyDto>($"/api/marketing/journeys/{Id}", Save(exitCondition));
+        busy = false;
+        if (result.IsSuccess)
+        {
+            await ApplyAsync(result.Value!);
+            Report(done, false);
+            return;
+        }
+
+        exitErrors = result.FieldErrors.Count == 0 ? null : result.FieldErrors;
+        Report(exitErrors is null ? result.Error : null, true);
     }
 
     // Durum geçişi (yayın, duraklat, sürdür, arşiv): sunucu kuralları denetler; hata iletisi olduğu gibi gösterilir.

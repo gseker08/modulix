@@ -68,6 +68,38 @@ public class JourneyTests(ModulixApiFactory factory) : IClassFixture<ModulixApiF
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/marketing/journeys/{created.Id}")).StatusCode);
     }
 
+    // Arayüzün çıkış koşulu düzenleyicisi (ADR-0056 yolculuk ekranları): koşul kaydın tamamıyla birlikte yazılır ve null ile kaldırılır.
+    [Fact]
+    public async Task The_exit_condition_is_saved_with_the_whole_record_removed_with_null_and_a_partial_save_is_refused()
+    {
+        var (client, _) = await ManagerAsync();
+        var segment = await ActiveSegmentAsync(client, "cikis-kosulu");
+        var created = await CreateJourneyAsync(client, "cikis-kosulu-yolculugu", segment.Id);
+
+        var condition = new JsonObject { ["op"] = "and", ["items"] = new JsonArray(Leaf("crm.company.industry", "eq", "Gıda ve içecek")) }.ToJsonString();
+        var saved = await client.PutAsJsonAsync($"/api/marketing/journeys/{created.Id}",
+            new SaveJourneyRequest(created.Version, created.Code, created.Name, created.Description, created.Target, created.SegmentId, created.ReentryPolicy, condition, created.OwnerId));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var withCondition = (await saved.Content.ReadFromJsonAsync<JourneyDto>())!;
+        Assert.Equal(condition, withCondition.ExitCondition);
+
+        // Biçimi bozuk koşul alan hatasıyla reddedilir ve kayıtlı koşul değişmez.
+        var broken = await client.PutAsJsonAsync($"/api/marketing/journeys/{created.Id}",
+            new SaveJourneyRequest(withCondition.Version, withCondition.Code, withCondition.Name, withCondition.Description, withCondition.Target, withCondition.SegmentId, withCondition.ReentryPolicy, "{bozuk", withCondition.OwnerId));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, broken.StatusCode);
+        Assert.Equal(condition, (await client.GetFromJsonAsync<JourneyDto>($"/api/marketing/journeys/{created.Id}"))!.ExitCondition);
+
+        // Eksik gönderilen kayıt (zorunlu alanlar null) reddedilir: PUT kaydın tamamını yazar.
+        var partial = await client.PutAsJsonAsync($"/api/marketing/journeys/{created.Id}", new SaveJourneyRequest(withCondition.Version, Name: "Yeni ad", ReentryPolicy: "Never"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, partial.StatusCode);
+
+        // Koşul null gönderilince kaldırılır.
+        var removed = await client.PutAsJsonAsync($"/api/marketing/journeys/{created.Id}",
+            new SaveJourneyRequest(withCondition.Version, withCondition.Code, withCondition.Name, withCondition.Description, withCondition.Target, withCondition.SegmentId, withCondition.ReentryPolicy, null, withCondition.OwnerId));
+        Assert.Equal(HttpStatusCode.OK, removed.StatusCode);
+        Assert.Null((await removed.Content.ReadFromJsonAsync<JourneyDto>())!.ExitCondition);
+    }
+
     // ---- Hata ve doğrulama ----
 
     [Fact]

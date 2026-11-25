@@ -14016,7 +14016,7 @@
   "marketing.journeyDetail.exitCondition": "Exit condition",
   "marketing.journeyDetail.noExitCondition": "Not defined",
   "marketing.journeyDetail.hasExitCondition": "Defined",
-  "marketing.journeyDetail.exitConditionNote": "The exit condition is shown here; its editor comes in a later slice. A person who unsubscribes leaves the journey unconditionally.",
+  "marketing.journeyDetail.exitConditionNote": "The exit condition is shown here; it is edited on the \"Exit condition\" tab. A person who unsubscribes leaves the journey unconditionally.",
   "marketing.journey-status.draft": "Draft",
   "marketing.journey-status.active": "Active",
   "marketing.journey-status.paused": "Paused",
@@ -14093,5 +14093,16 @@
   "marketing.journey-skip.provider-failed": "The provider rejected the message",
   "marketing.journey-skip.provider-exception": "Provider error; outcome unknown",
   "marketing.journey-skip.timeout": "The provider did not answer; outcome unknown",
-  "marketing.journey-skip.unknown-result": "Outcome unknown"
+  "marketing.journey-skip.unknown-result": "Outcome unknown",
+  "marketing.journeyDetail.tab.exit": "Exit condition",
+  "marketing.journeyDetail.exit.intro": "An enrollment that meets the condition leaves the journey and the remaining send steps are skipped. The condition uses the same language as a segment condition and is evaluated for active enrollments on every entry round. A person who unsubscribes leaves unconditionally.",
+  "marketing.journeyDetail.exit.none": "No exit condition",
+  "marketing.journeyDetail.exit.noneHelp": "Without a condition an enrollment ends only when the journey finishes, manually or when the person unsubscribes.",
+  "marketing.journeyDetail.exit.add": "Add condition",
+  "marketing.journeyDetail.exit.remove": "Remove condition",
+  "marketing.journeyDetail.exit.removeQuestion": "Remove the exit condition?",
+  "marketing.journeyDetail.exit.save": "Save condition",
+  "marketing.journeyDetail.exit.saved": "The exit condition was saved. It is validated on publish or resume against the fields the publisher can see.",
+  "marketing.journeyDetail.exit.removed": "The exit condition was removed.",
+  "marketing.journeyDetail.exit.catalogDenied": "The field list comes from the segment field catalog; permission to view segments is needed to edit the condition."
 }

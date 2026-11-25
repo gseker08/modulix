@@ -14016,7 +14016,7 @@
   "marketing.journeyDetail.exitCondition": "Çıxış şərti",
   "marketing.journeyDetail.noExitCondition": "Təyin edilməyib",
   "marketing.journeyDetail.hasExitCondition": "Təyin edilib",
-  "marketing.journeyDetail.exitConditionNote": "Çıxış şərti burada göstərilir; redaktoru növbəti dilimdədir. Abunəlikdən çıxan şəxs səyahətdən şərtsiz çıxır.",
+  "marketing.journeyDetail.exitConditionNote": "Çıxış şərti burada göstərilir; redaktoru \"Çıxış şərti\" tabındadır. Abunəlikdən çıxan şəxs səyahətdən şərtsiz çıxır.",
   "marketing.journey-status.draft": "Layihə",
   "marketing.journey-status.active": "Aktiv",
   "marketing.journey-status.paused": "Dayandırılıb",
@@ -14093,5 +14093,16 @@
   "marketing.journey-skip.provider-failed": "Provayder mesajı rədd etdi",
   "marketing.journey-skip.provider-exception": "Provayder xətası; nəticə qeyri-müəyyən",
   "marketing.journey-skip.timeout": "Provayder cavab vermədi; nəticə qeyri-müəyyən",
-  "marketing.journey-skip.unknown-result": "Nəticə qeyri-müəyyən"
+  "marketing.journey-skip.unknown-result": "Nəticə qeyri-müəyyən",
+  "marketing.journeyDetail.tab.exit": "Çıxış şərti",
+  "marketing.journeyDetail.exit.intro": "Şərti ödəyən qeyd səyahətdən çıxır və qalan göndərmə addımları atlanır. Şərt seqment şərti ilə eyni dildədir; hər giriş turunda aktiv qeydlər üçün yoxlanılır. Abunəlikdən çıxan şəxs şərtsiz çıxır.",
+  "marketing.journeyDetail.exit.none": "Çıxış şərti yoxdur",
+  "marketing.journeyDetail.exit.noneHelp": "Şərt təyin edilməyibsə qeyd yalnız səyahət bitəndə, əl ilə və ya abunəlikdən çıxanda başa çatır.",
+  "marketing.journeyDetail.exit.add": "Şərt əlavə et",
+  "marketing.journeyDetail.exit.remove": "Şərti sil",
+  "marketing.journeyDetail.exit.removeQuestion": "Çıxış şərti silinsin?",
+  "marketing.journeyDetail.exit.save": "Şərti yadda saxla",
+  "marketing.journeyDetail.exit.saved": "Çıxış şərti yadda saxlandı. Dərc və ya davam etdirmədə dərc edənin görə bildiyi sahələrə qarşı yoxlanılır.",
+  "marketing.journeyDetail.exit.removed": "Çıxış şərti silindi.",
+  "marketing.journeyDetail.exit.catalogDenied": "Sahə siyahısı seqment sahə kataloqundandır; şərti redaktə etmək üçün seqmentlərə baxmaq icazəsi lazımdır."
 }
