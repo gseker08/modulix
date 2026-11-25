@@ -482,17 +482,21 @@
         background: transparent;
     }
 
-    /* Çekmece dar: alanlar en çok iki kolona böler (span-3/4 yarım, span-8 tam satır). */
-    .drawer .form-grid > *,
-    .drawer .form-grid > .span-3,
-    .drawer .form-grid > .span-4,
-    .drawer .form-grid > .span-6 {
-        grid-column: span 6;
-    }
+    /* Çekmece dar: alanlar en çok iki kolona böler (span-3/4 yarım, span-8 tam satır). 12 kolonlu ızgara yalnızca 768 px ve
+       üstünde vardır (lists.css); daha darda form ızgarası tek kolondur ve bu eşleme tek kolonlu ızgaraya gizli kolon ekleyip
+       tam genişlikli alanı daraltırdı. */
+    @media (min-width: 768px) {
+        .drawer .form-grid > *,
+        .drawer .form-grid > .span-3,
+        .drawer .form-grid > .span-4,
+        .drawer .form-grid > .span-6 {
+            grid-column: span 6;
+        }
 
-    .drawer .form-grid > .span-8,
-    .drawer .form-grid > .span-12 {
-        grid-column: 1 / -1;
+        .drawer .form-grid > .span-8,
+        .drawer .form-grid > .span-12 {
+            grid-column: 1 / -1;
+        }
     }
 
     /* Kaydet / İptal her zaman görünür: çekmecenin altına yapışık. */
