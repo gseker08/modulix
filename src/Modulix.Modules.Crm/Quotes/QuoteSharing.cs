@@ -15,6 +15,12 @@ public sealed record QuoteSnapshotLine(
 public sealed record QuoteSnapshotTax(decimal RatePercent, decimal Net, decimal Tax);
 
 /// <summary>
+/// Grubun, gruba dahil edilen ek ücretlerle birlikte net toplamı (Dilim 2c belge gösterimi): dahil edilen ek ücret satır olarak görünmez, yalnızca bu
+/// alt toplamda yer alır. Alt toplam satırı grubun son satırından sonra çizilir.
+/// </summary>
+public sealed record QuoteSnapshotGroupSubtotal(string GroupName, decimal Net);
+
+/// <summary>
 /// Belgenin üretildiği andaki veri. Hem PDF hem müşteri sayfası bundan üretilir; maliyet ve iç not içermez. Alan adları
 /// API'deki herkese açık sözleşmeyle (PublicQuoteContent) birebir aynıdır: ikisi JSON üzerinden eşlenir.
 /// </summary>
@@ -23,7 +29,8 @@ public sealed record QuoteDocumentSnapshot(
     DateTimeOffset PresentedAt, string Currency, bool PriceIncludesTax, string CustomerName, string? CustomerTaxNumber, string? CustomerCity,
     string? ContactName, string? ContactEmail, QuoteSellerInfo Seller, IReadOnlyList<QuoteSnapshotLine> Lines, IReadOnlyList<QuoteSnapshotTax> TaxGroups,
     decimal ListTotal, decimal DiscountTotal, decimal NetTotal, decimal TaxTotal, decimal GrossTotal, decimal OptionalNet,
-    string? PaymentTerms, string? DeliveryTerms, string? CommercialTerms);
+    string? PaymentTerms, string? DeliveryTerms, string? CommercialTerms,
+    IReadOnlyList<QuoteSnapshotGroupSubtotal>? GroupSubtotals = null, bool IncludesUnlistedCharges = false);
 
 public sealed record QuoteDocumentInfo(Guid Id, int RevisionNo, string FileName, int SizeBytes, string Sha256, int TemplateVersion, DateTimeOffset CreatedAt);
 

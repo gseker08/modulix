@@ -12273,6 +12273,8 @@
   "crm.public-quote.vat-rate": "ƏDV %{0}",
   "crm.public-quote.gross-total": "Ümumi cəm",
   "crm.public-quote.optional-note": "Seçimli və alternativ bəndlər cəmə daxil deyil (xalis {0}).",
+  "crm.public-quote.group-subtotal": "{0} yekunu (əlavə haqlar daxil)",
+  "crm.public-quote.unlisted-charges-note": "Yekunlara ayrıca sətir kimi göstərilməyən əlavə haqlar daxildir.",
   "crm.public-quote.download": "PDF kimi yüklə",
   "crm.public-quote.digest": "Sənəd xülasəsi (SHA-256):",
   "crm.public-quote.decision": "Qərarınız",

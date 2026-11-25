@@ -12273,6 +12273,8 @@
   "crm.public-quote.vat-rate": "KDV %{0}",
   "crm.public-quote.gross-total": "Genel toplam",
   "crm.public-quote.optional-note": "Opsiyonel ve alternatif kalemler toplama dahil değildir (net {0}).",
+  "crm.public-quote.group-subtotal": "{0} toplamı (ek ücretler dahil)",
+  "crm.public-quote.unlisted-charges-note": "Toplamlar, ayrıca satır olarak gösterilmeyen ek ücretleri içerir.",
   "crm.public-quote.download": "PDF olarak indir",
   "crm.public-quote.digest": "Belge özeti (SHA-256):",
   "crm.public-quote.decision": "Kararınız",

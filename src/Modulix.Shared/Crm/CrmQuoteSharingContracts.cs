@@ -44,13 +44,17 @@ public sealed record PublicQuoteLine(
 
 public sealed record PublicQuoteTax(decimal RatePercent, decimal Net, decimal Tax);
 
+/// <summary>Grubun, gruba dahil edilen ek ücretlerle birlikte net toplamı: alt toplam satırı grubun son satırından sonra gösterilir.</summary>
+public sealed record PublicQuoteGroupSubtotal(string GroupName, decimal Net);
+
 /// <summary>Müşterinin gördüğü sabit belge verisi. Alan adları sunucudaki belge verisiyle (QuoteDocumentSnapshot) aynıdır; maliyet ve iç not yoktur.</summary>
 public sealed record PublicQuoteContent(
     int Schema, string QuoteNumber, int RevisionNo, string Title, string? Description, DateOnly IssueDate, DateTimeOffset? ValidUntil,
     DateTimeOffset PresentedAt, string Currency, bool PriceIncludesTax, string CustomerName, string? CustomerTaxNumber, string? CustomerCity,
     string? ContactName, string? ContactEmail, PublicQuoteSeller Seller, IReadOnlyList<PublicQuoteLine> Lines, IReadOnlyList<PublicQuoteTax> TaxGroups,
     decimal ListTotal, decimal DiscountTotal, decimal NetTotal, decimal TaxTotal, decimal GrossTotal, decimal OptionalNet,
-    string? PaymentTerms, string? DeliveryTerms, string? CommercialTerms);
+    string? PaymentTerms, string? DeliveryTerms, string? CommercialTerms,
+    IReadOnlyList<PublicQuoteGroupSubtotal>? GroupSubtotals = null, bool IncludesUnlistedCharges = false);
 
 public sealed record PublicQuoteDecisionInfo(string Decision, string SignerName, DateTimeOffset At);
 

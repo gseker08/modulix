@@ -74,8 +74,18 @@ else if (view is not null)
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var line in content.Lines)
+                    @{
+                        // Gruba dahil edilen ek ücretin bulunduğu gruplar için alt toplam satırı, grubun son satırından sonra gelir.
+                        var subtotals = (content.GroupSubtotals ?? []).ToDictionary(g => g.GroupName, StringComparer.OrdinalIgnoreCase);
+                        var lastOfGroup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                        for (var i = 0; i < content.Lines.Count; i++)
+                        {
+                            if (content.Lines[i].GroupName is { Length: > 0 } groupName) { lastOfGroup[groupName] = i; }
+                        }
+                    }
+                    @for (var index = 0; index < content.Lines.Count; index++)
                     {
+                        var line = content.Lines[index];
                         <tr>
                             <td data-label="@Texts.Get("crm.public-quote.col.item")" class="primary">
                                 @line.Name
@@ -89,6 +99,13 @@ else if (view is not null)
                             <td data-label="@Texts.Get("crm.public-quote.col.vat")" class="text-end">%@line.TaxRatePercent.ToString("0.##", Regional.Numbers)</td>
                             <td data-label="@Texts.Get("crm.public-quote.col.net")" class="text-end">@(line.Included ? line.Net.ToString("N2", Regional.Numbers) : "—")</td>
                         </tr>
+                        @if (line.GroupName is { Length: > 0 } endName && lastOfGroup[endName] == index && subtotals.TryGetValue(endName, out var subtotal))
+                        {
+                            <tr>
+                                <th scope="row" colspan="5" class="text-end">@Texts.Get("crm.public-quote.group-subtotal", subtotal.GroupName)</th>
+                                <td class="text-end"><strong>@subtotal.Net.ToString("N2", Regional.Numbers)</strong></td>
+                            </tr>
+                        }
                     }
                 </tbody>
             </table>
@@ -109,6 +126,10 @@ else if (view is not null)
             @if (content.OptionalNet > 0)
             {
                 <p class="small text-muted">@Texts.Get("crm.public-quote.optional-note", QuoteLabels.Money(content.OptionalNet, content.Currency))</p>
+            }
+            @if (content.IncludesUnlistedCharges)
+            {
+                <p class="small text-muted">@Texts.Get("crm.public-quote.unlisted-charges-note")</p>
             }
 
             @foreach (var (label, text) in Terms(content))

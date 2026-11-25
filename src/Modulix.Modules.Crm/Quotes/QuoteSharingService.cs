@@ -91,12 +91,12 @@ internal sealed class QuoteSharing(
             }
         }
 
-        var lines = (await reader.LinesAsync(quoteId, cancellationToken))
-            .Select(l => new QuoteSnapshotLine(
-                l.GroupName, l.ProductCode, l.Name, l.Description, l.Quantity, l.UnitName, l.UnitPrice, l.DiscountKind, l.DiscountValue,
-                l.TaxRatePercent, l.Role, l.IsSelected, l.Included, l.RecurringPeriod, l.ListAmount, l.LineDiscount, l.Net, l.Tax, l.Gross))
-            .ToList();
-        var taxGroups = lines.Where(l => l.Included).GroupBy(l => l.TaxRatePercent).OrderBy(g => g.Key)
+        // Belgede görünen satırlar ek ücretin sunum seçimine göre kurulur (gizlenen/gruba dahil edilen ek ücret satır olarak görünmez); vergi grupları ise
+        // teklifin TÜM dahil satırlarından hesaplanır, bu yüzden görünmeyen ek ücretin vergisi de toplamda yer alır.
+        var allLines = await reader.LinesAsync(quoteId, cancellationToken);
+        var composed = QuoteDocumentComposer.Compose(allLines);
+        var lines = composed.Lines.ToList();
+        var taxGroups = allLines.Where(l => l.Included).GroupBy(l => l.TaxRatePercent).OrderBy(g => g.Key)
             .Select(g => new QuoteSnapshotTax(g.Key, g.Sum(l => l.Net), g.Sum(l => l.Tax))).ToList();
 
         return RecordResult<QuoteDocumentSnapshot>.Ok(new QuoteDocumentSnapshot(
@@ -104,7 +104,8 @@ internal sealed class QuoteSharing(
             quote.Currency, quote.PriceIncludesTax, customerName, company.IsSuccess ? Text(company.Value!, "taxNumber") : null,
             company.IsSuccess ? Text(company.Value!, "city") : null, contactName is { Length: > 0 } ? contactName : null, contactEmail, seller, lines, taxGroups,
             quote.ListTotal, quote.DiscountTotal, quote.NetTotal, quote.TaxTotal, quote.GrossTotal, quote.OptionalNet,
-            quote.PaymentTerms, quote.DeliveryTerms, quote.CommercialTerms));
+            quote.PaymentTerms, quote.DeliveryTerms, quote.CommercialTerms, composed.GroupSubtotals.Count > 0 ? composed.GroupSubtotals : null,
+            composed.IncludesUnlistedCharges));
     }
 
     public async Task<RecordResult<QuoteDocumentInfo>> StoreDocumentAsync(
