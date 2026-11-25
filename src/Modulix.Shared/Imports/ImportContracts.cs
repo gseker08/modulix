@@ -24,7 +24,11 @@ public sealed record ImportRunDto(
 
 public sealed record ImportRunPageDto(IReadOnlyList<ImportRunDto> Items, int Page, int PageSize, int TotalCount);
 
-public sealed record ImportIssueDto(int RowNo, string? ColumnKey, string Code, string Severity, string Message);
+/// <summary>
+/// Satır ya da dosya sorunu. <c>ColumnKey</c> teknik sütun anahtarıdır; <c>ColumnLabel</c> okurun dilindeki sütun adıdır ("E-posta") ve sütun
+/// tanımda yoksa (silinmiş özel alan, gizli alan) boştur; arayüz o zaman anahtarı gösterir.
+/// </summary>
+public sealed record ImportIssueDto(int RowNo, string? ColumnKey, string Code, string Severity, string Message, string? ColumnLabel = null);
 
 public sealed record ImportIssuePageDto(IReadOnlyList<ImportIssueDto> Items, int Page, int PageSize, int TotalCount);
 

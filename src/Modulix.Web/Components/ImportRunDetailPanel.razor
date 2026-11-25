@@ -80,7 +80,7 @@ else
                 {
                     <tr>
                         <td data-label="@Texts.Get("admin.importRun.row")">@(issue.RowNo == 0 ? Texts.Get("admin.importRun.file") : issue.RowNo.ToString())</td>
-                        <td data-label="@Texts.Get("admin.importDesign.column")">@(issue.ColumnKey ?? "—")</td>
+                        <td data-label="@Texts.Get("admin.importDesign.column")">@(issue.ColumnLabel ?? issue.ColumnKey ?? "—")</td>
                         <td data-label="@Texts.Get("admin.importRun.error")">@SettingsLabels.ImportCode(issue.Code)</td>
                         <td data-label="@Texts.Get("admin.importRun.severity")"><span class="badge stage-@ImportText.SeverityBadge(issue.Severity)">@SettingsLabels.ImportSeverity(issue.Severity)</span></td>
                         <td data-label="@Texts.Get("common.field.description")">@issue.Message</td>

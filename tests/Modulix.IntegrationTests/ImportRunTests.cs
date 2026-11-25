@@ -49,6 +49,34 @@ public class ImportRunTests(ModulixApiFactory factory) : IClassFixture<ModulixAp
     }
 
     [Fact]
+    public async Task A_row_issue_names_its_column_for_the_reader_both_in_the_run_response_and_in_the_log()
+    {
+        var (client, _, _) = await ImporterAsync();
+        using var _c = client;
+        var (other, _, _) = await ImporterAsync();
+        using var _o = other;
+        var definition = Assert.Single(await client.GetFromJsonAsync<List<ImportDefinitionDto>>("/api/imports/definitions") ?? []);
+        var emailLabel = definition.Fields.Single(f => f.Key == "email").Label;
+
+        // Koşu yanıtı ve günlük aynı etiketi taşır: kullanıcı "email" değil sütunun adını görür.
+        var result = await PreviewAsync(client, "Konu;Soyad;E-posta\r\nFilo;Yılmaz;a@acme.test\r\nDepo;Kaya;gecersiz\r\n");
+        var issue = Assert.Single(result.Issues.Items);
+        Assert.Equal(("email", emailLabel), (issue.ColumnKey, issue.ColumnLabel));
+        Assert.NotEqual(issue.ColumnKey, issue.ColumnLabel);
+
+        var logged = (await client.GetFromJsonAsync<ImportRunDetailDto>($"/api/imports/{result.Run.Id}"))!;
+        Assert.Equal(emailLabel, Assert.Single(logged.Issues.Items).ColumnLabel);
+
+        // Sütunu olmayan (dosya düzeyi) sorunda ne anahtar ne etiket vardır.
+        var unknown = await PreviewAsync(client, "Konu;Soyad;Bizim kod\r\nFilo;Kaya;X1\r\n");
+        var fileLevel = unknown.Issues.Items.Single(i => i.Code == "file-invalid");
+        Assert.Equal((null, null), (fileLevel.ColumnKey, fileLevel.ColumnLabel));
+
+        // Başka firma koşuyu göremez; etiket için ayrı bir kapı yoktur, koşu kapısı korur.
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync($"/api/imports/{result.Run.Id}")).StatusCode);
+    }
+
+    [Fact]
     public async Task Apply_creates_valid_rows_through_the_pipeline_and_skips_invalid_ones()
     {
         var (client, tenant, user) = await ImporterAsync();
