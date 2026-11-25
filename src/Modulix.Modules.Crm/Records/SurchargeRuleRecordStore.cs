@@ -52,6 +52,25 @@ internal sealed class SurchargeRuleRecordStore(CrmStoreContext context) : CrmRec
 
     protected override IOrderedQueryable<SurchargeRule> Order(IQueryable<SurchargeRule> source) => source.OrderBy(r => r.Priority).ThenBy(r => r.Name);
 
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        ["name", "-name", "kind", "-kind", "priority", "-priority", "presentation", "-presentation", "isActive", "-isActive"];
+
+    // Liste ekranının sıralanabilir başlıkları (ad, tür, öncelik, görünüm, durum, para birimi); sıra her zaman ad ve kimlikle sabitlenir.
+    protected override IOrderedQueryable<SurchargeRule> Order(IQueryable<SurchargeRule> source, string? sort) => sort switch
+    {
+        "name" => source.OrderBy(r => r.Name).ThenBy(r => r.Id),
+        "-name" => source.OrderByDescending(r => r.Name).ThenBy(r => r.Id),
+        "kind" => source.OrderBy(r => r.Kind).ThenBy(r => r.Name),
+        "-kind" => source.OrderByDescending(r => r.Kind).ThenBy(r => r.Name),
+        "priority" => source.OrderBy(r => r.Priority).ThenBy(r => r.Name),
+        "-priority" => source.OrderByDescending(r => r.Priority).ThenBy(r => r.Name),
+        "presentation" => source.OrderBy(r => r.Presentation).ThenBy(r => r.Name),
+        "-presentation" => source.OrderByDescending(r => r.Presentation).ThenBy(r => r.Name),
+        "isActive" => source.OrderBy(r => r.IsActive).ThenBy(r => r.Name),
+        "-isActive" => source.OrderByDescending(r => r.IsActive).ThenBy(r => r.Name),
+        _ => Order(source),
+    };
+
     protected override IQueryable<SurchargeRule> Search(IQueryable<SurchargeRule> source, string term) => source.Where(r => r.Name.Contains(term));
 
     protected override Task AppliedAsync(SurchargeRule entity, JsonObject values, CancellationToken cancellationToken)

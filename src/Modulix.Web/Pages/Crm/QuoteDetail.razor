@@ -386,6 +386,55 @@
                 @if (quote.CalculatedAt is { } calculated) { <small class="text-muted">@Texts.Get("crm.quoteDetail.totals.calculatedAt", CrmLabels.Time(calculated))</small> }
             </section>
 
+            @* Ek ücret hesap dökümü (ADR-0018 devamı, dilim 2d): taslak teklifte etkin kuralların uygulanan ve uygulanmayan hâli; "kural neden çalışmadı" sorusunun yanıtı. *@
+            @if (surcharges is { } breakdown && (breakdown.Applied.Count > 0 || breakdown.Skipped.Count > 0))
+            {
+                <section aria-labelledby="surcharge-title">
+                    <h2 id="surcharge-title">Ek ücret hesabı <small class="text-muted">Taslak teklife uygulanan ek ücret kuralları (@quote.Currency)</small></h2>
+                    @if (breakdown.Applied.Count > 0)
+                    {
+                        <table class="table record-table">
+                            <caption class="visually-hidden">Uygulanan ek ücretler</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col"><AppIcon Name="zap" Size="14" /> Kural</th>
+                                    <th scope="col"><AppIcon Name="list" Size="14" /> Tür</th>
+                                    <th scope="col"><AppIcon Name="eye" Size="14" /> Görünüm</th>
+                                    <th scope="col"><AppIcon Name="info" Size="14" /> Hesap</th>
+                                    <th scope="col" class="text-end">Tutar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var applied in breakdown.Applied)
+                                {
+                                    <tr>
+                                        <td data-label="Kural" class="primary">@applied.Name</td>
+                                        <td data-label="Tür">@SurchargeLabels.Kind(applied.Kind)</td>
+                                        <td data-label="Görünüm">@SurchargeLabels.Presentation(applied.Presentation)@(applied.Group is { Length: > 0 } g ? $" · {g}" : "")</td>
+                                        <td data-label="Hesap">@applied.Explanation</td>
+                                        <td data-label="Tutar" class="text-end">@QuoteLabels.Money(applied.Amount, breakdown.Currency)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr><th scope="row" colspan="4">Toplam ek ücret</th><td class="text-end"><strong>@QuoteLabels.Money(breakdown.Total, breakdown.Currency)</strong></td></tr>
+                            </tfoot>
+                        </table>
+                    }
+
+                    @if (breakdown.Skipped.Count > 0)
+                    {
+                        <h3>Uygulanmayan kurallar</h3>
+                        <ul>
+                            @foreach (var skipped in breakdown.Skipped)
+                            {
+                                <li><strong>@skipped.Name</strong> <span class="text-muted">· @skipped.Reason</span></li>
+                            }
+                        </ul>
+                    }
+                </section>
+            }
+
             @* Hizmet kapsamı (ADR-0029 Dilim F3): sunum anında bağlı fırsattan, adlarıyla sabitlenir; sonradan fırsat ya da katalog değişse de aynı kalır. *@
             @if (quote.ServiceScopeSnapshot is { Count: > 0 } scopeSnapshot)
             {
@@ -531,6 +580,7 @@
 
     private QuoteDto? quote;
     private List<QuoteLineDto> lines = [];
+    private QuoteSurchargeBreakdownDto? surcharges;
     private List<QuoteActionStateDto> actions = [];
     private List<QuoteHistoryDto> history = [];
     private QuoteApprovalRequirementDto? requirement;
@@ -619,6 +669,7 @@
         form = QuoteForm.From(loaded);
         dirty = false;
         lines = (await Api.GetAllAsync<QuoteLineDto>($"/api/crm/quote-lines?quoteId={id}")).Items;
+        surcharges = loaded.Status == "Draft" ? (await Api.GetAsync<QuoteSurchargeBreakdownDto>($"/api/crm/quotes/{id}/surcharges")).Value : null;
         actions = (await Api.GetAsync<List<QuoteActionStateDto>>($"/api/crm/quotes/{id}/actions")).Value ?? [];
         history = (await Api.GetAsync<List<QuoteHistoryDto>>($"/api/crm/quotes/{id}/history")).Value ?? [];
         requirement = loaded.Status == "Draft" ? (await Api.GetAsync<QuoteApprovalRequirementDto>($"/api/crm/quotes/{id}/approval-requirements")).Value : null;
