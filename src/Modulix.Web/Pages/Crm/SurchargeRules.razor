@@ -1,0 +1,510 @@
+@page "/crm/ek-ucret-kurallari"
+@using System.Text.Json.Nodes
+@inject ApiClient Api
+@inject SessionState Session
+@inject ToastService Toasts
+
+<PageTitle>Ek ücret kuralları · Modulix</PageTitle>
+
+@* Ek ücret kuralları (ADR-0018 devamı, dilim 2d). Kurallar tipli uçtadır (/api/crm/surcharge-rules); okuma crm.prices.read, yazma crm.prices.write ister.
+   Sektöre özel davranış kodda değil kuralın koşullarında ve çarpan anahtarlarındadır; ekran hiçbir sektörü bilmez. *@
+<AuthGate Module="@CrmAccess.ModuleKey" Permission="@CrmAccess.PricesRead">
+    <PageHeader Title="Ek ücret kuralları" Icon="zap"
+                Subtitle="Koşulu sağlayan etkin kurallar tekliflere ek ücret olarak eklenir: sabit tutar, yüzde, asgari bedel ve süreye bağlı ücret. Eksik girdi uydurulmaz; kural çalışmazsa teklifteki hesap dökümü nedenini gösterir." />
+
+    @if (message is not null)
+    {
+        <div class="alert alert-danger" role="alert">@message</div>
+    }
+
+    @if (form is not null)
+    {
+        <form class="record-form" novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <h2>@(form.Id is null ? "Yeni ek ücret kuralı" : "Ek ücret kuralını düzenle")</h2>
+            <TabBar Tabs="FormTabItems" State="tabs" Label="Ek ücret kuralı bölümleri" />
+            <TabPanel State="tabs" Key="genel">
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="s-name">Ad *</label>
+                        <input id="s-name" class="form-control" maxlength="150" required aria-required="true" @bind="form.Name" />
+                        <FieldError Field="name" Errors="errors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="s-priority">Öncelik</label>
+                        <input id="s-priority" class="form-control" type="number" step="1" @bind="form.Priority" />
+                        <FieldError Field="priority" Errors="errors" />
+                        <div class="form-text">Küçük sayı önce uygulanır.</div>
+                    </div>
+                    <div>
+                        <label class="form-label" for="s-presentation">Teklifte görünüm *</label>
+                        <select id="s-presentation" class="form-select" @bind="form.Presentation">
+                            @foreach (var p in SurchargeLabels.Presentations)
+                            {
+                                <option value="@p.Key">@p.Label</option>
+                            }
+                        </select>
+                        <FieldError Field="presentation" Errors="errors" />
+                        <div class="form-text">Ayrı satır teklife satır olarak eklenir; grubun içinde tutar grup toplamına karışır; yalnızca dökümde ise müşteriye satır gösterilmez.</div>
+                    </div>
+                    <div class="form-check">
+                        <input id="s-active" class="form-check-input" type="checkbox" @bind="form.IsActive" />
+                        <label class="form-check-label" for="s-active">Etkin</label>
+                    </div>
+                    <div class="form-check">
+                        <input id="s-stackable" class="form-check-input" type="checkbox" @bind="form.Stackable" />
+                        <label class="form-check-label" for="s-stackable">Diğer kurallarla birlikte uygulanabilir</label>
+                    </div>
+                    <div class="wide">
+                        <label class="form-label" for="s-description">Açıklama</label>
+                        <textarea id="s-description" class="form-control" rows="2" maxlength="500" @bind="form.Description"></textarea>
+                        <FieldError Field="description" Errors="errors" />
+                    </div>
+                </div>
+            </TabPanel>
+            <TabPanel State="tabs" Key="hesap">
+                <div class="form-grid">
+                    <div>
+                        <label class="form-label" for="s-kind">Kural türü *</label>
+                        <select id="s-kind" class="form-select" @bind="form.Kind">
+                            @foreach (var k in SurchargeLabels.Kinds)
+                            {
+                                <option value="@k.Key">@k.Label</option>
+                            }
+                        </select>
+                        <FieldError Field="kind" Errors="errors" />
+                    </div>
+                    <div>
+                        <label class="form-label" for="s-currency">Para birimi *</label>
+                        <input id="s-currency" class="form-control" maxlength="3" @bind="form.Currency" />
+                        <FieldError Field="currency" Errors="errors" />
+                        <div class="form-text">Kural yalnızca bu para birimindeki tekliflere uygulanır.</div>
+                    </div>
+                    @if (form.Kind is "Fixed" or "Minimum" or "Duration")
+                    {
+                        <div>
+                            <label class="form-label" for="s-amount">Tutar</label>
+                            <input id="s-amount" class="form-control" type="number" step="0.01" min="0" @bind="form.Amount" />
+                            <FieldError Field="amount" Errors="errors" />
+                        </div>
+                    }
+                    @if (form.Kind is "Percent" or "Duration")
+                    {
+                        <div>
+                            <label class="form-label" for="s-percent">Yüzde</label>
+                            <input id="s-percent" class="form-control" type="number" step="0.01" min="0" @bind="form.Percent" />
+                            <FieldError Field="percent" Errors="errors" />
+                            <div class="form-text">Tutar ile yüzdeden yalnızca biri girilir.</div>
+                        </div>
+                    }
+                    @if (form.Kind is "Percent" or "Duration")
+                    {
+                        <div>
+                            <label class="form-label" for="s-base">Yüzde tabanı</label>
+                            <input id="s-base" class="form-control" maxlength="100" placeholder="quote.subtotal" @bind="form.BaseKey" />
+                            <FieldError Field="baseKey" Errors="errors" />
+                            <div class="form-text">quote.subtotal, group.&lt;grup&gt; ya da line.&lt;kalem&gt; gibi bir bağlam anahtarı.</div>
+                        </div>
+                    }
+                    @if (form.Kind is "Minimum")
+                    {
+                        <div>
+                            <label class="form-label" for="s-group">Grup *</label>
+                            <input id="s-group" class="form-control" maxlength="100" @bind="form.Group" />
+                            <FieldError Field="group" Errors="errors" />
+                            <div class="form-text">Grup toplamı asgari bedelin altındaysa fark eklenir.</div>
+                        </div>
+                    }
+                    @if (form.Kind is "Duration")
+                    {
+                        <div>
+                            <label class="form-label" for="s-duration">Süre anahtarı *</label>
+                            <input id="s-duration" class="form-control" maxlength="100" placeholder="quantity.gun" @bind="form.DurationKey" />
+                            <FieldError Field="durationKey" Errors="errors" />
+                        </div>
+                        <div>
+                            <label class="form-label" for="s-free">Ücretsiz birim</label>
+                            <input id="s-free" class="form-control" type="number" step="0.01" min="0" @bind="form.FreeUnits" />
+                            <FieldError Field="freeUnits" Errors="errors" />
+                        </div>
+                    }
+                    @if (form.Kind is "Fixed" or "Duration")
+                    {
+                        <div class="wide">
+                            <label class="form-label" for="s-qty">Çarpan anahtarları</label>
+                            <input id="s-qty" class="form-control" maxlength="400" placeholder="quantity.konteyner, quantity.arac" @bind="form.QuantityKeys" />
+                            <FieldError Field="quantityKeys" Errors="errors" />
+                            <div class="form-text">Virgülle ayırın; tutar bu anahtarların değerleriyle çarpılır. Boşsa tek sefer uygulanır.</div>
+                        </div>
+                    }
+                    <div>
+                        <label class="form-label" for="s-tax">KDV oranı (%) *</label>
+                        <input id="s-tax" class="form-control" type="number" step="0.01" min="0" max="100" @bind="form.TaxRatePercent" />
+                        <FieldError Field="taxRatePercent" Errors="errors" />
+                        <div class="form-text">Ayrı satır olarak üretilen ek ücretin vergi oranı.</div>
+                    </div>
+                </div>
+            </TabPanel>
+            <TabPanel State="tabs" Key="kosul">
+                <p class="text-muted">Kural yalnızca aşağıdaki koşulların tümü sağlanınca uygulanır. Koşul yoksa her teklife uygulanır. Anahtar teklif özel alanı ya da bağlam anahtarı olabilir.</p>
+                <FieldError Field="conditions" Errors="errors" />
+                @foreach (var condition in form.Conditions)
+                {
+                    var current = condition;
+                    <div class="form-grid">
+                        <div>
+                            <label class="form-label">Anahtar</label>
+                            <input class="form-control" maxlength="100" aria-label="Koşul anahtarı" @bind="current.Key" />
+                        </div>
+                        <div>
+                            <label class="form-label">Karşılaştırma</label>
+                            <select class="form-select" aria-label="Koşul karşılaştırması" @bind="current.Operator">
+                                @foreach (var op in SurchargeLabels.Operators)
+                                {
+                                    <option value="@op.Key">@op.Label</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">Değer</label>
+                            <input class="form-control" maxlength="100" aria-label="Koşul değeri" @bind="current.Value" />
+                        </div>
+                        <div>
+                            <IconAction Icon="x" Label="Koşulu kaldır" OnClick="() => RemoveCondition(current)" />
+                        </div>
+                    </div>
+                }
+                <button type="button" class="btn btn-tonal" @onclick="AddCondition"><AppIcon Name="plus" Size="16" /> Koşul ekle</button>
+            </TabPanel>
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">İptal</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">Kaydet</button>
+            </div>
+        </form>
+    }
+
+    <ViewTabs Items="ViewOptions" Value="@view" ValueChanged="ChooseViewAsync" Label="Ek ücret kuralı görünümleri" />
+
+    <div class="list-toolbar">
+        <form class="search" @onsubmit="() => LoadAsync(1)" @onsubmit:preventDefault>
+            <input class="form-control" type="search" aria-label="Kural ara" placeholder="Kural ara" @bind="search" />
+        </form>
+        <span class="ms-auto"></span>
+        @if (form is null && Session.Can(CrmAccess.PricesWrite))
+        {
+            <button type="button" class="btn btn-primary" @onclick="NewRule"><AppIcon Name="plus" Size="16" /> Yeni ek ücret kuralı</button>
+        }
+    </div>
+
+    @if (page is null)
+    {
+        <LoadingState Kind="LoadingKind.Table" />
+    }
+    else if (page.Items.Count == 0)
+    {
+        <EmptyState Icon="zap" Title="Ek ücret kuralı yok." Text="Kural eklenene kadar tekliflere otomatik ek ücret eklenmez." />
+    }
+    else
+    {
+        <table class="table record-table">
+            <caption class="visually-hidden">Ek ücret kuralları</caption>
+            <thead>
+                <tr>
+                    <th scope="col"><SortHeader Label="Kural" ColumnIcon="tag" Asc="name" Desc="-name" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="Tür" ColumnIcon="list" Asc="kind" Desc="-kind" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><AppIcon Name="sliders" Size="14" /> Hesap</th>
+                    <th scope="col"><SortHeader Label="Görünüm" ColumnIcon="eye" Asc="presentation" Desc="-presentation" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="Öncelik" ColumnIcon="trending-up" Asc="priority" Desc="-priority" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col"><SortHeader Label="Durum" ColumnIcon="check-circle" Asc="isActive" Desc="-isActive" Value="@sort" Default="" ValueChanged="SortAsync" /></th>
+                    <th scope="col" class="row-menu-cell"><span class="visually-hidden">Eylemler</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var rule in page.Items)
+                {
+                    <tr>
+                        <td data-label="Kural" class="primary">
+                            @if (Session.Can(CrmAccess.PricesWrite))
+                            {
+                                <button type="button" class="btn btn-link p-0" @onclick="() => Edit(rule)">@rule.Name</button>
+                            }
+                            else
+                            {
+                                <span>@rule.Name</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(rule.Description))
+                            {
+                                <div class="small text-muted">@rule.Description</div>
+                            }
+                        </td>
+                        <td data-label="Tür">@SurchargeLabels.Kind(rule.Kind)</td>
+                        <td data-label="Hesap">@SurchargeLabels.Summary(rule.Kind, rule.Currency, rule.Amount, rule.Percent, rule.Group, rule.BaseKey, rule.DurationKey, rule.FreeUnits)</td>
+                        <td data-label="Görünüm">@SurchargeLabels.Presentation(rule.Presentation)</td>
+                        <td data-label="Öncelik">@rule.Priority</td>
+                        <td data-label="Durum">
+                            @if (rule.IsActive)
+                            {
+                                <span class="badge stage-won">Etkin</span>
+                            }
+                            else
+                            {
+                                <span class="badge stage-cancelled">Pasif</span>
+                            }
+                        </td>
+                        <td class="row-menu-cell">
+                            @if (Session.Can(CrmAccess.PricesWrite))
+                            {
+                                <RowMenu Label="@($"{rule.Name} eylemleri")">
+                                    <button type="button" class="dropdown-item" role="menuitem" @onclick="() => Edit(rule)">Düzenle</button>
+                                    <RowMenuDelete Question="Ek ücret kuralı silinsin mi? Mevcut tekliflerde üretilmiş satırlar kalır, kural yeniden hesaplamada uygulanmaz." OnConfirm="() => DeleteAsync(rule)" />
+                                </RowMenu>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <Pager Page="page.Page" PageSize="page.PageSize" TotalCount="page.TotalCount" PageChanged="LoadAsync" />
+    }
+</AuthGate>
+
+@code {
+    private const string Url = "/api/crm/surcharge-rules";
+    private const string AllView = "all";
+    private const string ActiveView = "active";
+    private const string PassiveView = "passive";
+
+    private readonly TabState tabs = new("genel");
+    private CrmPage<SurchargeRuleDto>? page;
+    private RuleForm? form;
+    private IReadOnlyDictionary<string, string[]>? errors;
+    private string? message;
+    private bool busy;
+    private string view = AllView;
+    private string? search;
+
+    // Sıralama sunucudadır (SurchargeRuleRecordStore sort anahtarları); boş değer deponun varsayılan sırasıdır (öncelik, ad).
+    private string sort = "";
+
+    private static readonly IReadOnlyList<ViewOption> ViewOptions =
+    [
+        new(AllView, "Tüm kurallar", Icon: "zap"),
+        new(ActiveView, "Etkin", Icon: "check-circle"),
+        new(PassiveView, "Pasif", Icon: "x"),
+    ];
+
+    private IReadOnlyList<TabItem> FormTabItems =>
+    [
+        new("genel", "Genel", Errors: Count("name", "priority", "presentation", "description")),
+        new("hesap", "Hesap", Errors: Count("kind", "currency", "amount", "percent", "baseKey", "group", "durationKey", "freeUnits", "quantityKeys", "taxRatePercent")),
+        new("kosul", "Koşullar", Count: form?.Conditions.Count, Errors: Count("conditions")),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.EnsureLoadedAsync();
+        if (Session.Can(CrmAccess.PricesRead))
+        {
+            await LoadAsync(1);
+        }
+    }
+
+    private int Count(params string[] fields) => errors is null ? 0 : fields.Count(errors.ContainsKey);
+
+    private async Task ChooseViewAsync(string key)
+    {
+        view = key;
+        await LoadAsync(1);
+    }
+
+    private async Task SortAsync(string value)
+    {
+        sort = value;
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int pageNumber)
+    {
+        var url = $"{Url}?page={pageNumber}&pageSize={ListPaging.Size}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        if (view != AllView)
+        {
+            url += "&active=" + (view == ActiveView ? "true" : "false");
+        }
+
+        if (sort.Length > 0)
+        {
+            url += "&sort=" + Uri.EscapeDataString(sort);
+        }
+
+        var result = await Api.GetAsync<CrmPage<SurchargeRuleDto>>(url);
+        page = result.Value;
+        message = result.Error;
+    }
+
+    private void NewRule()
+    {
+        form = new RuleForm();
+        tabs.Select("genel");
+        errors = null;
+        message = null;
+    }
+
+    private void Edit(SurchargeRuleDto rule)
+    {
+        form = new RuleForm
+        {
+            Id = rule.Id,
+            Version = rule.Version,
+            Name = rule.Name,
+            Description = rule.Description,
+            Priority = rule.Priority,
+            IsActive = rule.IsActive,
+            Kind = rule.Kind,
+            Currency = rule.Currency,
+            Amount = rule.Amount,
+            Percent = rule.Percent,
+            TaxRatePercent = rule.TaxRatePercent,
+            Group = rule.Group,
+            BaseKey = rule.BaseKey,
+            DurationKey = rule.DurationKey,
+            FreeUnits = rule.FreeUnits,
+            QuantityKeys = SurchargeLabels.JoinKeys(rule.QuantityKeys),
+            Presentation = rule.Presentation,
+            Stackable = rule.Stackable,
+            Conditions = [.. (rule.Conditions ?? []).Select(c => new ConditionRow
+            {
+                Key = c?["key"]?.GetValue<string>() ?? string.Empty,
+                Operator = c?["operator"]?.GetValue<string>() ?? "Equals",
+                Value = c?["value"]?.GetValue<string>() ?? string.Empty,
+            })],
+        };
+        tabs.Select("genel");
+        errors = null;
+        message = null;
+    }
+
+    private void AddCondition() => form?.Conditions.Add(new ConditionRow());
+
+    private void RemoveCondition(ConditionRow row) => form?.Conditions.Remove(row);
+
+    private void Cancel()
+    {
+        form = null;
+        errors = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy || form is null)
+        {
+            return;
+        }
+
+        busy = true;
+        message = null;
+        var f = form;
+        var conditions = new JsonArray();
+        foreach (var c in f.Conditions.Where(c => !string.IsNullOrWhiteSpace(c.Key) || !string.IsNullOrWhiteSpace(c.Value)))
+        {
+            conditions.Add(new JsonObject { ["key"] = c.Key.Trim(), ["operator"] = c.Operator, ["value"] = c.Value.Trim() });
+        }
+
+        // Türe uymayan alanlar gönderilmez; sunucu "tutar ile yüzdeden yalnızca biri" kuralını da denetler.
+        var request = new SaveSurchargeRuleRequest(
+            f.Name.Trim(), f.Kind, f.Currency.Trim().ToUpperInvariant(), Blank(f.Description), f.Priority, f.IsActive,
+            f.Kind is "Fixed" or "Minimum" or "Duration" ? f.Amount : null,
+            f.Kind is "Percent" or "Duration" ? f.Percent : null,
+            f.Kind == "Minimum" ? Blank(f.Group) : null,
+            f.Kind is "Percent" or "Duration" ? Blank(f.BaseKey) : null,
+            f.Kind == "Duration" ? Blank(f.DurationKey) : null,
+            f.Kind == "Duration" ? f.FreeUnits : 0m,
+            f.Kind is "Fixed" or "Duration" ? SurchargeLabels.ParseKeys(f.QuantityKeys) : [],
+            conditions, f.Presentation, f.Stackable, f.TaxRatePercent, f.Version);
+        var result = f.Id is { } id
+            ? await Api.PutAsync<SurchargeRuleDto>($"{Url}/{id}", request)
+            : await Api.PostAsync<SurchargeRuleDto>(Url, request);
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            errors = result.FieldErrors;
+            message = result.FieldErrors is { Count: > 0 } ? null : result.Error;
+            if (errors is { Count: > 0 })
+            {
+                tabs.Select(errors.Keys.Any(k => k == "conditions") ? "kosul" : FirstFailingTab());
+            }
+
+            return;
+        }
+
+        form = null;
+        errors = null;
+        Toasts.Success("Ek ücret kuralı kaydedildi.");
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private string FirstFailingTab() =>
+        FormTabItems.FirstOrDefault(t => t.Errors > 0)?.Key ?? "genel";
+
+    private async Task DeleteAsync(SurchargeRuleDto rule)
+    {
+        var result = await Api.DeleteAsync($"{Url}/{rule.Id}?version={rule.Version}");
+        if (result.IsSuccess)
+        {
+            Toasts.Success("Ek ücret kuralı silindi.");
+        }
+
+        message = result.IsSuccess ? null : result.Error;
+        await LoadAsync(page?.Page ?? 1);
+    }
+
+    private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+    private sealed class ConditionRow
+    {
+        public string Key { get; set; } = string.Empty;
+
+        public string Operator { get; set; } = "Equals";
+
+        public string Value { get; set; } = string.Empty;
+    }
+
+    private sealed class RuleForm
+    {
+        public Guid? Id { get; init; }
+
+        public long? Version { get; init; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public int Priority { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
+        public string Kind { get; set; } = "Fixed";
+
+        public string Currency { get; set; } = "TRY";
+
+        public decimal? Amount { get; set; }
+
+        public decimal? Percent { get; set; }
+
+        public decimal? TaxRatePercent { get; set; } = 20m;
+
+        public string? Group { get; set; }
+
+        public string? BaseKey { get; set; }
+
+        public string? DurationKey { get; set; }
+
+        public decimal FreeUnits { get; set; }
+
+        public string? QuantityKeys { get; set; }
+
+        public string Presentation { get; set; } = "SeparateLine";
+
+        public bool Stackable { get; set; } = true;
+
+        public List<ConditionRow> Conditions { get; set; } = [];
+    }
+}

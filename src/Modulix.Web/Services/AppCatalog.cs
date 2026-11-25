@@ -216,6 +216,7 @@ public static class AppCatalog
         new("crm.products", Crm, "Ürün ve hizmetler", "package", "crm/urunler", 10, CrmAccess.ModuleKey, CrmAccess.ProductsRead, Group: CrmCatalogGroup),
         new("crm.price-lists", Crm, "Fiyat listeleri", "list", "crm/fiyat-listeleri", 20, CrmAccess.ModuleKey, CrmAccess.PricesRead, Tone: AppTone.Teal, Group: CrmCatalogGroup),
         new("crm.discounts", Crm, "İndirim kuralları", "zap", "crm/indirimler", 30, CrmAccess.ModuleKey, CrmAccess.PricesRead, Tone: AppTone.Teal, Group: CrmCatalogGroup),
+        new("crm.surcharge-rules", Crm, "Ek ücret kuralları", "zap", "crm/ek-ucret-kurallari", 35, CrmAccess.ModuleKey, CrmAccess.PricesRead, Tone: AppTone.Teal, Group: CrmCatalogGroup),
         new("crm.price-calculator", Crm, "Fiyat hesaplama", "search", "crm/fiyat-hesapla", 40, CrmAccess.ModuleKey, CrmAccess.PricesRead, Group: CrmCatalogGroup),
 
         // Satış Raporları
