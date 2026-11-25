@@ -107,6 +107,9 @@ public static class CrmTimelineKeys
     /// <summary>Teklif kabul edildi.</summary>
     public const string QuoteAccepted = "crm.timeline.quote-accepted";
 
+    /// <summary>Teklif reddedildi, süresi doldu ya da iptal edildi (<c>Status</c> ve <c>Type</c> nihai teklif durumudur).</summary>
+    public const string QuoteOutcome = "crm.timeline.quote-outcome";
+
     /// <summary>Müşteri adayı bu firmaya dönüştü.</summary>
     public const string LeadConverted = "crm.timeline.lead-converted";
 }

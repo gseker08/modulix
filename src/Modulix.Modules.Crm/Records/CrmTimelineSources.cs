@@ -235,7 +235,12 @@ internal sealed class QuoteTimelineSource(IRecordPipeline pipeline, IModuleData 
 
     protected override string EntityKey => CrmModule.Entities.Quote;
 
-    /// <summary>Teklifin kabul edildiği an teklif tarihçesinden okunur; her revizyonun kabulü ayrı satırdır.</summary>
+    private static readonly string[] Outcomes = [QuoteStatus.Accepted, QuoteStatus.Rejected, QuoteStatus.Expired, QuoteStatus.Cancelled];
+
+    /// <summary>
+    /// Teklifin sonuçlandığı an (kabul, red, süre dolumu, iptal) teklif tarihçesinden okunur; her revizyonun sonucu ayrı satırdır.
+    /// Taslak, sunuldu ve yerine geçildi geçişleri satır vermez (ADR-0053).
+    /// </summary>
     protected override async Task<(IReadOnlyList<CustomerTimelineEntry> Entries, bool HasMore)> StatusRowsAsync(
         CustomerTimelineQuery query, int take, CancellationToken cancellationToken)
     {
@@ -248,16 +253,17 @@ internal sealed class QuoteTimelineSource(IRecordPipeline pipeline, IModuleData 
         var ids = visible.Keys.ToList();
         var before = query.Before;
         var accepted = await data.Set<QuoteEvent>().AsNoTracking()
-            .Where(e => ids.Contains(e.QuoteId) && e.ToStatus == QuoteStatus.Accepted && (before == null || e.CreatedAt < before))
+            .Where(e => ids.Contains(e.QuoteId) && e.ToStatus != null && Outcomes.Contains(e.ToStatus) && (before == null || e.CreatedAt < before))
             .OrderByDescending(e => e.CreatedAt).ThenBy(e => e.QuoteId).Take(take + 1).ToListAsync(cancellationToken);
         return (
             [
                 .. accepted.Take(take).Select(e => new CustomerTimelineEntry(
-                    CrmTimelineKeys.QuoteAccepted,
+                    e.ToStatus == QuoteStatus.Accepted ? CrmTimelineKeys.QuoteAccepted : CrmTimelineKeys.QuoteOutcome,
                     e.QuoteId,
                     e.CreatedAt,
                     Text(visible[e.QuoteId].Values, "title") ?? string.Empty,
-                    QuoteStatus.Accepted,
+                    e.ToStatus,
+                    e.ToStatus,
                     OwnerId: Id(visible[e.QuoteId].Values, OwnedRecordType.OwnerField),
                     Reference: Text(visible[e.QuoteId].Values, "quoteNumber"))),
             ],

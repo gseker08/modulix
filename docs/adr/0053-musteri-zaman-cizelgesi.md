@@ -101,12 +101,15 @@ token yoktur. Fırsat ve teklif satırı kendi sayfasına bağlanır; "Daha eski
      görünürse (izin ve veri kapsamı) üretilir; görünmeyen fırsatın kapanışı çizelgeye girmez. Satırlar tutar ve gerekçe taşımaz (`OpportunityHistory.Details`
      hassas tutar içerir, okunmaz). Durum satırları kayıt satırının kendi kaynağındadır: süzgeçte "Fırsatlar" ve "Teklifler" çipi hem kayıt hem durum
      satırını getirir. Sınır: durum satırı için firmanın kayıtlarının görünür kısmı okunur, en çok 1000 fırsat ya da teklif.
+   - **Dilim 5 (25 Kasım 2026), migration yok:** teklifin diğer sonuçları da `QuoteEvent` tarihçesinden satır verir: *reddedildi*, *süresi doldu*, *iptal edildi*
+     (yeni `crm.timeline.quote-outcome`; `Status` ve `Type` nihai teklif durumudur, tür etiketi duruma göre yazılır). Yetki ve kaynak süzgeci kabul satırıyla aynıdır.
+     Taslak, sunuldu, onay ve yerine geçildi geçişleri satır vermez (rozet güncel durumu gösterir).
 
 ## Yapılmadı / sınırlar
 
 - Firma kartındaki ilişkili sipariş, destek ve kampanya listeleri yerinde duruyor (Sipariş 2a, Sözleşme 2b, Destek 2c, Pazarlama 2d satırları çizelgeye geldi).
 - Kişiye ya da müşteri adayına giden kampanya iletileri firma çizelgesinde yalnızca kişi, firmanın ortak taraf kimliğiyle eşleşiyorsa görünür; kişi kartında çizelge yoktur.
-- Bir kayıt, kayıt satırının yanında yalnızca bu üç durum değişikliğinde ek satır üretir (fırsat kazanıldı/kaybedildi, teklif kabul edildi, aday dönüştü); diğer geçişler (aşama, iptal, red, süre dolumu) satır vermez ve rozet güncel durumu gösterir.
+- Bir kayıt, kayıt satırının yanında yalnızca şu durum değişikliklerinde ek satır üretir: fırsat kazanıldı/kaybedildi, teklif kabul edildi/reddedildi/süresi doldu/iptal edildi, aday dönüştü; diğer geçişler (fırsat aşaması, teklif onay adımları) satır vermez ve rozet güncel durumu gösterir.
 - Sipariş, sözleşme, destek talebi ve pazarlama satırları (dilim 2a–2d), özet şeridi, kaynak çipleri ve durum satırları (dilim 3 ve 4) 23 Kasım 2026'da
   açık ve koyu temada, 1440 px ve 390 px genişlikte gözle doğrulandı; ancak **gerçek veriyle değil, sahte API ile**: `Modulix.Web` yayınlanıp tarayıcıda
   (Playwright) API çağrıları sabit yanıtlarla karşılandı. Bu turda özet şeridinin 390 px'te "Son hareket" tarihini kırptığı bulundu ve düzeltildi (PR #570).
