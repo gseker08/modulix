@@ -337,7 +337,8 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
             copySource = null;
             await QuoteTotals.RecalculateAsync(Context.Data, entity, pending, null, "documentDiscountValue", cancellationToken);
         }
-        else if (isNew || values.ContainsKey("documentDiscountKind") || values.ContainsKey("documentDiscountValue") || values.ContainsKey("priceIncludesTax"))
+        else if (isNew || values.ContainsKey("documentDiscountKind") || values.ContainsKey("documentDiscountValue") || values.ContainsKey("priceIncludesTax")
+            || (entity.Status == QuoteStatus.Draft && (values.ContainsKey(RecordFields.Custom) || values.ContainsKey("currency"))))
         {
             await QuoteTotals.RecalculateAsync(Context.Data, entity, null, null, "documentDiscountValue", cancellationToken);
         }
@@ -421,7 +422,8 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
     // Revizyon: kalemler aynı kararlı anahtarlarla kopyalanır (karşılaştırma için). Çoğaltma: yeni ailedir, yeni anahtarlar üretilir.
     private async Task<List<QuoteLine>> CopyLinesAsync(Quote target, Quote source, bool duplicate, CancellationToken cancellationToken)
     {
-        var lines = await Context.Data.Set<QuoteLine>().AsNoTracking().Where(l => l.QuoteId == source.Id).OrderBy(l => l.Position).ToListAsync(cancellationToken);
+        // Kuraldan üretilmiş satırlar kopyalanmaz: yeni taslak kendi yeniden hesabında kurallardan üretir.
+        var lines = await Context.Data.Set<QuoteLine>().AsNoTracking().Where(l => l.QuoteId == source.Id && l.SourceRuleId == null).OrderBy(l => l.Position).ToListAsync(cancellationToken);
         var keys = lines.ToDictionary(l => l.StableKey, l => duplicate ? Guid.CreateVersion7() : l.StableKey);
         var copies = new List<QuoteLine>();
         foreach (QuoteLine l in lines)
@@ -475,6 +477,8 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
     [
         Field.SharedId<QuoteLine>("quoteId", l => l.QuoteId),
         Field.SharedId<QuoteLine>("stableKey", l => l.StableKey),
+        Field.Id<QuoteLine>("sourceRuleId", l => l.SourceRuleId, (_, _) => { }).AsSystem(),
+        Field.Text<QuoteLine>("surchargePresentation", 20, l => l.SurchargePresentation, (_, _) => { }).AsSystem(),
         Field.Count<QuoteLine>("position", l => l.Position, (l, v) => l.Position = v),
         Field.Text<QuoteLine>("groupName", QuoteLine.NameMaxLength, l => l.GroupName, (l, v) => l.GroupName = v),
         Field.Choice<QuoteLine>("kind", QuoteLineKind.All, l => l.Kind, (l, v) => l.Kind = v),
@@ -553,6 +557,13 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
     {
         var isNew = creating;
         creating = false;
+
+        // Kuraldan üretilen satır kalem değildir: elle değiştirilemez (kural değiştirilir ya da kapatılır). Sunucunun kendi yeniden hesabı bu yoldan geçmez.
+        if (!isNew && !gate.IsOpen && entity.SourceRuleId is not null)
+        {
+            throw new RecordValidationException([new RecordFieldError("name", CrmMessages.Quote.SurchargeLineLocked)]);
+        }
+
         var parent = quote?.Id == entity.QuoteId ? quote : await LoadQuoteAsync(entity.QuoteId, cancellationToken);
         quote = null;
         if (parent is null)
@@ -587,6 +598,11 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
         if (parent.Status != QuoteStatus.Draft)
         {
             throw new RecordConflictException(CrmMessages.Quote.LineDeleteLocked);
+        }
+
+        if (entity.SourceRuleId is not null && !gate.IsOpen)
+        {
+            throw new RecordConflictException(CrmMessages.Quote.SurchargeLineDeleteLocked);
         }
 
         // Paket ana kalemi silinince bileşenleri de gider; toplam kalan kalemlerden yeniden hesaplanır.

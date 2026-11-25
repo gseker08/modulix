@@ -77,6 +77,9 @@ public class SurchargeRuleApiTests(ModulixApiFactory factory) : IClassFixture<Mo
         await ExpectErrorsAsync(admin, new SaveSurchargeRuleRequest("İşleç", "Fixed", "EUR", Amount: 1m, Conditions: new JsonArray(Condition("a", "Benzer", "b"))), "conditions");
         await ExpectErrorsAsync(admin, new SaveSurchargeRuleRequest("Para birimi", "Fixed", "EURO", Amount: 1m), "currency");
 
+        // Vergi oranı zorunludur: kuraldan üretilen teklif satırının vergisi uydurulmaz.
+        await ExpectErrorsAsync(admin, new SaveSurchargeRuleRequest("Vergisiz", "Fixed", "EUR", Amount: 1m), "taxRatePercent");
+
         // Eşzamanlılık: eski sürümle yazma 409.
         var rule = await PostAsync<SurchargeRuleDto>(admin, new SaveSurchargeRuleRequest("Kural", "Fixed", "EUR", Amount: 10m));
         Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync($"{Url}/{rule.Id}", Save(rule) with { Amount = 20m })).StatusCode);
@@ -112,7 +115,7 @@ public class SurchargeRuleApiTests(ModulixApiFactory factory) : IClassFixture<Mo
 
     private static SaveSurchargeRuleRequest Save(SurchargeRuleDto r) => new(
         r.Name, r.Kind, r.Currency, r.Description, r.Priority, r.IsActive, r.Amount, r.Percent, r.Group, r.BaseKey, r.DurationKey, r.FreeUnits,
-        r.QuantityKeys, r.Conditions, r.Presentation, r.Stackable, r.Version);
+        r.QuantityKeys, r.Conditions, r.Presentation, r.Stackable, r.TaxRatePercent, r.Version);
 
     private static async Task ExpectErrorsAsync(HttpClient client, SaveSurchargeRuleRequest request, string field)
     {
@@ -124,7 +127,8 @@ public class SurchargeRuleApiTests(ModulixApiFactory factory) : IClassFixture<Mo
 
     private static async Task<T> PostAsync<T>(HttpClient client, SaveSurchargeRuleRequest body)
     {
-        var response = await client.PostAsJsonAsync(Url, body);
+        // Vergi oranı zorunludur (kuraldan üretilen teklif satırı bu oranla hesaplanır); mutlu yol çağrıları varsayılanı buradan alır.
+        var response = await client.PostAsJsonAsync(Url, body with { TaxRatePercent = body.TaxRatePercent ?? 20m });
         Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<T>())!;
     }

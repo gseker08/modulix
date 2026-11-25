@@ -44,6 +44,7 @@ internal static class QuoteEndpoints
         QuoteSharingEndpoints.MapInternal(quotes);
         quotes.MapGet("/{id:guid}/approval-requirements", ApprovalRequirementsAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/{id:guid}/compare", CompareAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
+        quotes.MapGet("/{id:guid}/surcharges", SurchargesAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         quotes.MapGet("/{id:guid}/handover", HandoverAsync).RequirePermission(CrmModule.Permissions.QuotesRead);
         crm.MapPost("/opportunities/{id:guid}/primary-quote", async (Guid id, SetPrimaryQuoteRequest r, IQuoteOpportunitySync sync, CancellationToken ct) =>
         {
@@ -138,6 +139,22 @@ internal static class QuoteEndpoints
                 result.Value.ThresholdReason, result.Value.Restricted, result.Value.CanDecide, result.Value.Note,
                 [.. result.Value.Steps.Select(s => new QuoteApprovalStepDto(s.Step, s.Approvers, s.Completed, s.ApprovedBy))], result.Value.CurrentStep, result.Value.ActingAsDelegate))
             : RecordProblems.ToProblem(result.Error!);
+    }
+
+    private static async Task<IResult> SurchargesAsync(Guid id, IQuoteSurcharges surcharges, CancellationToken ct)
+    {
+        var result = await surcharges.PreviewAsync(id, ct);
+        if (!result.IsSuccess)
+        {
+            return RecordProblems.ToProblem(result.Error!);
+        }
+
+        var r = result.Value!.Result;
+        return Results.Ok(new QuoteSurchargeBreakdownDto(
+            result.Value.Currency, r.Total,
+            [.. r.Applied.Select(a => new QuoteSurchargeLineDto(a.RuleId, a.Name, a.Kind.ToString(), a.Group, a.Presentation.ToString(), a.Amount, a.Explanation))],
+            [.. r.Skipped.Select(s => new QuoteSurchargeSkipDto(s.RuleId, s.Name, s.Reason))],
+            r.GroupTotals));
     }
 
     private static async Task<IResult> CompareAsync(Guid id, Guid with, IQuoteComparison comparison, CancellationToken ct)

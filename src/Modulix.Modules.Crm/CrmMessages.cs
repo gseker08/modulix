@@ -595,6 +595,12 @@ internal static class CrmMessages
         public static ServerMessage LineDeleteLocked =>
             ServerMessage.Of("crm.server.quote.line-delete-locked", "Taslak olmayan teklifin kalemi silinemez; yeni revizyon açın.");
 
+        public static ServerMessage SurchargeLineLocked =>
+            ServerMessage.Of("crm.server.quote.surcharge-line-locked", "Bu kalem bir ek ücret kuralından üretildi; düzenlenemez. Kuralı değiştirin ya da kapatın.");
+
+        public static ServerMessage SurchargeLineDeleteLocked =>
+            ServerMessage.Of("crm.server.quote.surcharge-line-delete-locked", "Kuraldan üretilen kalem silinemez; ilgili kuralı kapatın ya da koşullarını değiştirin.");
+
         public static ServerMessage ProductNotFound => ServerMessage.Of("crm.server.quote.product-not-found", "Ürün bulunamadı.");
 
         public static ServerMessage ProductNotSellable =>
@@ -650,6 +656,9 @@ internal static class CrmMessages
 
         public static ServerMessage SurchargeAmountOrPercent =>
             ServerMessage.Of("crm.server.pricing.surcharge-amount-or-percent", "Bu kural türü için yalnızca tutar ya da yalnızca yüzde girilir, ikisi birlikte olmaz.");
+
+        public static ServerMessage SurchargeTaxRequired =>
+            ServerMessage.Of("crm.server.pricing.surcharge-tax-required", "Vergi oranı girin; kuraldan üretilen teklif satırı bu oranla hesaplanır.");
 
         public static ServerMessage SurchargeBaseRequired =>
             ServerMessage.Of("crm.server.pricing.surcharge-base-required", "Yüzde için taban anahtarı girin.");

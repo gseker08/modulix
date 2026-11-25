@@ -920,7 +920,7 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         new(Entities.SurchargeRule, "Ek ücret kuralı (CRM)", Permissions.PricesRead, new Dictionary<string, string>
         {
             ["name"] = "Ad", ["description"] = "Açıklama", ["priority"] = "Öncelik", ["isActive"] = "Etkin", ["kind"] = "Tür", ["currency"] = "Para birimi",
-            ["amount"] = "Tutar", ["percent"] = "Yüzde", ["group"] = "Grup", ["baseKey"] = "Taban anahtarı", ["durationKey"] = "Süre anahtarı",
+            ["amount"] = "Tutar", ["percent"] = "Yüzde", ["taxRatePercent"] = "Vergi oranı (%)", ["group"] = "Grup", ["baseKey"] = "Taban anahtarı", ["durationKey"] = "Süre anahtarı",
             ["freeUnits"] = "Serbest süre", ["quantityKeys"] = "Çarpan anahtarları", ["conditions"] = "Koşullar", ["presentation"] = "Teklifte görünüm",
             ["stackable"] = "Birleşir",
         }, "name"),
@@ -1210,6 +1210,7 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         services.AddScoped<IQuoteWorkflow, QuoteWorkflow>();
         services.AddScoped<IQuoteSharing, QuoteSharing>();
         services.AddScoped<IQuoteComparison, QuoteComparisonService>();
+        services.AddScoped<IQuoteSurcharges, QuoteSurchargeService>();
         services.AddScoped<IQuoteReport, QuoteReport>();
         services.AddScoped<QuoteMarkers>();
         services.AddScoped<IQuoteExpiry, QuoteExpiry>();

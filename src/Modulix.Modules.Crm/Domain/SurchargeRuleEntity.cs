@@ -54,6 +54,12 @@ public sealed class SurchargeRule : CrmEntity
     /// <summary>JSON dizisi: <c>[{ "key", "operator", "value" }]</c>; tümü sağlanırsa kural çalışır.</summary>
     public string? Conditions { get; internal set; }
 
+    /// <summary>
+    /// Kuraldan üretilen teklif satırının vergi oranı (%). Boş kural teklife satır üretemez (oran uydurulmaz): kayıtta zorunludur, boş yalnızca
+    /// bu alan eklenmeden önce kaydedilmiş kurallarda kalır ve onlar "vergi oranı tanımlı değil" nedeniyle uygulanmaz.
+    /// </summary>
+    public decimal? TaxRatePercent { get; internal set; }
+
     /// <summary><see cref="SurchargeRules.Presentations"/>: teklifte ayrı satır, gruba dahil ya da yalnız hesap dökümü.</summary>
     public string Presentation { get; internal set; } = SurchargeRules.SeparateLine;
 

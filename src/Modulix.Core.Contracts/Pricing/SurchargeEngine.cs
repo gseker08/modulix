@@ -250,6 +250,13 @@ public static class SurchargeEngine
 
             case SurchargeKind.Minimum:
             {
+                // Asgari bedel grubun kalemlerini korur: bağlamda grup toplamı yoksa (grupta kalem yok) tam asgari tutar eklenmez.
+                if (!context.Numbers.ContainsKey("group." + rule.Group))
+                {
+                    reason = "Grupta kalem yok.";
+                    return null;
+                }
+
                 decimal total = groupTotal(rule.Group!);
                 if (total >= rule.Amount!.Value)
                 {

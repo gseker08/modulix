@@ -30,6 +30,7 @@ internal sealed class SurchargeRuleRecordStore(CrmStoreContext context) : CrmRec
         Field.Currency<SurchargeRule>("currency", r => r.Currency, (r, v) => r.Currency = v),
         Field.Money<SurchargeRule>("amount", r => r.Amount, (r, v) => r.Amount = v),
         Field.Rate<SurchargeRule>("percent", r => r.Percent, (r, v) => r.Percent = v),
+        Field.Rate<SurchargeRule>("taxRatePercent", r => r.TaxRatePercent, (r, v) => r.TaxRatePercent = v),
         Field.Text<SurchargeRule>("group", SurchargeRule.GroupMaxLength, r => r.GroupKey, (r, v) => r.GroupKey = v),
         Field.Text<SurchargeRule>("baseKey", SurchargeRule.KeyMaxLength, r => r.BaseKey, (r, v) => r.BaseKey = v),
         Field.Text<SurchargeRule>("durationKey", SurchargeRule.KeyMaxLength, r => r.DurationKey, (r, v) => r.DurationKey = v),
@@ -60,6 +61,12 @@ internal sealed class SurchargeRuleRecordStore(CrmStoreContext context) : CrmRec
         entity.DurationKey = Blank(entity.DurationKey);
 
         var errors = SurchargeRules.Validate(entity).Select(e => new RecordFieldError(e.Field, e.Message)).ToList();
+        if (entity.TaxRatePercent is null)
+        {
+            // Kuraldan üretilen teklif satırının vergisi bu orandandır; boş bırakılırsa oran uydurulmaz.
+            errors.Add(new RecordFieldError("taxRatePercent", CrmMessages.Pricing.SurchargeTaxRequired));
+        }
+
         if (errors.Count > 0)
         {
             return Task.FromException(new RecordValidationException(errors));
