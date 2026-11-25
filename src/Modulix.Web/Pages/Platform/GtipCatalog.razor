@@ -92,7 +92,7 @@
 
         <div class="form-actions">
             <button type="button" class="btn btn-outline-secondary" disabled="@(busy || bytes is null)" @onclick="PreviewAsync">@Texts.Get("platform.gtip.preview")</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || preview is not { CanImport: true })">
+            <button type="submit" class="btn btn-primary" disabled="@(busy || preview is not { CanImport: true })" aria-busy="@(busy ? "true" : "false")">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>

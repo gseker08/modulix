@@ -109,7 +109,7 @@
                     }
 
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(form.Name) || (form.Id is null && string.IsNullOrWhiteSpace(form.Code)))">@Texts.Get("common.save")</button>
+                        <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(form.Name) || (form.Id is null && string.IsNullOrWhiteSpace(form.Code)))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
                         <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
                     </div>
                 </form>

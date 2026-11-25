@@ -123,7 +123,7 @@
                             </div>
                         </div>
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(termsModule))">@Texts.Get("platform.tenantDetail.saveTerms")</button>
+                            <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(termsModule))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("platform.tenantDetail.saveTerms")</button>
                         </div>
                     </form>
                 }
@@ -209,7 +209,7 @@
                         </div>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("admin.invite.send")</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("admin.invite.send")</button>
                     </div>
                 </form>
             }
