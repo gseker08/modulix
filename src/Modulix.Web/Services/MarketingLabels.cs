@@ -26,6 +26,8 @@ public static class MarketingLabels
     public const string JourneyReentryGroup = "marketing.journey-reentry";
     public const string EnrollmentStatusGroup = "marketing.enrollment-status";
     public const string EnrollmentReasonGroup = "marketing.enrollment-reason";
+    public const string JourneyExitReasonGroup = "marketing.journey-exit-reason";
+    public const string JourneySkipGroup = "marketing.journey-skip";
 
     public static string KeyOf(string group, string key) => $"{group}.{key.Replace(':', '-').ToLowerInvariant()}";
 
@@ -136,6 +138,20 @@ public static class MarketingLabels
     internal static readonly (string Key, string Label)[] EnrollmentReasonSource =
         [("unsubscribed", "Abonelikten çıktı"), ("exit-condition", "Çıkış koşulu sağlandı"), ("completed", "Yolculuk tamamlandı")];
 
+    /// <summary>Rapordaki çıkış nedeni kodları; serbest metin gerekçeler sunucuda tek <c>manual</c> kodunda toplanır.</summary>
+    internal static readonly (string Key, string Label)[] JourneyExitReasonSource =
+        [("unsubscribed", "Abonelikten çıktı"), ("exit-condition", "Çıkış koşulu sağlandı"), ("manual", "Elle çıkarıldı"), ("completed", "Yolculuk tamamlandı")];
+
+    /// <summary>Yolculuk göndericisinin atlama ve hata kodları; izin kararı kodları (<c>denied</c>, <c>suppressed:*</c>…) <see cref="Reason"/> tablosundadır.</summary>
+    internal static readonly (string Key, string Label)[] JourneySkipSource =
+    [
+        ("frequency-limit", "Günlük ileti sınırı doldu"), ("no-access", "Alıcı kaynağını okuma izni yok"), ("journey-inactive", "Yolculuk etkin değil"),
+        ("no-resolver", "Alıcı çözümlenemedi"), ("unsubscribe-link-unavailable", "Abonelikten çıkma bağlantısı kurulamadı"), ("address-gone", "Adres artık yok"),
+        ("content-invalid", "İçerik geçersiz"), ("content-not-found", "İçerik bulunamadı"), ("enrollment-not-found", "Kayıt bulunamadı"), ("campaign-not-found", "Kampanya bulunamadı"),
+        ("provider-missing", "Sağlayıcı tanımlı değil"), ("provider-failed", "Sağlayıcı iletiyi reddetti"), ("provider-exception", "Sağlayıcı hatası; sonuç belirsiz"),
+        ("timeout", "Sağlayıcı yanıt vermedi; sonuç belirsiz"), ("unknown-result", "Sonuç belirsiz"),
+    ];
+
     public static IReadOnlyList<(string Key, string Label)> Targets => Translate(TargetGroup, TargetSource);
 
     public static IReadOnlyList<(string Key, string Label)> Kinds => Translate(KindGroup, KindSource);
@@ -149,6 +165,15 @@ public static class MarketingLabels
     public static IReadOnlyList<(string Key, string Label)> EnrollmentStatuses => Translate(EnrollmentStatusGroup, EnrollmentStatusSource);
 
     public static IReadOnlyList<(string Key, string Label)> EnrollmentReasons => Translate(EnrollmentReasonGroup, EnrollmentReasonSource);
+
+    public static IReadOnlyList<(string Key, string Label)> JourneyExitReasons => Translate(JourneyExitReasonGroup, JourneyExitReasonSource);
+
+    public static IReadOnlyList<(string Key, string Label)> JourneySkipReasons => Translate(JourneySkipGroup, JourneySkipSource);
+
+    public static string JourneyExitReason(string code) => Lookup(JourneyExitReasonGroup, JourneyExitReasonSource, code);
+
+    /// <summary>Atlama kodu: önce göndericinin kodları, yoksa izin kararı nedenleri; bilinmeyen kod olduğu gibi gösterilir.</summary>
+    public static string JourneySkipReason(string code) => Lookup(JourneySkipGroup, JourneySkipSource, code, Reason(code));
 
     public static string EnrollmentBadge(string status) => status switch { "Active" => "won", "Completed" => "qualified", _ => "cancelled" };
 

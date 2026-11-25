@@ -1,0 +1,122 @@
+@inject ApiClient Api
+
+@* Yolculuk raporu (ADR-0056): yalnızca sayılar; kişi, adres ya da hedef kimliği yoktur. "Kabul edildi" sağlayıcının iletiyi aldığı anlamına gelir, teslim edildi demek değildir.
+   Dönüşüm satırı içerik bazındadır (kural adımı değil): aynı içerik iki adımda kullanılırsa tek satırda toplanır. Rapor yetkisi (marketing.reports.read) ve yolculuğu
+   görme izni sunucuda denetlenir; sekme yetkisiz kullanıcıya hiç çizilmez ama bu gizleme yetki değildir. *@
+<section aria-labelledby="journey-report-title">
+    <h2 id="journey-report-title" class="h5">@Texts.Get("marketing.journeyReport.title")</h2>
+    <p class="text-muted">@Texts.Get("marketing.journeyReport.intro")</p>
+
+    @if (report is null && error is null)
+    {
+        <LoadingState />
+    }
+    else if (error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@error <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="LoadAsync">@Texts.Get("crm.sales.retry")</button></div>
+    }
+    else if (report is { Enrolled: 0, Messages.Total: 0 })
+    {
+        <EmptyState Icon="shuffle" Title="@Texts.Get("marketing.journeyReport.emptyTitle")" Text="@Texts.Get("marketing.journeyReport.empty")" />
+    }
+    else if (report is not null)
+    {
+        <p class="small text-muted">@Texts.Get("marketing.journeyReport.generated", CrmLabels.Time(report.GeneratedAt))</p>
+
+        <div class="dash-kpis" role="group" aria-label="@Texts.Get("marketing.journeyReport.summary")">
+            <DashKpi Label="@Texts.Get("marketing.journeyReport.enrolled")" Icon="users" Value="@report.Enrolled.ToString("N0")"
+                     Detail="@Texts.Get("marketing.journeyReport.enrolledDetail", report.Active.ToString("N0"), report.Completed.ToString("N0"), report.Exited.ToString("N0"))" />
+            <DashKpi Label="@Texts.Get("marketing.journeyReport.messages")" Icon="mail" Tone="teal" Value="@report.Messages.Total.ToString("N0")"
+                     Detail="@Texts.Get("marketing.journeyReport.messagesDetail", report.Messages.Accepted.ToString("N0"), report.Messages.Skipped.ToString("N0"), report.Messages.Failed.ToString("N0"))" />
+            <DashKpi Label="@Texts.Get("marketing.journeyReport.completionRate")" Icon="check" Tone="success" Value="@Rate(report.Completed, report.Enrolled)"
+                     Detail="@Texts.Get("marketing.journeyReport.completionDetail", report.Completed.ToString("N0"), report.Enrolled.ToString("N0"))" />
+        </div>
+
+        @if (report.ExitReasons.Count > 0)
+        {
+            <h3 class="h6">@Texts.Get("marketing.journeyReport.exitReasons")</h3>
+            <table class="table record-table">
+                <caption class="visually-hidden">@Texts.Get("marketing.journeyReport.exitReasons")</caption>
+                <thead><tr><th scope="col">@Texts.Get("marketing.journeyEnrollments.col.reason")</th><th scope="col">@Texts.Get("marketing.journeyReport.count")</th></tr></thead>
+                <tbody>
+                    @foreach (var r in report.ExitReasons)
+                    {
+                        <tr>
+                            <td data-label="@Texts.Get("marketing.journeyEnrollments.col.reason")" class="primary">@MarketingLabels.JourneyExitReason(r.Reason)</td>
+                            <td data-label="@Texts.Get("marketing.journeyReport.count")">@r.Count.ToString("N0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (report.Messages.SkipReasons.Count > 0)
+        {
+            <h3 class="h6">@Texts.Get("marketing.journeyReport.skipReasons")</h3>
+            <p class="small text-muted">@Texts.Get("marketing.journeyReport.skipHelp")</p>
+            <table class="table record-table">
+                <caption class="visually-hidden">@Texts.Get("marketing.journeyReport.skipReasons")</caption>
+                <thead><tr><th scope="col">@Texts.Get("marketing.journeyReport.reason")</th><th scope="col">@Texts.Get("marketing.journeyReport.count")</th></tr></thead>
+                <tbody>
+                    @foreach (var s in report.Messages.SkipReasons)
+                    {
+                        <tr>
+                            <td data-label="@Texts.Get("marketing.journeyReport.reason")" class="primary">@MarketingLabels.JourneySkipReason(s.Code)</td>
+                            <td data-label="@Texts.Get("marketing.journeyReport.count")">@s.Count.ToString("N0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (report.Contents.Count > 0)
+        {
+            <h3 class="h6">@Texts.Get("marketing.journeyReport.contents")</h3>
+            <table class="table record-table">
+                <caption class="visually-hidden">@Texts.Get("marketing.journeyReport.contents")</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">@Texts.Get("marketing.journeyReport.content")</th>
+                        <th scope="col">@Texts.Get("marketing.journeyReport.col.total")</th>
+                        <th scope="col">@Texts.Get("marketing.journeyReport.col.accepted")</th>
+                        <th scope="col">@Texts.Get("marketing.journeyReport.col.skipped")</th>
+                        <th scope="col">@Texts.Get("marketing.journeyReport.col.failed")</th>
+                        <th scope="col">@Texts.Get("marketing.journeyReport.col.unknown")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in report.Contents)
+                    {
+                        <tr>
+                            <td data-label="@Texts.Get("marketing.journeyReport.content")" class="primary">@(string.IsNullOrWhiteSpace(c.Subject) ? Texts.Get("marketing.journeyReport.noSubject") : c.Subject)</td>
+                            <td data-label="@Texts.Get("marketing.journeyReport.col.total")">@c.Total.ToString("N0")</td>
+                            <td data-label="@Texts.Get("marketing.journeyReport.col.accepted")">@c.Accepted.ToString("N0")</td>
+                            <td data-label="@Texts.Get("marketing.journeyReport.col.skipped")">@c.Skipped.ToString("N0")</td>
+                            <td data-label="@Texts.Get("marketing.journeyReport.col.failed")">@c.Failed.ToString("N0")</td>
+                            <td data-label="@Texts.Get("marketing.journeyReport.col.unknown")">@c.Unknown.ToString("N0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid JourneyId { get; set; }
+
+    private JourneyReportDto? report;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        var result = await Api.GetAsync<JourneyReportDto>($"/api/marketing/journeys/{JourneyId}/report");
+        report = result.Value;
+        error = result.IsSuccess ? null : result.Error;
+    }
+
+    private static string Rate(int part, int whole) => whole == 0 ? "—" : $"%{(int)Math.Round(part * 100.0 / whole)}";
+}
