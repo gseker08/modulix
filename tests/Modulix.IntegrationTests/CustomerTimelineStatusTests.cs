@@ -63,9 +63,9 @@ public class CustomerTimelineStatusTests(ModulixApiFactory factory) : IClassFixt
         var company = await CreateCompanyAsync(client, "Sonuç Lojistik");
         var other = await CreateCompanyAsync(client, "Başka Lojistik");
         var rejected = await PresentedQuoteAsync(client, company.Id);
-        await TransitionAsync(client, rejected.Id, "record-rejected", rejected.Version);
+        await TransitionAsync(client, rejected.Id, "record-rejected", rejected.Version, "Fiyat yüksek bulundu");
         var cancelled = await PresentedQuoteAsync(client, company.Id);
-        await TransitionAsync(client, cancelled.Id, "cancel", cancelled.Version);
+        await TransitionAsync(client, cancelled.Id, "cancel", cancelled.Version, "Müşteri vazgeçti");
         var open = await PresentedQuoteAsync(client, company.Id);
 
         var timeline = (await client.GetFromJsonAsync<CustomerTimelineDto>($"/api/crm/companies/{company.Id}/timeline?take=50"))!;
@@ -210,9 +210,9 @@ public class CustomerTimelineStatusTests(ModulixApiFactory factory) : IClassFixt
         return await TransitionAsync(client, quote.Id, "present", (await client.GetFromJsonAsync<QuoteDto>($"/api/crm/quotes/{quote.Id}"))!.Version);
     }
 
-    private static async Task<QuoteDto> TransitionAsync(HttpClient client, Guid id, string action, long version)
+    private static async Task<QuoteDto> TransitionAsync(HttpClient client, Guid id, string action, long version, string? reason = null)
     {
-        var response = await client.PostAsJsonAsync($"/api/crm/quotes/{id}/{action}", new QuoteTransitionRequest(version));
+        var response = await client.PostAsJsonAsync($"/api/crm/quotes/{id}/{action}", new QuoteTransitionRequest(version, reason));
         Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<QuoteDto>())!;
     }
