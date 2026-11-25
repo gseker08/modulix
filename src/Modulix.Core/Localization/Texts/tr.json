@@ -1892,7 +1892,7 @@
   "crm.opportunityReport.col.unknownAmount": "Tutarı bilinmeyen",
   "crm.opportunityReport.col.unknownProbability": "Olasılığı bilinmeyen",
   "crm.salesAnalysis.title": "Satış analizi",
-  "crm.salesAnalysis.intro": "Teklif ve lead kohortları ile aşama dönüşümü. Kohort, seçili dönemde oluşan kayıtların sonradan nereye vardığını izler; güncel durum dağılımı değildir.",
+  "crm.salesAnalysis.intro": "Teklif ve müşteri adayı kohortları ile aşama dönüşümü. Kohort, seçili dönemde oluşan kayıtların sonradan nereye vardığını izler; güncel durum dağılımı değildir.",
   "crm.sales.scopeNote": "Veriler yetkiniz ve veri kapsamınızla sınırlıdır.",
   "crm.salesOverview.title": "Satış görünümü",
   "crm.salesTeam.title": "Ekip performansı",
