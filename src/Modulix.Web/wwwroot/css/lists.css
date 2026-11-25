@@ -1082,7 +1082,9 @@ tr.done td.primary {
 
 .summary {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* Sütun sayısı panelin genişliğine bağlıdır, ekran genişliğine değil: firma detayında sağda ayrı bir sütun olduğu için 768-1100 px'te
+       panel 360-430 px kalır ve sabit üç sütun "Son hareket" tarihini kartın dışına taşırıyordu. Kart en az 10 rem (tarih + dolgu) olur. */
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
     gap: 0.75rem;
     margin-bottom: 1rem;
 }
