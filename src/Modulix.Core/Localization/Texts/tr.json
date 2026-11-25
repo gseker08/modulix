@@ -14016,7 +14016,7 @@
   "marketing.journeyDetail.exitCondition": "Çıkış koşulu",
   "marketing.journeyDetail.noExitCondition": "Tanımlı değil",
   "marketing.journeyDetail.hasExitCondition": "Tanımlı",
-  "marketing.journeyDetail.exitConditionNote": "Çıkış koşulu bu ekranda gösterilir; düzenleyicisi sonraki dilimdedir. Abonelikten çıkan kişi koşulsuz yolculuktan çıkar.",
+  "marketing.journeyDetail.exitConditionNote": "Çıkış koşulu bu ekranda gösterilir; düzenleyicisi \"Çıkış koşulu\" sekmesindedir. Abonelikten çıkan kişi koşulsuz yolculuktan çıkar.",
   "marketing.journey-status.draft": "Taslak",
   "marketing.journey-status.active": "Etkin",
   "marketing.journey-status.paused": "Duraklatıldı",
@@ -14093,5 +14093,16 @@
   "marketing.journey-skip.provider-failed": "Sağlayıcı iletiyi reddetti",
   "marketing.journey-skip.provider-exception": "Sağlayıcı hatası; sonuç belirsiz",
   "marketing.journey-skip.timeout": "Sağlayıcı yanıt vermedi; sonuç belirsiz",
-  "marketing.journey-skip.unknown-result": "Sonuç belirsiz"
+  "marketing.journey-skip.unknown-result": "Sonuç belirsiz",
+  "marketing.journeyDetail.tab.exit": "Çıkış koşulu",
+  "marketing.journeyDetail.exit.intro": "Koşulu sağlayan kayıt yolculuktan çıkar ve kalan gönderme adımları atlanır. Koşul segment koşuluyla aynı dildedir; her giriş turunda etkin kayıtlar için değerlendirilir. Abonelikten çıkan kişi koşulsuz çıkar.",
+  "marketing.journeyDetail.exit.none": "Çıkış koşulu yok",
+  "marketing.journeyDetail.exit.noneHelp": "Koşul tanımlı değilse kayıt yalnızca yolculuk bitince, elle ya da abonelikten çıkınca sona erer.",
+  "marketing.journeyDetail.exit.add": "Koşul ekle",
+  "marketing.journeyDetail.exit.remove": "Koşulu kaldır",
+  "marketing.journeyDetail.exit.removeQuestion": "Çıkış koşulu kaldırılsın mı?",
+  "marketing.journeyDetail.exit.save": "Koşulu kaydet",
+  "marketing.journeyDetail.exit.saved": "Çıkış koşulu kaydedildi. Yayın ya da sürdürmede yayınlayanın görebildiği alanlara karşı doğrulanır.",
+  "marketing.journeyDetail.exit.removed": "Çıkış koşulu kaldırıldı.",
+  "marketing.journeyDetail.exit.catalogDenied": "Alan listesi segment alan kataloğundandır; koşulu düzenlemek için segmentleri görüntüleme izni gerekir."
 }
