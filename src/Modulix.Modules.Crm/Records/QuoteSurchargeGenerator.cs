@@ -20,7 +20,7 @@ internal static class QuoteSurchargeGenerator
 {
     /// <summary>Üretilecek satırın saf tanımı (veritabanı yok).</summary>
     internal sealed record DesiredLine(
-        Guid RuleId, long RuleVersion, string Name, string Explanation, decimal Amount, decimal TaxRatePercent, string Presentation, Guid StableKey);
+        Guid RuleId, long RuleVersion, string Name, string Explanation, decimal Amount, decimal TaxRatePercent, string Presentation, Guid StableKey, string? GroupKey);
 
     /// <summary>
     /// Kuralları bağlama karşı değerlendirir. Vergi oranı olmayan kural uygulanmaz (nedeniyle listelenir); ana toplama giren kalem yoksa hiçbir kural
@@ -50,7 +50,7 @@ internal static class QuoteSurchargeGenerator
                 var rule = byId[a.RuleId];
                 return new DesiredLine(
                     rule.Id, rule.Version, Truncate(a.Name, QuoteLine.NameMaxLength), Truncate(a.Explanation, QuoteLine.TextMaxLength), a.Amount,
-                    rule.TaxRatePercent!.Value, a.Presentation.ToString(), StableKey(familyId, rule.Id));
+                    rule.TaxRatePercent!.Value, a.Presentation.ToString(), StableKey(familyId, rule.Id), rule.GroupKey);
             }),
         ];
     }
@@ -95,6 +95,14 @@ internal static class QuoteSurchargeGenerator
         var familyId = quote.FamilyId == Guid.Empty ? quote.Id : quote.FamilyId;
         var desired = Plan(familyId, rules, Evaluate(rules, context, manual.Any(l => l.Included)));
 
+        // Kuralın grubu (anahtar) elle satırların grup adlarından biriyle eşleşirse üretilen satır o grubun adını taşır: müşteri belgesinde grubun başlığı altında
+        // görünür ya da grubun alt toplamına katılır. Eşleşme yoksa grupsuzdur.
+        var groupNames = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var line in manual.Where(l => !string.IsNullOrWhiteSpace(l.GroupName)))
+        {
+            groupNames.TryAdd(QuoteSurchargeContextBuilder.Slug(line.GroupName), line.GroupName!.Trim());
+        }
+
         var byRule = existing.ToDictionary(l => l.SourceRuleId!.Value);
         var merged = new List<QuoteLine>(manual);
         int position = manual.Count == 0 ? 0 : manual.Max(l => l.Position);
@@ -108,6 +116,7 @@ internal static class QuoteSurchargeGenerator
             }
 
             line.Position = position;
+            line.GroupName = want.GroupKey is { Length: > 0 } key && groupNames.TryGetValue(key, out var groupName) ? groupName : null;
             line.Name = want.Name;
             line.Description = want.Explanation;
             line.Quantity = 1m;

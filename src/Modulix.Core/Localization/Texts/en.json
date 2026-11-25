@@ -12273,6 +12273,8 @@
   "crm.public-quote.vat-rate": "VAT {0}%",
   "crm.public-quote.gross-total": "Grand total",
   "crm.public-quote.optional-note": "Optional and alternative items are not included in the total (net {0}).",
+  "crm.public-quote.group-subtotal": "{0} subtotal (surcharges included)",
+  "crm.public-quote.unlisted-charges-note": "The totals include surcharges that are not listed as separate lines.",
   "crm.public-quote.download": "Download as PDF",
   "crm.public-quote.digest": "Document digest (SHA-256):",
   "crm.public-quote.decision": "Your decision",

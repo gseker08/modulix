@@ -14,8 +14,11 @@ namespace Modulix.Modules.Crm.Endpoints;
 /// </summary>
 public static class QuotePdf
 {
-    /// <summary>Şablon sürümü: görünüm değiştiğinde artırılır; belgeyle birlikte saklanır.</summary>
-    public const int TemplateVersion = 1;
+    /// <summary>
+    /// Şablon sürümü: görünüm değiştiğinde artırılır; belgeyle birlikte saklanır. 2: grup alt toplam satırı ve "ayrıca gösterilmeyen ek ücretleri içerir" notu
+    /// (ek ücret sunum seçimi, ADR-0018 Dilim 2c); eski belgeler 1 olarak kalır.
+    /// </summary>
+    public const int TemplateVersion = 2;
 
     private static readonly NumberFormatInfo Numbers = new() { NumberDecimalSeparator = ",", NumberGroupSeparator = ".", NumberGroupSizes = [3] };
     private static readonly string Accent = "#1F4E79";
@@ -152,6 +155,17 @@ public static class QuotePdf
                 }
             });
 
+            // Gruba dahil edilen ek ücretin bulunduğu gruplar için alt toplam satırı, grubun son satırından sonra çizilir.
+            var subtotals = (quote.GroupSubtotals ?? []).ToDictionary(g => g.GroupName, StringComparer.OrdinalIgnoreCase);
+            var lastOfGroup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < quote.Lines.Count; i++)
+            {
+                if (quote.Lines[i].GroupName is { Length: > 0 } groupName)
+                {
+                    lastOfGroup[groupName] = i;
+                }
+            }
+
             string? group = null;
             var index = 0;
             foreach (var line in quote.Lines)
@@ -196,6 +210,13 @@ public static class QuotePdf
                 table.Cell().Element(Cell).AlignRight().Text(DiscountText(line));
                 table.Cell().Element(Cell).AlignRight().Text($"%{line.TaxRatePercent.ToString("0.##", Numbers)}");
                 table.Cell().Element(Cell).AlignRight().Text(muted ? "—" : line.Net.ToString("N2", Numbers)).FontColor(muted ? Muted : "#1B2430");
+
+                if (line.GroupName is { Length: > 0 } endName && lastOfGroup[endName] == index - 1 && subtotals.TryGetValue(endName, out var subtotal))
+                {
+                    table.Cell().ColumnSpan(6).Background("#F6F8FA").PaddingVertical(3).PaddingHorizontal(3).AlignRight()
+                        .Text(t.Get("crm.public-quote.group-subtotal", subtotal.GroupName)).Bold().FontSize(8.5f);
+                    table.Cell().Background("#F6F8FA").PaddingVertical(3).PaddingHorizontal(3).AlignRight().Text(subtotal.Net.ToString("N2", Numbers)).Bold();
+                }
             }
         });
 
@@ -234,6 +255,11 @@ public static class QuotePdf
             {
                 column.Item().PaddingTop(4).Text(t.Get("crm.public-quote.optional-note", Money(quote.OptionalNet, quote.Currency)))
                     .FontSize(7.5f).FontColor(Muted);
+            }
+
+            if (quote.IncludesUnlistedCharges)
+            {
+                column.Item().PaddingTop(4).Text(t.Get("crm.public-quote.unlisted-charges-note")).FontSize(7.5f).FontColor(Muted);
             }
         });
 
