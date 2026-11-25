@@ -19,7 +19,7 @@
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
             <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : "false")">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -103,7 +103,7 @@
             </LayoutForm>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get("common.save")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.cancel")</button>
                 @if (form.Id is not null)
                 {
