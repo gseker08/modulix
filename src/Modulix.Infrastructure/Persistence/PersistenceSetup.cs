@@ -169,6 +169,7 @@ public static class PersistenceSetup
         services.AddScoped<CustomFieldService>();
         services.AddScoped<ICustomFieldService>(sp => sp.GetRequiredService<CustomFieldService>());
         services.AddScoped<ICustomFieldProvider>(sp => sp.GetRequiredService<CustomFieldService>());
+        services.AddScoped<Modulix.Core.Contracts.Customization.ICommercialCustomFields>(sp => sp.GetRequiredService<CustomFieldService>());
         services.AddScoped<ChoiceListService>();
         services.AddScoped<IChoiceListService>(sp => sp.GetRequiredService<ChoiceListService>());
         services.AddScoped<IChoiceLists>(sp => sp.GetRequiredService<ChoiceListService>());

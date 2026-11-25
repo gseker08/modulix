@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Modulix.Core.Contracts.Authorization;
 using Modulix.Core.Contracts.Customization;
 using Modulix.Core.Contracts.Persistence;
@@ -15,8 +16,22 @@ internal sealed class CrmStoreContext(
     ActivityWorkflowGate? activityGate = null, IRecordCommandContext? command = null, OpportunityWorkflowGate? opportunityGate = null,
     IOpportunityPolicyProvider? policy = null, IActivityCodeCatalog? activityCodes = null, IIndustryCatalog? industries = null,
     IServiceProvider? services = null, CampaignLinkTrust? campaignTrust = null, TimeProvider? time = null,
-    Modulix.Core.Contracts.Numbering.IDocumentNumbers? numbers = null)
+    Modulix.Core.Contracts.Numbering.IDocumentNumbers? numbers = null, ICommercialCustomFields? commercialFields = null)
 {
+    /// <summary>
+    /// Teklif başlığında ticari sayılan özel alan anahtarları (ADR-0019): firmanın ticari işaretlediği alanlar ile etkin ek ücret kurallarının koşul,
+    /// taban, süre ve çarpan anahtarı olarak kullandığı alanlar (kuralda kullanılan alan işaretlenmese de ticaridir). Servis yoksa (birim testi) boştur.
+    /// </summary>
+    public async Task<IReadOnlySet<string>> CommercialQuoteFieldsAsync(CancellationToken cancellationToken)
+    {
+        var keys = commercialFields is null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : new HashSet<string>(await commercialFields.GetKeysAsync(CrmModule.Entities.Quote, cancellationToken), StringComparer.Ordinal);
+        var rules = await data.Set<Modulix.Modules.Crm.Domain.SurchargeRule>().AsNoTracking().Where(r => r.IsActive).ToListAsync(cancellationToken);
+        keys.UnionWith(Modulix.Modules.Crm.Pricing.SurchargeRules.UsedKeys(rules));
+        return keys;
+    }
+
     /// <summary>Ortak belge numaralama (ADR-0049 dilim 3a): teklif numarası. Host her zaman verir; yalnızca servissiz kurulumda (birim testi) yoktur.</summary>
     public Modulix.Core.Contracts.Numbering.IDocumentNumbers Numbers =>
         numbers ?? throw new InvalidOperationException("Belge numaralama servisi kayıtlı değil.");

@@ -83,6 +83,26 @@ public static class SurchargeRules
         rule.Id, rule.Name, Enum.Parse<SurchargeKind>(rule.Kind), rule.Currency, rule.Priority, rule.Amount, rule.Percent, rule.GroupKey, rule.BaseKey,
         rule.DurationKey, rule.FreeUnits, ParseKeys(rule.QuantityKeys), ParseConditions(rule.Conditions), Enum.Parse<SurchargePresentation>(rule.Presentation), rule.Stackable);
 
+    /// <summary>Kuralların koşul, taban, süre ve çarpan olarak başvurduğu anahtarlar (bağlam anahtarı ya da özel alan anahtarı olabilir).</summary>
+    public static IReadOnlySet<string> UsedKeys(IEnumerable<DomainRule> rules)
+    {
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var rule in rules)
+        {
+            keys.UnionWith(ParseConditions(rule.Conditions).Select(c => c.Key));
+            keys.UnionWith(ParseKeys(rule.QuantityKeys));
+            foreach (var key in new[] { rule.BaseKey, rule.DurationKey })
+            {
+                if (!string.IsNullOrWhiteSpace(key))
+                {
+                    keys.Add(key);
+                }
+            }
+        }
+
+        return keys;
+    }
+
     public static IReadOnlyList<string> ParseKeys(string? json) =>
         string.IsNullOrWhiteSpace(json) || JsonNode.Parse(json) is not JsonArray array ? [] : [.. array.Select(i => i!.GetValue<string>())];
 

@@ -6426,6 +6426,8 @@
   "admin.customFields.typeFixed": "Tip yadda saxlanıldıqdan sonra dəyişmir.",
   "admin.customFields.required": "Məcburi",
   "admin.customFields.showInList": "Siyahıda göstər",
+  "admin.customFields.commercial": "Kommersiya məzmunu (qiyməti və ya şərtləri müəyyən edir)",
+  "admin.customFields.commercialHelp": "Təqdim edilmiş təklifdə bu sahənin dəyəri yerində dəyişmir; dəyişiklik üçün yeni revizya açılır. Əlavə haqq qaydasında istifadə olunan sahə işarələnməsə də kommersiya sayılır.",
   "admin.customFields.optionN": "Seçim {0}",
   "admin.customFields.optionsHint": "İstifadə olunmuş seçim silinmir; passiv edin. Passiv seçim yeni qeyddə seçilə bilməz.",
   "admin.customFields.add": "Sahəni əlavə et",

@@ -6426,6 +6426,8 @@
   "admin.customFields.typeFixed": "Tip kaydedildikten sonra değişmez.",
   "admin.customFields.required": "Zorunlu",
   "admin.customFields.showInList": "Listede göster",
+  "admin.customFields.commercial": "Ticari içerik (fiyatı ya da şartları belirler)",
+  "admin.customFields.commercialHelp": "Sunulmuş teklifte bu alanın değeri yerinde değişmez; değişiklik için yeni revizyon açılır. Ek ücret kuralında kullanılan alan işaretlenmese de ticari sayılır.",
   "admin.customFields.optionN": "Seçenek {0}",
   "admin.customFields.optionsHint": "Kullanılmış bir seçenek silinmez; pasife alın. Pasif seçenek yeni kayıtta seçilemez.",
   "admin.customFields.add": "Alanı ekle",

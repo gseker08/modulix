@@ -67,6 +67,12 @@ public sealed class CustomField : ITenantEntity, ICompanyShared
 
     public bool ShowInList { get; set; }
 
+    /// <summary>
+    /// Ticari içerik: değeri fiyatı ya da şartları belirler. Sunulmuş (taslak olmayan) teklifte ticari alan yerinde değişmez, yeni revizyon açılır
+    /// (ADR-0019 kilit kararı). Ek ücret kuralında kullanılan alan bu işaret olmasa da ticari sayılır.
+    /// </summary>
+    public bool IsCommercial { get; set; }
+
     public int SortOrder { get; set; }
 
     public DateTimeOffset? ArchivedAt { get; private set; }
@@ -107,7 +113,7 @@ public sealed class CustomField : ITenantEntity, ICompanyShared
     public void Restore() => ArchivedAt = null;
 
     public CustomFieldInfo ToInfo() =>
-        new(Id, EntityKey, Key, Label, Type, Required, ShowInList, SortOrder, IsArchived, HasOptions ? Options : []);
+        new(Id, EntityKey, Key, Label, Type, Required, ShowInList, SortOrder, IsArchived, HasOptions ? Options : [], IsCommercial);
 }
 
 /// <summary>Özel alan tanımı; boru hattı, ekranlar ve denetim kaydı bunu kullanır.</summary>
@@ -121,4 +127,5 @@ public sealed record CustomFieldInfo(
     bool ShowInList,
     int SortOrder,
     bool Archived,
-    IReadOnlyList<CustomFieldOption> Options);
+    IReadOnlyList<CustomFieldOption> Options,
+    bool IsCommercial = false);

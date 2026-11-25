@@ -78,7 +78,8 @@ public static class CustomFieldEndpoints
         (CoreFieldType)request.Type,
         request.Required,
         request.ShowInList,
-        request.Options?.Select(o => new CustomFieldOptionInput(o.Key, o.Label ?? string.Empty, o.Active)).ToList());
+        request.Options?.Select(o => new CustomFieldOptionInput(o.Key, o.Label ?? string.Empty, o.Active)).ToList(),
+        request.IsCommercial);
 
     internal static CustomFieldDto ToDto(CustomFieldInfo field) => new(
         field.Id,
@@ -89,7 +90,8 @@ public static class CustomFieldEndpoints
         field.Required,
         field.ShowInList,
         field.Archived,
-        field.Options.Select(o => new CustomFieldOptionDto(o.Key, o.Label, o.Active)).ToList());
+        field.Options.Select(o => new CustomFieldOptionDto(o.Key, o.Label, o.Active)).ToList(),
+        field.IsCommercial);
 
     private static IResult NotFound() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Alan bulunamadı.");
 }

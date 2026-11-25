@@ -6426,6 +6426,8 @@
   "admin.customFields.typeFixed": "The type cannot be changed after saving.",
   "admin.customFields.required": "Required",
   "admin.customFields.showInList": "Show in list",
+  "admin.customFields.commercial": "Commercial content (determines price or terms)",
+  "admin.customFields.commercialHelp": "On a submitted quote this field's value cannot be changed in place; open a new revision instead. A field used in a surcharge rule counts as commercial even when unchecked.",
   "admin.customFields.optionN": "Option {0}",
   "admin.customFields.optionsHint": "A used option cannot be deleted; deactivate it instead. An inactive option cannot be chosen on new records.",
   "admin.customFields.add": "Add field",

@@ -70,6 +70,14 @@
                             <input class="form-check-input" type="checkbox" @bind="form.ShowInList" />
                             <span class="form-check-label">@Texts.Get("admin.customFields.showInList")</span>
                         </label>
+                        @if (SupportsCommercial)
+                        {
+                            <label class="form-check">
+                                <input class="form-check-input" type="checkbox" @bind="form.IsCommercial" />
+                                <span class="form-check-label">@Texts.Get("admin.customFields.commercial")</span>
+                            </label>
+                            <div class="form-text">@Texts.Get("admin.customFields.commercialHelp")</div>
+                        }
                     </div>
                     @if (CustomFieldTypeLabels.HasOptions(form.Type))
                     {
@@ -173,6 +181,9 @@
 @code {
     private IReadOnlyList<CustomizableEntityDto>? entities;
     private string? entityKey;
+
+    // Ticari kilit yalnızca teklif başlığında vardır (ADR-0019); öteki türlerde işaret anlamsız olduğundan sunulmaz.
+    private bool SupportsCommercial => entityKey == "crm.quote";
     private List<CustomFieldDto>? fields;
     private FieldForm? form;
     private string? message;
@@ -225,7 +236,7 @@
     {
         form = new FieldForm
         {
-            Id = field.Id, Label = field.Label, Type = field.Type, Required = field.Required, ShowInList = field.ShowInList,
+            Id = field.Id, Label = field.Label, Type = field.Type, Required = field.Required, ShowInList = field.ShowInList, IsCommercial = field.IsCommercial,
             Options = [.. field.Options.Select(o => new OptionForm { Key = o.Key, Label = o.Label, Active = o.Active })],
         };
         errors = null;
@@ -237,7 +248,7 @@
         var options = CustomFieldTypeLabels.HasOptions(form!.Type)
             ? form.Options.Where(o => o.Key is not null || !string.IsNullOrWhiteSpace(o.Label)).Select(o => new SaveCustomFieldOption(o.Key, o.Label, o.Active)).ToList()
             : null;
-        var request = new SaveCustomFieldRequest(entityKey!, form.Label, form.Type, form.Required, form.ShowInList, options);
+        var request = new SaveCustomFieldRequest(entityKey!, form.Label, form.Type, form.Required, form.ShowInList, options, form.IsCommercial);
         var result = form.Id is { } id
             ? await Api.PutAsync<CustomFieldDto>($"/api/customization/fields/{id}", request)
             : await Api.PostAsync<CustomFieldDto>("/api/customization/fields", request);
@@ -284,6 +295,8 @@
         public bool Required { get; set; }
 
         public bool ShowInList { get; set; }
+
+        public bool IsCommercial { get; set; }
 
         public List<OptionForm> Options { get; set; } = [];
     }
