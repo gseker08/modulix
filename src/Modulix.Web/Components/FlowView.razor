@@ -44,6 +44,7 @@
                 @if (Editable && node.StepIndex is { } index)
                 {
                     <div class="flow-actions">
+                        <IconAction Icon="pencil" Label="@Texts.Get("admin.flow.edit", index + 1)" OnClick="() => OnEdit.InvokeAsync(index)" />
                         <IconAction Icon="arrow-up" Label="@Texts.Get("admin.flow.moveUp", index + 1)" Disabled="@(index == 0)" OnClick="() => OnMove.InvokeAsync(new FlowMove(index, -1))" />
                         <IconAction Icon="arrow-down" Label="@Texts.Get("admin.flow.moveDown", index + 1)" Disabled="@(index == steps - 1)" OnClick="() => OnMove.InvokeAsync(new FlowMove(index, 1))" />
                         <IconAction Icon="trash" Label="@Texts.Get("admin.flow.remove", index + 1)" OnClick="() => OnRemove.InvokeAsync(index)" />
@@ -71,6 +72,9 @@
     [Parameter] public EventCallback<FlowMove> OnMove { get; set; }
 
     [Parameter] public EventCallback<int> OnRemove { get; set; }
+
+    /// <summary>Adımın alanlarının düzenlendiği forma geçer (E6-2b): düzenleyici ilgili adım kartının aksiyon seçicisine odaklanır. Alan düzenleyicisi tek yerdedir (form).</summary>
+    [Parameter] public EventCallback<int> OnEdit { get; set; }
 
     /// <summary>Sürüm karşılaştırmasında (E6-3) adım kimliğine göre değişiklik işareti: eklendi, kaldırıldı, değişti, taşındı. Rozet metinle de yazılır; renk tek başına anlam taşımaz.</summary>
     [Parameter] public IReadOnlyDictionary<string, FlowChangeKind>? Marks { get; set; }

@@ -88,7 +88,21 @@
         }
     });
 
+    // Kimliği verilen öğeyi görünür kılar ve odaklar (akıştaki düğümden formdaki alana geçiş). Hareket azaltma tercihinde kaydırma animasyonsuzdur.
+    function focusById(id) {
+        const element = document.getElementById(id);
+        if (!element) {
+            return false;
+        }
+
+        const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        element.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+        element.focus({ preventScroll: true });
+        return true;
+    }
+
     window.modulixShell = {
+        focusById: focusById,
         setAccent: (light, dark) => applyAccent(light, dark),
         getTheme: () => root.getAttribute('data-theme') || 'light',
         setTheme: theme => {
