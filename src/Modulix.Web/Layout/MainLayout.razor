@@ -43,7 +43,11 @@
                         </label>
                     }
 
-                    <NotificationBell />
+                    @* Bildirim kutusu firmaya aittir: firması olmayan (yalnızca platform) kullanıcıda dakikada bir 403 alan istek atılmaz. *@
+                    @if (Session.HasActiveTenant)
+                    {
+                        <NotificationBell />
+                    }
 
                     <ThemeToggle />
 
