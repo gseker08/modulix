@@ -21,6 +21,10 @@
                 <div class="flow-body">
                     <small class="flow-kind">@node.KindLabel</small>
                     <strong class="flow-title">@node.Title@if (MarkOf(node) is { } mark) { <text> </text><span class="badge stage-@MarkBadge(mark)">@MarkLabel(mark)</span> }</strong>
+                    @if (OutcomeOf(node) is { } outcome)
+                    {
+                        <span class="flow-line"><span class="badge stage-@OutcomeBadge(outcome)">@Texts.Get($"admin.flow.outcome.{outcome.ToString().ToLowerInvariant()}")</span></span>
+                    }
                     @foreach (var line in node.Lines)
                     {
                         <span class="flow-line">@line</span>
@@ -70,6 +74,20 @@
 
     /// <summary>Sürüm karşılaştırmasında (E6-3) adım kimliğine göre değişiklik işareti: eklendi, kaldırıldı, değişti, taşındı. Rozet metinle de yazılır; renk tek başına anlam taşımaz.</summary>
     [Parameter] public IReadOnlyDictionary<string, FlowChangeKind>? Marks { get; set; }
+
+    /// <summary>Deneme çalıştırmasının (E6-3b) adım kimliğine göre sonucu: çalışırdı, adım koşulu nedeniyle atlanırdı, kullanılamıyor, kural koşulu sağlanmıyor. Rozet metinle de yazılır.</summary>
+    [Parameter] public IReadOnlyDictionary<string, FlowOutcome>? Outcomes { get; set; }
+
+    private FlowOutcome? OutcomeOf(FlowNode node) =>
+        node.StepId is { } id && Outcomes is not null && Outcomes.TryGetValue(id, out var outcome) ? outcome : null;
+
+    private static string OutcomeBadge(FlowOutcome outcome) => outcome switch
+    {
+        FlowOutcome.WouldRun => "won",
+        FlowOutcome.SkippedByStepCondition => "onhold",
+        FlowOutcome.NotPermitted => "lost",
+        _ => "cancelled",
+    };
 
     private FlowChangeKind? MarkOf(FlowNode node) =>
         node.StepId is { } id && Marks is not null && Marks.TryGetValue(id, out var kind) ? kind : null;

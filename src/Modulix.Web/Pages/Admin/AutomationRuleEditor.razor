@@ -80,7 +80,15 @@
         @if (entity is not null)
         {
             <FormSection Title="@Texts.Get("admin.flow.title")" Icon="shuffle" Description="@Texts.Get("admin.automationEditor.flowHelp")">
-                <FlowView Nodes="LiveFlow()" Editable="true" OnInsert="InsertActionAt" OnMove="MoveActionAt" OnRemove="RemoveActionAt" />
+                @{
+                    var liveFlow = LiveFlow();
+                    var outcomes = AutomationFlowOutcomes.From(preview, liveFlow.Where(n => n.StepId is not null).Select(n => n.StepId!));
+                }
+                <FlowView Nodes="liveFlow" Editable="true" OnInsert="InsertActionAt" OnMove="MoveActionAt" OnRemove="RemoveActionAt" Outcomes="outcomes" />
+                @if (outcomes.Count > 0)
+                {
+                    <p class="small text-muted">@Texts.Get("admin.flow.outcomeStale")</p>
+                }
             </FormSection>
 
             <FormSection Title="@Texts.Get("admin.automationEditor.when")" Icon="zap" Description="@Texts.Get("admin.automationEditor.whenHelp")">

@@ -252,7 +252,7 @@ public static class AutomationEndpoints
         preview.ConditionsPassed,
         preview.Explanation is null ? null : ToDto(preview.Explanation),
         [.. preview.PlannedActions.Select(a => new PlannedActionDto(
-            a.StepId, a.Action, a.DisplayName, a.SideEffect.ToString(), JsonSerializer.SerializeToElement(a.Parameters), a.Permitted, a.Note))],
+            a.StepId, a.Action, a.DisplayName, a.SideEffect.ToString(), JsonSerializer.SerializeToElement(a.Parameters), a.Permitted, a.Note, a.StepConditionPassed))],
         preview.Warnings);
 
     private static ConditionExplanationDto ToDto(ConditionExplanation explanation) =>
