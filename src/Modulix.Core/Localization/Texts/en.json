@@ -14152,7 +14152,7 @@
   "admin.flow.moveUp": "Move step {0} up",
   "admin.flow.moveDown": "Move step {0} down",
   "admin.flow.remove": "Remove step {0}",
-  "admin.automationEditor.flowHelp": "The current flow of the rule. You can add a step between steps, move or remove a step; fill in the step's fields in the form below. The draft does not change until you save.",
+  "admin.automationEditor.flowHelp": "The current flow of the rule. You can add a step between steps, move or remove a step; the pencil button takes you to the form where the step's fields are. The draft does not change until you save.",
   "admin.versionDiff.title": "Difference from published version {0}",
   "admin.versionDiff.none": "The draft is the same as the published version; nothing changed.",
   "admin.versionDiff.trigger": "The trigger changed",
@@ -14171,5 +14171,6 @@
   "admin.flow.outcome.skippedbystepcondition": "Step condition not met, would be skipped",
   "admin.flow.outcome.notpermitted": "Unavailable",
   "admin.flow.outcome.rulenotmatched": "Rule condition not met, would not run",
-  "admin.flow.outcomeStale": "The badges are the result of the last validation on the sample record; validate again if you changed the rule. Nothing was run."
+  "admin.flow.outcomeStale": "The badges are the result of the last validation on the sample record; validate again if you changed the rule. Nothing was run.",
+  "admin.flow.edit": "Edit step {0} in the form"
 }

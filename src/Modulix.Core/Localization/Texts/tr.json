@@ -14152,7 +14152,7 @@
   "admin.flow.moveUp": "{0}. adımı yukarı taşı",
   "admin.flow.moveDown": "{0}. adımı aşağı taşı",
   "admin.flow.remove": "{0}. adımı kaldır",
-  "admin.automationEditor.flowHelp": "Kuralın o anki akışı. Adımlar arasına yeni adım ekleyebilir, adımı taşıyabilir ya da kaldırabilirsiniz; adımın alanlarını aşağıdaki formda doldurun. Kaydedene kadar taslak değişmez.",
+  "admin.automationEditor.flowHelp": "Kuralın o anki akışı. Adımlar arasına yeni adım ekleyebilir, adımı taşıyabilir ya da kaldırabilirsiniz; kalem düğmesi adımın alanlarının bulunduğu forma götürür. Kaydedene kadar taslak değişmez.",
   "admin.versionDiff.title": "Yayınlanmış sürüm {0} ile fark",
   "admin.versionDiff.none": "Taslak, yayınlanmış sürümle aynı; değişen bir şey yok.",
   "admin.versionDiff.trigger": "Tetikleyici değişti",
@@ -14171,5 +14171,6 @@
   "admin.flow.outcome.skippedbystepcondition": "Adım koşulu sağlanmıyor, atlanırdı",
   "admin.flow.outcome.notpermitted": "Kullanılamıyor",
   "admin.flow.outcome.rulenotmatched": "Kural koşulu sağlanmıyor, çalışmaz",
-  "admin.flow.outcomeStale": "Rozetler son doğrulamanın örnek kayıttaki sonucudur; kuralı değiştirdiyseniz yeniden doğrulayın. Hiçbir şey çalıştırılmadı."
+  "admin.flow.outcomeStale": "Rozetler son doğrulamanın örnek kayıttaki sonucudur; kuralı değiştirdiyseniz yeniden doğrulayın. Hiçbir şey çalıştırılmadı.",
+  "admin.flow.edit": "{0}. adımı formda düzenle"
 }

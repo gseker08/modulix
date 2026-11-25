@@ -14152,7 +14152,7 @@
   "admin.flow.moveUp": "{0}. addımı yuxarı apar",
   "admin.flow.moveDown": "{0}. addımı aşağı apar",
   "admin.flow.remove": "{0}. addımı sil",
-  "admin.automationEditor.flowHelp": "Qaydanın cari axını. Addımlar arasına yeni addım əlavə edə, addımı apara və ya silə bilərsiniz; addımın sahələrini aşağıdakı formada doldurun. Yadda saxlayana qədər layihə dəyişmir.",
+  "admin.automationEditor.flowHelp": "Qaydanın cari axını. Addımlar arasına yeni addım əlavə edə, addımı apara və ya silə bilərsiniz; qələm düyməsi addımın sahələrinin olduğu formaya aparır. Yadda saxlayana qədər layihə dəyişmir.",
   "admin.versionDiff.title": "Dərc olunmuş {0}. versiya ilə fərq",
   "admin.versionDiff.none": "Layihə dərc olunmuş versiya ilə eynidir; dəyişiklik yoxdur.",
   "admin.versionDiff.trigger": "Tətikləyici dəyişdi",
@@ -14171,5 +14171,6 @@
   "admin.flow.outcome.skippedbystepcondition": "Addım şərti ödənmir, atlanardı",
   "admin.flow.outcome.notpermitted": "İstifadə oluna bilmir",
   "admin.flow.outcome.rulenotmatched": "Qayda şərti ödənmir, işləməz",
-  "admin.flow.outcomeStale": "Nişanlar son yoxlamanın nümunə qeyddəki nəticəsidir; qaydanı dəyişmisinizsə yenidən yoxlayın. Heç nə işlədilmədi."
+  "admin.flow.outcomeStale": "Nişanlar son yoxlamanın nümunə qeyddəki nəticəsidir; qaydanı dəyişmisinizsə yenidən yoxlayın. Heç nə işlədilmədi.",
+  "admin.flow.edit": "{0}. addımı formada redaktə et"
 }

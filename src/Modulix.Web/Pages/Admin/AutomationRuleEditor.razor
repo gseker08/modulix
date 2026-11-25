@@ -5,6 +5,7 @@
 @inject ApiClient Api
 @inject SessionState Session
 @inject NavigationManager Navigation
+@inject IJSRuntime Js
 
 <PageTitle>@(IsNew ? Texts.Get("admin.automationEditor.newTitle") : Texts.Get("admin.automationEditor.editTitle")) · Modulix</PageTitle>
 
@@ -84,7 +85,7 @@
                     var liveFlow = LiveFlow();
                     var outcomes = AutomationFlowOutcomes.From(preview, liveFlow.Where(n => n.StepId is not null).Select(n => n.StepId!));
                 }
-                <FlowView Nodes="liveFlow" Editable="true" OnInsert="InsertActionAt" OnMove="MoveActionAt" OnRemove="RemoveActionAt" Outcomes="outcomes" />
+                <FlowView Nodes="liveFlow" Editable="true" OnInsert="InsertActionAt" OnMove="MoveActionAt" OnRemove="RemoveActionAt" OnEdit="EditActionAsync" Outcomes="outcomes" />
                 @if (outcomes.Count > 0)
                 {
                     <p class="small text-muted">@Texts.Get("admin.flow.outcomeStale")</p>
@@ -883,6 +884,9 @@
     }
 
     private void RemoveActionAt(int index) => definition.RemoveActionAt(index);
+
+    // Akıştaki düğümden formdaki adım kartına geçer: adım kartının aksiyon seçicisi görünür kılınır ve odaklanır (kimlik: action{sıra}).
+    private async Task EditActionAsync(int index) => await Js.InvokeVoidAsync("modulixShell.focusById", $"action{index + 1}");
 
     // Tuval, formun o anki (kaydedilmemiş) halini çizer: taslağı sunucuya göndermeden yerel olarak okunur.
     private IReadOnlyList<FlowNode> LiveFlow() =>
