@@ -1,5 +1,6 @@
 @* Kayıt sayfası sekme çubuğu. Panelleri sayfa çizer: id="tabpanel-{Key}", aria-labelledby="tab-{Key}", hidden="@State.Hidden(Key)".
    Yetkisi olmayan sekme listeye hiç eklenmez. Telefonda çubuk yatay kayar. *@
+<div class="record-tabs-wrap">
 <div class="record-tabs" role="tablist" aria-label="@LabelText">
     @foreach (var tab in Tabs)
     {
@@ -19,6 +20,7 @@
             }
         </button>
     }
+</div>
 </div>
 
 @code {

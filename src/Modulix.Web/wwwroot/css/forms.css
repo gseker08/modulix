@@ -147,6 +147,13 @@
             color: var(--mx-text-secondary);
         }
 
+/* Sekme çubuğu kapsayıcısı (TabBar): içerik paneli içeriğine göre genişler (.content: fit-content), kapsayıcı ise genişliğini
+   içeriğinden almaz (contain: inline-size). Böylece çok sekmeli çubuk paneli ve sayfayı genişletmez, sığmayınca kendi içinde kayar;
+   sığıyorsa çubuk (fit-content, max-width: 100%) eskisi gibi içeriği kadar yer tutar. ViewTabs kendi contain kuralını taşır. */
+.record-tabs-wrap {
+    contain: inline-size;
+}
+
 /* Sekmeler */
 .record-tabs {
     display: flex;

@@ -16,10 +16,12 @@
 
     <Notice Text="@message" Failed="@failed" />
 
+    <div class="record-tabs-wrap">
     <div class="record-tabs" role="tablist" aria-label="@Texts.Get("common.sections")">
         <button type="button" role="tab" class="record-tab @(tab == "prefs" ? "active" : null)" aria-selected="@(tab == "prefs")" @onclick='() => SwitchAsync("prefs")'>@Texts.Get("admin.commPrefs.tab.prefs")</button>
         <button type="button" role="tab" class="record-tab @(tab == "blocks" ? "active" : null)" aria-selected="@(tab == "blocks")" @onclick='() => SwitchAsync("blocks")'>@Texts.Get("admin.commPrefs.tab.blocks")</button>
         <button type="button" role="tab" class="record-tab @(tab == "topics" ? "active" : null)" aria-selected="@(tab == "topics")" @onclick='() => SwitchAsync("topics")'>@Texts.Get("admin.commPrefs.tab.topics")</button>
+    </div>
     </div>
 
     @if (tab == "prefs")
