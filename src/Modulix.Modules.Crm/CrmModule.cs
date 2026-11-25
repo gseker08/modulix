@@ -462,7 +462,7 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         new(Entities.Contact, "Kişi"),
         new(Entities.Opportunity, "Fırsat"),
         new(Entities.Activity, "Aktivite"),
-        new(Entities.Lead, "Lead"),
+        new(Entities.Lead, "Müşteri adayı"),
         new(Entities.Quote, "Teklif"),
         new(Entities.QuoteLine, "Teklif satırı"),
     ];
@@ -851,7 +851,7 @@ public sealed class CrmModule : IModule, IModuleEndpoints, IModulePublicEndpoint
         new(Entities.Activity, "Aktivite (CRM)", Permissions.ActivitiesRead, new Dictionary<string, string>
         {
             ["type"] = "Tür", ["subject"] = "Konu", ["dueAt"] = "Son tarih", ["completedAt"] = "Tamamlanma", ["companyId"] = "Firma",
-            ["contactId"] = "Kişi", ["opportunityId"] = "Fırsat", ["leadId"] = "Lead", ["outcome"] = "Sonuç", ["ownerId"] = "Sorumlu", ["notes"] = "Açıklama",
+            ["contactId"] = "Kişi", ["opportunityId"] = "Fırsat", ["leadId"] = "Müşteri adayı", ["outcome"] = "Sonuç", ["ownerId"] = "Sorumlu", ["notes"] = "Açıklama",
             ["status"] = "Durum", ["statusReason"] = "Durum / sonuç açıklaması", ["priority"] = "Öncelik", ["startAt"] = "Başlangıç", ["endAt"] = "Bitiş",
             ["isAllDay"] = "Tüm gün", ["startDate"] = "Başlangıç günü", ["endDate"] = "Bitiş günü", ["timeZone"] = "Saat dilimi", ["location"] = "Konum",
             ["onlineMeetingUrl"] = "Çevrim içi toplantı", ["isPrivate"] = "Özel", ["estimatedMinutes"] = "Tahmini süre (dk)", ["actualMinutes"] = "Gerçekleşen süre (dk)",
