@@ -32,7 +32,7 @@ public class SurchargeRuleListTests(ModulixApiFactory factory) : IClassFixture<M
         Assert.Equal(["Charlie", "Bravo", "Alfa"], await NamesAsync(admin, "sort=priority"));
         Assert.Equal(["Alfa"], await NamesAsync(admin, "active=false"));
         Assert.Equal(["Charlie"], await NamesAsync(admin, "kind=Percent"));
-        Assert.Equal(["Charlie", "Bravo", "Alfa"], await NamesAsync(admin, "sort=bilinmeyen"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await admin.GetAsync("/api/crm/surcharge-rules?sort=bilinmeyen")).StatusCode);
     }
 
     [Fact]

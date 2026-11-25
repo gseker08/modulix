@@ -52,6 +52,9 @@ internal sealed class SurchargeRuleRecordStore(CrmStoreContext context) : CrmRec
 
     protected override IOrderedQueryable<SurchargeRule> Order(IQueryable<SurchargeRule> source) => source.OrderBy(r => r.Priority).ThenBy(r => r.Name);
 
+    protected override IReadOnlyCollection<string>? SortKeys { get; } =
+        ["name", "-name", "kind", "-kind", "priority", "-priority", "presentation", "-presentation", "isActive", "-isActive"];
+
     // Liste ekranının sıralanabilir başlıkları (ad, tür, öncelik, görünüm, durum, para birimi); sıra her zaman ad ve kimlikle sabitlenir.
     protected override IOrderedQueryable<SurchargeRule> Order(IQueryable<SurchargeRule> source, string? sort) => sort switch
     {
