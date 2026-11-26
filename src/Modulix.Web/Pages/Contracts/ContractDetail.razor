@@ -83,7 +83,7 @@
                         <textarea id="reason" class="form-control" rows="2" maxlength="500" @bind="reasonText"></textarea>
                         <FieldError Field="reason" Errors="actionErrors" />
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.quoteDetail.confirm")</button>
+                            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("crm.quoteDetail.confirm")</button>
                             <button type="button" class="btn btn-outline-secondary" @onclick="() => reasonAction = null">@Texts.Get("common.dismiss")</button>
                         </div>
                     </form>
@@ -265,7 +265,7 @@
                     @if (CanEditHeader)
                     {
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@Texts.Get(contract is null ? "crm.quoteDetail.createDraft" : "common.save")</button>
+                            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : "false")">@Texts.Get(contract is null ? "crm.quoteDetail.createDraft" : "common.save")</button>
                             @if (dirty) { <span class="text-muted" role="status">@Texts.Get("crm.quoteDetail.unsaved")</span> }
                         </div>
                     }
@@ -313,7 +313,7 @@
                                 </div>
                             </div>
                             <div class="form-actions">
-                                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
                                 <button type="button" class="btn btn-outline-secondary" @onclick="CancelChild">@Texts.Get("common.dismiss")</button>
                             </div>
                         </form>
@@ -423,7 +423,7 @@
                                 </div>
                             </div>
                             <div class="form-actions">
-                                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
                                 <button type="button" class="btn btn-outline-secondary" @onclick="CancelChild">@Texts.Get("common.dismiss")</button>
                             </div>
                         </form>
