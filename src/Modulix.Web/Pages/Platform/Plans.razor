@@ -53,7 +53,7 @@
             </div>
             <div class="form-actions">
                 <button type="button" class="btn btn-outline-secondary" @onclick="() => editing = null">@Texts.Get("common.cancel")</button>
-                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
             </div>
         </form>
     }

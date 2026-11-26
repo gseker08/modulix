@@ -355,7 +355,7 @@
                     @if (previewing) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
                     @Texts.Get("marketing.preview")
                 </button>
-                <button type="submit" class="btn btn-primary" disabled="@(saving || previewing || Dataset is not { Available: true })">
+                <button type="submit" class="btn btn-primary" disabled="@(saving || previewing || Dataset is not { Available: true })" aria-busy="@(saving ? "true" : "false")">
                     @if (saving) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
                     @Texts.Get("common.save")
                 </button>

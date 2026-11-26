@@ -22,7 +22,7 @@
                 <input id="code" class="form-control" autocomplete="one-time-code" inputmode="text" maxlength="20" required
                        @bind="code" @bind:event="oninput" />
             </div>
-            <button type="submit" class="btn btn-primary w-100" disabled="@(busy || string.IsNullOrWhiteSpace(code))">@Texts.Get("auth.login.twoFactor.submit")</button>
+            <button type="submit" class="btn btn-primary w-100" disabled="@(busy || string.IsNullOrWhiteSpace(code))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("auth.login.twoFactor.submit")</button>
         </form>
     }
     else
@@ -36,7 +36,7 @@
                 <label class="form-label" for="password">@Texts.Get("common.password")</label>
                 <input id="password" class="form-control" type="password" autocomplete="current-password" required @bind="password" />
             </div>
-            <button type="submit" class="btn btn-primary w-100" disabled="@busy">@Texts.Get("auth.login.submit")</button>
+            <button type="submit" class="btn btn-primary w-100" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("auth.login.submit")</button>
         </form>
         <p class="mt-3"><a href="sifremi-unuttum">@Texts.Get("auth.login.forgot")</a></p>
     }

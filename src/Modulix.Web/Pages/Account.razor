@@ -42,7 +42,7 @@
                 <FieldError Field="displayName" Errors="nameErrors" />
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || displayName.Trim() == profile.DisplayName)">@Texts.Get("common.save")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || displayName.Trim() == profile.DisplayName)" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
             </div>
         </form>
 
@@ -62,7 +62,7 @@
                 <div class="form-text">@Texts.Get("account.language.help")</div>
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || language == (profile.PreferredLanguage ?? string.Empty))">@Texts.Get("common.save")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || language == (profile.PreferredLanguage ?? string.Empty))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
             </div>
         </form>
 
@@ -84,7 +84,7 @@
             </div>
             <div class="form-text mb-3">@Texts.Get("account.email.help")</div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(newEmail))">@Texts.Get("account.email.send")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(newEmail))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("account.email.send")</button>
             </div>
         </form>
 

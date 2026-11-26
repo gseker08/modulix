@@ -39,7 +39,7 @@
                 <FieldError Field="roles" Errors="errors" />
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(email) || newRoles.Count == 0)">@Texts.Get("common.add")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(email) || newRoles.Count == 0)" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.add")</button>
             </div>
         </form>
 
