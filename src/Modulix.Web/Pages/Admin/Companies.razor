@@ -31,7 +31,7 @@
         </div>
         </FormTabs>
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name))">@Texts.Get("admin.companies.add")</button>
+            <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(name))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("admin.companies.add")</button>
         </div>
     </form>
 

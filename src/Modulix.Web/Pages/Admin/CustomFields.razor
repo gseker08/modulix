@@ -107,7 +107,7 @@
                 </div>
                 </FormTabs>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(form.Label))">
+                    <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(form.Label))" aria-busy="@(busy ? "true" : "false")">
                         @(form.Id is null ? Texts.Get("admin.customFields.add") : Texts.Get("common.save"))
                     </button>
                     <button type="button" class="btn btn-outline-secondary" @onclick="() => form = null">@Texts.Get("common.dismiss")</button>
