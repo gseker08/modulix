@@ -4,8 +4,19 @@ namespace Modulix.Modules.Crm.Contracts.Timeline;
 /// Müşteri zaman çizelgesi sorgusu: <paramref name="CompanyId"/> CRM firma kaydının, <paramref name="PartyId"/> aynı firmanın ortak (Core) taraf
 /// kaydının kimliğidir; kaynak kendi kayıtlarını hangisine bağlıyorsa onu kullanır. <paramref name="Before"/> verilirse yalnızca o andan önceki
 /// satırlar istenir (sayfalama imleci; sınır hariç). <paramref name="Take"/> kaynağın döndüreceği en çok satır sayısıdır.
+/// <para>
+/// Kişi çizelgesi (ADR-0059): <paramref name="ContactId"/> verilirse sorgu o CRM kişisinin kayıtlarınadır (CRM kaynakları kullanır); firma
+/// bağlamı <paramref name="CompanyId"/> kişinin ana firması (firmasızsa <see cref="Guid.Empty"/>) ve <paramref name="PartyId"/> o firmanın ortak
+/// taraf kaydıdır. <paramref name="PersonId"/> kişinin ortak (Core) kişi kaydının kimliğidir (CRM dışındaki kaynaklar için). Kişi sorgusuna
+/// yalnızca <see cref="ICustomerTimelineSource.SupportsPerson"/> bildiren kaynaklar çağrılır.
+/// </para>
 /// </summary>
-public sealed record CustomerTimelineQuery(Guid CompanyId, Guid? PartyId, DateTimeOffset? Before, int Take);
+public sealed record CustomerTimelineQuery(
+    Guid CompanyId, Guid? PartyId, DateTimeOffset? Before, int Take, Guid? ContactId = null, Guid? PersonId = null)
+{
+    /// <summary>Sorgu bir firmaya değil bir kişiye aittir.</summary>
+    public bool IsPerson => ContactId is not null || PersonId is not null;
+}
 
 /// <summary>
 /// Zaman çizelgesindeki tek satır. <paramref name="EntityKey"/> kaydın türü (ör. <c>crm.activity</c>), <paramref name="OccurredAt"/> satırın
@@ -38,6 +49,12 @@ public interface ICustomerTimelineSource
 {
     /// <summary>Kaynağın anahtarı; modül anahtarıyla başlar (ör. <c>crm.activities</c>). Yanıtta hangi kaynakların okunduğunu bildirir.</summary>
     string Key { get; }
+
+    /// <summary>
+    /// Kaynak kişi çizelgesini (<see cref="CustomerTimelineQuery.IsPerson"/>) destekler mi (ADR-0059). Varsayılan hayırdır: kaynak kendi kayıtlarını bir
+    /// kişiye bağlayabildiğinde bildirir, böylece kişi çizelgesine kendiliğinden girer; bağlayamayan kaynak çağrılmaz ve yanıttaki kaynak listesinde yoktur.
+    /// </summary>
+    bool SupportsPerson => false;
 
     Task<CustomerTimelineSlice?> ReadAsync(CustomerTimelineQuery query, CancellationToken cancellationToken);
 

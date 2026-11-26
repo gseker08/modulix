@@ -1,6 +1,6 @@
 # ADR-0059: Kişi kartında zaman çizelgesi
 
-- **Durum:** Öneri (taslak), 26 Kasım 2026. Karar bekler; kod yazılmadı.
+- **Durum:** Kabul edildi, 26 Kasım 2026; **dilim 1 (CRM kaynakları: aktivite, teklif; uç noktalar, kişi detayında sekme ve özet şeridi) teslim edildi.** Diğer dilimler bekler.
 - **Kaynak:** [ADR-0053](0053-musteri-zaman-cizelgesi.md) "Yapılmadı / sınırlar" (kişi kartında çizelge yok); `docs/oncelikli-isler.md` R3.
 - **Karar (önerilen):** Kaynak sözleşmesi (`ICustomerTimelineSource`) **geriye uyumlu genişletilir**: sorguya isteğe bağlı kişi kimlikleri eklenir, kişiye bağlanabilen kaynaklar kişi sorgusunu uygular, bağlayamayanlar `null`/boş dönmeden önce **kişi kapsamını desteklemediklerini bildirir**. Kişi kartı aynı birleştirici ve aynı arayüz bileşeniyle `GET /api/crm/contacts/{id}/timeline` ucundan beslenir.
 
@@ -59,8 +59,16 @@ Kaynakların bugünkü kişi bağları (koddan):
 - Kişi firma değiştirirse eski firmayla kurulmuş kayıtlar kayıtların bağına göre görünür; geçmiş yeniden yazılmaz.
 - Kişiler arası birleştirme (`ContactMerge`) sonrası kimlik eşlemesi çizelgeyi izler; ayrıca bir geçiş yapılmaz.
 
-## Açık kararlar (kullanıcıdan)
+## Verilen kararlar (26 Kasım 2026)
 
-1. Kapsam: ilk dilimde yalnızca CRM kaynakları mı, yoksa dört modülün hepsi birlikte mi?
-2. Fırsat/aday için kişi alanı eklenecek mi (ayrı ADR) yoksa kişi çizelgesinde hiç olmayacak mı?
-3. Özet şeridi kişi kartında gösterilsin mi, yoksa yalnızca liste mi?
+1. **Kapsam:** ilk dilim yalnızca CRM kaynakları (aktivite, teklif); Sipariş, Sözleşme, Destek ve Pazarlama sonraki dilimlerde.
+2. **Fırsat ve aday:** kişi alanı **eklenecek** (migration gerektirir; ayrı küçük adım, "migration'da dur ve bildir" kuralı). Alan eklenip kaynak `ContactScope` bildirince kişi çizelgesine kendiliğinden girer; birleştirici ve arayüz değişmez.
+3. **Özet şeridi:** kişi kartında **olacak**; kaynakların kendi son hareket ve açık iş bildirimlerinden gelir.
+
+**Dinamiklik ilkesi:** hangi kaynakların kişi çizelgesinde olduğu ve hangi alanın kişiye bağ sayıldığı hiçbir yerde sabit listeyle yazılmaz. Kaynak kayıtlıysa ve `SupportsPerson` diyorsa girer; arayüz sekmeleri, süzgeç çipleri ve özet kartları API'nin döndürdüğü `sources` ve `open` listelerinden çizilir; yeni bir modül yalnızca arayüzü uygulayıp kaydolarak (ve kişi bağını bildirerek) kişi çizelgesine girer. Fırsat/aday kişi alanı da form metadata'sında (ADR-0021) tanımlanır, firma özelleştirebilir.
+
+## Dilim 1'de uygulanan ayrıntı (öneriden sapma)
+
+- Sorgu hem `ContactId` (CRM kişisi; CRM kaynakları) hem `PersonId` (ortak kişi; CRM dışı kaynaklar, sonraki dilimler) taşır; CRM kişisi `crm.Contacts` kaydıdır ve CRM dışı modüller CRM'e başvuramaz. `CompanyId` kişinin ana firması, firmasızsa `Guid.Empty`'dir; `IsPerson` kişi sorgusunu ayırt eder.
+- Uç ve birleştirici ortaktır (`TimelineComposer`); firma ve kişi uçları ince katmandır. Kişi sorgusunda desteklemeyen kaynak çağrılmaz ve `sources` süzgecinde tanınmaz (400).
+- CRM kaynağı kişiyi `ContactScope` ile bildirir: aktivite `related=crm.contact:{id}` (kişi, dönüşen aday ve bağlantılar), teklif `contactId`; teklif durum satırları (kabul, red, süre dolumu, iptal) kişinin tekliflerinden üretilir.

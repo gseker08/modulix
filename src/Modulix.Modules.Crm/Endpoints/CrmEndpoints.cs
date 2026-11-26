@@ -35,6 +35,8 @@ internal static class CrmEndpoints
         MergeEndpoints.Map(crm);
         ResourceEndpoints.MapResource<ContactDto, SaveContactRequest>(crm, "/api/crm", "contacts", CrmModule.Entities.Contact,
             CrmModule.Permissions.ContactsRead, CrmModule.Permissions.ContactsWrite);
+        crm.MapGet("/contacts/{id:guid}/timeline", ContactTimelineEndpoint.GetAsync).RequirePermission(CrmModule.Permissions.ContactsRead);
+        crm.MapGet("/contacts/{id:guid}/timeline/summary", ContactTimelineEndpoint.SummaryAsync).RequirePermission(CrmModule.Permissions.ContactsRead);
         ResourceEndpoints.MapResource<CompanyContactDto, SaveCompanyContactRequest>(crm, "/api/crm", "company-contacts", CrmModule.Entities.CompanyContact,
             CrmModule.Permissions.ContactsRead, CrmModule.Permissions.ContactsWrite);
         ResourceEndpoints.MapResource<LocationDto, SaveLocationRequest>(crm, "/api/crm", "locations", CrmModule.Entities.Location,

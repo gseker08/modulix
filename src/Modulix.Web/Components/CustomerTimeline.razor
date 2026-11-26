@@ -130,9 +130,16 @@
     private DateTimeOffset? nextBefore;
     private string? error;
     private bool loading;
-    private (Guid Company, long Version)? loadedFor;
+    private (Guid Owner, long Version)? loadedFor;
 
-    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    private Guid Owner => ContactId ?? CompanyId;
+
+    /// <summary>Çizelgenin sahibi: firma ya da kişi (ADR-0059); ikisi birlikte verilmez, kişi verilirse kişi çizelgesi çizilir.</summary>
+    [Parameter] public Guid CompanyId { get; set; }
+
+    [Parameter] public Guid? ContactId { get; set; }
+
+    private string Base => ContactId is { } contact ? $"/api/crm/contacts/{contact}" : $"/api/crm/companies/{CompanyId}";
 
     [Parameter, EditorRequired] public CrmLookups Lookups { get; set; } = default!;
 
@@ -141,12 +148,12 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (loadedFor == (CompanyId, Version))
+        if (loadedFor == (Owner, Version))
         {
             return;
         }
 
-        loadedFor = (CompanyId, Version);
+        loadedFor = (Owner, Version);
         items = null;
         nextBefore = null;
         available.Clear();
@@ -159,7 +166,7 @@
     }
 
     private async Task LoadSummaryAsync() =>
-        summary = (await Api.GetAsync<CustomerTimelineSummaryDto>($"/api/crm/companies/{CompanyId}/timeline/summary")).Value;
+        summary = (await Api.GetAsync<CustomerTimelineSummaryDto>($"{Base}/timeline/summary")).Value;
 
     // Açık iş sayısının görünen adı; arayüzün tanımadığı kaynak anahtarıyla yazılır.
     private static string OpenLabel(string key) => key switch
@@ -224,7 +231,7 @@
             query.Add($"sources={Uri.EscapeDataString(string.Join(',', selected))}");
         }
 
-        var result = await Api.GetAsync<CustomerTimelineDto>($"/api/crm/companies/{CompanyId}/timeline{(query.Count == 0 ? string.Empty : "?" + string.Join('&', query))}");
+        var result = await Api.GetAsync<CustomerTimelineDto>($"{Base}/timeline{(query.Count == 0 ? string.Empty : "?" + string.Join('&', query))}");
         loading = false;
         if (result.Value is not { } page)
         {

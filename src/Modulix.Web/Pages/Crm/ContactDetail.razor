@@ -256,6 +256,13 @@
                     </div>
                 }
 
+                @if (tabs.Rendered(TabTimeline))
+                {
+                    <div role="tabpanel" id="tabpanel-@TabTimeline" aria-labelledby="tab-@TabTimeline" class="record-tabpanel" hidden="@tabs.Hidden(TabTimeline)">
+                        <CustomerTimeline ContactId="Id" Lookups="Lookups" />
+                    </div>
+                }
+
                 @if (tabs.Rendered(TabHistory))
                 {
                     <div role="tabpanel" id="tabpanel-@TabHistory" aria-labelledby="tab-@TabHistory" class="record-tabpanel" hidden="@tabs.Hidden(TabHistory)">
@@ -289,6 +296,7 @@
     private const string TabCompanies = "firmalar";
     private const string TabActivities = "aktiviteler";
     private const string TabSales = "satis";
+    private const string TabTimeline = "cizelge";
     private const string TabHistory = "gecmis";
 
     private readonly TabState tabs = new(TabGeneral);
@@ -309,6 +317,8 @@
                 list.Add(new(TabSales, Texts.Get("crm.company.tab.sales"), Session.Can(CrmAccess.OpportunitiesRead) ? (int?)opportunityTotal : null));
             }
 
+            // Zaman çizelgesi her zaman vardır: kullanıcı yalnızca okuyabildiği kaynakların satırlarını görür (sunucuda süzülür).
+            list.Add(new(TabTimeline, Texts.Get("crm.company.tab.timeline")));
             list.Add(new(TabHistory, Texts.Get("common.history.tab")));
             return list;
         }
