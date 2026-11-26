@@ -16,6 +16,14 @@ public sealed record CustomerTimelineQuery(
 {
     /// <summary>Sorgu bir firmaya değil bir kişiye aittir.</summary>
     public bool IsPerson => ContactId is not null || PersonId is not null;
+
+    /// <summary>
+    /// Kayıtları ortak kayda (firmanın ortak tarafı ya da kişinin ortak kişisi) bağlayan kaynakların kullandığı süzgeç: firma sorgusunda
+    /// <c>partyId</c>, kişi sorgusunda <c>personId</c>. Bağ yoksa (ortak kaydı olmayan firma ya da kişi) <c>null</c>: okunabilir, boş kaynak.
+    /// </summary>
+    public (string Field, Guid Id)? SharedRecordScope => IsPerson
+        ? PersonId is { } person ? ("personId", person) : null
+        : PartyId is { } party ? ("partyId", party) : null;
 }
 
 /// <summary>

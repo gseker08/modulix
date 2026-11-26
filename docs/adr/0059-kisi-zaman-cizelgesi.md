@@ -1,6 +1,6 @@
 # ADR-0059: Kişi kartında zaman çizelgesi
 
-- **Durum:** Kabul edildi, 26 Kasım 2026; **dilim 1 (CRM kaynakları: aktivite, teklif; uç noktalar, kişi detayında sekme ve özet şeridi) teslim edildi.** Diğer dilimler bekler.
+- **Durum:** Kabul edildi, 26 Kasım 2026; **dilim 1 (CRM kaynakları: aktivite, teklif; uç noktalar, kişi detayında sekme ve özet şeridi) teslim edildi.** **Dilim 2 (Sipariş, Sözleşme, Destek, Pazarlama kaynakları) 26 Kasım 2026'da teslim edildi.** Fırsat ve aday kişi alanı bekler.
 - **Kaynak:** [ADR-0053](0053-musteri-zaman-cizelgesi.md) "Yapılmadı / sınırlar" (kişi kartında çizelge yok); `docs/oncelikli-isler.md` R3.
 - **Karar (önerilen):** Kaynak sözleşmesi (`ICustomerTimelineSource`) **geriye uyumlu genişletilir**: sorguya isteğe bağlı kişi kimlikleri eklenir, kişiye bağlanabilen kaynaklar kişi sorgusunu uygular, bağlayamayanlar `null`/boş dönmeden önce **kişi kapsamını desteklemediklerini bildirir**. Kişi kartı aynı birleştirici ve aynı arayüz bileşeniyle `GET /api/crm/contacts/{id}/timeline` ucundan beslenir.
 
@@ -72,3 +72,10 @@ Kaynakların bugünkü kişi bağları (koddan):
 - Sorgu hem `ContactId` (CRM kişisi; CRM kaynakları) hem `PersonId` (ortak kişi; CRM dışı kaynaklar, sonraki dilimler) taşır; CRM kişisi `crm.Contacts` kaydıdır ve CRM dışı modüller CRM'e başvuramaz. `CompanyId` kişinin ana firması, firmasızsa `Guid.Empty`'dir; `IsPerson` kişi sorgusunu ayırt eder.
 - Uç ve birleştirici ortaktır (`TimelineComposer`); firma ve kişi uçları ince katmandır. Kişi sorgusunda desteklemeyen kaynak çağrılmaz ve `sources` süzgecinde tanınmaz (400).
 - CRM kaynağı kişiyi `ContactScope` ile bildirir: aktivite `related=crm.contact:{id}` (kişi, dönüşen aday ve bağlantılar), teklif `contactId`; teklif durum satırları (kabul, red, süre dolumu, iptal) kişinin tekliflerinden üretilir.
+
+## Dilim 2'de uygulanan ayrıntı
+
+- Sipariş, Sözleşme ve Destek kaynakları kayıtlarını zaten ortak kişiye (`personId`) bağlıyordu; üçü de `SupportsPerson => true` bildirir. Süzgeç alanı sorgudan gelir: `CustomerTimelineQuery.SharedRecordScope` firma sorgusunda `partyId`, kişi sorgusunda `personId` verir; ortak kaydı olmayan firma ya da kişide kaynak "okunabilir, boş"tur. Açık iş sayıları da aynı bağdan sayılır.
+- Pazarlama kaynağı geçmişi ortak kişi kimliğiyle sorar (`ICampaignReports.HistoryAsync`, iletim `PersonId`'si ve yanıt `personId`'si zaten eşleşir); rapor, alıcı ve yanıt izinleri aynen uygulanır.
+- Sözleşmede yalnızca sözleşmenin kendi `personId`'si sayılır; sözleşme tarafı (`ContractParty.PersonId`) olarak anılan kişi çizelgeye girmez (sınır; istenirse ayrı karar).
+- Hiçbir kaynak adı birleştiriciye ya da arayüze yazılmadı: bildirim kaynağın kendisindedir.

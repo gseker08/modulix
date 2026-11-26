@@ -16,17 +16,19 @@ namespace Modulix.Modules.Support.Records;
 /// </summary>
 internal sealed class TicketTimelineSource(IRecordPipeline pipeline, IModuleData data) : ICustomerTimelineSource
 {
+    public bool SupportsPerson => true;
+
     public string Key => "support.tickets";
 
     public async Task<CustomerTimelineSlice?> ReadAsync(CustomerTimelineQuery query, CancellationToken cancellationToken)
     {
-        if (query.PartyId is not { } partyId)
+        if (query.SharedRecordScope is not { } scope)
         {
             // Ortak taraf kaydı olmayan firmanın talebi olamaz: okunabilir, boş kaynak.
             return new CustomerTimelineSlice([], false);
         }
 
-        var filters = new Dictionary<string, string> { ["partyId"] = partyId.ToString() };
+        var filters = new Dictionary<string, string> { [scope.Field] = scope.Id.ToString() };
         if (query.Before is { } before)
         {
             filters["createdBefore"] = before.ToString("O", CultureInfo.InvariantCulture);
@@ -62,13 +64,13 @@ internal sealed class TicketTimelineSource(IRecordPipeline pipeline, IModuleData
 
     public async Task<int?> CountOpenAsync(CustomerTimelineQuery query, CancellationToken cancellationToken)
     {
-        if (query.PartyId is not { } partyId)
+        if (query.SharedRecordScope is not { } scope)
         {
             return 0;
         }
 
         // Açık talep: iptal edilmemiş, kapanmamış ve birleştirilmemiş (çözüldü, müşteri teyidini beklerken açık sayılır).
-        var filters = new Dictionary<string, string> { ["partyId"] = partyId.ToString(), ["open"] = "true" };
+        var filters = new Dictionary<string, string> { [scope.Field] = scope.Id.ToString(), ["open"] = "true" };
         var page = await pipeline.QueryAsync(new RecordQuery(SupportModule.Entities.Ticket, 1, 1, Filters: filters), cancellationToken);
         return page.IsSuccess
             ? page.Value!.TotalCount

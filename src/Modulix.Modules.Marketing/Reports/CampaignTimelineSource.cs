@@ -11,17 +11,19 @@ namespace Modulix.Modules.Marketing.Reports;
 /// </summary>
 internal sealed class CampaignTimelineSource(ICampaignReports reports) : ICustomerTimelineSource
 {
+    public bool SupportsPerson => true;
+
     public string Key => "marketing.touches";
 
     public async Task<CustomerTimelineSlice?> ReadAsync(CustomerTimelineQuery query, CancellationToken cancellationToken)
     {
-        if (query.PartyId is not { } partyId)
+        if (query.SharedRecordScope is not { } scope)
         {
             // Ortak taraf kaydı olmayan firmaya kampanya gitmez: okunabilir, boş kaynak.
             return new CustomerTimelineSlice([], false);
         }
 
-        var history = await reports.HistoryAsync(partyId, query.Before, query.Take, cancellationToken);
+        var history = await reports.HistoryAsync(scope.Id, query.Before, query.Take, cancellationToken);
         if (!history.IsSuccess)
         {
             // Çağıran geçmişi okuyamıyorsa kaynak yoktur; başka hata sessizce boş çizelgeye çevrilmez.

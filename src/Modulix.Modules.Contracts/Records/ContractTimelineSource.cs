@@ -17,17 +17,19 @@ namespace Modulix.Modules.Contracts.Records;
 /// </summary>
 internal sealed class ContractTimelineSource(IRecordPipeline pipeline, IModuleData data) : ICustomerTimelineSource
 {
+    public bool SupportsPerson => true;
+
     public string Key => "contracts.contracts";
 
     public async Task<CustomerTimelineSlice?> ReadAsync(CustomerTimelineQuery query, CancellationToken cancellationToken)
     {
-        if (query.PartyId is not { } partyId)
+        if (query.SharedRecordScope is not { } scope)
         {
             // Ortak taraf kaydı olmayan firmanın sözleşmesi olamaz: okunabilir, boş kaynak.
             return new CustomerTimelineSlice([], false);
         }
 
-        var filters = new Dictionary<string, string> { ["partyId"] = partyId.ToString() };
+        var filters = new Dictionary<string, string> { [scope.Field] = scope.Id.ToString() };
         if (query.Before is { } before)
         {
             filters["createdBefore"] = before.ToString("O", CultureInfo.InvariantCulture);

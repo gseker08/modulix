@@ -17,17 +17,19 @@ namespace Modulix.Modules.Orders.Records;
 /// </summary>
 internal sealed class OrderTimelineSource(IRecordPipeline pipeline, IModuleData data) : ICustomerTimelineSource
 {
+    public bool SupportsPerson => true;
+
     public string Key => "orders.orders";
 
     public async Task<CustomerTimelineSlice?> ReadAsync(CustomerTimelineQuery query, CancellationToken cancellationToken)
     {
-        if (query.PartyId is not { } partyId)
+        if (query.SharedRecordScope is not { } scope)
         {
             // Ortak taraf kaydı olmayan firmanın siparişi olamaz: okunabilir, boş kaynak.
             return new CustomerTimelineSlice([], false);
         }
 
-        var filters = new Dictionary<string, string> { ["partyId"] = partyId.ToString() };
+        var filters = new Dictionary<string, string> { [scope.Field] = scope.Id.ToString() };
         if (query.Before is { } before)
         {
             filters["createdBefore"] = before.ToString("O", CultureInfo.InvariantCulture);
@@ -63,7 +65,7 @@ internal sealed class OrderTimelineSource(IRecordPipeline pipeline, IModuleData 
 
     public async Task<int?> CountOpenAsync(CustomerTimelineQuery query, CancellationToken cancellationToken)
     {
-        if (query.PartyId is not { } partyId)
+        if (query.SharedRecordScope is not { } scope)
         {
             return 0;
         }
@@ -71,7 +73,7 @@ internal sealed class OrderTimelineSource(IRecordPipeline pipeline, IModuleData 
         // Açık sipariş: taslak, onay bekleyen ve onaylanmış (iptal edilmiş ve kapanmış olanlar hariç).
         var filters = new Dictionary<string, string>
         {
-            ["partyId"] = partyId.ToString(),
+            [scope.Field] = scope.Id.ToString(),
             ["status"] = string.Join(',', OrderStatus.Draft, OrderStatus.PendingApproval, OrderStatus.Approved),
         };
         var page = await pipeline.QueryAsync(new RecordQuery(OrdersModule.Entities.Order, 1, 1, Filters: filters), cancellationToken);
