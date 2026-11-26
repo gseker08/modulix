@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -43,7 +44,7 @@ public class CentralBankRateJobTests : IClassFixture<ModulixApiFactory>, IAsyncL
         feed.Snapshot = Bulletin(usd: 34.10m, eur: 37.50m);
 
         // Elle girilmiş EUR kuru aynı gün için varsa merkez bankası onu ezmez.
-        await WriteManualAsync(tenant.Id, "EUR", 40m);
+        await WriteManualAsync(tenant, "EUR", 40m);
 
         var first = await RunAsync(tenant.Id);
         Assert.Equal((1, 0, 1, 1), (first.Created, first.Updated, first.Skipped, first.Missing)); // USD yeni; EUR elle; GBP bültende yok
@@ -93,19 +94,29 @@ public class CentralBankRateJobTests : IClassFixture<ModulixApiFactory>, IAsyncL
         return await tenantScope.ServiceProvider.GetRequiredService<IExchangeRateReader>().FindAsync(from, "TRY", Day, CancellationToken.None);
     }
 
-    private async Task WriteManualAsync(Guid tenantId, string from, decimal rate)
+    // Elle kur, firma yöneticisinin kendi kimliğiyle ve kayıt ucundan yazılır (kur yazma izni core.exchange-rates.manage).
+    private async Task WriteManualAsync(Modulix.Core.Platform.Tenant tenant, string from, decimal rate)
     {
-        using var scope = factory.OpenScope(tenantId);
-        var pipeline = scope.ServiceProvider.GetRequiredService<Modulix.Core.Contracts.Records.IRecordPipeline>();
-        var result = await pipeline.CreateAsync(new Modulix.Core.Contracts.Records.RecordCommand(CurrencyEntities.ExchangeRate, null, new System.Text.Json.Nodes.JsonObject
+        var admin = await factory.CreateUserAsync(tenant);
+        using (var scope = factory.OpenScope(tenant.Id))
+        {
+            var roles = scope.ServiceProvider.GetRequiredService<Modulix.Core.Authorization.IRoleService>();
+            var system = await roles.EnsureSystemRoleAsync(CancellationToken.None);
+            Assert.True(await roles.SetMembershipRolesAsync(await factory.GetMembershipIdAsync(admin.Id, tenant.Id), [system.Id], CancellationToken.None));
+        }
+
+        using var client = factory.CreateBrowserClient();
+        var login = await client.PostAsJsonAsync("/api/auth/login", new Modulix.Shared.Auth.LoginRequest(admin.Email!, ModulixApiFactory.Password));
+        Assert.Equal(System.Net.HttpStatusCode.OK, login.StatusCode);
+        var response = await client.PostAsJsonAsync("/api/records/core.exchange-rate", new Modulix.Shared.Records.RecordWriteRequest(new System.Text.Json.Nodes.JsonObject
         {
             ["fromCurrency"] = from,
             ["toCurrency"] = "TRY",
             ["rate"] = rate,
             ["validOn"] = Day.ToString("yyyy-MM-dd"),
             ["source"] = ExchangeRateSources.Manual,
-        }), CancellationToken.None);
-        Assert.True(result.IsSuccess, result.Error?.Message);
+        }));
+        Assert.True(response.StatusCode == System.Net.HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
     }
 
     private static CentralBankSnapshot Bulletin(decimal usd, decimal eur) =>
