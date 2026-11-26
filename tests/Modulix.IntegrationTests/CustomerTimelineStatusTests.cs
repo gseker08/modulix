@@ -56,6 +56,37 @@ public class CustomerTimelineStatusTests(ModulixApiFactory factory) : IClassFixt
     }
 
     [Fact]
+    public async Task Rejected_and_cancelled_quotes_add_outcome_rows_and_other_companies_do_not_see_them()
+    {
+        var (tenant, admin) = await TenantWithAdminAsync();
+        using var client = await LoginAsync(admin);
+        var company = await CreateCompanyAsync(client, "Sonuç Lojistik");
+        var other = await CreateCompanyAsync(client, "Başka Lojistik");
+        var rejected = await PresentedQuoteAsync(client, company.Id);
+        await TransitionAsync(client, rejected.Id, "record-rejected", rejected.Version, "Fiyat yüksek bulundu");
+        var cancelled = await PresentedQuoteAsync(client, company.Id);
+        await TransitionAsync(client, cancelled.Id, "cancel", cancelled.Version, "Müşteri vazgeçti");
+        var open = await PresentedQuoteAsync(client, company.Id);
+
+        var timeline = (await client.GetFromJsonAsync<CustomerTimelineDto>($"/api/crm/companies/{company.Id}/timeline?take=50"))!;
+        var outcomes = timeline.Items.Where(i => i.EntityKey == CrmTimelineKeys.QuoteOutcome).ToList();
+        Assert.Equivalent(new[] { (rejected.Id, "Rejected"), (cancelled.Id, "Cancelled") }, outcomes.Select(i => (i.RecordId, i.Status!)));
+        Assert.All(outcomes, i => Assert.Equal(i.Status, i.Type));
+        // Yalnızca sunulmuş teklif sonuç satırı vermez.
+        Assert.DoesNotContain(outcomes, i => i.RecordId == open.Id);
+
+        var otherView = (await client.GetFromJsonAsync<CustomerTimelineDto>($"/api/crm/companies/{other.Id}/timeline?take=50"))!;
+        Assert.DoesNotContain(otherView.Items, i => i.EntityKey == CrmTimelineKeys.QuoteOutcome);
+
+        // Teklif okuma izni olmayan kullanıcı sonuç satırını görmez.
+        var noQuotes = await factory.CreateUserAsync(tenant);
+        await factory.CreateRoleAsync(tenant.Id, [CompaniesRead, OpportunitiesRead], Scope.All, noQuotes);
+        using var noQuotesClient = await LoginAsync(noQuotes);
+        var hidden = (await noQuotesClient.GetFromJsonAsync<CustomerTimelineDto>($"/api/crm/companies/{company.Id}/timeline?take=50"))!;
+        Assert.DoesNotContain(hidden.Items, i => i.EntityKey == CrmTimelineKeys.QuoteOutcome);
+    }
+
+    [Fact]
     public async Task Rows_follow_the_opportunity_history_and_other_companies_conversions_are_not_included()
     {
         var (_, admin) = await TenantWithAdminAsync();
@@ -165,18 +196,23 @@ public class CustomerTimelineStatusTests(ModulixApiFactory factory) : IClassFixt
     /// <summary>Satırlı, sunulmuş ve kabul edilmiş teklif.</summary>
     private static async Task<QuoteDto> AcceptedQuoteAsync(HttpClient client, Guid companyId)
     {
+        var presented = await PresentedQuoteAsync(client, companyId);
+        return await TransitionAsync(client, presented.Id, "record-accepted", presented.Version);
+    }
+
+    private static async Task<QuoteDto> PresentedQuoteAsync(HttpClient client, Guid companyId)
+    {
         var created = await client.PostAsJsonAsync("/api/crm/quotes", new SaveQuoteRequest("Bakım teklifi", companyId, ValidUntil: DateTimeOffset.UtcNow.AddDays(30)));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var quote = (await created.Content.ReadFromJsonAsync<QuoteDto>())!;
         var line = await client.PostAsJsonAsync("/api/crm/quote-lines", new SaveQuoteLineRequest(quote.Id, "Kalem", "Free", null, 1m, 100m, null, "None", 0m, 0m, null, "Standard"));
         Assert.True(line.StatusCode == HttpStatusCode.Created, await line.Content.ReadAsStringAsync());
-        var presented = await TransitionAsync(client, quote.Id, "present", (await client.GetFromJsonAsync<QuoteDto>($"/api/crm/quotes/{quote.Id}"))!.Version);
-        return await TransitionAsync(client, quote.Id, "record-accepted", presented.Version);
+        return await TransitionAsync(client, quote.Id, "present", (await client.GetFromJsonAsync<QuoteDto>($"/api/crm/quotes/{quote.Id}"))!.Version);
     }
 
-    private static async Task<QuoteDto> TransitionAsync(HttpClient client, Guid id, string action, long version)
+    private static async Task<QuoteDto> TransitionAsync(HttpClient client, Guid id, string action, long version, string? reason = null)
     {
-        var response = await client.PostAsJsonAsync($"/api/crm/quotes/{id}/{action}", new QuoteTransitionRequest(version));
+        var response = await client.PostAsJsonAsync($"/api/crm/quotes/{id}/{action}", new QuoteTransitionRequest(version, reason));
         Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<QuoteDto>())!;
     }

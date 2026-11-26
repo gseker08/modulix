@@ -79,7 +79,7 @@
                             {
                                 <span class="badge stage-@status.ToLowerInvariant()">@CrmText.OpportunityStatusName(status)</span>
                             }
-                            else if (item.EntityKey is CrmEntityKeys.Quote or CrmTimelineKeys.QuoteAccepted)
+                            else if (item.EntityKey is CrmEntityKeys.Quote or CrmTimelineKeys.QuoteAccepted or CrmTimelineKeys.QuoteOutcome)
                             {
                                 <span class="badge stage-@QuoteLabels.StatusBadge(status)">@QuoteLabels.Label(QuoteLabels.Statuses, status)</span>
                             }
@@ -251,6 +251,7 @@
         CrmEntityKeys.Quote => "file-text",
         CrmTimelineKeys.OpportunityClosed => "check-circle",
         CrmTimelineKeys.QuoteAccepted => "check",
+        CrmTimelineKeys.QuoteOutcome => "file-text",
         CrmTimelineKeys.LeadConverted => "user-check",
         OrdersAccess.OrderEntityKey => "package",
         ContractsAccess.ContractEntityKey => "clipboard-list",
@@ -269,6 +270,13 @@
         CrmEntityKeys.Quote => Texts.Get("crm.timeline.kind.quote"),
         CrmTimelineKeys.OpportunityClosed => Texts.Get(type == "Won" ? "crm.timeline.kind.opportunityWon" : "crm.timeline.kind.opportunityLost"),
         CrmTimelineKeys.QuoteAccepted => Texts.Get("crm.timeline.kind.quoteAccepted"),
+        CrmTimelineKeys.QuoteOutcome => Texts.Get(type switch
+        {
+            "Rejected" => "crm.timeline.kind.quoteRejected",
+            "Expired" => "crm.timeline.kind.quoteExpired",
+            "Cancelled" => "crm.timeline.kind.quoteCancelled",
+            _ => "crm.timeline.kind.quote",
+        }),
         CrmTimelineKeys.LeadConverted => Texts.Get("crm.timeline.kind.leadConverted"),
         OrdersAccess.OrderEntityKey => Texts.Get("crm.timeline.kind.order"),
         ContractsAccess.ContractEntityKey => Texts.Get("crm.timeline.kind.contract"),
@@ -286,7 +294,7 @@
     private static string? Href(CustomerTimelineItemDto item) => item.EntityKey switch
     {
         CrmEntityKeys.Opportunity or CrmTimelineKeys.OpportunityClosed => $"crm/firsatlar/{item.RecordId}",
-        CrmEntityKeys.Quote or CrmTimelineKeys.QuoteAccepted => $"crm/teklifler/{item.RecordId}",
+        CrmEntityKeys.Quote or CrmTimelineKeys.QuoteAccepted or CrmTimelineKeys.QuoteOutcome => $"crm/teklifler/{item.RecordId}",
         CrmTimelineKeys.LeadConverted => $"crm/leadler/{item.RecordId}",
         OrdersAccess.OrderEntityKey => $"siparisler/{item.RecordId}",
         ContractsAccess.ContractEntityKey => $"sozlesmeler/{item.RecordId}",
