@@ -177,6 +177,11 @@ public static class PersistenceSetup
         services.AddScoped<ILookupSettings>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<ILookupSearch>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<Modulix.Core.Contracts.Records.ILookupLabels, LookupLabels>();
+        services.AddSingleton<Modulix.Core.Currency.ICentralBankFeed>(sp => new Modulix.Infrastructure.Currency.TcmbRateFeed(
+            new HttpClient { Timeout = TimeSpan.FromSeconds(10) },
+            sp.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>(),
+            sp.GetService<TimeProvider>() ?? TimeProvider.System,
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Modulix.Infrastructure.Currency.TcmbRateFeed>>()));
         services.AddScoped<ISectorProfileService, SectorProfileService>();
         services.AddScoped<Modulix.Core.Contracts.Customization.ISectorCatalogSuggestions, SectorCatalogSuggestions>();
         services.AddScoped<ISubProfileService, SubProfileService>();
