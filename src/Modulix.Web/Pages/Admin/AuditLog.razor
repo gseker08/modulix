@@ -81,7 +81,7 @@
                 <input id="auditTo" class="form-control" type="date" @bind="to" />
             </div>
             <div class="audit-filter-actions">
-                <button type="submit" class="btn btn-primary">@Texts.Get("common.filter")</button>
+                <button type="submit" class="btn btn-primary" aria-busy="@(loading ? "true" : "false")">@Texts.Get("common.filter")</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="ClearAsync">@Texts.Get("admin.audit.clear")</button>
             </div>
         </form>
@@ -213,12 +213,22 @@
         await LoadAsync(1);
     }
 
+    private bool loading;
+
     private async Task LoadAsync(int pageNumber)
     {
         expanded.Clear();
-        var result = await Api.GetAsync<AuditPageResponse>($"/api/audit?page={pageNumber}&sort={Uri.EscapeDataString(sort)}&{Filters()}");
-        page = result.Value;
-        message = result.Error;
+        loading = true;
+        try
+        {
+            var result = await Api.GetAsync<AuditPageResponse>($"/api/audit?page={pageNumber}&sort={Uri.EscapeDataString(sort)}&{Filters()}");
+            page = result.Value;
+            message = result.Error;
+        }
+        finally
+        {
+            loading = false;
+        }
     }
 
     private async Task ClearAsync()

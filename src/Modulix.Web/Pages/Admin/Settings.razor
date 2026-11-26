@@ -126,7 +126,7 @@
                 @if (canEdit)
                 {
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@(busy || !IsChanged(group))">@Texts.Get("common.save")</button>
+                        <button type="submit" class="btn btn-primary" disabled="@(busy || !IsChanged(group))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
                         @if (IsChanged(group))
                         {
                             <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Reset(group)">@Texts.Get("common.dismiss")</button>

@@ -90,7 +90,7 @@
                 <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Add">@Texts.Get("admin.choiceLists.addValue")</button>
                 <FieldError Field="values" Errors="errors" />
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                    <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
                     <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => Select(current)">@Texts.Get("common.dismiss")</button>
                 </div>
             </form>

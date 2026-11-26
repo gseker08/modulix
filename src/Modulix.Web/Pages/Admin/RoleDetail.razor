@@ -223,7 +223,7 @@
 
                 @* Üyeler ve menü düzeni sekmeleri formun parçası değildir; kaydet satırı yalnızca form sekmelerinde görünür. *@
                 <div class="form-actions" hidden="@(!OnFormTab)">
-                    <button type="submit" class="btn btn-primary" disabled="@busy">@(IsNew ? Texts.Get("admin.roleDetail.create") : Texts.Get("common.save"))</button>
+                    <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@(IsNew ? Texts.Get("admin.roleDetail.create") : Texts.Get("common.save"))</button>
                     <a class="btn btn-outline-secondary" href="yonetim/roller">@Texts.Get("common.dismiss")</a>
                 </div>
             </form>

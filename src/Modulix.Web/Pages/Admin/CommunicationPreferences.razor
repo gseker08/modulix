@@ -135,7 +135,7 @@
                         </div>
                     </div>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(formAddress))">@Texts.Get("common.save")</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(formAddress))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button></div>
             </form>
         }
     }
@@ -234,7 +234,7 @@
                         </div>
                     </div>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(blockAddress))">@Texts.Get("admin.commPrefs.block")</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(blockAddress))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("admin.commPrefs.block")</button></div>
             </form>
         }
     }
@@ -297,7 +297,7 @@
                         </div>
                     </div>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(topicKey) || string.IsNullOrWhiteSpace(topicName))">@Texts.Get("common.save")</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(topicKey) || string.IsNullOrWhiteSpace(topicName))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button></div>
             </form>
         }
 
@@ -377,7 +377,7 @@
                         </div>
                     </div>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(tpAddress) || tpTopic.Length == 0)">@Texts.Get("common.save")</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrWhiteSpace(tpAddress) || tpTopic.Length == 0)" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button></div>
             </form>
         }
     }
