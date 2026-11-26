@@ -2,92 +2,20 @@ namespace Modulix.ArchitectureTests;
 
 /// <summary>
 /// Arayüz tasarım kuralı (CLAUDE.md, düğmeler): kaydetme sırasında düğmeye <c>aria-busy="true"</c> verilir; ekran okuyucu ve çift tıklama
-/// kullanıcısı işlemin sürdüğünü bu işaretten anlar. Kural <c>type="submit"</c> olan birincil (<c>btn-primary</c>) düğmeler için denetlenir.
-/// Kuraldan önce yazılmış ekranlar <see cref="PendingCleanup"/> listesindedir (dosya → <c>aria-busy</c>'siz düğme sayısı); liste yalnızca küçülür:
-/// yeni bir ihlal testi kırar, bir dosya temizlenince sayısı düşürülür (ya da satırı silinir), yoksa ikinci test kırılır.
+/// kullanıcısı işlemin sürdüğünü bu işaretten anlar. Kural <c>type="submit"</c> olan birincil (<c>btn-primary</c>) düğmeler için denetlenir;
+/// istisna yoktur. Yeni düğme <c>aria-busy="@(saving ? "true" : "false")"</c> taşır (değişken düğmenin <c>disabled</c> ifadesindekidir).
 /// </summary>
 public sealed class ButtonBusyRulesTests
 {
-    /// <summary>
-    /// Dosya (Modulix.Web'e göre, "/" ayraçlı) → <c>aria-busy</c>'siz birincil gönder düğmesi sayısı. Yeni satır eklenmez; düğmeye
-    /// <c>aria-busy="@(saving ? "true" : "false")"</c> eklenip sayı düşürülür.
-    /// </summary>
-    private static readonly Dictionary<string, int> PendingCleanup = new()
-    {
-        ["Components/ActivityActions.razor"] = 1,
-        ["Components/ActivityEditor.razor"] = 2,
-        ["Components/AddressesSection.razor"] = 1,
-        ["Components/CampaignResponsesPanel.razor"] = 1,
-        ["Components/CargoEditor.razor"] = 2,
-        ["Components/CarrierTermsEditor.razor"] = 2,
-        ["Components/CompanyContactEditor.razor"] = 1,
-        ["Components/CompanyRelationsSection.razor"] = 1,
-        ["Components/ContactEditor.razor"] = 1,
-        ["Components/ContactPointsSection.razor"] = 1,
-        ["Components/ContractCommitmentsPanel.razor"] = 2,
-        ["Components/ContractRenewalPanel.razor"] = 1,
-        ["Components/ContractSignaturePanel.razor"] = 2,
-        ["Components/CreateTenantForm.razor"] = 1,
-        ["Components/CredentialEditor.razor"] = 2,
-        ["Components/DriverEditor.razor"] = 2,
-        ["Components/InviteUserForm.razor"] = 1,
-        ["Components/LeadEditor.razor"] = 1,
-        ["Components/MaintenanceEditor.razor"] = 2,
-        ["Components/NewCompanyPerson.razor"] = 1,
-        ["Components/OpportunityEditor.razor"] = 1,
-        ["Components/OrderActionsPanel.razor"] = 1,
-        ["Components/OrderChangeRequestsPanel.razor"] = 1,
-        ["Components/OrderJobsPanel.razor"] = 1,
-        ["Components/PartyRelationshipsSection.razor"] = 1,
-        ["Components/PasswordForm.razor"] = 1,
-        ["Components/PersonalViewBar.razor"] = 1,
-        ["Components/QuoteSharingPanel.razor"] = 1,
-        ["Components/ReportSchedulesPanel.razor"] = 1,
-        ["Components/TenantBillingSection.razor"] = 1,
-        ["Components/TenantPlanSection.razor"] = 1,
-        ["Components/TenantScopeLimitsSection.razor"] = 1,
-        ["Components/TenantSupportSection.razor"] = 1,
-        ["Components/TicketActionsPanel.razor"] = 1,
-        ["Components/TripEditor.razor"] = 1,
-        ["Components/VehicleEditor.razor"] = 2,
-    };
-
     [Fact]
-    public void Primary_submit_buttons_declare_aria_busy_except_the_pending_cleanup()
+    public void Primary_submit_buttons_declare_aria_busy()
     {
-        var violations = new List<string>();
-        foreach (var (file, missing) in CountMissing())
-        {
-            var allowed = PendingCleanup.GetValueOrDefault(file);
-            if (missing > allowed)
-            {
-                violations.Add($"{file}: {missing} (izin verilen {allowed})");
-            }
-        }
+        var violations = CountMissing().Select(p => $"{p.File}: {p.Missing}").ToList();
 
         Assert.True(
             violations.Count == 0,
             "aria-busy'siz birincil gönder düğmesi var:" + Environment.NewLine + string.Join(Environment.NewLine, violations)
-            + Environment.NewLine + "Düğmeye aria-busy=\"@(busy ? \"true\" : \"false\")\" ekleyin; PendingCleanup'a yeni satır eklenmez.");
-    }
-
-    [Fact]
-    public void Pending_cleanup_counts_are_still_needed()
-    {
-        var actual = CountMissing().ToDictionary(p => p.File, p => p.Missing);
-        var stale = new List<string>();
-        foreach (var (file, allowed) in PendingCleanup)
-        {
-            var missing = actual.GetValueOrDefault(file);
-            if (missing < allowed)
-            {
-                stale.Add($"{file}: listede {allowed}, gerçekte {missing}; sayıyı düşürün" + (missing == 0 ? " (satırı silin)" : string.Empty));
-            }
-        }
-
-        Assert.True(
-            stale.Count == 0,
-            "PendingCleanup güncel değil:" + Environment.NewLine + string.Join(Environment.NewLine, stale));
+            + Environment.NewLine + "Düğmeye aria-busy=\"@(busy ? \"true\" : \"false\")\" ekleyin.");
     }
 
     [Theory]

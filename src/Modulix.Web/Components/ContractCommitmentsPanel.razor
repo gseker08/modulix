@@ -138,7 +138,7 @@
             </div>
             @if (lockedSchedule) { <p class="small text-muted">@Texts.Get("contracts.commitmentsPanel.locked")</p> }
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
                 <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">@Texts.Get("common.dismiss")</button>
                 @if (form.Id is not null) { <button type="button" class="btn btn-outline-danger ms-auto" disabled="@busy" @onclick="DeleteAsync">@Texts.Get("common.delete")</button> }
             </div>
@@ -237,7 +237,7 @@
                                             </div>
                                         </div>
                                         <div class="form-actions">
-                                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button>
+                                            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
                                             <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="CloseForms" />
                                         </div>
                                     </form>

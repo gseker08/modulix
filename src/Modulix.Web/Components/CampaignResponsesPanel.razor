@@ -86,7 +86,7 @@
                     </div>
                 </div>
             </fieldset>
-            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || deliveryChoice.Length == 0)">@Texts.Get("marketing.responsesPanel.save")</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@(busy || deliveryChoice.Length == 0)" aria-busy="@(busy ? "true" : "false")">@Texts.Get("marketing.responsesPanel.save")</button></div>
         </form>
     }
 </section>

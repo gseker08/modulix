@@ -105,7 +105,7 @@
             </div>
             <div class="form-actions">
                 <button type="button" class="btn btn-tonal" disabled="@(busy || !Dirty)" @onclick="PreviewAsync">@Texts.Get("platform.scopeLimits.preview")</button>
-                <button type="submit" class="btn btn-primary" disabled="@(busy || !Dirty || string.IsNullOrWhiteSpace(reason))">@Texts.Get("platform.scopeLimits.save")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || !Dirty || string.IsNullOrWhiteSpace(reason))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("platform.scopeLimits.save")</button>
             </div>
         </form>
     }

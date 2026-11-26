@@ -97,7 +97,7 @@
     }
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("platform.createTenant.submit")</button>
+        <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("platform.createTenant.submit")</button>
         <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">@Texts.Get("common.dismiss")</button>
     </div>
 </form>

@@ -6,7 +6,7 @@
     <form class="view-bar" role="group" aria-label="@Texts.Get("common.view.new")" @onsubmit="SaveAsAsync" @onsubmit:preventDefault>
         <label for="@inputId" class="view-bar-text">@Texts.Get("common.view.name")</label>
         <input id="@inputId" class="form-control form-control-sm view-bar-input" maxlength="60" placeholder="@Texts.Get("common.view.namePlaceholder")" @bind="name" @bind:event="oninput" />
-        <button type="submit" class="btn btn-primary btn-sm">@Texts.Get("common.save")</button>
+        <button type="submit" class="btn btn-primary btn-sm" aria-busy="@(saving ? "true" : "false")">@Texts.Get("common.save")</button>
         <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelAsync">@Texts.Get("common.view.cancel")</button>
         @if (Error is not null)
         {
@@ -56,6 +56,7 @@ else if (Active is not null)
     private readonly string inputId = "view-name-" + Guid.NewGuid().ToString("N")[..8];
     private string name = string.Empty;
     private bool confirmingDelete;
+    private bool saving;
 
     /// <summary>Açık kişisel görünüm; null ise sistem görünümüdür.</summary>
     [Parameter] public GridViewDto? Active { get; set; }
@@ -95,7 +96,15 @@ else if (Active is not null)
     {
         if (!string.IsNullOrWhiteSpace(name))
         {
-            await SaveAs.InvokeAsync(name.Trim());
+            saving = true;
+            try
+            {
+                await SaveAs.InvokeAsync(name.Trim());
+            }
+            finally
+            {
+                saving = false;
+            }
         }
     }
 

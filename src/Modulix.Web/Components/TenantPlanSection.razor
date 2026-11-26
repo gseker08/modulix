@@ -84,7 +84,7 @@
                 </div>
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(planKey) || string.IsNullOrWhiteSpace(planReason))">@Texts.Get("platform.plan.assignSubmit")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || string.IsNullOrEmpty(planKey) || string.IsNullOrWhiteSpace(planReason))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("platform.plan.assignSubmit")</button>
             </div>
         </form>
 
