@@ -47,7 +47,7 @@
                         </tbody>
                     </table>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("support.routing.saveMatrix")</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("support.routing.saveMatrix")</button></div>
             </form>
         }
     </section>
@@ -141,7 +141,7 @@
                 </FormTabs>
             </fieldset>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">@(rule.Id is null ? Texts.Get("support.routing.addRule") : Texts.Get("common.save"))</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@(rule.Id is null ? Texts.Get("support.routing.addRule") : Texts.Get("common.save"))</button>
                 @if (rule.Id is not null) { <button type="button" class="btn btn-outline-secondary" @onclick="NewRule">@Texts.Get("common.dismiss")</button> }
             </div>
         </form>

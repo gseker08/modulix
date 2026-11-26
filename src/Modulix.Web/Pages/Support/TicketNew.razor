@@ -153,7 +153,7 @@
             </TabPanel>
         </fieldset>
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("support.new.create")</button>
+            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("support.new.create")</button>
         </div>
     </form>
 </AuthGate>

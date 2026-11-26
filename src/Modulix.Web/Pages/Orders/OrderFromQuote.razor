@@ -161,7 +161,7 @@
                 </TabPanel>
             </fieldset>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@(busy || preview.Blockers.Count > 0 || (partial && quantities.Count(q => q.Value > 0) == 0))">@Texts.Get("orders.fromquote.submit")</button>
+                <button type="submit" class="btn btn-primary" disabled="@(busy || preview.Blockers.Count > 0 || (partial && quantities.Count(q => q.Value > 0) == 0))" aria-busy="@(busy ? "true" : "false")">@Texts.Get("orders.fromquote.submit")</button>
             </div>
         </form>
     }
