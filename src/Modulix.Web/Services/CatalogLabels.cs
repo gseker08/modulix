@@ -3,7 +3,7 @@ namespace Modulix.Web.Services;
 /// <summary>Ürün kataloğu sabit listelerinin Türkçe etiketleri (ADR-0018); anahtarlar sunucudaki CatalogRules ile aynıdır.</summary>
 public static class CatalogLabels
 {
-    private static readonly (string Key, string Label)[] KindSource = [("Product", "Ürün"), ("Service", "Hizmet")];
+    private static readonly (string Key, string Label)[] KindSource = [("Product", "Ürün"), ("Service", "Hizmet"), ("Expense", "Masraf")];
 
     private static readonly (string Key, string Label)[] StatusSource =
         [("Draft", "Taslak"), ("Active", "Aktif"), ("Inactive", "Pasif"), ("Withdrawn", "Satıştan kaldırıldı")];

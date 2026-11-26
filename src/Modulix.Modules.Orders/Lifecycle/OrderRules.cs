@@ -64,12 +64,15 @@ public static class LineKinds
     public const string Package = "Package";
     public const string Free = "Free";
 
-    public static readonly IReadOnlyList<string> All = [Product, Service, Package, Free];
+    /// <summary>Teklifteki masraf kalemi: teslim edilmez, hizmet gibi başlangıçla izlenir.</summary>
+    public const string Expense = "Expense";
+
+    public static readonly IReadOnlyList<string> All = [Product, Service, Package, Free, Expense];
 
     /// <summary>Fiziksel teslimat gerektiren kalem: ürün. Hizmet, paket ve serbest kalem teslim miktarı değil başlangıçla izlenir.</summary>
     public static bool IsDeliverable(string kind) => kind == Product;
 
-    public static bool IsService(string kind) => kind is Service or Package or Free;
+    public static bool IsService(string kind) => kind is Service or Package or Free or Expense;
 }
 
 /// <summary>Tarihçe türleri. Yeni tür eklemek serbesttir; eski satırlar aynen okunur.</summary>

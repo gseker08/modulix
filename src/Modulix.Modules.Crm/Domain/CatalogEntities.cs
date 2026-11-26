@@ -106,6 +106,9 @@ public static class CatalogRules
 {
     public const string KindProduct = "Product";
     public const string KindService = "Service";
+
+    /// <summary>Masraf kalemi (T1 kapama, liman lokal, damga vergisi…): müşteriye yansıtılan gider. Teklifte genel indirim almaz (<c>QuoteTotals.ToInput</c>).</summary>
+    public const string KindExpense = "Expense";
     public const string StatusDraft = "Draft";
     public const string StatusActive = "Active";
     public const string StatusInactive = "Inactive";
@@ -113,7 +116,7 @@ public static class CatalogRules
     public const string ChargeOneTime = "OneTime";
     public const string ChargeRecurring = "Recurring";
 
-    public static IReadOnlyList<string> Kinds { get; } = [KindProduct, KindService];
+    public static IReadOnlyList<string> Kinds { get; } = [KindProduct, KindService, KindExpense];
 
     public static IReadOnlyList<string> Statuses { get; } = [StatusDraft, StatusActive, StatusInactive, StatusWithdrawn];
 

@@ -118,7 +118,7 @@ internal static class QuoteTotals
         l.StableKey, l.Quantity, l.UnitPrice, l.TaxRatePercent,
         Enum.TryParse<QuoteLineRole>(l.Role, out var role) ? role : QuoteLineRole.Standard,
         Enum.TryParse<QuoteDiscountKind>(l.DiscountKind, out var kind) ? kind : QuoteDiscountKind.None,
-        l.DiscountValue, l.IsSelected, l.ParentStableKey, l.RecurringPeriod, ExcludedFromDocumentDiscount: l.SourceRuleId is not null);
+        l.DiscountValue, l.IsSelected, l.ParentStableKey, l.RecurringPeriod, ExcludedFromDocumentDiscount: l.SourceRuleId is not null || l.Kind == QuoteLineKind.Expense);
 
     private static string FieldFor(string code, string fallback) => code switch
     {
