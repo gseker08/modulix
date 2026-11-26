@@ -15,7 +15,7 @@
             <option value="">@Texts.Get("marketing.all")</option>
             @foreach (var c in MarketingLabels.Channels) { <option value="@c.Key">@c.Label</option> }
         </select>
-        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("marketing.campaignReport.load")</button>
+        <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("marketing.campaignReport.load")</button>
     </form>
 
     <Notice Text="@message" Failed="true" />

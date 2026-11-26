@@ -83,11 +83,6 @@ public sealed class ButtonBusyRulesTests
         ["Pages/Crm/SalesForecasts.razor"] = 1,
         ["Pages/Crm/SalesTargets.razor"] = 1,
         ["Pages/Crm/TaxAndRates.razor"] = 1,
-        ["Pages/Marketing/CampaignDetail.razor"] = 1,
-        ["Pages/Marketing/CampaignNew.razor"] = 1,
-        ["Pages/Marketing/CampaignReport.razor"] = 1,
-        ["Pages/Marketing/SegmentDetail.razor"] = 2,
-        ["Pages/Marketing/SegmentNew.razor"] = 1,
     };
 
     [Fact]
