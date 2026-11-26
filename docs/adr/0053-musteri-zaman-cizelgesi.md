@@ -108,7 +108,7 @@ token yoktur. Fırsat ve teklif satırı kendi sayfasına bağlanır; "Daha eski
 ## Yapılmadı / sınırlar
 
 - Firma kartındaki ilişkili sipariş, destek ve kampanya listeleri yerinde duruyor (Sipariş 2a, Sözleşme 2b, Destek 2c, Pazarlama 2d satırları çizelgeye geldi).
-- Kişiye ya da müşteri adayına giden kampanya iletileri firma çizelgesinde yalnızca kişi, firmanın ortak taraf kimliğiyle eşleşiyorsa görünür; kişi kartında çizelge yoktur.
+- Kişiye ya da müşteri adayına giden kampanya iletileri firma çizelgesinde yalnızca kişi, firmanın ortak taraf kimliğiyle eşleşiyorsa görünür; kişi kartında çizelge yoktur (öneri: [ADR-0059](0059-kisi-zaman-cizelgesi.md)).
 - Bir kayıt, kayıt satırının yanında yalnızca şu durum değişikliklerinde ek satır üretir: fırsat kazanıldı/kaybedildi, teklif kabul edildi/reddedildi/süresi doldu/iptal edildi, aday dönüştü; diğer geçişler (fırsat aşaması, teklif onay adımları) satır vermez ve rozet güncel durumu gösterir.
 - Sipariş, sözleşme, destek talebi ve pazarlama satırları (dilim 2a–2d), özet şeridi, kaynak çipleri ve durum satırları (dilim 3 ve 4) 23 Kasım 2026'da
   açık ve koyu temada, 1440 px ve 390 px genişlikte gözle doğrulandı; ancak **gerçek veriyle değil, sahte API ile**: `Modulix.Web` yayınlanıp tarayıcıda
