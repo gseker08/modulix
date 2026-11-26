@@ -53,7 +53,22 @@ internal static class SectorProfiles
                 [
                     new("tasiyicilik", "Taşıyıcı", "Taşımayı kendi araçlarınızla yaparsınız."),
                     new("tasima-organizasyonu", "Organizatör", "Taşımayı başka taşıyıcıların araçlarıyla organize edersiniz (forwarder)."),
-                ])),
+                ]),
+            // Müşteriye yansıtılan masraf kalemleri (katalog türü Expense); katalog ekranından firma isteyince yüklenir, tutarlar firmaya aittir.
+            CatalogItems:
+            [
+                new("MSR-T1-KAPAMA", "T1 kapama", "Expense"),
+                new("MSR-LIMAN-LOKAL", "Liman lokal", "Expense"),
+                new("MSR-ORDINO", "Ordino", "Expense"),
+                new("MSR-DAMGA-VERGISI", "Damga vergisi", "Expense"),
+                new("MSR-ITHALAT-ARDIYE", "İthalat ardiye", "Expense"),
+                new("MSR-SON-TASIMA", "Son taşıma", "Expense"),
+                new("MSR-ON-TASIMA", "Ön taşıma", "Expense"),
+                new("MSR-GUMRUK-MESAISI", "Gümrük mesaisi", "Expense"),
+                new("MSR-ETIKET-DEGISTIRME", "Etiket değiştirme", "Expense"),
+                new("MSR-ARAC-BEKLEME", "Araç bekleme", "Expense"),
+                new("MSR-ANTREPO-MESAISI", "Antrepo mesai", "Expense"),
+            ]),
         new(
             "clinic",
             "Klinik",

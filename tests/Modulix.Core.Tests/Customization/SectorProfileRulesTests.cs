@@ -143,3 +143,29 @@ public class SectorProfileRulesTests
         public IReadOnlyList<CustomizableEntity> CustomizableEntities { get; } = [new("ship.load", "Yük")];
     }
 }
+
+public class SectorProfileCatalogItemsTests
+{
+    private static readonly ModuleCatalog Modules = ModuleCatalog.Create();
+
+    private static SectorProfile With(params CatalogSuggestion[] items) => new SectorProfile("a", "A", "", [], [], [], CatalogItems: items);
+
+    [Fact]
+    public void Valid_catalog_items_are_accepted_and_exposed()
+    {
+        var catalog = new SectorProfileCatalog([With(new CatalogSuggestion("MSR-1", "Ordino", "Expense"), new CatalogSuggestion("MSR-2", "Damga", "Expense"))], Modules);
+        Assert.Equal(["MSR-1", "MSR-2"], catalog.Find("a")!.CatalogItems!.Select(i => i.Code));
+        Assert.Null(new SectorProfileCatalog([new SectorProfile("b", "B", "", [], [], [])], Modules).Find("b")!.CatalogItems);
+    }
+
+    [Fact]
+    public void Blank_overlong_or_duplicate_items_are_rejected_at_startup()
+    {
+        Assert.Throws<InvalidOperationException>(() => new SectorProfileCatalog([With(new CatalogSuggestion("", "Ad", "Expense"))], Modules));
+        Assert.Throws<InvalidOperationException>(() => new SectorProfileCatalog([With(new CatalogSuggestion("K", " ", "Expense"))], Modules));
+        Assert.Throws<InvalidOperationException>(() => new SectorProfileCatalog([With(new CatalogSuggestion("K", "Ad", ""))], Modules));
+        Assert.Throws<InvalidOperationException>(() => new SectorProfileCatalog([With(new CatalogSuggestion(new string('x', 51), "Ad", "Expense"))], Modules));
+        Assert.Throws<InvalidOperationException>(() => new SectorProfileCatalog([With(new CatalogSuggestion("K", "Ad", "Expense"), new CatalogSuggestion("k", "Başka", "Expense"))], Modules));
+    }
+}
+

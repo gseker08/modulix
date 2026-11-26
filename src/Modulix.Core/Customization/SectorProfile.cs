@@ -33,7 +33,8 @@ public sealed record SectorProfile(
     string? ActivitySectorCode = null,
     string? Icon = null,
     IReadOnlyDictionary<string, string>? ActivityIcons = null,
-    ProfileActivityFocus? ActivityFocus = null);
+    ProfileActivityFocus? ActivityFocus = null,
+    IReadOnlyList<CatalogSuggestion>? CatalogItems = null);
 
 /// <summary>
 /// Profilin faaliyet seçiminde öne çıkardığı ayrım (ör. taşıyıcı / organizatör): ekranda ilk grup olarak, kendi başlığı ve açıklamalarıyla
@@ -106,6 +107,13 @@ public sealed class SectorProfileCatalog
                 || focus.Items.Select(i => i.Code).Distinct(StringComparer.Ordinal).Count() != focus.Items.Count))
         {
             Fails("öne çıkarılan faaliyetler");
+        }
+
+        if (profile.CatalogItems is { } catalogItems
+            && (catalogItems.Any(i => string.IsNullOrWhiteSpace(i.Code) || i.Code.Length > 50 || string.IsNullOrWhiteSpace(i.Name) || i.Name.Length > 200 || string.IsNullOrWhiteSpace(i.Kind))
+                || catalogItems.Select(i => i.Code).Distinct(StringComparer.OrdinalIgnoreCase).Count() != catalogItems.Count))
+        {
+            Fails("katalog kalemleri");
         }
 
         foreach (var value in profile.ListValues)

@@ -55,6 +55,7 @@ internal static class CrmEndpoints
             CrmModule.Permissions.ProductsRead, CrmModule.Permissions.ProductsWrite);
         ResourceEndpoints.MapResource<ProductDto, SaveProductRequest>(crm, "/api/crm", "products", CrmModule.Entities.Product,
             CrmModule.Permissions.ProductsRead, CrmModule.Permissions.ProductsWrite);
+        ProductStarterPackEndpoints.Map(crm);
         PricingEndpoints.Map(crm);
         OpportunityEndpoints.Map(crm);
         ResourceEndpoints.MapResource<ActivityDto, SaveActivityRequest>(crm, "/api/crm", "activities", CrmModule.Entities.Activity,
