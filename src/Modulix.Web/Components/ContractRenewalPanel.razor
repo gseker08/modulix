@@ -95,7 +95,7 @@
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("contracts.renewalPanel.createDraftSubmit")</button>
+                    <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("contracts.renewalPanel.createDraftSubmit")</button>
                     <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="Close" />
                 </div>
             </form>

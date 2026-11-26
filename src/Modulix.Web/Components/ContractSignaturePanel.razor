@@ -120,7 +120,7 @@
                     }
                     <div class="form-actions">
                         <button type="button" class="btn btn-outline-secondary" @onclick="() => startForm.Signatories.Add(new SignatoryForm())">@Texts.Get("contracts.signaturePanel.addSignatory")</button>
-                        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("contracts.signaturePanel.start")</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("contracts.signaturePanel.start")</button>
                         <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="() => startForm = null" />
                     </div>
                 </form>
@@ -214,7 +214,7 @@
                                             </div>
                                             <p class="small text-muted">@Texts.Get("contracts.signaturePanel.manualNote")</p>
                                             <div class="form-actions">
-                                                <button type="submit" class="btn btn-primary" disabled="@(busy || manualContent is null)">@Texts.Get("contracts.signaturePanel.saveAndVerify")</button>
+                                                <button type="submit" class="btn btn-primary" disabled="@(busy || manualContent is null)" aria-busy="@(busy ? "true" : "false")">@Texts.Get("contracts.signaturePanel.saveAndVerify")</button>
                                                 <IconAction Icon="x" Label="@Texts.Get("common.dismiss")" OnClick="CloseForms" />
                                             </div>
                                         </form>

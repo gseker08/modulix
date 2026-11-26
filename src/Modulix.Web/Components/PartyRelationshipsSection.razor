@@ -108,7 +108,7 @@
                 </fieldset>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">@Texts.Get("common.save")</button>
+                    <button type="submit" class="btn btn-primary btn-sm" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button>
                     <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Cancel">@Texts.Get("common.dismiss")</button>
                 </div>
             </form>

@@ -20,7 +20,7 @@
         <div class="form-toolbar-actions">
             <UnsavedChanges IsDirty="() => dirty" />
             <button type="button" class="btn btn-outline-secondary" @onclick="Cancelled">İptal</button>
-            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null || ReadOnly)">
+            <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null || ReadOnly)" aria-busy="@(busy ? "true" : "false")">
                 @if (busy)
                 {
                     <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -183,7 +183,7 @@
 
     <div class="form-actions">
         <button type="button" class="btn btn-outline-secondary ms-auto" @onclick="Cancelled">İptal</button>
-        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null || ReadOnly)">Kaydet</button>
+        <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null || ReadOnly)" aria-busy="@(busy ? "true" : "false")">Kaydet</button>
     </div>
 </form>
 

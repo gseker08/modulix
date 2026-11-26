@@ -80,7 +80,7 @@
                     </fieldset>
                     <div class="form-actions">
                         <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="PreviewAsync">@Texts.Get("orders.change.preview")</button>
-                        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("orders.change.submit")</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("orders.change.submit")</button>
                         <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => creating = false">@Texts.Get("common.dismiss")</button>
                     </div>
                 </form>

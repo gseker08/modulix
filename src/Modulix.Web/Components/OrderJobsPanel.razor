@@ -77,7 +77,7 @@
                         </div>
                     </fieldset>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@(busy || selected.Count == 0)">@Texts.Get("orders.jobs.submit")</button>
+                        <button type="submit" class="btn btn-primary" disabled="@(busy || selected.Count == 0)" aria-busy="@(busy ? "true" : "false")">@Texts.Get("orders.jobs.submit")</button>
                         <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => creating = false">@Texts.Get("common.dismiss")</button>
                     </div>
                 </form>

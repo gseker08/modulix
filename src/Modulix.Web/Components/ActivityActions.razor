@@ -197,7 +197,7 @@
                     }
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary btn-sm" disabled="@busy">@Texts.Get("crm.act.confirm")</button>
+                    <button type="submit" class="btn btn-primary btn-sm" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("crm.act.confirm")</button>
                     @if (conflict)
                     {
                         <button type="button" class="btn btn-outline-danger btn-sm" disabled="@busy" @onclick="() => { allowConflict = true; return SubmitAsync(); }">@Texts.Get("crm.act.conflict.schedule")</button>
