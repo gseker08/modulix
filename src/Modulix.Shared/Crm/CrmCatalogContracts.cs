@@ -66,3 +66,11 @@ public sealed record SaveProductRequest(
     string ChargeType = "OneTime",
     string? RecurringPeriod = null,
     long? Version = null);
+
+// Sektör profilinin önerdiği katalog kalemleri (GET/POST /api/crm/products/starter-pack): ör. lojistik profilinde masraf kalemleri.
+// Exists: aynı kodlu ürün zaten katalogdadır (yüklenmez, değişmez). Tutarlar firmaya aittir; paket yalnızca kartları açar.
+public sealed record CatalogStarterItemDto(string Code, string Name, string Kind, bool Exists);
+
+public sealed record CatalogStarterPackDto(IReadOnlyList<CatalogStarterItemDto> Items, int Missing);
+
+public sealed record CatalogStarterPackResultDto(int Created, int Skipped);

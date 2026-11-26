@@ -284,6 +284,13 @@
         </form>
         <FilterToggle @bind-Open="filtersOpen" Count="status is null ? 0 : 1" />
         <GridColumnPicker State="grid" Changed="ColumnsChanged" />
+        @if (Session.Can(CrmAccess.ProductsWrite) && starterPack is { Missing: > 0 } pack)
+        {
+            @* Sektör profilinin önerdiği kalemler (ör. lojistikte masraf kalemleri): kartlar açılır, tutarları firma fiyat listesinde girer. *@
+            <button type="button" class="btn btn-tonal" disabled="@starterBusy" aria-busy="@(starterBusy ? "true" : "false")" title="@StarterTitle(pack)" @onclick="LoadStarterPackAsync">
+                <AppIcon Name="package" Size="16" /> Hazır kalemleri yükle (@pack.Missing)
+            </button>
+        }
         @if (Session.Can(CrmAccess.ProductsWrite) && form is null)
         {
             <button type="button" class="btn btn-primary" @onclick="New"><AppIcon Name="plus" Size="16" /> @Texts.Get("crm.products.new")</button>
@@ -434,6 +441,33 @@
     private string? kind;
     private bool busy;
     private readonly HashSet<Guid> picked = [];
+    private CatalogStarterPackDto? starterPack;
+    private bool starterBusy;
+
+    private static string StarterTitle(CatalogStarterPackDto pack) =>
+        "Eksik kalemler: " + string.Join(", ", pack.Items.Where(i => !i.Exists).Select(i => i.Name));
+
+    private async Task LoadStarterPackAsync()
+    {
+        if (starterBusy)
+        {
+            return;
+        }
+
+        starterBusy = true;
+        var result = await Api.PostAsync<CatalogStarterPackResultDto>("/api/crm/products/starter-pack", new { });
+        starterBusy = false;
+        if (!result.IsSuccess)
+        {
+            message = result.Error;
+            return;
+        }
+
+        Toasts.Success($"{result.Value!.Created} kalem eklendi.");
+        starterPack = (await Api.GetAsync<CatalogStarterPackDto>("/api/crm/products/starter-pack")).Value;
+        units = await LoadAllAsync<MeasureUnitDto>("/api/crm/units");
+        await LoadAsync(1);
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -444,6 +478,11 @@
         {
             categories = await LoadAllAsync<ProductCategoryDto>("/api/crm/product-categories");
             units = await LoadAllAsync<MeasureUnitDto>("/api/crm/units");
+            if (Session.Can(CrmAccess.ProductsWrite))
+            {
+                starterPack = (await Api.GetAsync<CatalogStarterPackDto>("/api/crm/products/starter-pack")).Value;
+            }
+
             await views.LoadAsync();
             await LoadAsync(1);
         }

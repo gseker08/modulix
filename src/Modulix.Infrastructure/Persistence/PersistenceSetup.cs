@@ -178,6 +178,7 @@ public static class PersistenceSetup
         services.AddScoped<ILookupSearch>(sp => sp.GetRequiredService<LookupService>());
         services.AddScoped<Modulix.Core.Contracts.Records.ILookupLabels, LookupLabels>();
         services.AddScoped<ISectorProfileService, SectorProfileService>();
+        services.AddScoped<Modulix.Core.Contracts.Customization.ISectorCatalogSuggestions, SectorCatalogSuggestions>();
         services.AddScoped<ISubProfileService, SubProfileService>();
         services.TryAddSingleton<CustomizationLimits>(); // varsayılan: sınırsız (ADR-0041 K7); uygulama yapılandırmadan üzerine yazar
         services.AddScoped<ISectorCatalog, SectorCatalogService>();
