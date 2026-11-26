@@ -103,7 +103,7 @@
                 </FormTabs>
             </fieldset>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">@(cal.Id is null ? Texts.Get("support.sla.addCalendar") : Texts.Get("common.save"))</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@(cal.Id is null ? Texts.Get("support.sla.addCalendar") : Texts.Get("common.save"))</button>
                 @if (cal.Id is not null) { <button type="button" class="btn btn-outline-secondary" @onclick="NewCalendar">@Texts.Get("common.dismiss")</button> }
             </div>
         </form>
@@ -282,7 +282,7 @@
                 </TabPanel>
             </fieldset>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary" disabled="@busy">@(pol.Id is null ? Texts.Get("support.sla.addPolicy") : Texts.Get("common.save"))</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@(pol.Id is null ? Texts.Get("support.sla.addPolicy") : Texts.Get("common.save"))</button>
                 @if (pol.Id is not null) { <button type="button" class="btn btn-outline-secondary" @onclick="NewPolicy">@Texts.Get("common.dismiss")</button> }
             </div>
         </form>

@@ -88,16 +88,6 @@ public sealed class ButtonBusyRulesTests
         ["Pages/Marketing/CampaignReport.razor"] = 1,
         ["Pages/Marketing/SegmentDetail.razor"] = 2,
         ["Pages/Marketing/SegmentNew.razor"] = 1,
-        ["Pages/Orders/OperationJobDetail.razor"] = 1,
-        ["Pages/Orders/OrderFromQuote.razor"] = 1,
-        ["Pages/Orders/OrderFulfillment.razor"] = 3,
-        ["Pages/Orders/OrderHandover.razor"] = 2,
-        ["Pages/Support/PublicSurvey.razor"] = 1,
-        ["Pages/Support/SupportRouting.razor"] = 2,
-        ["Pages/Support/SupportSettings.razor"] = 2,
-        ["Pages/Support/SupportSla.razor"] = 2,
-        ["Pages/Support/TicketDetail.razor"] = 1,
-        ["Pages/Support/TicketNew.razor"] = 1,
     };
 
     [Fact]

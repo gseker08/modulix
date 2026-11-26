@@ -55,7 +55,7 @@ else if (view is not null)
                     <label class="form-label mt-3" for="survey-comment">@Texts.Get("support.public-survey.comment")</label>
                     <textarea id="survey-comment" class="form-control" rows="3" maxlength="1000" @bind="comment"></textarea>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("support.public-survey.submit")</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("support.public-survey.submit")</button></div>
             </form>
             <p class="small text-muted mt-2">@Texts.Get("support.public-survey.valid-until", CrmLabels.Time(view.ExpiresAt))</p>
         }

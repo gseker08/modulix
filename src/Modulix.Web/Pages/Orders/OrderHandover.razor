@@ -106,7 +106,7 @@
                             <LookupPicker Id="accept-responsible" LookupKey="orders.handover.responsible" @bind-Value="responsible" Placeholder="@(h.ResponsibleUserId is null ? "—" : Lookups.MemberName(h.ResponsibleUserId))" />
                         }
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("orders.actions.confirm", ActionLabel(chosen, h.Status))</button>
+                            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("orders.actions.confirm", ActionLabel(chosen, h.Status))</button>
                             <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => selected = null">@Texts.Get("common.dismiss")</button>
                         </div>
                     </form>
@@ -173,7 +173,7 @@
             </fieldset>
             @if (Editable)
             {
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("orders.handover-page.save")</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("orders.handover-page.save")</button></div>
             }
         </form>
 

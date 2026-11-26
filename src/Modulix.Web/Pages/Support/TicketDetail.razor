@@ -109,7 +109,7 @@
                             </fieldset>
                             <Notice Text="@sendMessage" Failed="true" />
                             <div class="form-actions">
-                                <button type="submit" class="btn btn-primary" disabled="@sending">@Texts.Get("support.detail.send")</button>
+                                <button type="submit" class="btn btn-primary" disabled="@sending" aria-busy="@(sending ? "true" : "false")">@Texts.Get("support.detail.send")</button>
                             </div>
                         </form>
                     }

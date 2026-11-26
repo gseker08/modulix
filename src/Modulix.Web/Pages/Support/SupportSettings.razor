@@ -75,7 +75,7 @@
                 </div>
                 </FormTabs>
             </fieldset>
-            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("support.settings.addQueue")</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("support.settings.addQueue")</button></div>
         </form>
     </section>
 
@@ -140,7 +140,7 @@
                 </div>
                 </FormTabs>
             </fieldset>
-            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("support.settings.addCategory")</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("support.settings.addCategory")</button></div>
         </form>
     </section>
 </AuthGate>
