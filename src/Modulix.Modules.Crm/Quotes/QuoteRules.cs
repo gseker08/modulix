@@ -56,7 +56,10 @@ public static class QuoteLineKind
     public const string Package = "Package";
     public const string Free = "Free";
 
-    public static readonly IReadOnlyList<string> All = [Product, Service, Package, Free];
+    /// <summary>Katalogdaki masraf kalemi (<c>CatalogRules.KindExpense</c>) teklif satırına bu türle gelir.</summary>
+    public const string Expense = "Expense";
+
+    public static readonly IReadOnlyList<string> All = [Product, Service, Package, Free, Expense];
 }
 
 public static class QuoteAction

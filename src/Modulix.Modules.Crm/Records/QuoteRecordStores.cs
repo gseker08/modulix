@@ -703,7 +703,12 @@ internal sealed class QuoteLineRecordStore(CrmStoreContext context, IPriceCalcul
                 entity.Description ??= product.Description;
                 if (entity.Kind == QuoteLineKind.Free)
                 {
-                    entity.Kind = product.Kind == CatalogRules.KindService ? QuoteLineKind.Service : QuoteLineKind.Product;
+                    entity.Kind = product.Kind switch
+                    {
+                        CatalogRules.KindService => QuoteLineKind.Service,
+                        CatalogRules.KindExpense => QuoteLineKind.Expense,
+                        _ => QuoteLineKind.Product,
+                    };
                 }
 
                 await PriceFromCatalogAsync(entity, product, parent, values["unitPrice"] is not null ? entity.UnitPrice : null, canManual, errors, cancellationToken);

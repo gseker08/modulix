@@ -37,7 +37,7 @@ public static class OrderLabels
     public static IReadOnlyList<(string Key, string Label)> LineKinds => Translate("line-kind", LineKindsSource);
 
     private static readonly (string Key, string Label)[] LineKindsSource =
-        [("Product", "Ürün"), ("Service", "Hizmet"), ("Package", "Paket"), ("Free", "Serbest kalem")];
+        [("Product", "Ürün"), ("Service", "Hizmet"), ("Package", "Paket"), ("Free", "Serbest kalem"), ("Expense", "Masraf")];
 
     public static IReadOnlyList<(string Key, string Label)> AcceptanceMethods => Translate("acceptance", AcceptanceMethodsSource);
 

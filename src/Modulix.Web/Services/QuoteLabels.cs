@@ -22,7 +22,7 @@ public static class QuoteLabels
     ];
 
     private static readonly (string Key, string Label)[] LineKindSource =
-        [("Product", "Ürün"), ("Service", "Hizmet"), ("Package", "Paket"), ("Free", "Serbest kalem")];
+        [("Product", "Ürün"), ("Service", "Hizmet"), ("Package", "Paket"), ("Free", "Serbest kalem"), ("Expense", "Masraf")];
 
     private static readonly (string Key, string Label)[] RoleSource =
     [
