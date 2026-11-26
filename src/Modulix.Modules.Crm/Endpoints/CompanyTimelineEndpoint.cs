@@ -18,22 +18,9 @@ internal static class CompanyTimelineEndpoint
     public static async Task<IResult> GetAsync(
         Guid id, DateTimeOffset? before, int? take, string? sources, IRecordPipeline pipeline, IEnumerable<ICustomerTimelineSource> registered, CancellationToken ct)
     {
-        if (take is < 1 or > CustomerTimelineDto.MaxTake)
+        if (TimelineComposer.Validate(take, sources, registered, personScope: false) is { } problem)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["take"] = [$"Satır sayısı 1 ile {CustomerTimelineDto.MaxTake} arasında olmalıdır."],
-            });
-        }
-
-        var wanted = ParseSources(sources);
-        var known = registered.Select(r => r.Key).ToHashSet(StringComparer.Ordinal);
-        if (wanted.FirstOrDefault(key => !known.Contains(key)) is { } unknown)
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["sources"] = [$"Tanınmayan kaynak: {unknown}."],
-            });
+            return problem;
         }
 
         var company = await pipeline.GetAsync(new RecordRef(CrmModule.Entities.Company, id), ct);
@@ -42,35 +29,8 @@ internal static class CompanyTimelineEndpoint
             return RecordProblems.ToProblem(company.Error!);
         }
 
-        var size = take ?? CustomerTimelineDto.DefaultTake;
         var partyId = Guid.TryParse(company.Value!.Values["partyId"]?.GetValue<string>(), out var party) ? party : (Guid?)null;
-        var query = new CustomerTimelineQuery(id, partyId, before, size);
-
-        // Her kaynak imleçten önceki en yeni "size" satırını verir; birleşimin en yeni "size" satırı bu yüzden eksiksizdir.
-        var readable = new List<string>();
-        var entries = new List<CustomerTimelineEntry>();
-        var more = false;
-        foreach (var source in registered.Where(r => wanted.Count == 0 || wanted.Contains(r.Key)).OrderBy(r => r.Key, StringComparer.Ordinal))
-        {
-            if (await source.ReadAsync(query, ct) is not { } slice)
-            {
-                continue;
-            }
-
-            readable.Add(source.Key);
-            entries.AddRange(slice.Entries);
-            more |= slice.HasMore;
-        }
-
-        var ordered = entries.OrderByDescending(e => e.OccurredAt).ThenBy(e => e.RecordId).ToList();
-        var page = ordered.Take(size).ToList();
-        more |= ordered.Count > page.Count;
-        return Results.Ok(new CustomerTimelineDto(
-            [.. page.Select(e => new CustomerTimelineItemDto(e.EntityKey, e.RecordId, e.OccurredAt, e.Title, e.Status, e.Type, e.OwnerId, e.Reference))],
-            more && page.Count > 0 ? page[^1].OccurredAt : null,
-            readable));
+        var size = take ?? CustomerTimelineDto.DefaultTake;
+        return await TimelineComposer.ComposeAsync(new CustomerTimelineQuery(id, partyId, before, size), sources, registered, ct);
     }
-
-    private static HashSet<string> ParseSources(string? value) =>
-        [.. (value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
 }

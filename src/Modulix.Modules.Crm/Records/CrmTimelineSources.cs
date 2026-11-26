@@ -20,6 +20,14 @@ internal abstract class CrmTimelineSource(IRecordPipeline pipeline) : ICustomerT
 {
     public abstract string Key { get; }
 
+    public bool SupportsPerson => ContactScope(Guid.Empty) is not null;
+
+    /// <summary>
+    /// Kayıtları bir CRM kişisine bağlayan süzgeç (ADR-0059); kaynak kişiye bağlanamıyorsa <c>null</c> (varsayılan). Kaynak bunu ezince kişi
+    /// çizelgesine kendiliğinden girer.
+    /// </summary>
+    protected virtual Dictionary<string, string>? ContactScope(Guid contactId) => null;
+
     protected abstract string EntityKey { get; }
 
     /// <summary>Firmaya göre süzgeç, en yeniden eskiye sıralama ve (verildiyse) imleç.</summary>
@@ -62,7 +70,9 @@ internal abstract class CrmTimelineSource(IRecordPipeline pipeline) : ICustomerT
     protected async Task<Dictionary<Guid, RecordData>> VisibleRecordsAsync(CustomerTimelineQuery query, CancellationToken cancellationToken)
     {
         var visible = new Dictionary<Guid, RecordData>();
-        var filters = new Dictionary<string, string> { ["companyId"] = query.CompanyId.ToString() };
+        var filters = query.ContactId is { } contactId
+            ? ContactScope(contactId) ?? throw new InvalidOperationException($"Kaynak kişi çizelgesini desteklemiyor ({Key}).")
+            : new Dictionary<string, string> { ["companyId"] = query.CompanyId.ToString() };
         for (var pageNo = 1; visible.Count < MaxVisible; pageNo++)
         {
             var page = await pipeline.QueryAsync(new RecordQuery(EntityKey, pageNo, RecordQuery.MaxPageSize, Filters: filters), cancellationToken);
@@ -126,14 +136,17 @@ internal sealed class ActivityTimelineSource(IRecordPipeline pipeline, IModuleDa
 
     protected override string EntityKey => CrmModule.Entities.Activity;
 
+    // Kişiye bağlı aktiviteler: kişinin kendisi, dönüşen adayı ve bağlantıları (kişi detayındaki aktivite listesiyle aynı kapsam).
+    protected override Dictionary<string, string>? ContactScope(Guid contactId) =>
+        new() { ["related"] = $"{CrmModule.Entities.Contact}:{contactId}" };
+
     protected override Dictionary<string, string> Filters(CustomerTimelineQuery query, string? before)
     {
         // timeline: firmanın kişilerine ve fırsatlarına bağlı aktiviteler de gelir (firma detayındaki aktivite listesiyle aynı kapsam).
-        var filters = new Dictionary<string, string>
-        {
-            ["timeline"] = $"{CrmModule.Entities.Company}:{query.CompanyId}",
-            ["sort"] = ActivityRecordStore.OccurredDescending,
-        };
+        var filters = query.ContactId is { } contactId
+            ? ContactScope(contactId)!
+            : new Dictionary<string, string> { ["timeline"] = $"{CrmModule.Entities.Company}:{query.CompanyId}" };
+        filters["sort"] = ActivityRecordStore.OccurredDescending;
         if (before is not null)
         {
             filters["occurredBefore"] = before;
@@ -235,6 +248,8 @@ internal sealed class QuoteTimelineSource(IRecordPipeline pipeline, IModuleData 
 
     protected override string EntityKey => CrmModule.Entities.Quote;
 
+    protected override Dictionary<string, string>? ContactScope(Guid contactId) => new() { ["contactId"] = contactId.ToString() };
+
     private static readonly string[] Outcomes = [QuoteStatus.Accepted, QuoteStatus.Rejected, QuoteStatus.Expired, QuoteStatus.Cancelled];
 
     /// <summary>
@@ -273,7 +288,10 @@ internal sealed class QuoteTimelineSource(IRecordPipeline pipeline, IModuleData 
     protected override Dictionary<string, string> Filters(CustomerTimelineQuery query, string? before)
     {
         // Her revizyon ayrı satırdır: revizyonun çıkarıldığı an müşteri geçmişinin parçasıdır.
-        var filters = new Dictionary<string, string> { ["companyId"] = query.CompanyId.ToString(), ["sort"] = "-createdAt" };
+        var filters = query.ContactId is { } contactId
+            ? ContactScope(contactId)!
+            : new Dictionary<string, string> { ["companyId"] = query.CompanyId.ToString() };
+        filters["sort"] = "-createdAt";
         if (before is not null)
         {
             filters["createdBefore"] = before;
