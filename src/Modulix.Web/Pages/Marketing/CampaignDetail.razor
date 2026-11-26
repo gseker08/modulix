@@ -140,7 +140,7 @@
                 }
                 else if (CanWrite)
                 {
-                    <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button></div>
+                    <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button></div>
                 }
             </form>
 

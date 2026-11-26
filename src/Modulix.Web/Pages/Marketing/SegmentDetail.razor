@@ -65,7 +65,7 @@
                         </div>
                     </div>
                 </fieldset>
-                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("marketing.segmentDetail.copyCreate")</button></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("marketing.segmentDetail.copyCreate")</button></div>
             </form>
         }
 
@@ -110,7 +110,7 @@
                 }
                 else if (CanWrite)
                 {
-                    <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("common.save")</button></div>
+                    <div class="form-actions"><button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("common.save")</button></div>
                 }
             </form>
 
