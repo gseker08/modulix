@@ -433,12 +433,13 @@
 /* Ortak lookup bileşeni (ADR-0016) */
 .lookup { position: relative; }
 .lookup-field { position: relative; display: flex; align-items: center; gap: .25rem; }
+.lookup-input { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
 .lookup-field .form-control { flex: 1; min-width: 0; min-height: var(--mx-control-height); padding-right: 2.25rem; }
 .lookup-field .form-control[readonly]:not(:disabled) { cursor: pointer; background-color: var(--mx-surface-hover); }
 @media (pointer: coarse) { .lookup-field .form-control { min-height: 44px; } }
 .lookup-clear { position: absolute; right: .35rem; width: 2rem; height: 2rem; border: 0; background: transparent; font-size: 1.25rem; line-height: 1; color: var(--mx-text-secondary); border-radius: .25rem; }
 .lookup-clear:hover, .lookup-clear:focus-visible { background: var(--mx-surface-muted); outline: 2px solid var(--mx-brand-primary); }
-.lookup-view { white-space: nowrap; font-size: .875rem; padding: .5rem; }
+.lookup-view { flex: none; }
 .lookup-list { position: absolute; z-index: 1050; left: 0; right: 0; margin: .15rem 0 0; padding: .25rem 0; list-style: none; max-height: 18rem; overflow-y: auto; background: var(--bs-body-bg); border: 1px solid var(--mx-border); border-radius: .5rem; box-shadow: var(--mx-shadow-popover); }
 .lookup-list[hidden] { display: none; }
 .lookup-option { padding: .6rem .75rem; min-height: 2.75rem; cursor: pointer; }

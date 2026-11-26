@@ -13,6 +13,7 @@
     else
     {
         <div class="lookup-field">
+            <div class="lookup-input">
             <input id="@Id" @ref="input" class="form-control @(Invalid ? "is-invalid" : null)"
                    role="combobox" aria-haspopup="listbox" aria-expanded="@(open ? "true" : "false")" aria-controls="@ListId"
                    aria-autocomplete="@(Searchable ? "list" : "none")" aria-activedescendant="@ActiveOptionId"
@@ -24,9 +25,10 @@
             {
                 <button type="button" class="lookup-clear" aria-label="@Texts.Get("lookup.clear", AccessibleName)" @onclick="ClearAsync">×</button>
             }
+            </div>
             @if (current is not null && canView && selected is { Unavailable: false } && info?.ViewPath is { } path)
             {
-                <a class="lookup-view" href="@path.Replace("{id}", current.ToString())" aria-label="@Texts.Get("lookup.openSelected", AccessibleName)">@Texts.Get("common.open")</a>
+                <a class="btn btn-ghost btn-icon lookup-view" href="@path.Replace("{id}", current.ToString())" title="@Texts.Get("lookup.openSelected", AccessibleName)" aria-label="@Texts.Get("lookup.openSelected", AccessibleName)"><AppIcon Name="arrow-right" Size="16" /></a>
             }
         </div>
 
