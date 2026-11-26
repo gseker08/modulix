@@ -200,7 +200,7 @@
 
             <div class="form-actions">
                 <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => GoAsync(0)">@Texts.Get("contracts.wizard.back")</button>
-                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get(contract is null ? "contracts.wizard.createAndContinue" : "contracts.wizard.saveAndContinue")</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get(contract is null ? "contracts.wizard.createAndContinue" : "contracts.wizard.saveAndContinue")</button>
             </div>
         </form>
     }
@@ -347,7 +347,7 @@
             </div>
             <div class="form-actions">
                 <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="() => GoAsync(2)">@Texts.Get("contracts.wizard.back")</button>
-                <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("contracts.wizard.saveAndContinue")</button>
+                <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("contracts.wizard.saveAndContinue")</button>
             </div>
         </form>
     }

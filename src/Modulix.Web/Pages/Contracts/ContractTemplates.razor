@@ -171,7 +171,7 @@
                 <div class="form-actions">
                     @if (CanEditSelected)
                     {
-                        <button type="submit" class="btn btn-primary" disabled="@busy">@(selected is null ? Texts.Get("contracts.templates.createDraft") : Texts.Get("common.save"))</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@(selected is null ? Texts.Get("contracts.templates.createDraft") : Texts.Get("common.save"))</button>
                     }
                     @if (selected is not null && CanPublish && selected.Status != "Archived")
                     {
@@ -197,7 +197,7 @@
                     }
                     <FieldError Field="reason" Errors="errors" />
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" disabled="@busy">@TemplateLabels.Action(action)</button>
+                        <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@TemplateLabels.Action(action)</button>
                         <button type="button" class="btn btn-outline-secondary" @onclick="() => action = null">@Texts.Get("common.dismiss")</button>
                     </div>
                 </form>
