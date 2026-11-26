@@ -101,7 +101,7 @@
                     <p>@Texts.Get("crm.salesForecastDetail.deleteConfirm")</p>
                 }
                 <div class="form-actions">
-                    <button type="submit" class="btn @(pending == "delete" ? "btn-danger" : "btn-primary")" disabled="@busy">
+                    <button type="submit" class="btn @(pending == "delete" ? "btn-danger" : "btn-primary")" disabled="@busy" aria-busy="@(busy ? "true" : "false")">
                         @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
                         @PendingConfirmText(pending)
                     </button>
@@ -299,7 +299,7 @@
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@busy">
+                    <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">
                         @if (busy) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
                         @Texts.Get("crm.salesForecastDetail.saveAdjust")
                     </button>

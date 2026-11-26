@@ -162,7 +162,7 @@
             @if (CanEditHeader)
             {
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)">@(quote is null ? Texts.Get("crm.quoteDetail.createDraft") : Texts.Get("common.save"))</button>
+                    <button type="submit" class="btn btn-primary" disabled="@(busy || layout is null)" aria-busy="@(busy ? "true" : "false")">@(quote is null ? Texts.Get("crm.quoteDetail.createDraft") : Texts.Get("common.save"))</button>
                     @if (dirty) { <span class="text-muted" role="status">@Texts.Get("crm.quoteDetail.unsaved")</span> }
                 </div>
             }
@@ -304,7 +304,7 @@
                             </TabPanel>
                         }
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.quoteDetail.line.save")</button>
+                            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("crm.quoteDetail.line.save")</button>
                             <button type="button" class="btn btn-outline-secondary" @onclick="CancelLine">@Texts.Get("common.dismiss")</button>
                         </div>
                     </form>
@@ -475,7 +475,7 @@
                         <label class="form-label" for="reason">@Texts.Get("crm.quoteDetail.reasonFor", reasonAction == "revise" ? Texts.Get("crm.quoteDetail.revise") : QuoteLabels.Action(reasonAction))</label>
                         <textarea id="reason" class="form-control" rows="2" maxlength="500" @bind="reasonText"></textarea>
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.quoteDetail.confirm")</button>
+                            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("crm.quoteDetail.confirm")</button>
                             <button type="button" class="btn btn-outline-secondary" @onclick="() => reasonAction = null">@Texts.Get("common.dismiss")</button>
                         </div>
                     </form>

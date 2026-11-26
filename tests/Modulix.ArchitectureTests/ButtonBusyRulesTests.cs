@@ -50,23 +50,6 @@ public sealed class ButtonBusyRulesTests
         ["Components/TicketActionsPanel.razor"] = 1,
         ["Components/TripEditor.razor"] = 1,
         ["Components/VehicleEditor.razor"] = 2,
-        ["Pages/Crm/DiscountPolicies.razor"] = 1,
-        ["Pages/Crm/LeadForms.razor"] = 1,
-        ["Pages/Crm/MeasureUnits.razor"] = 1,
-        ["Pages/Crm/OpportunityReport.razor"] = 1,
-        ["Pages/Crm/PriceCalculator.razor"] = 1,
-        ["Pages/Crm/PriceLists.razor"] = 1,
-        ["Pages/Crm/ProductCategories.razor"] = 1,
-        ["Pages/Crm/Products.razor"] = 1,
-        ["Pages/Crm/PublicQuote.razor"] = 1,
-        ["Pages/Crm/QuoteDelegations.razor"] = 1,
-        ["Pages/Crm/QuoteDetail.razor"] = 3,
-        ["Pages/Crm/QuoteReport.razor"] = 1,
-        ["Pages/Crm/QuoteRules.razor"] = 1,
-        ["Pages/Crm/SalesForecastDetail.razor"] = 2,
-        ["Pages/Crm/SalesForecasts.razor"] = 1,
-        ["Pages/Crm/SalesTargets.razor"] = 1,
-        ["Pages/Crm/TaxAndRates.razor"] = 1,
     };
 
     [Fact]

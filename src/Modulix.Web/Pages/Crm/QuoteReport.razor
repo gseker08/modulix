@@ -20,7 +20,7 @@
         <input id="qr-from" class="form-control" type="date" @bind="from" />
         <label class="form-label" for="qr-to">@Texts.Get("crm.quoteReport.to")</label>
         <input id="qr-to" class="form-control" type="date" @bind="to" />
-        <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.sales.runReport")</button>
+        <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("crm.sales.runReport")</button>
     </form>
 
     @if (message is not null)

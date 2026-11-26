@@ -92,7 +92,7 @@
             }
         </div>
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.priceCalculator.calculate")</button>
+            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("crm.priceCalculator.calculate")</button>
         </div>
     </form>
 

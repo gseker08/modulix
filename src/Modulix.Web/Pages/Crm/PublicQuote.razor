@@ -187,7 +187,7 @@ else if (view is not null)
                         <FieldError Errors="@errors" Field="confirmTerms" />
                         <FieldError Errors="@errors" Field="documentSha256" />
                         <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" disabled="@busy">@Texts.Get("crm.public-quote.confirm-accept")</button>
+                            <button type="submit" class="btn btn-primary" disabled="@busy" aria-busy="@(busy ? "true" : "false")">@Texts.Get("crm.public-quote.confirm-accept")</button>
                             <IconAction Icon="x" Label="@Texts.Get("common.cancel")" OnClick="() => mode = null" />
                         </div>
                     </form>
