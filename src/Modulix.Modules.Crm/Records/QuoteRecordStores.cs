@@ -312,7 +312,9 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
                 var pairChanged = original is not null && (original.Currency != entity.Currency || original.ReportingCurrency != entity.ReportingCurrency);
                 if (entity.ExchangeRate is null || (pairChanged && entity.ExchangeRate == original!.ExchangeRate))
                 {
-                    var found = await rates.FindAsync(entity.Currency, entity.ReportingCurrency, entity.IssueDate, cancellationToken);
+                    // Yeni teklifte teklif tarihi bu noktada henüz atanmamıştır (OnCreated sonra gelir); bugün alınır.
+                    var quoteDay = entity.IssueDate == default ? DateOnly.FromDateTime(Context.Now.UtcDateTime) : entity.IssueDate;
+                    var found = await rates.FindAsync(entity.Currency, entity.ReportingCurrency, quoteDay, cancellationToken);
                     if (found is null)
                     {
                         entity.ExchangeRate = null;
