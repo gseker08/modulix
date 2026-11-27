@@ -75,6 +75,9 @@ public static class SettingKeys
 
     public const string WorkHours = "core.calendar.work-hours";
 
+    /// <summary>Fatura kuru kuralı (ADR-0049 dilim 5d devamı): <c>previous-day</c> (varsayılan) ya da <c>same-day</c>.</summary>
+    public const string InvoiceRateRule = "core.exchange-rates.invoice-rule";
+
     /// <summary>Otomasyon acil durdurma anahtarı (ADR-0027): "false" ise firmanın hiçbir kuralı çalışmaz.</summary>
     public const string AutomationEnabled = "core.automation.enabled";
 

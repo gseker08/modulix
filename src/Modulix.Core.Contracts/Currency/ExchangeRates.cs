@@ -20,6 +20,25 @@ public static class ExchangeRateSources
 }
 
 /// <summary>
+/// Fatura kuru kuralı (ADR-0049 dilim 5d devamı): faturaya hangi günün kuru uygulanır. Firma ayarıdır (<c>core.exchange-rates.invoice-rule</c>); sektöre özel değildir.
+/// <see cref="PreviousDay"/> (varsayılan): fatura gününden bir önceki günün kuru, yani önceki iş günü yayımlanan merkez bankası kuru
+/// (hafta sonu ve tatilde kur yayımlanmadığı için "en yeni önceki kur" kuralı doğal olarak son iş gününü verir). <see cref="SameDay"/>: fatura günü kuru.
+/// </summary>
+public static class InvoiceRateRules
+{
+    public const string PreviousDay = "previous-day";
+
+    public const string SameDay = "same-day";
+
+    public const string Default = PreviousDay;
+
+    public static IReadOnlyList<string> All { get; } = [PreviousDay, SameDay];
+
+    /// <summary>Kurun aranacağı gün: kural günün kendisi ya da bir önceki gündür. Bilinmeyen kural varsayılan kuralla çözülür.</summary>
+    public static DateOnly LookupDay(DateOnly invoiceDate, string? rule) => rule == SameDay ? invoiceDate : invoiceDate.AddDays(-1);
+}
+
+/// <summary>
 /// Bir gün için bulunan kur. <see cref="Rate"/> istenen yönde 1 kaynak birimin hedef birim karşılığıdır; ters kurdan türetildiyse
 /// (<see cref="Inverted"/>) 1 / kayıtlı kurdur. <see cref="RateDate"/> kurun geçerlilik gününü verir (istenen günden eski olabilir).
 /// </summary>
@@ -37,6 +56,12 @@ public interface IExchangeRateReader
 {
     /// <summary>1 <paramref name="from"/> kaç <paramref name="to"/>; kodlar üç harfli ISO 4217, büyük harf.</summary>
     Task<ExchangeRateQuote?> FindAsync(string from, string to, DateOnly day, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Faturaya uygulanacak kur: firmanın fatura kuru kuralına göre (<see cref="InvoiceRateRules"/>) aranacak günü belirler, sonra <see cref="FindAsync"/> gibi
+    /// en yeni önceki kuru verir. Kur bulunamazsa <c>null</c>; uydurulmaz.
+    /// </summary>
+    Task<ExchangeRateQuote?> FindForInvoiceAsync(string from, string to, DateOnly invoiceDate, CancellationToken cancellationToken);
 
     /// <summary>Bütün kayıtlı kurlar (tarihçe dahil), sırasız.</summary>
     Task<IReadOnlyList<ExchangeRatePoint>> ListAsync(CancellationToken cancellationToken);

@@ -250,6 +250,16 @@ internal sealed class ExchangeRateReader(ModulixDbContext db) : IExchangeRateRea
         return inverse is null ? null : new ExchangeRateQuote(1m / inverse.Rate, inverse.ValidOn, Inverted: true);
     }
 
+    public async Task<ExchangeRateQuote?> FindForInvoiceAsync(string from, string to, DateOnly invoiceDate, CancellationToken cancellationToken)
+    {
+        // Ayar tenant geneli değerdir (şirket başına değil); okuyucu kayıt boru hattına bağlanmasın diye aynı bağlamdan doğrudan okunur (sorgu süzgeci ve RLS tenant'ı sınırlar).
+        var rule = await db.TenantSettings.AsNoTracking()
+            .Where(s => s.Key == Modulix.Core.Modules.CoreModule.SettingKeys.InvoiceRateRule && s.CompanyId == null)
+            .Select(s => s.Value)
+            .SingleOrDefaultAsync(cancellationToken) ?? InvoiceRateRules.Default;
+        return await FindAsync(from, to, InvoiceRateRules.LookupDay(invoiceDate, rule), cancellationToken);
+    }
+
     public async Task<IReadOnlyList<ExchangeRatePoint>> ListAsync(CancellationToken cancellationToken) =>
         await db.ExchangeRates.AsNoTracking().Select(r => new ExchangeRatePoint(r.FromCurrency, r.ToCurrency, r.Rate, r.ValidOn)).ToListAsync(cancellationToken);
 }
