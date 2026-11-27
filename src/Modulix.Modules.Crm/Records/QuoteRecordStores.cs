@@ -266,7 +266,7 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
         var original = isNew
             ? null
             : await Context.Data.Set<Quote>().AsNoTracking().Where(q => q.Id == entity.Id)
-                .Select(q => new { q.Status, q.ApprovalStatus, q.DocumentDiscountKind, q.DocumentDiscountValue, q.CustomFields }).SingleOrDefaultAsync(cancellationToken);
+                .Select(q => new { q.Status, q.ApprovalStatus, q.DocumentDiscountKind, q.DocumentDiscountValue, q.CustomFields, q.Currency, q.ReportingCurrency, q.ExchangeRate }).SingleOrDefaultAsync(cancellationToken);
         var commercialTouched = values.Any(kv => CommercialFields.Contains(kv.Key));
 
         // Sunulmuş ya da sonuçlanmış sürümün ticari içeriği yerinde değişmez; değişiklik için yeni revizyon açılır.
@@ -304,7 +304,30 @@ internal sealed class QuoteRecordStore(CrmStoreContext context, QuoteWorkflowGat
                 await ValidateRelationsAsync(entity, errors, cancellationToken);
             }
 
-            if ((entity.ExchangeRate is null) != (entity.ExchangeRateDate is null || entity.ReportingCurrency is null))
+            // Gösterge kuru (ADR-0049 dilim 5d devamı): gösterge para birimi verilip kur verilmemişse, ya da teklif/gösterge para birimi değişip istemci eski kuru olduğu gibi
+            // geri göndermişse (kur artık başka çifte aittir), kur firmanın kur defterinden teklif tarihine göre alınır; bulunamazsa uydurulmaz, 422 döner.
+            // İstemci açık bir kur gönderdiyse elle girilmiş sayılır ve korunur. Toplamlar bu kurdan etkilenmez; kur yalnızca gösterge ve rapordur.
+            if (entity.ReportingCurrency is not null && entity.ReportingCurrency != entity.Currency && Context.ExchangeRates is { } rates)
+            {
+                var pairChanged = original is not null && (original.Currency != entity.Currency || original.ReportingCurrency != entity.ReportingCurrency);
+                if (entity.ExchangeRate is null || (pairChanged && entity.ExchangeRate == original!.ExchangeRate))
+                {
+                    var found = await rates.FindAsync(entity.Currency, entity.ReportingCurrency, entity.IssueDate, cancellationToken);
+                    if (found is null)
+                    {
+                        entity.ExchangeRate = null;
+                        entity.ExchangeRateDate = null;
+                        errors.Add(new RecordFieldError("reportingCurrency", CrmMessages.Quote.ExchangeRateNotFound));
+                    }
+                    else
+                    {
+                        entity.ExchangeRate = found.Rate;
+                        entity.ExchangeRateDate = found.RateDate;
+                    }
+                }
+            }
+
+            if (errors.Count == 0 && (entity.ExchangeRate is null) != (entity.ExchangeRateDate is null || entity.ReportingCurrency is null))
             {
                 errors.Add(new RecordFieldError("exchangeRate", CrmMessages.Quote.ExchangeRateTogether));
             }

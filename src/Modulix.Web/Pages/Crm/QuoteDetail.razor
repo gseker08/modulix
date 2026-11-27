@@ -112,6 +112,12 @@
                                     <input id="q-currency" class="form-control" maxlength="3" @bind="form.Currency" />
                                     <FieldError Field="currency" Errors="errors" />
                                     break;
+                                case "reportingCurrency":
+                                    <label class="@f.LabelClass()" for="q-reporting">@f.Label</label>
+                                    <input id="q-reporting" class="form-control" maxlength="3" placeholder="TRY" @bind="form.ReportingCurrency" />
+                                    <FieldError Field="reportingCurrency" Errors="errors" />
+                                    <small class="text-muted">Boşsa gösterge yoktur. Kur, kur defterinden teklif tarihine göre otomatik alınır; toplamı değiştirmez.</small>
+                                    break;
                                 case "validUntil":
                                     <label class="@f.LabelClass()" for="q-valid">@f.Label</label>
                                     <input id="q-valid" type="datetime-local" class="form-control" required="@f.Required" aria-required="@f.AriaRequired()" @bind="form.ValidUntil" />
@@ -377,6 +383,10 @@
                     @if (quote.OptionalNet > 0)
                     {
                         <div><dt>@Texts.Get("crm.quoteDetail.totals.optional")</dt><dd>@QuoteLabels.Money(quote.OptionalNet, quote.Currency)</dd></div>
+                    }
+                    @if (quote.ReportingCurrency is { } reporting && quote.ExchangeRate is { } reportingRate)
+                    {
+                        <div><dt>Gösterge (@reporting)</dt><dd>≈ @QuoteLabels.Money(decimal.Round(quote.GrossTotal * reportingRate, 2), reporting) <small class="text-muted">(1 @quote.Currency = @reportingRate.ToString("0.####", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")) @reporting@(quote.ExchangeRateDate is { } rateDate ? $", {rateDate:dd.MM.yyyy} kuru" : ""))</small></dd></div>
                     }
                     @foreach (var period in Recurring())
                     {
@@ -690,9 +700,14 @@
     {
         if (busy) { return; }
         busy = true;
+        // Gösterge para birimi değişmediyse mevcut kur ve tarihi geri gönderilir (sunucu, para birimi çifti değişmişse kuru yeniler); değiştiyse boş gider ve sunucu kuru kur defterinden alır.
+        var reportingSame = quote is not null && string.Equals(quote.ReportingCurrency, Blank(form.ReportingCurrency), StringComparison.OrdinalIgnoreCase);
+        string? reportingCode = Blank(form.ReportingCurrency)?.ToUpperInvariant();
+        decimal? reportingRateValue = reportingSame ? quote!.ExchangeRate : null;
+        DateOnly? reportingRateDay = reportingSame ? quote!.ExchangeRateDate : null;
         var request = new SaveQuoteRequest(
             form.Title, form.CompanyId ?? Guid.Empty, Blank(form.Description), form.ContactId, form.OpportunityId, form.PriceListId, form.OwnerId, null,
-            form.ValidUntil is { } until ? new DateTimeOffset(until) : null, form.Currency, null, null, null, form.PriceIncludesTax,
+            form.ValidUntil is { } until ? new DateTimeOffset(until) : null, form.Currency, reportingCode, reportingRateValue, reportingRateDay, form.PriceIncludesTax,
             form.DocumentDiscountKind, form.DocumentDiscountValue, Blank(form.PaymentTerms), Blank(form.DeliveryTerms), Blank(form.CommercialTerms),
             Blank(form.InternalNotes), quote?.Version, CustomFieldText.ForSave(HeaderCustomFields, form.Custom));
         var result = quote is { } current
@@ -898,6 +913,7 @@
         public Guid? PriceListId { get; set; }
         public string Currency { get; set; } = "TRY";
         public DateTime? ValidUntil { get; set; }
+        public string? ReportingCurrency { get; set; }
         public bool PriceIncludesTax { get; set; }
         public string DocumentDiscountKind { get; set; } = "None";
         public decimal DocumentDiscountValue { get; set; }
@@ -911,7 +927,7 @@
         public static QuoteForm From(QuoteDto q) => new()
         {
             Title = q.Title, CompanyId = q.CompanyId, ContactId = q.ContactId, OpportunityId = q.OpportunityId, OwnerId = q.OwnerId, PriceListId = q.PriceListId,
-            Currency = q.Currency, ValidUntil = q.ValidUntil?.LocalDateTime, PriceIncludesTax = q.PriceIncludesTax, DocumentDiscountKind = q.DocumentDiscountKind,
+            Currency = q.Currency, ReportingCurrency = q.ReportingCurrency, ValidUntil = q.ValidUntil?.LocalDateTime, PriceIncludesTax = q.PriceIncludesTax, DocumentDiscountKind = q.DocumentDiscountKind,
             DocumentDiscountValue = q.DocumentDiscountValue, Description = q.Description, PaymentTerms = q.PaymentTerms, DeliveryTerms = q.DeliveryTerms,
             CommercialTerms = q.CommercialTerms, InternalNotes = q.InternalNotes, Custom = q.Custom?.DeepClone().AsObject() ?? [],
         };
