@@ -894,6 +894,18 @@ public sealed class CoreModule : IModule
             Subscriptions.Automation, [DomainEventTypes.RecordCreated, DomainEventTypes.RecordUpdated], [], []) with { Ordered = false },
         EventSubscription.For<Files.FileCleanupSubscriber>(
             Subscriptions.FileCleanup, [DomainEventTypes.RecordDeleted], [], []) with { Ordered = false },
+        // Zamanlanmış kur işinin kimliği (oturumsuz): yalnızca kur yazma iznini taşır, olay işlemez.
+        EventSubscription.For<Currency.ExchangeRateJobAnchor>(
+            Currency.ExchangeRateJob.Identity, [DomainEventTypes.RecordDeleted], [Modulix.Core.Contracts.Currency.CurrencyEntities.ExchangeRate], [Permissions.ManageExchangeRates]),
+    ];
+
+    /// <summary>
+    /// Merkez bankası kur çekimi (ADR-0049 dilim 5d): altı saatte bir. Kaynak <c>ExchangeRates:CentralBank:Enabled</c> ile açılır (varsayılan kapalı);
+    /// kapalıyken iş bir şey yapmaz. Yapılandırma <c>Jobs:core.exchange-rates</c>.
+    /// </summary>
+    IReadOnlyList<ModuleJobDefinition> IModule.Jobs { get; } =
+    [
+        ModuleJobDefinition.For<Currency.ExchangeRateJob>(Currency.ExchangeRateJob.JobKey, TimeSpan.FromHours(6), Currency.ExchangeRateJob.Identity),
     ];
 
     /// <summary>
@@ -914,6 +926,9 @@ public sealed class CoreModule : IModule
         services.AddScoped<AutomationEventSubscriber>();
         services.AddScoped<ApprovalRecordSubscriber>();
         services.AddScoped<Files.FileCleanupSubscriber>();
+        services.AddScoped<Currency.ExchangeRateJobAnchor>();
+        services.AddScoped<Currency.CentralBankRateSync>();
+        services.AddScoped<Currency.ExchangeRateJob>();
 
         // "Onaya gönder" aksiyonu ve yayındaki süreç adı denetimi (Dilim 4c-2).
         services.AddScoped<Modulix.Core.Approvals.RequestApprovalAction>();

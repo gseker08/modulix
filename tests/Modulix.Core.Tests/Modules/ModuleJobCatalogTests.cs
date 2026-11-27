@@ -18,7 +18,9 @@ public class ModuleJobCatalogTests
             new JobModule("sales", ModuleJobDefinition.For<DemoJob>("sales.reminders", Interval, "sales.scheduler") with { LegacySection = "SalesJobs" }),
         ]);
 
-        var (moduleKey, job) = Assert.Single(catalog.Jobs);
+        // Core da kendi işini bildirir (merkez bankası kur çekimi, ADR-0049 dilim 5d); satış işi onunla birlikte listelenir.
+        Assert.Contains(catalog.Jobs, j => j.ModuleKey == "core" && j.Job.Key == "core.exchange-rates");
+        var (moduleKey, job) = Assert.Single(catalog.Jobs, j => j.ModuleKey == "sales");
         Assert.Equal("sales", moduleKey);
         Assert.Equal("sales.reminders", job.Key);
         Assert.True(job.RequiresWritableModule);
