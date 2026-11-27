@@ -574,6 +574,9 @@ internal static class CrmMessages
         public static ServerMessage ExchangeRateTogether =>
             ServerMessage.Of("crm.server.quote.exchange-rate-together", "Kur, raporlama para birimi ve kur tarihi birlikte verilmelidir.");
 
+        public static ServerMessage ExchangeRateNotFound =>
+            ServerMessage.Of("crm.server.quote.exchange-rate-not-found", "Gösterge para birimi için kur defterinde kur bulunamadı; kuru girin ya da Yönetim > Döviz kurları'na ekleyin.");
+
         public static ServerMessage ReportingCurrencyDifferent =>
             ServerMessage.Of("crm.server.quote.reporting-currency-different", "Raporlama para birimi teklif para biriminden farklı olmalıdır.");
 

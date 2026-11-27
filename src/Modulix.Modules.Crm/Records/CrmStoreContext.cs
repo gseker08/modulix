@@ -16,8 +16,12 @@ internal sealed class CrmStoreContext(
     ActivityWorkflowGate? activityGate = null, IRecordCommandContext? command = null, OpportunityWorkflowGate? opportunityGate = null,
     IOpportunityPolicyProvider? policy = null, IActivityCodeCatalog? activityCodes = null, IIndustryCatalog? industries = null,
     IServiceProvider? services = null, CampaignLinkTrust? campaignTrust = null, TimeProvider? time = null,
-    Modulix.Core.Contracts.Numbering.IDocumentNumbers? numbers = null, ICommercialCustomFields? commercialFields = null)
+    Modulix.Core.Contracts.Numbering.IDocumentNumbers? numbers = null, ICommercialCustomFields? commercialFields = null,
+    Modulix.Core.Contracts.Currency.IExchangeRateReader? exchangeRates = null)
 {
+    /// <summary>Firmanın kur defteri okuyucusu (teklif gösterge kuru); servissiz kurulumda (birim testi) yoktur ve kur doldurma atlanır.</summary>
+    public Modulix.Core.Contracts.Currency.IExchangeRateReader? ExchangeRates { get; } = exchangeRates;
+
     /// <summary>
     /// Teklif başlığında ticari sayılan özel alan anahtarları (ADR-0019): firmanın ticari işaretlediği alanlar ile etkin ek ücret kurallarının koşul,
     /// taban, süre ve çarpan anahtarı olarak kullandığı alanlar (kuralda kullanılan alan işaretlenmese de ticaridir). Servis yoksa (birim testi) boştur.

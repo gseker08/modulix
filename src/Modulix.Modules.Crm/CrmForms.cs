@@ -192,6 +192,7 @@ public static class CrmForms
             new("priceListId", "Fiyat listesi", "fiyat", 6),
             new("currency", "Para birimi", "fiyat", 3, Fixed: true),
             new("validUntil", "Geçerlilik", "fiyat", 3),
+            new("reportingCurrency", "Gösterge para birimi", "fiyat", 3),
             new("priceIncludesTax", "Fiyatlandırma", "fiyat", 6, Fixed: true),
             new("documentDiscountKind", "Belge indirimi", "indirim", 6),
             new("documentDiscountValue", "İndirim değeri", "indirim", 6),
