@@ -234,7 +234,7 @@ internal sealed class ExchangeRateRecordStore(ModulixDbContext db) : IRecordStor
 }
 
 /// <summary>Firmanın kurlarını okur (ADR-0049 dilim 5a); izin gerektirmez, aktif tenant'ın satırlarını görür (sorgu süzgeci ve RLS).</summary>
-internal sealed class ExchangeRateReader(ModulixDbContext db, Modulix.Core.Contracts.Settings.ITenantSettingReader settings) : IExchangeRateReader
+internal sealed class ExchangeRateReader(ModulixDbContext db) : IExchangeRateReader
 {
     public async Task<ExchangeRateQuote?> FindAsync(string from, string to, DateOnly day, CancellationToken cancellationToken)
     {
@@ -252,7 +252,11 @@ internal sealed class ExchangeRateReader(ModulixDbContext db, Modulix.Core.Contr
 
     public async Task<ExchangeRateQuote?> FindForInvoiceAsync(string from, string to, DateOnly invoiceDate, CancellationToken cancellationToken)
     {
-        var rule = await settings.GetValueAsync(Modulix.Core.Modules.CoreModule.SettingKeys.InvoiceRateRule, cancellationToken);
+        // Ayar tenant geneli değerdir (şirket başına değil); okuyucu kayıt boru hattına bağlanmasın diye aynı bağlamdan doğrudan okunur (sorgu süzgeci ve RLS tenant'ı sınırlar).
+        var rule = await db.TenantSettings.AsNoTracking()
+            .Where(s => s.Key == Modulix.Core.Modules.CoreModule.SettingKeys.InvoiceRateRule && s.CompanyId == null)
+            .Select(s => s.Value)
+            .SingleOrDefaultAsync(cancellationToken) ?? InvoiceRateRules.Default;
         return await FindAsync(from, to, InvoiceRateRules.LookupDay(invoiceDate, rule), cancellationToken);
     }
 
