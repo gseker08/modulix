@@ -321,6 +321,9 @@ public sealed class CoreModule : IModule
 
         public const string WorkHours = "core.calendar.work-hours";
 
+        /// <summary>Fatura kuru kuralı (ADR-0049 dilim 5d devamı); değerler <see cref="Contracts.Currency.InvoiceRateRules"/>'tadır.</summary>
+        public const string InvoiceRateRule = "core.exchange-rates.invoice-rule";
+
         /// <summary>Acil durdurma (ADR-0027): "Hayır" ise firmanın hiçbir kuralı çalışmaz; kuyruktaki çalışmalar iptal edilir.</summary>
         public const string AutomationEnabled = "core.automation.enabled";
 
@@ -345,6 +348,7 @@ public sealed class CoreModule : IModule
     private const string AutomationGroup = "Otomasyon";
     private const string AiGroup = "Yapay zekâ";
     private const string AppearanceGroup = "Görünüm";
+    private const string ExchangeRatesGroup = "Döviz kurları";
 
     IReadOnlyList<SettingDefinition> IModule.Settings { get; } =
     [
@@ -397,6 +401,12 @@ public sealed class CoreModule : IModule
             Description = "İzin gün sayısı bu günlere göre hesaplanır; çalışılmayan günler ve Yönetim > Resmî tatiller listesindeki günler düşülür. "
                 + "Açılmış izin taleplerinin gün sayısı değişmez.",
             Options = [.. Contracts.Calendar.WorkWeek.DayOptions.Select(o => new SettingOption(o.Value, o.Label))],
+        },
+        new(SettingKeys.InvoiceRateRule, "Fatura kuru kuralı", ExchangeRatesGroup, SettingType.Choice, Contracts.Currency.InvoiceRateRules.Default)
+        {
+            Description = "Faturaya hangi günün kurunun uygulanacağı. Önceki gün (varsayılan): fatura gününden bir önceki günün kuru, yani önceki iş günü yayımlanan kur "
+                + "(hafta sonu ve tatilde en yeni önceki kur). Fatura günü: fatura tarihinin kuru. Kur yoksa uydurulmaz. Kesilmiş faturalara etki etmez.",
+            Options = [new SettingOption(Contracts.Currency.InvoiceRateRules.PreviousDay, "Önceki iş günü kuru"), new SettingOption(Contracts.Currency.InvoiceRateRules.SameDay, "Fatura günü kuru")],
         },
         new(SettingKeys.WorkHours, "Mesai saatleri", CalendarGroup, SettingType.Choice, Contracts.Calendar.WorkWeek.DefaultHours)
         {

@@ -234,7 +234,7 @@ internal sealed class ExchangeRateRecordStore(ModulixDbContext db) : IRecordStor
 }
 
 /// <summary>Firmanın kurlarını okur (ADR-0049 dilim 5a); izin gerektirmez, aktif tenant'ın satırlarını görür (sorgu süzgeci ve RLS).</summary>
-internal sealed class ExchangeRateReader(ModulixDbContext db) : IExchangeRateReader
+internal sealed class ExchangeRateReader(ModulixDbContext db, Modulix.Core.Contracts.Settings.ITenantSettingReader settings) : IExchangeRateReader
 {
     public async Task<ExchangeRateQuote?> FindAsync(string from, string to, DateOnly day, CancellationToken cancellationToken)
     {
@@ -248,6 +248,12 @@ internal sealed class ExchangeRateReader(ModulixDbContext db) : IExchangeRateRea
         var inverse = await db.ExchangeRates.AsNoTracking().Where(r => r.FromCurrency == to && r.ToCurrency == from && r.ValidOn <= day)
             .OrderByDescending(r => r.ValidOn).FirstOrDefaultAsync(cancellationToken);
         return inverse is null ? null : new ExchangeRateQuote(1m / inverse.Rate, inverse.ValidOn, Inverted: true);
+    }
+
+    public async Task<ExchangeRateQuote?> FindForInvoiceAsync(string from, string to, DateOnly invoiceDate, CancellationToken cancellationToken)
+    {
+        var rule = await settings.GetValueAsync(Modulix.Core.Modules.CoreModule.SettingKeys.InvoiceRateRule, cancellationToken);
+        return await FindAsync(from, to, InvoiceRateRules.LookupDay(invoiceDate, rule), cancellationToken);
     }
 
     public async Task<IReadOnlyList<ExchangeRatePoint>> ListAsync(CancellationToken cancellationToken) =>
